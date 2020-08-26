@@ -14,11 +14,11 @@ func getSecuritySeed() string {
 }
 
 func genRandomToken() string {
-	return genRandomString(32)
+	return genRandomString(64)
 }
 
 func genShortId() string {
-	return genRandomString(16)
+	return genRandomString(12)
 }
 
 func genRandomString(n int) string {

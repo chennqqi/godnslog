@@ -1,4 +1,5 @@
 # Introduce
+
 CEYE.IO platform, which monitoring DNS queries and HTTP requests through its own DNS server and HTTP server, it can also create custom files as online payloads. It can help security researchers collect information when testing vulnerabilities (e.g. SSRF/XXE/RFI/RCE).
 
 For each user, there is a six random characters unique identifier code and unique subdomain value, it can be found in profile page. All DNS queries and HTTP requests for the subdomain and followings are logged. For example, b182oj is the unique identifier code for someone, and b182oj.ceye.io is his/her subdomain. All DNS quries and HTTP requests for b182oj.ceye.io and *.b182oj.ceye.io will be recorded. All records can export from the server, by processing these access logs, researchers are be able to confirm and improve their research.

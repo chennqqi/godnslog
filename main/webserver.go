@@ -12,6 +12,7 @@ import (
 
 	"models"
 
+	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/sirupsen/logrus"
@@ -23,6 +24,13 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/mattn/go-sqlite3"
+)
+
+const (
+	AuthExpire                   = 24 * 3600 * time.Second
+	DefaultCleanInterval         = 7200 //seconds
+	DefaultQueryApiMaxItem       = 20
+	DefaultMaxCallbackErrorCount = 5
 )
 
 type WebServerConfig struct {
@@ -122,25 +130,28 @@ func (self *WebServer) RunStoreRoutine() {
 		defer self.wg.Done()
 		req, err := retryablehttp.NewRequest("POST", rcd.Callback, nil)
 		resp, err := client.Do(req)
+		errorCountKey := fmt.Sprintf("%v.errcount", rcd.Uid)
 		if err != nil {
+			c.IncrementInt64(errorCountKey, 1)
 			logrus.Infof("[webserver.go::RunStoreRoutine] dns callback:", err)
 			return
 		}
+		c.Delete(errorCountKey)
 		io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
 	}
 
-	httpCallBack := func(rcd *HttpRecord) {
-		defer self.wg.Done()
-		req, err := retryablehttp.NewRequest("POST", rcd.Callback, nil)
-		resp, err := client.Do(req)
-		if err != nil {
-			logrus.Infof("[webserver.go::RunStoreRoutine] http callback:", err)
-			return
-		}
-		io.Copy(ioutil.Discard, resp.Body)
-		resp.Body.Close()
-	}
+	// httpCallBack := func(rcd *HttpRecord) {
+	// 	defer self.wg.Done()
+	// 	req, err := retryablehttp.NewRequest("POST", rcd.Callback, nil)
+	// 	resp, err := client.Do(req)
+	// 	if err != nil {
+	// 		logrus.Infof("[webserver.go::RunStoreRoutine] http callback:", err)
+	// 		return
+	// 	}
+	// 	io.Copy(ioutil.Discard, resp.Body)
+	// 	resp.Body.Close()
+	// }
 
 FOR_LOOP:
 	for {
@@ -169,33 +180,39 @@ FOR_LOOP:
 					logrus.Fatalf("[web.go::storeRoutine] orm.InsertOne: %v", err)
 				}
 				if d.Callback != "" && d.Uid > 0 {
+					errorCountKey := fmt.Sprintf("%v.errcount", d.Uid)
+					v, exist := c.Get(errorCountKey)
+					if exist {
+						if v.(int64) >= DefaultMaxCallbackErrorCount {
+							break
+						}
+					}
 					self.wg.Add(1)
 					go dnsCallBack(d)
 				}
-
 			case *HttpRecord:
-				h := rcd.(*HttpRecord)
-				_, err := session.InsertOne(&models.TblHttp{
-					Uid:    h.Uid,
-					Domain: h.Domain,
-					Ip:     h.Ip,
-					Ua:     h.Ua,
-					Data:   h.Data,
-					Ctype:  h.Ctype,
-					Method: h.Method,
-					Ctime:  h.Ctime,
-				})
+				// logged in `record` function
+				// 	h := rcd.(*HttpRecord)
+				// 	_, err := session.InsertOne(&models.TblHttp{
+				// 		Uid:    h.Uid,
+				// 		Url:    h.Url,
+				// 		Ip:     h.Ip,
+				// 		Ua:     h.Ua,
+				// 		Data:   h.Data,
+				// 		Ctype:  h.Ctype,
+				// 		Method: h.Method,
+				// 		Ctime:  h.Ctime,
+				// 	})
 
-				if err != nil {
-					logrus.Fatalf("[web.go::storeRoutine] orm.InsertOne: %v", err)
-				}
+				// 	if err != nil {
+				// 		logrus.Fatalf("[web.go::storeRoutine] orm.InsertOne: %v", err)
+				// 	}
 
-				//async callback
-				if h.Callback != "" && h.Uid > 0 {
-					self.wg.Add(1)
-					go httpCallBack(h)
-				}
-
+				// 	//async callback
+				// 	if h.Callback != "" && h.Uid > 0 {
+				// 		self.wg.Add(1)
+				// 		go httpCallBack(h)
+				// 	}
 			}
 		}
 	}
@@ -206,6 +223,12 @@ func (self *WebServer) Run() error {
 	r := gin.Default()
 	url := ginSwagger.URL("http://localhost:8080/swagger/doc.json") // The url pointing to API definition
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, url))
+
+	//static handler
+	r.Use(static.Serve("/", static.LocalFile("dist", false)))
+	r.NoRoute(func(c *gin.Context) {
+		c.File("dist/index.html")
+	})
 
 	//api handler
 	api := r.Group("/api")

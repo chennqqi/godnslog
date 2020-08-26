@@ -1,0 +1,40 @@
+FROM node:lts-alpine as frontend-builder
+WORKDIR /app
+COPY frontend/* .
+RUN npm install
+RUN yarn build
+
+FROM golang:alpine as backend-builder
+
+RUN go env -w GOPROXY=https://goproxy.cn
+RUN echo "https://mirror.tuna.tsinghua.edu.cn/alpine/v3.8/main" > /etc/apk/repositories
+RUN apk add build-base git musl-dev
+
+COPY main /src/godnslog
+WORKDIR src/godnslog
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o /go/bin/godnslog
+
+
+FROM alpine:3.11
+
+# tinghua mirror
+RUN echo "https://mirror.tuna.tsinghua.edu.cn/alpine/v3.11/main" > /etc/apk/repositories
+RUN apk add -nocache -U tzdata ca-certificates && \
+	update-ca-certificates
+
+RUN mkdir -p /app
+
+COPY --from backend-builder /go/bin/godnslog /app/godnslog
+COPY --from frontend-builder /app/dist /app/dist
+
+RUN	addgroup -S app && \
+	adduser app -S -G app -h /app && \
+	chown -R app:app /app &&
+	setcap cap_net_bind_service=eip /app/godnslog
+
+WORKDIR /app
+
+EXPOSE 8080
+EXPOSE 53/UDP 53/TCP
+
+ENTRYPOINT [ "/app/godnslog" ]

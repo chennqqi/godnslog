@@ -14,11 +14,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-const (
-	AuthExpire           = 24 * 3600 * time.Second
-	DefaultCleanInterval = 7200 //seconds
-)
-
 type MyClaims struct {
 	Seed string `json:"seed"`
 	jwt.StandardClaims
@@ -1261,7 +1256,7 @@ func (self *WebServer) getHttpRecord(c *gin.Context) {
 		rcd := &resp.Data[i]
 		item := &items[i]
 		rcd.Id = item.Id
-		rcd.Domain = item.Domain
+		rcd.Url = item.Url
 		rcd.Ip = item.Ip
 		rcd.Ctime = item.Ctime
 		rcd.Ctype = item.Ctype

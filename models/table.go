@@ -41,12 +41,11 @@ type TblDns struct {
 type TblHttp struct {
 	Id     int64     `xorm:"pk autoincr"`
 	Uid    int64     `xorm:"notnull"` //TblUser.Id fk
-	Domain string    `xorm:"varchar(255) notnull"`
 	Ip     string    `xorm:"varchar(16) notnull"`
+	Url    string    `xorm:"text notnull"`
 	Method string    `xorm:"varchar(16)"`
 	Data   string    `xorm:"mediumtext"`
 	Ctype  string    `xorm:"varchar(64)"`
-	Path   string    `xorm:"text"`
 	Ua     string    `xorm:"text"`
 	Ctime  time.Time `xorm:"datetime"`
 	Atime  time.Time `xorm:"datetime created"`

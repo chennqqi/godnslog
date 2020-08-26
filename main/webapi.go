@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sort"
 	"time"
 
 	"models"
 
+	"github.com/chennqqi/goutils/ginutils"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
@@ -19,15 +21,51 @@ import (
 // web api
 //==============================================================================
 func (self *WebServer) apiAuthHandler(c *gin.Context) {
-	shortUserId := c.GetHeader("X-Api-User")
-	hash := c.GetHeader("X-Api-AuthHash")
+	host := c.GetHeader("X-Forwarded-Host")
+	var err error
+	if host == "" {
+		host, _, err = net.SplitHostPort(c.Request.Host)
+		if err != nil {
+			host = c.Request.Host
+		}
+	}
 
-	t, tExist := c.GetQuery("t")
-	q, qExist := c.GetQuery("q")
+	_, shortId, _ := parseDomain(host, self.Domain)
+	c.Set("host", host)
+	c.Set("shortId", shortId)
+	proto := c.GetHeader("X-Forwarded-Proto")
+	if proto == "" {
+		proto = "http"
+	}
+	c.Set("proto", proto)
 
-	var t64 int64
-	fmt.Sscanf(t, "%d", &t64)
+	cache := self.cache
+	domainKey := shortId + ".suser"
+	v, exist := cache.Get(domainKey)
+	if !exist {
+		self.resp(c, 401, &CR{
+			Message: "No User",
+			Code:    CodeNoAuth,
+		})
+		c.Abort()
+		return
+	}
+	user := v.(*models.TblUser)
+	c.Set("uid", user.Id)
+	token := user.Token
 
+	//authorization 1
+	t64, err := ginutils.GetHeaderInt64(c, "_t")
+	if err != nil {
+		self.resp(c, 401, &CR{
+			Message: "No param time",
+			Code:    CodeBadData,
+		})
+		c.Abort()
+		return
+	}
+
+	//authorization1: verify time
 	if time.Now().Unix()-t64 > 60 || time.Now().Unix()-t64 < -60 {
 		self.resp(c, 400, &CR{
 			Message: "Expire",
@@ -36,55 +74,34 @@ func (self *WebServer) apiAuthHandler(c *gin.Context) {
 		c.Abort()
 		return
 	}
-	if !tExist || !qExist {
+
+	//authorization2: verify hash
+	hash, hashExist := c.GetQuery("hash")
+	if !hashExist {
 		self.resp(c, 400, &CR{
-			Message: "param required",
-			Code:    CodeExpire,
+			Message: "No hash",
+			Code:    CodeBadData,
 		})
 		c.Abort()
 		return
 	}
-
-	//lazy load
-	cache := self.cache
-	uidKey := shortUserId + ".uid"
-	uidv, exist := cache.Get(uidKey)
-	var tokenString string
-	if exist {
-		c.Set("uid", uidv.(int64))
-		token, _ := cache.Get(shortUserId + ".token")
-		tokenString = token.(string)
-	} else {
-		session := self.orm.NewSession()
-		defer session.Close()
-
-		var user models.TblUser
-		exist, err := session.Where(`name=?`, shortUserId).Get(&user)
-		if err != nil {
-			logrus.Errorf("[webapi.go::apiAuthHandler] orm.Get: %v", err)
-			self.resp(c, 401, &CR{
-				Message: "Failed",
-				Code:    CodeServerInternal,
-			})
-			c.Abort()
-			return
-		} else if !exist {
-			self.resp(c, 401, &CR{
-				Message: "param required",
-				Code:    CodeNoAuth,
-			})
-			c.Abort()
+	querys := c.Request.URL.Query()
+	var keys []string
+	for k, _ := range querys {
+		if k != "hash" {
+			keys = append(keys, k)
 		}
-		cache.Set(uidKey, user.Id, AuthExpire)
-		cache.Set(shortUserId+".token", user.Token, AuthExpire)
-		tokenString = user.Token
 	}
 
 	h := md5.New()
-	h.Write([]byte(tokenString))
-	h.Write([]byte(t))
-	h.Write([]byte(q))
+	sort.Strings(keys)
+	for _, key := range keys {
+		value := querys.Get(key)
+		h.Write([]byte(value))
+	}
+	h.Write([]byte(token))
 	expectHash := hex.EncodeToString(h.Sum(nil))
+
 	if hash != expectHash {
 		self.resp(c, 401, &CR{
 			Message: "Auth failed",
@@ -111,8 +128,10 @@ func (self *WebServer) queryDnsRecord(c *gin.Context) {
 		return
 	}
 
-	var rcd models.TblDns
-	exist, err := session.Where(`uid=?`, id).And(`domain=?`, domain).Get(&rcd)
+	var rcds []models.TblDns
+	err := session.Where(`uid=?`, id).
+		And(`domain=?`, domain).
+		Limit(DefaultQueryApiMaxItem).Find(&rcds)
 
 	if err != nil {
 		self.resp(c, 502, &CR{
@@ -120,19 +139,22 @@ func (self *WebServer) queryDnsRecord(c *gin.Context) {
 			Code:    CodeServerInternal,
 		})
 		return
-	} else if !exist {
-		self.resp(c, 400, &CR{
-			Message: "Not Found",
-			Code:    CodeNoData,
-		})
-		return
+	}
+
+	items := make([]DnsRecord, len(rcds))
+	for i := 0; i < len(rcds); i++ {
+		item := &items[i]
+		rcd := &rcds[i]
+		item.Domain = rcd.Domain
+		item.Ip = rcd.Ip
+		item.Ctime = rcd.Ctime
 	}
 
 	self.resp(c, 200, &CR{
 		Message: "OK",
-		Result: &DnsRecord{
-			Domain: rcd.Domain,
-			//TODO: api
+		Result: map[string]interface{}{
+			"type": "dns",
+			"data": items,
 		},
 	})
 }
@@ -153,8 +175,10 @@ func (self *WebServer) queryHttpRecord(c *gin.Context) {
 		return
 	}
 
-	var rcd models.TblHttp
-	exist, err := session.Where(`uid=?`, id).And(`domain=?`, domain).Get(&rcd)
+	var rcds []models.TblHttp
+	err := session.Where(`uid=?`, id).
+		And(`domain=?`, domain).
+		Limit(DefaultQueryApiMaxItem).Find(&rcds)
 
 	if err != nil {
 		self.resp(c, 502, &CR{
@@ -162,19 +186,26 @@ func (self *WebServer) queryHttpRecord(c *gin.Context) {
 			Code:    CodeServerInternal,
 		})
 		return
-	} else if !exist {
-		self.resp(c, 400, &CR{
-			Message: "Not Found",
-			Code:    CodeNoData,
-		})
-		return
+	}
+	items := make([]HttpRecord, len(rcds))
+	for i := 0; i < len(rcds); i++ {
+		item := &items[i]
+		rcd := &rcds[i]
+
+		item.Url = rcd.Url
+		item.Ctype = rcd.Ctype
+		item.Ip = rcd.Ip
+		item.Method = rcd.Method
+		item.Ua = rcd.Ua
+		item.Data = rcd.Data
+		item.Ctime = rcd.Ctime
 	}
 
 	self.resp(c, 200, &CR{
 		Message: "OK",
-		Result: &HttpRecord{
-			Domain: rcd.Domain,
-			//TODO: api
+		Result: map[string]interface{}{
+			"type": "http",
+			"data": items,
 		},
 	})
 }
@@ -188,12 +219,11 @@ func (self *WebServer) record(c *gin.Context) {
 	io.Copy(&data, c.Request.Body)
 	c.Request.Body.Close()
 
-	host, _, err := net.SplitHostPort(c.Request.Host)
-	if err != nil {
-		host = c.Request.Host
-	}
-
 	var uid int64
+	host := c.GetString("host")
+	proto := c.GetString("proto")
+	url := fmt.Sprintf("%v://%v%v", proto, host, c.Request.URL.EscapedPath())
+
 	_, shortId, _ := parseDomain(host, self.Domain)
 	cache := self.cache
 	v, exist := cache.Get(shortId + ".suser")
@@ -202,16 +232,16 @@ func (self *WebServer) record(c *gin.Context) {
 		uid = user.Id
 	}
 
-	_, err = session.InsertOne(&models.TblHttp{
+	_, err := session.InsertOne(&models.TblHttp{
 		Uid:    uid,
 		Ip:     c.ClientIP(),
-		Domain: host,
+		Url:    url,
 		Ua:     c.GetHeader("User-Agent"),
 		Ctype:  c.GetHeader("Content-Type"),
 		Method: c.Request.Method,
-		Path:   c.Param("any"),
-		Ctime:  time.Now(),
-		Data:   data.String(), //TODO: anti-xss
+		// Path:   c.Param("any"),
+		Ctime: time.Now(),
+		Data:  data.String(), //TODO: anti-xss
 	})
 	if err != nil {
 		logrus.Errorf("[webapi.go::Record] orm.InsertOne: %v", err)

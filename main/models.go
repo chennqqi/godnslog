@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net"
 	"time"
 )
 
@@ -32,17 +31,17 @@ type Setting struct {
 }
 
 // tbl_user
-type User struct {
-	Id            int64  `xorm:"pk autoincr"`
-	Name          string `xorm:"varchar(64) notnull unique"`
-	Role          int    `xorm:"tinyint notnull default 0"`
-	Token         string `xorm:"varchar(128) notnull"`
-	Callback      string `xorm:"text"`
-	CleanInterval int64
-}
+// type User struct {
+// 	Id            int64  `xorm:"pk autoincr"`
+// 	Name          string `xorm:"varchar(64) notnull unique"`
+// 	Role          int    `xorm:"tinyint notnull default 0"`
+// 	Token         string `xorm:"varchar(128) notnull"`
+// 	Callback      string `xorm:"text"`
+// 	CleanInterval int64
+// }
 
 type DnsRecord struct {
-	Id       int64     `json:"id"`
+	Id       int64     `json:"id,omitempty"`
 	Uid      int64     `json:"-"`
 	Callback string    `json:"-"`
 	Domain   string    `json:"domain"`
@@ -51,21 +50,16 @@ type DnsRecord struct {
 }
 
 type HttpRecord struct {
-	Id       int64     `json:"id"`
+	Id       int64     `json:"id,omitempty"`
 	Uid      int64     `json:"-"`
 	Callback string    `json:"-"`
-	Domain   string    `json:"domain"`
+	Url      string    `json:"url"`
 	Ip       string    `json:"addr"`
 	Method   string    `json:"method"`
 	Data     string    `json:"data"`
 	Ctype    string    `json:"ctype"`
 	Ua       string    `json:"ua"`
 	Ctime    time.Time `json:"ctime"`
-}
-
-type UserDomain struct {
-	Uid     int64
-	Rebind4 []net.IP
 }
 
 // commone response
