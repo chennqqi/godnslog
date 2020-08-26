@@ -1,35 +1,38 @@
-FROM node:lts-alpine as frontend-builder
+FROM node:12.18.3-alpine3.12 as frontend-builder
 WORKDIR /app
-COPY frontend/* .
-RUN npm install
+COPY frontend /app
+#RUN echo "https://mirror.tuna.tsinghua.edu.cn/alpine/v3.12/main" > /etc/apk/repositories \
+#	&& apk add git 
+RUN yarn config set registry https://registry.npm.taobao.org && yarn install
 RUN yarn build
 
-FROM golang:alpine as backend-builder
+FROM golang:1.14.7-alpine3.12 as backend-builder
 
 RUN go env -w GOPROXY=https://goproxy.cn
-RUN echo "https://mirror.tuna.tsinghua.edu.cn/alpine/v3.8/main" > /etc/apk/repositories
+RUN echo "https://mirror.tuna.tsinghua.edu.cn/alpine/v3.12/main" > /etc/apk/repositories
 RUN apk add build-base git musl-dev
 
-COPY main /src/godnslog
-WORKDIR src/godnslog
+COPY main /src/godnslog/main
+COPY models /src/godnslog/models
+COPY go.mod /src/godnslog/go.mod
+WORKDIR /src/godnslog/main
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o /go/bin/godnslog
 
-
-FROM alpine:3.11
+FROM alpine:3.12
 
 # tinghua mirror
-RUN echo "https://mirror.tuna.tsinghua.edu.cn/alpine/v3.11/main" > /etc/apk/repositories
-RUN apk add -nocache -U tzdata ca-certificates && \
+RUN echo "https://mirror.tuna.tsinghua.edu.cn/alpine/v3.12/main" > /etc/apk/repositories
+RUN apk add --no-cache -U tzdata ca-certificates libcap && \
 	update-ca-certificates
 
 RUN mkdir -p /app
 
-COPY --from backend-builder /go/bin/godnslog /app/godnslog
-COPY --from frontend-builder /app/dist /app/dist
+COPY --from=backend-builder /go/bin/godnslog /app/godnslog
+COPY --from=frontend-builder /app/dist /app/dist
 
 RUN	addgroup -S app && \
 	adduser app -S -G app -h /app && \
-	chown -R app:app /app &&
+	chown -R app:app /app && \
 	setcap cap_net_bind_service=eip /app/godnslog
 
 WORKDIR /app
