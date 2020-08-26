@@ -30,12 +30,20 @@ import (
 		127.0.0.2
 */
 
-//TODO: 支持rebind
-// cache中查询
 const (
 	notIPQuery = iota
 	_IP4Query
 	_IP6Query
+)
+
+var (
+	reserveNames = map[string]bool{
+		"www": true,
+		"app": true,
+		"ns":  true,
+		"api": true,
+		"m":   true,
+	}
 )
 
 type DnsServerConfig struct {
@@ -169,11 +177,13 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 		aaaa := &dns.AAAA{rr_header, ip}
 		m.Answer = append(m.Answer, aaaa)
 		w.WriteMsg(m)
-		h.log(&DnsRecord{
-			Domain: strings.TrimSuffix(q.Name, "."),
-			Ctime:  time.Now(),
-			Ip:     remoteIp.String(),
-		})
+
+		// NOT LOG
+		// h.log(&DnsRecord{
+		// 	Domain: strings.TrimSuffix(q.Name, "."),
+		// 	Ctime:  time.Now(),
+		// 	Ip:     remoteIp.String(),
+		// })
 		return
 	}
 	getIPv4 := func(user *models.TblUser) net.IP {
@@ -194,6 +204,10 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 			respV4(h.V4, 0, uid)
 			return
 		}
+		if reserveNames[shortId] {
+			respV4(h.V4, 600, uid)
+			return
+		}
 
 		v, exist := cache.Get(shortId + ".suser")
 		var user *models.TblUser
@@ -211,41 +225,22 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 		return
 
 	case _IP6Query:
-		index := strings.Index(q.Name, "."+h.Domain)
-		if index <= 0 {
-			respV6(h.V6, 0)
-			return
-		}
+		respV6(h.V6, 600)
 
-		//prefix = r.u3yszl9nidbsx8p9
-		prefix := q.Name[:index]
-		lastIdx := strings.LastIndex(prefix, ".")
-		if lastIdx <= 0 {
-			respV6(h.V6, 0)
-			return
-		}
-		var shortId string
-		if lastIdx != len(prefix) {
-			//shortId = u3yszl9nidbsx8p9
-			shortId = prefix[lastIdx+1:]
-		}
-		//prefix = r
-		prefix = prefix[:lastIdx]
+		// _, shortId, isRebind := parseDomain(q.Name, h.Domain)
+		// if shortId == "" {
+		// 	respV6(h.V6, 0)
+		// 	return
+		// }
+		// if reserveNames[shortId] {
+		// 	respV6(h.V6, 600)
+		// 	return
+		// }
+		// _ = isRebind
+		// //TODO: ipv6 rebind
 
-		//rebinding
-		if prefix == "r" || strings.HasSuffix(prefix, ".r") {
-			v, exist := cache.Get(shortId + ".rebind6")
-			if exist {
-				rebindIps := v.([]net.IP)
-				h.log(&DnsRecord{})
-				idx := time.Now().Second() % len(rebindIps)
-				ip := rebindIps[idx]
-				respV6(ip, 0)
-				return
-			}
-		}
-		respV6(h.V6, 0)
-		return
+		// respV6(h.V6, 0)
+		//return
 
 	default:
 	}

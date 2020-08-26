@@ -276,6 +276,12 @@ func (self *WebServer) Run() error {
 		appapi.GET("/http", self.queryHttpRecord)
 	}
 
+	payload := r.Group("/payload")
+	{
+		payload.GET("/xss", self.xss)
+		payload.GET("/phprfi", self.phpRFI)
+	}
+
 	//http log
 	r.Any("/log/*any", self.record)
 
