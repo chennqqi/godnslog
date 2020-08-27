@@ -40,6 +40,7 @@ type WebServerConfig struct {
 	ApiDomain string
 	WwwDomain string
 	Listen    string
+	Swagger   bool
 }
 
 type WebServer struct {
@@ -221,8 +222,11 @@ FOR_LOOP:
 
 func (self *WebServer) Run() error {
 	r := gin.Default()
-	url := ginSwagger.URL("http://localhost:8080/swagger/doc.json") // The url pointing to API definition
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, url))
+
+	if self.Swagger {
+		url := ginSwagger.URL("http://localhost:8080/swagger/doc.json") // The url pointing to API definition
+		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, url))
+	}
 
 	//static handler
 	r.Use(static.Serve("/", static.LocalFile("dist", false)))

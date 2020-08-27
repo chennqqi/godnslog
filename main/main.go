@@ -77,10 +77,11 @@ func main() {
 	cache := NewCache(24*3600*time.Second, 10*time.Minute)
 
 	web, err := NewWebServer(&WebServerConfig{
-		Driver: driver,
-		Dsn:    dsn,
-		Domain: domain,
-		Listen: ":8080",
+		Driver:  driver,
+		Dsn:     dsn,
+		Domain:  domain,
+		Listen:  ":8080",
+		Swagger: swagger,
 	}, cache)
 	if err != nil {
 		logrus.Fatalf("[main.go::main] NewWebServer: %v", err)
