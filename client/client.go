@@ -1,24 +1,25 @@
-package main
+package client
 
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"sort"
 	"time"
-)
 
-const (
-	GODNS_MD5 = "694ef536e5d0245f203a1bcf8cbf3294"
+	"github.com/chennqqi/godnslog/models"
 )
 
 type Client struct {
 	*http.Client
 
-	host  string
-	token string
+	host   string
+	token  string
+	domain string
 }
 
 func NewClient(host, token string) (*Client, error) {
@@ -26,6 +27,14 @@ func NewClient(host, token string) (*Client, error) {
 		Client: &http.Client{},
 	}
 	return client, nil
+}
+
+func (self *Client) ToDnsDomain(v interface{}) string {
+	return fmt.Sprintf("%v.%v", v, self.host)
+}
+
+func (self *Client) ToHttpURL(v interface{}) string {
+	return fmt.Sprintf("%v/log/%v", self.host, v)
 }
 
 func (self *Client) Hash(querys url.Values) string {
@@ -43,7 +52,7 @@ func (self *Client) Hash(querys url.Values) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func (self *Client) QueryDns(domain string) error {
+func (self *Client) QueryDns(domain string) ([]models.DnsRecord, error) {
 	c := self.Client
 
 	querys := make(url.Values)
@@ -53,17 +62,23 @@ func (self *Client) QueryDns(domain string) error {
 	hash := self.Hash(querys)
 	querys.Set("hash", hash)
 
-	u := fmt.Sprintf("%v/app/dns?%v", querys.Encode())
+	u := fmt.Sprintf("%v/app/dns?%v", self.host, querys.Encode())
 	req, err := http.NewRequest("GET", u, nil)
 	resp, err := c.Do(req)
 	if err != nil {
-
+		return nil, err
 	}
 	defer resp.Body.Close()
-	return nil
+
+	var rcds []models.DnsRecord
+	var cr models.CR
+	cr.Result = &rcds
+
+	txt, _ := ioutil.ReadAll(resp.Body)
+	return rcds, json.Unmarshal(txt, &cr)
 }
 
-func (self *Client) QueryHttp(suffix string) error {
+func (self *Client) QueryHttp(suffix string) ([]models.HttpRecord, error) {
 	c := self.Client
 
 	querys := make(url.Values)
@@ -72,24 +87,18 @@ func (self *Client) QueryHttp(suffix string) error {
 	hash := self.Hash(querys)
 	querys.Set("hash", hash)
 
-	u := fmt.Sprintf("%v/app/http?%v", querys.Encode())
+	u := fmt.Sprintf("%v/app/http?%v", self.host, querys.Encode())
 	req, err := http.NewRequest("GET", u, nil)
 	resp, err := c.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
-	return nil
-}
 
-func main() {
-	client, err := NewClient(
-		`http://xxx.godnslog.com`,
-		`21231231`)
+	var rcds []models.HttpRecord
+	var cr models.CR
+	cr.Result = &rcds
 
-	if err != nil {
-
-	}
-	client.QueryDns("xxxx")
-	client.QueryHttp("xxx")
+	txt, _ := ioutil.ReadAll(resp.Body)
+	return rcds, json.Unmarshal(txt, &cr)
 }

@@ -1,12 +1,13 @@
-package main
+package server
 
 import (
 	"fmt"
 	"strings"
 	"time"
 
-	"models"
+	"github.com/chennqqi/godnslog/models"
 
+	"github.com/chennqqi/godnslog/cache"
 	"github.com/chennqqi/goutils/ginutils"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
@@ -22,95 +23,6 @@ type MyClaims struct {
 //==============================================================================
 // ui standard api
 //==============================================================================
-type LoginRequest struct {
-	Email    string `json:"email"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-type LoginResponse struct {
-	Islogin bool   `json:"isLogin"`
-	Token   string `json:"token"`
-	//TODO:
-	Username string `json:"username"`
-	RoleId   string `json:"roleId"`
-	Lang     string `json:"lang"`
-}
-
-type Role struct {
-	Id          string       `json:"id"`
-	Name        string       `json:"name"`
-	Description string       `json:"description"`
-	Permissions []Permission `json:"permissions"`
-}
-
-type PermissionActionSet struct {
-	Action       string `json:"action"`
-	Description  string `json:"description"`
-	DefaultCheck bool   `json:"defaultCheck"`
-}
-
-type Permission struct {
-	RoleId          int                   `json:"roleId"`
-	PermissionId    string                `json:"permissionId"`
-	PermissionName  string                `json:"permissionName"`
-	ActionEntitySet []PermissionActionSet `json:"ActionEntitySet"`
-}
-
-type UserInfo struct {
-	Id       int64     `json:"id"`
-	Name     string    `json:"username"`
-	Email    string    `json:"email"`
-	Avatar   string    `json:"avatar"`
-	Language string    `json:"lang"`
-	Role     Role      `json:"role"`
-	Utime    time.Time `json:"utime"`
-}
-
-type UserRequest struct {
-	Id       int64  `json:"id"`
-	Name     string `json:"username"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Role     int    `json:"role"`
-	Language string `json:"lang"`
-}
-
-type DnsRecordResp struct {
-	Pagination
-	Data []DnsRecord `json:"data"`
-}
-
-type HttpRecordResp struct {
-	Pagination
-	Data []HttpRecord `json:"data"`
-}
-
-type UserListResp struct {
-	Pagination
-	Data []UserInfo `json:"data"`
-}
-
-type AppSetting struct {
-	Callback string `json:"callback"`
-	//CallbackMessage string   `json:"callbackReport,omitempty"`
-	CleanHour int64    `json:"cleanHour"`
-	Rebind    []string `json:"rebind"`
-}
-
-type DeleteRecordRequest struct {
-	Ids []int64 `json:"ids"`
-}
-
-type AppSecurity struct {
-	Token  string `json:"token"`
-	Domain string `json:"domain"`
-}
-
-type AppSecuritySet struct {
-	Password string `json:"password"`
-}
-
 func (self *WebServer) respData(c *gin.Context, status, code int,
 	message string, data interface{}) {
 	c.JSON(status, &CR{
@@ -156,14 +68,14 @@ func (self *WebServer) initDatabase() error {
 		}
 	}
 
-	cache := self.cache
+	store := self.store
 	//sync user
 	orm.Iterate(new(models.TblUser), func(idx int, bean interface{}) error {
 		user := bean.(*models.TblUser)
 		userKey := fmt.Sprintf("%v.user", user.Id)
-		cache.Set(userKey, user, NoExpiration)
+		store.Set(userKey, user, cache.NoExpiration)
 		domainKey := fmt.Sprintf("%v.suser", user.ShortId)
-		cache.Set(domainKey, user, NoExpiration)
+		store.Set(domainKey, user, cache.NoExpiration)
 		return nil
 	})
 
@@ -187,9 +99,9 @@ func (self *WebServer) authHandler(c *gin.Context) {
 		return []byte(self.verifyKey), nil
 	})
 	if token.Valid {
-		cache := self.cache
+		store := self.store
 		key := fmt.Sprintf("%v.seed", claim.Id)
-		realSeed, exist := cache.Get(key)
+		realSeed, exist := store.Get(key)
 		if !exist {
 			logrus.Infof("That's not even a token")
 			c.JSON(401, CR{
@@ -207,7 +119,7 @@ func (self *WebServer) authHandler(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		u, exist := cache.Get(fmt.Sprintf("%v.user", claim.Id))
+		u, exist := store.Get(fmt.Sprintf("%v.user", claim.Id))
 		if !exist {
 			logrus.Infof("[webui.go::authHandler] cache.Get(user), not exist")
 			c.JSON(401, CR{
@@ -341,10 +253,10 @@ func (self *WebServer) userLogin(c *gin.Context) {
 		self.respData(c, 502, CodeServerInternal, "bad service", nil)
 		return
 	}
-	cache := self.cache
+	store := self.store
 
-	cache.Set(fmt.Sprintf("%v.seed", user.Id), seed, AuthExpire)
-	cache.Set(fmt.Sprintf("%v.user", user.Id), user, NoExpiration)
+	store.Set(fmt.Sprintf("%v.seed", user.Id), seed, self.AuthExpire)
+	store.Set(fmt.Sprintf("%v.user", user.Id), user, cache.NoExpiration)
 
 	self.resp(c, 200, &CR{
 		Message: "OK",
@@ -366,10 +278,10 @@ func (self *WebServer) userLogin(c *gin.Context) {
 // @Failure 401 {object} CR "Unauthorized"
 // @Router /user/logout [post]
 func (self *WebServer) userLogout(c *gin.Context) {
-	cache := self.cache
+	store := self.store
 	id := c.GetInt64("id")
-	cache.Delete(fmt.Sprintf("%v.seed", id))
-	cache.Delete(fmt.Sprintf("%v.user", id))
+	store.Delete(fmt.Sprintf("%v.seed", id))
+	store.Delete(fmt.Sprintf("%v.user", id))
 	self.resp(c, 200, &CR{
 		Message: "OK",
 	})
@@ -381,18 +293,18 @@ func (self *WebServer) userLogout(c *gin.Context) {
 // @Produce  json
 // @Param   some_id     path    int     true        "Some ID"
 // @Success 200 {string} string	"ok"
-// @Failure 400 {object} web.APIError "We need ID!!"
-// @Failure 404 {object} web.APIError "Can not find ID"
-// @Failure 401 {object} web.APIError "Can not find ID"
+// @Failure 400 {object} CR "We need ID!!"
+// @Failure 404 {object} CR "Can not find ID"
+// @Failure 401 {object} CR "Can not find ID"
 // @Router /user/info [get]
 func (self *WebServer) userInfo(c *gin.Context) {
 	id := c.GetInt64("id")
 	session := self.orm.NewSession()
 	defer session.Close()
 
-	cache := self.cache
+	store := self.store
 	userKey := fmt.Sprintf("%v.user", id)
-	v, exist := cache.Get(userKey)
+	v, exist := store.Get(userKey)
 	var user *models.TblUser
 	if !exist {
 		user = new(models.TblUser)
@@ -413,23 +325,23 @@ func (self *WebServer) userInfo(c *gin.Context) {
 			})
 			return
 		}
-		cache.Set(userKey, user, NoExpiration)
+		store.Set(userKey, user, cache.NoExpiration)
 		domainKey := fmt.Sprintf("%v.suser", user.ShortId)
-		cache.Set(domainKey, user, NoExpiration)
+		store.Set(domainKey, user, cache.NoExpiration)
 	} else {
 		user = v.(*models.TblUser)
 	}
 
-	var role Role
+	var role models.Role
 	role.Id = "normal"
 	role.Name = "用户"
-	role.Permissions = []Permission{
-		Permission{
+	role.Permissions = []models.Permission{
+		models.Permission{
 			RoleId:         roleNormal,
 			PermissionId:   "document",
 			PermissionName: "文档",
 		},
-		Permission{
+		models.Permission{
 			RoleId:         roleNormal,
 			PermissionId:   "record",
 			PermissionName: "记录",
@@ -439,13 +351,13 @@ func (self *WebServer) userInfo(c *gin.Context) {
 	case roleAdmin, roleSuper:
 		role.Id = "admin"
 		role.Name = "管理员"
-		role.Permissions = append(role.Permissions, []Permission{
-			Permission{
+		role.Permissions = append(role.Permissions, []models.Permission{
+			models.Permission{
 				RoleId:         roleNormal,
 				PermissionId:   "setting",
 				PermissionName: "设置",
 			},
-			Permission{
+			models.Permission{
 				RoleId:         roleAdmin,
 				PermissionId:   "manage",
 				PermissionName: "管理用户",
@@ -453,7 +365,7 @@ func (self *WebServer) userInfo(c *gin.Context) {
 		}...)
 
 	default:
-		role.Permissions = append(role.Permissions, Permission{
+		role.Permissions = append(role.Permissions, models.Permission{
 			RoleId:         roleNormal,
 			PermissionId:   "setting",
 			PermissionName: "设置",
@@ -479,9 +391,9 @@ func (self *WebServer) userInfo(c *gin.Context) {
 // @Produce  json
 // @Param   some_id     path    int     true        "Some ID"
 // @Success 200 {string} string	"ok"
-// @Failure 400 {object} web.APIError "We need ID!!"
-// @Failure 404 {object} web.APIError "Can not find ID"
-// @Failure 401 {object} web.APIError "Can not find ID"
+// @Failure 400 {object} CR "We need ID!!"
+// @Failure 404 {object} CR "Can not find ID"
+// @Failure 401 {object} CR "Can not find ID"
 // @Router /admin/user/list [get]
 func (self *WebServer) userList(c *gin.Context) {
 	pageNo, pageNoErr := ginutils.GetQueryInt(c, "pageNo")
@@ -512,7 +424,7 @@ func (self *WebServer) userList(c *gin.Context) {
 	resp.PageSize = pageSize
 	resp.PageNo = pageNo
 	resp.TotalPage = (resp.TotalCount + (pageSize - 1)) / pageSize
-	resp.Data = make([]UserInfo, len(items))
+	resp.Data = make([]models.UserInfo, len(items))
 	for i := 0; i < len(items); i++ {
 		rcd := &resp.Data[i]
 		item := &items[i]
@@ -535,9 +447,9 @@ func (self *WebServer) userList(c *gin.Context) {
 // @Produce  json
 // @Param   some_id     path    int     true        "Some ID"
 // @Success 200 {string} string	"ok"
-// @Failure 400 {object} web.APIError "We need ID!!"
-// @Failure 404 {object} web.APIError "Can not find ID"
-// @Failure 401 {object} web.APIError "Can not find ID"
+// @Failure 400 {object} CR "We need ID!!"
+// @Failure 404 {object} CR "Can not find ID"
+// @Failure 401 {object} CR "Can not find ID"
 // @Router /user/nav [get]
 func (self *WebServer) userNav(c *gin.Context) {
 }
@@ -552,9 +464,9 @@ func (self *WebServer) userNav(c *gin.Context) {
 // @Produce  json
 // @Param   some_id     path    int     true        "Some ID"
 // @Success 200 {string} string	"ok"
-// @Failure 400 {object} web.APIError "We need ID!!"
-// @Failure 404 {object} web.APIError "Can not find ID"
-// @Failure 401 {object} web.APIError "Can not find ID"
+// @Failure 400 {object} CR "We need ID!!"
+// @Failure 404 {object} CR "Can not find ID"
+// @Failure 401 {object} CR "Can not find ID"
 // @Router /user/nav [get]
 func (self *WebServer) delUser(c *gin.Context) {
 	var req DeleteRecordRequest
@@ -588,7 +500,7 @@ func (self *WebServer) delUser(c *gin.Context) {
 	session.In("uid", ids).Delete(&models.TblDns{})
 	session.In("uid", ids).Delete(&models.TblHttp{})
 
-	cache := self.cache
+	cache := self.store
 	for i := 0; i < len(req.Ids); i++ {
 		seedKey := fmt.Sprintf("%v.seed", req.Ids[i])
 		userKey := fmt.Sprintf("%v.user", req.Ids[i])
@@ -639,9 +551,9 @@ func (self *WebServer) addUser(c *gin.Context) {
 		Role:          roleNormal,
 		Token:         genRandomToken(),
 		ShortId:       genShortId(),
-		Lang:          defaultLanguage,
+		Lang:          self.DefaultLanguage,
 		Pass:          string(hashedPass),
-		CleanInterval: DefaultCleanInterval,
+		CleanInterval: self.DefaultCleanInterval,
 	}
 	_, err = session.InsertOne(&item)
 	if self.IsDuplicate(err) {
@@ -681,7 +593,7 @@ func (self *WebServer) setUser(c *gin.Context) {
 		return
 	}
 
-	cache := self.cache
+	store := self.store
 	id := c.GetInt64("id")
 	role := c.GetInt("role")
 	session := self.orm.NewSession()
@@ -731,7 +643,7 @@ func (self *WebServer) setUser(c *gin.Context) {
 		}
 
 		//logout req.Id
-		cache := self.cache
+		cache := self.store
 		cache.Delete(fmt.Sprintf("%v.seed", req.Id))
 		cache.Delete(fmt.Sprintf("%v.user", req.Id))
 		self.resp(c, 200, &CR{
@@ -741,7 +653,7 @@ func (self *WebServer) setUser(c *gin.Context) {
 	case roleNormal:
 		//allow change language only
 		userKey := fmt.Sprintf("%v.user", id)
-		v, exist := cache.Get(userKey)
+		v, exist := store.Get(userKey)
 		if !exist {
 			user = new(models.TblUser)
 			exist, err := session.ID(id).Get(user)
@@ -778,17 +690,17 @@ func (self *WebServer) setUser(c *gin.Context) {
 			})
 			return
 		}
-		cache.Set(userKey, dupUser, NoExpiration)
+		store.Set(userKey, dupUser, cache.NoExpiration)
 		domainKey := fmt.Sprintf("%v.suser", dupUser.ShortId)
-		cache.Set(domainKey, dupUser, NoExpiration)
+		store.Set(domainKey, dupUser, cache.NoExpiration)
 	}
 }
 
 func (self *WebServer) getAppSetting(c *gin.Context) {
 	id := c.GetInt64("id")
-	cache := self.cache
+	store := self.store
 	userKey := fmt.Sprintf("%v.user", id)
-	v, exist := cache.Get(fmt.Sprintf(userKey, id))
+	v, exist := store.Get(fmt.Sprintf(userKey, id))
 	var user *models.TblUser
 	if !exist {
 		session := self.orm.NewSession()
@@ -812,9 +724,9 @@ func (self *WebServer) getAppSetting(c *gin.Context) {
 			})
 			return
 		}
-		cache.Set(userKey, user, NoExpiration)
+		store.Set(userKey, user, cache.NoExpiration)
 		domainKey := fmt.Sprintf("%v.suser", user.ShortId)
-		cache.Set(domainKey, user, NoExpiration)
+		store.Set(domainKey, user, cache.NoExpiration)
 	} else {
 		user = v.(*models.TblUser)
 	}
@@ -842,9 +754,9 @@ func (self *WebServer) setAppSetting(c *gin.Context) {
 	}
 
 	id := c.GetInt64("id")
-	cache := self.cache
+	store := self.store
 	userKey := fmt.Sprintf("%v.user", id)
-	v, exist := cache.Get(userKey)
+	v, exist := store.Get(userKey)
 	session := self.orm.NewSession()
 	defer session.Close()
 
@@ -867,9 +779,9 @@ func (self *WebServer) setAppSetting(c *gin.Context) {
 			})
 			return
 		}
-		cache.Set(userKey, user, NoExpiration)
+		store.Set(userKey, user, cache.NoExpiration)
 		domainkey := fmt.Sprintf("%v.suser", user.ShortId)
-		cache.Set(domainkey, user, NoExpiration)
+		store.Set(domainkey, user, cache.NoExpiration)
 	} else {
 		user = v.(*models.TblUser)
 	}
@@ -894,8 +806,8 @@ func (self *WebServer) setAppSetting(c *gin.Context) {
 	{
 		domainKey := fmt.Sprintf("%v.suser", user.ShortId)
 		userKey := fmt.Sprintf("%v.user", user.Id)
-		cache.Set(userKey, dupUser, NoExpiration)
-		cache.Set(domainKey, dupUser, NoExpiration)
+		store.Set(userKey, dupUser, cache.NoExpiration)
+		store.Set(domainKey, dupUser, cache.NoExpiration)
 	}
 
 	self.resp(c, 200, &CR{
@@ -906,9 +818,9 @@ func (self *WebServer) setAppSetting(c *gin.Context) {
 //change self password
 func (self *WebServer) getSecuritySetting(c *gin.Context) {
 	id := c.GetInt64("id")
-	cache := self.cache
+	store := self.store
 	userKey := fmt.Sprintf("%v.user", id)
-	v, exist := cache.Get(userKey)
+	v, exist := store.Get(userKey)
 	var user *models.TblUser
 	if !exist {
 		session := self.orm.NewSession()
@@ -931,9 +843,9 @@ func (self *WebServer) getSecuritySetting(c *gin.Context) {
 			})
 			return
 		}
-		cache.Set(userKey, user, NoExpiration)
+		store.Set(userKey, user, cache.NoExpiration)
 		domainkey := fmt.Sprintf("%v.suser", user.ShortId)
-		cache.Set(domainkey, user, NoExpiration)
+		store.Set(domainkey, user, cache.NoExpiration)
 	} else {
 		user = v.(*models.TblUser)
 	}
@@ -1002,9 +914,9 @@ func (self *WebServer) setSecuritySetting(c *gin.Context) {
 // @Produce  json
 // @Param   some_id     path    int     true        "Some ID"
 // @Success 200 {string} string	"ok"
-// @Failure 400 {object} web.APIError "We need ID!!"
-// @Failure 404 {object} web.APIError "Can not find ID"
-// @Failure 401 {object} web.APIError "Can not find ID"
+// @Failure 400 {object} CR "We need ID!!"
+// @Failure 404 {object} CR "Can not find ID"
+// @Failure 401 {object} CR "Can not find ID"
 // @Router /testapi/get-string-by-int/{some_id} [get]
 func (self *WebServer) getDnsRecord(c *gin.Context) {
 	ip, ipExist := c.GetQuery("ip")
@@ -1063,7 +975,7 @@ func (self *WebServer) getDnsRecord(c *gin.Context) {
 	resp.PageSize = pageSize
 	resp.PageNo = pageNo
 	resp.TotalPage = (resp.TotalCount + (pageSize - 1)) / pageSize
-	resp.Data = make([]DnsRecord, len(items))
+	resp.Data = make([]models.DnsRecord, len(items))
 	for i := 0; i < len(items); i++ {
 		rcd := &resp.Data[i]
 		item := &items[i]
@@ -1085,8 +997,8 @@ func (self *WebServer) getDnsRecord(c *gin.Context) {
 // @Produce  json
 // @Param   some_id     path    int     true        "Some ID"
 // @Success 200 {string} string	"ok"
-// @Failure 400 {object} web.APIError "We need ID!!"
-// @Failure 404 {object} web.APIError "Can not find ID"
+// @Failure 400 {object} CR "We need ID!!"
+// @Failure 404 {object} CR "Can not find ID"
 // @Router /testapi/get-string-by-int/{some_id} [get]
 func (self *WebServer) delDnsRecord(c *gin.Context) {
 	var req DeleteRecordRequest
@@ -1250,7 +1162,7 @@ func (self *WebServer) getHttpRecord(c *gin.Context) {
 	resp.PageSize = pageSize
 	resp.PageNo = pageNo
 	resp.TotalPage = (resp.TotalCount + (pageSize - 1)) / pageSize
-	resp.Data = make([]HttpRecord, len(items))
+	resp.Data = make([]models.HttpRecord, len(items))
 
 	for i := 0; i < len(items); i++ {
 		rcd := &resp.Data[i]

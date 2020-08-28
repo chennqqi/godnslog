@@ -41,3 +41,4 @@ package-lock.json
 *.lock
 *.sum
 dist
+godnslog.db

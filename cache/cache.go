@@ -1,29 +1,28 @@
-package main
+package cache
 
 import (
 	"time"
 
-	"github.com/patrickmn/go-cache"
+	gocache "github.com/patrickmn/go-cache"
 )
 
 const (
-	NoExpiration = cache.NoExpiration
+	NoExpiration = gocache.NoExpiration
 	// For use with functions that take an expiration time. Equivalent to
 	// passing in the same expiration duration as was given to New() or
 	// NewFrom() when the cache was created (e.g. 5 minutes.)
-	DefaultExpiration = cache.DefaultExpiration
+	DefaultExpiration = gocache.DefaultExpiration
 )
 
 type Cache struct {
-	*cache.Cache
-
+	*gocache.Cache
 	rcdCh chan interface{}
 }
 
 func NewCache(def, interval time.Duration) *Cache {
 	var c Cache
 	{
-		c.Cache = cache.New(AuthExpire, time.Minute)
+		c.Cache = gocache.New(def, interval)
 		c.rcdCh = make(chan interface{}, 128)
 	}
 	return &c

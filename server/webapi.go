@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"sort"
 	"time"
 
-	"models"
+	"github.com/chennqqi/godnslog/models"
 
 	"github.com/chennqqi/goutils/ginutils"
 	"github.com/gin-gonic/gin"
@@ -39,9 +39,9 @@ func (self *WebServer) apiAuthHandler(c *gin.Context) {
 	}
 	c.Set("proto", proto)
 
-	cache := self.cache
+	store := self.store
 	domainKey := shortId + ".suser"
-	v, exist := cache.Get(domainKey)
+	v, exist := store.Get(domainKey)
 	if !exist {
 		self.resp(c, 401, &CR{
 			Message: "No User",
@@ -55,7 +55,7 @@ func (self *WebServer) apiAuthHandler(c *gin.Context) {
 	token := user.Token
 
 	//authorization 1
-	t64, err := ginutils.GetHeaderInt64(c, "_t")
+	t64, err := ginutils.GetHeaderInt64(c, "t")
 	if err != nil {
 		self.resp(c, 401, &CR{
 			Message: "No param time",
@@ -118,7 +118,6 @@ func (self *WebServer) queryDnsRecord(c *gin.Context) {
 	defer session.Close()
 
 	id := c.GetInt64("uid")
-
 	domain, domainExist := c.GetQuery("domain")
 	if !domainExist {
 		self.resp(c, 400, &CR{
@@ -128,11 +127,17 @@ func (self *WebServer) queryDnsRecord(c *gin.Context) {
 		return
 	}
 
-	var rcds []models.TblDns
-	err := session.Where(`uid=?`, id).
-		And(`domain=?`, domain).
-		Limit(DefaultQueryApiMaxItem).Find(&rcds)
+	session = session.Where(`uid=?`, id)
+	exactly, _ := ginutils.GetQueryBoolean(c, "exactly")
 
+	if exactly {
+		session = session.And(`domain like ?`, "%"+domain+"%")
+	} else {
+		session = session.And(`domain like ?`, "%"+domain+"%")
+	}
+
+	var rcds []models.TblDns
+	err := session.Limit(self.DefaultQueryApiMaxItem).Find(&rcds)
 	if err != nil {
 		self.resp(c, 502, &CR{
 			Message: "domain parameter required",
@@ -165,8 +170,7 @@ func (self *WebServer) queryHttpRecord(c *gin.Context) {
 	defer session.Close()
 
 	id := c.GetInt64("uid")
-
-	domain, domainExist := c.GetQuery("domain")
+	suffix, domainExist := c.GetQuery("suffix")
 	if !domainExist {
 		self.resp(c, 400, &CR{
 			Message: "domain parameter required",
@@ -175,10 +179,17 @@ func (self *WebServer) queryHttpRecord(c *gin.Context) {
 		return
 	}
 
+	session = session.Where(`uid=?`, id)
+
+	exactly, _ := ginutils.GetQueryBoolean(c, "exactly")
+	if exactly {
+		session = session.And(`url like ?`, "%"+suffix)
+	} else {
+		session = session.And(`url like ?`, "%"+suffix+"%")
+	}
+
 	var rcds []models.TblHttp
-	err := session.Where(`uid=?`, id).
-		And(`domain=?`, domain).
-		Limit(DefaultQueryApiMaxItem).Find(&rcds)
+	err := session.Limit(self.DefaultQueryApiMaxItem).Find(&rcds)
 
 	if err != nil {
 		self.resp(c, 502, &CR{
@@ -225,8 +236,8 @@ func (self *WebServer) record(c *gin.Context) {
 	url := fmt.Sprintf("%v://%v%v", proto, host, c.Request.URL.EscapedPath())
 
 	_, shortId, _ := parseDomain(host, self.Domain)
-	cache := self.cache
-	v, exist := cache.Get(shortId + ".suser")
+	store := self.store
+	v, exist := store.Get(shortId + ".suser")
 	if exist {
 		user := v.(*models.TblUser)
 		uid = user.Id

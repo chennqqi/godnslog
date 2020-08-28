@@ -1,0 +1,201 @@
+basePath: /
+definitions:
+  server.CR:
+    $ref: '#/definitions/models.CR'
+host: www.godnslog.com
+info:
+  contact:
+    email: chennqqi@qq.com
+    name: API Support
+    url: https://github.com/chennqqi/godnslog/issue
+  description: This is godnslog server.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: GoDnsLog API
+  version: "0.1"
+paths:
+  /admin/user/list:
+    get:
+      consumes:
+      - application/json
+      description: get Dns Record by user query
+      parameters:
+      - description: Some ID
+        in: path
+        name: some_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            type: string
+        "400":
+          description: We need ID!!
+          schema:
+            $ref: '#/definitions/server.CR'
+        "401":
+          description: Can not find ID
+          schema:
+            $ref: '#/definitions/server.CR'
+        "404":
+          description: Can not find ID
+          schema:
+            $ref: '#/definitions/server.CR'
+      summary: userInfo
+  /testapi/get-string-by-int/{some_id}:
+    get:
+      consumes:
+      - application/json
+      description: del Dns Record by query ids
+      parameters:
+      - description: Some ID
+        in: path
+        name: some_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            type: string
+        "400":
+          description: We need ID!!
+          schema:
+            $ref: '#/definitions/server.CR'
+        "404":
+          description: Can not find ID
+          schema:
+            $ref: '#/definitions/server.CR'
+      summary: delDnsRecord
+  /user/info:
+    get:
+      consumes:
+      - application/json
+      description: get Dns Record by user query
+      parameters:
+      - description: Some ID
+        in: path
+        name: some_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            type: string
+        "400":
+          description: We need ID!!
+          schema:
+            $ref: '#/definitions/server.CR'
+        "401":
+          description: Can not find ID
+          schema:
+            $ref: '#/definitions/server.CR'
+        "404":
+          description: Can not find ID
+          schema:
+            $ref: '#/definitions/server.CR'
+      summary: userInfo
+  /user/login:
+    post:
+      consumes:
+      - application/json
+      description: get Dns Record by user query
+      parameters:
+      - description: Some ID
+        in: path
+        name: some_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/server.CR'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/server.CR'
+        "502":
+          description: BadService
+          schema:
+            $ref: '#/definitions/server.CR'
+      summary: userLogin
+  /user/logout:
+    post:
+      consumes:
+      - application/json
+      description: get Dns Record by user query
+      parameters:
+      - description: Some ID
+        in: path
+        name: some_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/server.CR'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/server.CR'
+        "502":
+          description: BadService
+          schema:
+            $ref: '#/definitions/server.CR'
+      summary: userLogout
+  /user/nav:
+    get:
+      consumes:
+      - application/json
+      description: get Dns Record by user query
+      parameters:
+      - description: Some ID
+        in: path
+        name: some_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            type: string
+        "400":
+          description: We need ID!!
+          schema:
+            $ref: '#/definitions/server.CR'
+        "401":
+          description: Can not find ID
+          schema:
+            $ref: '#/definitions/server.CR'
+        "404":
+          description: Can not find ID
+          schema:
+            $ref: '#/definitions/server.CR'
+      summary: userNav
+swagger: "2.0"
