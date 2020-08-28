@@ -105,14 +105,13 @@
       handleSubmit () {
         this.form.validateFields((err, values) => {
           if (!err) {
+            const data = { ...values, rebind: this.rebind }
+            setSettingApp(data).then(res => {
+              this.$message.info(res.message)
+            })
+          } else {
             console.log('verify error:', err)
             this.$message.warn(err)
-          } else {
-            const data = { ...values, rebind: this.rebind }
-            console.log('post data', data)
-            setSettingApp(data).then(res => {
-              this.$message.info(res.result)
-            })
           }
         })
         this.loadData()
