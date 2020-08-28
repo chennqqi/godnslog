@@ -1,7 +1,8 @@
 # API
 
 
-## 
+源代码目录的`client`目录提供了SDK供客户端调用，`examples`目录中提供了样例代码，API接口还未定版，预计下个版本完成。
+API将会支持精准查询和模糊匹配两种模式。
 
 
 ## 参数说明
@@ -41,9 +42,7 @@ curl bkkpdcy7lo84.godnslog.com/data/dns?q={domain}&t={timestamp}&hash={hash}
 
 ## 查询HTTP记录
 
-1.请求
-```bash
-curl http://api.ceye.io/v1/records?token={token}&type={dns|http}&filter={filter}
 ```
+curl bkkpdcy7lo84.godnslog.com/data/dns?q={domain}&t={timestamp}&hash={hash}
 
-2.返回值
+```
