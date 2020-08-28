@@ -55,12 +55,12 @@ func (self *WebServer) initDatabase() error {
 	newpass, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
 	if count == 0 {
 		_, err = orm.InsertOne(&models.TblUser{
-			Name:    "admin",
-			Email:   "admin@admin.com",
-			ShortId: genShortId(),
-			Pass:    string(newpass),
-			Token:   genRandomToken(),
-			Role:    roleSuper,
+			ShortId:       genShortId(),
+			Pass:          string(newpass),
+			Token:         genRandomToken(),
+			Role:          roleSuper,
+			Lang:          self.DefaultLanguage,
+			CleanInterval: self.DefaultCleanInterval,
 		})
 		if err != nil {
 			logrus.Errorf("[webui.go::initDatabase] orm.InsertOne(user): %v", err)
