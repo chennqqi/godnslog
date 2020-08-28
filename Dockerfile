@@ -11,10 +11,10 @@ FROM golang:1.14.7-alpine3.12 as backend-builder
 RUN echo "https://mirror.tuna.tsinghua.edu.cn/alpine/v3.12/main" > /etc/apk/repositories
 RUN apk add build-base git musl-dev
 
-COPY main /src/godnslog/main
 COPY models /src/godnslog/models
-COPY go.mod /src/godnslog/go.mod
-WORKDIR /src/godnslog/main
+COPY server /src/godnslog/server
+COPY main.go go.mod /src/godnslog/
+WOKDIR /src/godnslog
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o /go/bin/godnslog
 
 # build app
