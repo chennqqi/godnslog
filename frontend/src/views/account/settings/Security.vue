@@ -33,10 +33,11 @@
     data () {
       return {
         value: '123456',
-        infos: [{
-            title: this.$t('Domain'),
+        infos: [
+          {
+            title: this.$t('Dns Addr'),
             value: '-',
-            key: 'domain',
+            key: 'dns_addr',
             actions: {
               title: this.$t('Copy'),
               callback: (val) => {
@@ -45,7 +46,18 @@
             }
           },
           {
-            title: this.$t('Token'),
+            title: this.$t('Http Addr'),
+            value: '-',
+            key: 'http_addr',
+            actions: {
+              title: this.$t('Copy'),
+              callback: (val) => {
+                this.copy(val)
+              }
+            }
+          },
+          {
+            title: this.$t('Secret'),
             value: '138****8293',
             key: 'token',
             actions: {

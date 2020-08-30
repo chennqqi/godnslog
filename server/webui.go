@@ -55,6 +55,8 @@ func (self *WebServer) initDatabase() error {
 	newpass, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
 	if count == 0 {
 		_, err = orm.InsertOne(&models.TblUser{
+			Name:          "admin",
+			Email:         "admin@godnslog.com",
 			ShortId:       genShortId(),
 			Pass:          string(newpass),
 			Token:         genRandomToken(),
@@ -608,7 +610,7 @@ func (self *WebServer) setUser(c *gin.Context) {
 		if req.Password != "" {
 			newPass, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 			if err != nil {
-				logrus.Errorf("[webapi.go::delUser] bcrypt.GenerateFromPassword:", err)
+				logrus.Errorf("[webapi.go::delUser] bcrypt.GenerateFromPassword: %v", err)
 				self.resp(c, 400, &CR{
 					Message: "failed",
 					Code:    CodeServerInternal,
@@ -853,8 +855,9 @@ func (self *WebServer) getSecuritySetting(c *gin.Context) {
 	self.resp(c, 200, &CR{
 		Message: "OK",
 		Result: AppSecurity{
-			Domain: user.ShortId + "." + self.Domain,
-			Token:  user.Token,
+			HttpAddr: fmt.Sprintf("http://%v/log/%v/", self.IP, user.ShortId),
+			DnsAddr:  user.ShortId + "." + self.Domain,
+			Token:    user.Token,
 		},
 	})
 }
@@ -892,7 +895,7 @@ func (self *WebServer) setSecuritySetting(c *gin.Context) {
 	_, err = session.ID(id).SetExpr(`pass`, customQuote(string(newPass))).Update(&models.TblUser{})
 	if err != nil {
 		sql, _ := session.LastSQL()
-		logrus.Errorf("[webuig.go::setSecuritySetting] orm.Update (%v), last SQL:", err, sql)
+		logrus.Errorf("[webuig.go::setSecuritySetting] orm.Update(%v), last SQL: %v", err, sql)
 		self.resp(c, 502, &CR{
 			Message: "update Failed",
 			Code:    CodeServerInternal,
@@ -1168,7 +1171,7 @@ func (self *WebServer) getHttpRecord(c *gin.Context) {
 		rcd := &resp.Data[i]
 		item := &items[i]
 		rcd.Id = item.Id
-		rcd.Url = item.Url
+		rcd.Path = item.Path
 		rcd.Ip = item.Ip
 		rcd.Ctime = item.Ctime
 		rcd.Ctype = item.Ctype

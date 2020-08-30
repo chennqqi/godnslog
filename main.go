@@ -99,6 +99,7 @@ func main() {
 		Driver:                       driver,
 		Dsn:                          dsn,
 		Domain:                       domain,
+		IP:                           ipv4,
 		Listen:                       httpListen,
 		Swagger:                      swagger,
 		AuthExpire:                   AuthExpire,

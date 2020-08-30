@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"net"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/chennqqi/godnslog/models"
@@ -20,17 +20,21 @@ import (
 //==============================================================================
 // web api
 //==============================================================================
-func (self *WebServer) apiAuthHandler(c *gin.Context) {
+func (self *WebServer) dataPreHandler(c *gin.Context) {
 	host := c.GetHeader("X-Forwarded-Host")
-	var err error
+
 	if host == "" {
-		host, _, err = net.SplitHostPort(c.Request.Host)
-		if err != nil {
+		host = c.GetHeader("host")
+		if host == "" {
 			host = c.Request.Host
 		}
 	}
+	if strings.Contains(host, ":") {
+		host, _, _ = net.SplitHostPort(host)
+	}
 
 	_, shortId, _ := parseDomain(host, self.Domain)
+
 	c.Set("host", host)
 	c.Set("shortId", shortId)
 	proto := c.GetHeader("X-Forwarded-Proto")
@@ -52,10 +56,14 @@ func (self *WebServer) apiAuthHandler(c *gin.Context) {
 	}
 	user := v.(*models.TblUser)
 	c.Set("uid", user.Id)
-	token := user.Token
+	c.Set("token", user.Token)
+}
 
-	//authorization 1
-	t64, err := ginutils.GetHeaderInt64(c, "t")
+func (self *WebServer) dataAuthHandler(c *gin.Context) {
+	//authorization 1: t=$timestamp
+	token := c.GetString("token")
+
+	t64, err := ginutils.GetQueryInt64(c, "t")
 	if err != nil {
 		self.resp(c, 401, &CR{
 			Message: "No param time",
@@ -112,13 +120,14 @@ func (self *WebServer) apiAuthHandler(c *gin.Context) {
 	}
 }
 
+// dig ${q}.${shortId}.godnslog.com
 func (self *WebServer) queryDnsRecord(c *gin.Context) {
 	orm := self.orm
 	session := orm.NewSession()
 	defer session.Close()
 
 	id := c.GetInt64("uid")
-	domain, domainExist := c.GetQuery("domain")
+	variable, domainExist := c.GetQuery("q")
 	if !domainExist {
 		self.resp(c, 400, &CR{
 			Message: "domain parameter required",
@@ -128,12 +137,11 @@ func (self *WebServer) queryDnsRecord(c *gin.Context) {
 	}
 
 	session = session.Where(`uid=?`, id)
-	exactly, _ := ginutils.GetQueryBoolean(c, "exactly")
-
-	if exactly {
-		session = session.And(`domain like ?`, "%"+domain+"%")
+	blur, _ := ginutils.GetQueryInt(c, "blur")
+	if blur == 0 {
+		session = session.And(`var = ?`, variable)
 	} else {
-		session = session.And(`domain like ?`, "%"+domain+"%")
+		session = session.And(`var like ?`, "%"+variable+"%")
 	}
 
 	var rcds []models.TblDns
@@ -146,7 +154,7 @@ func (self *WebServer) queryDnsRecord(c *gin.Context) {
 		return
 	}
 
-	items := make([]DnsRecord, len(rcds))
+	items := make([]models.DnsRecord, len(rcds))
 	for i := 0; i < len(rcds); i++ {
 		item := &items[i]
 		rcd := &rcds[i]
@@ -157,20 +165,18 @@ func (self *WebServer) queryDnsRecord(c *gin.Context) {
 
 	self.resp(c, 200, &CR{
 		Message: "OK",
-		Result: map[string]interface{}{
-			"type": "dns",
-			"data": items,
-		},
+		Result:  items,
 	})
 }
 
+// curl http://${shortId}.godnslog.com/log/${q}
 func (self *WebServer) queryHttpRecord(c *gin.Context) {
 	orm := self.orm
 	session := orm.NewSession()
 	defer session.Close()
 
 	id := c.GetInt64("uid")
-	suffix, domainExist := c.GetQuery("suffix")
+	q, domainExist := c.GetQuery("q")
 	if !domainExist {
 		self.resp(c, 400, &CR{
 			Message: "domain parameter required",
@@ -178,14 +184,13 @@ func (self *WebServer) queryHttpRecord(c *gin.Context) {
 		})
 		return
 	}
-
 	session = session.Where(`uid=?`, id)
 
-	exactly, _ := ginutils.GetQueryBoolean(c, "exactly")
-	if exactly {
-		session = session.And(`url like ?`, "%"+suffix)
+	blur, _ := ginutils.GetQueryInt(c, "blur")
+	if blur == 0 {
+		session = session.And(`var = ?`, q)
 	} else {
-		session = session.And(`url like ?`, "%"+suffix+"%")
+		session = session.And(`var like ?`, "%"+q+"%")
 	}
 
 	var rcds []models.TblHttp
@@ -203,7 +208,7 @@ func (self *WebServer) queryHttpRecord(c *gin.Context) {
 		item := &items[i]
 		rcd := &rcds[i]
 
-		item.Url = rcd.Url
+		item.Path = rcd.Path
 		item.Ctype = rcd.Ctype
 		item.Ip = rcd.Ip
 		item.Method = rcd.Method
@@ -214,10 +219,7 @@ func (self *WebServer) queryHttpRecord(c *gin.Context) {
 
 	self.resp(c, 200, &CR{
 		Message: "OK",
-		Result: map[string]interface{}{
-			"type": "http",
-			"data": items,
-		},
+		Result:  items,
 	})
 }
 
@@ -230,12 +232,11 @@ func (self *WebServer) record(c *gin.Context) {
 	io.Copy(&data, c.Request.Body)
 	c.Request.Body.Close()
 
-	var uid int64
-	host := c.GetString("host")
-	proto := c.GetString("proto")
-	url := fmt.Sprintf("%v://%v%v", proto, host, c.Request.URL.EscapedPath())
+	path := c.Request.URL.EscapedPath()
 
-	_, shortId, _ := parseDomain(host, self.Domain)
+	var uid int64
+	shortId := c.Param("shortId")
+
 	store := self.store
 	v, exist := store.Get(shortId + ".suser")
 	if exist {
@@ -246,13 +247,13 @@ func (self *WebServer) record(c *gin.Context) {
 	_, err := session.InsertOne(&models.TblHttp{
 		Uid:    uid,
 		Ip:     c.ClientIP(),
-		Url:    url,
+		Path:   path,
 		Ua:     c.GetHeader("User-Agent"),
 		Ctype:  c.GetHeader("Content-Type"),
+		Var:    c.Param("any"),
 		Method: c.Request.Method,
-		// Path:   c.Param("any"),
-		Ctime: time.Now(),
-		Data:  data.String(), //TODO: anti-xss
+		Ctime:  time.Now(),
+		Data:   data.String(),
 	})
 	if err != nil {
 		logrus.Errorf("[webapi.go::Record] orm.InsertOne: %v", err)

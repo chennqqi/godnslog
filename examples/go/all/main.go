@@ -8,7 +8,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -29,17 +28,12 @@ func main() {
 
 	flag.Parse()
 
-	if domain == "" || token == "" {
+	if domain == "" || secret == "" {
 		log.Println("Both domain and secret are required")
 		return
 	}
 
-	host = "http://" + domain
-	if ssl {
-		host = "https://" + domain
-	}
-
-	c, err := client.NewClient(host, token)
+	c, err := client.NewClient(host, secret, ssl)
 	if err != nil {
 		log.Println("NewClient: %v", err)
 		return
@@ -51,7 +45,7 @@ func main() {
 			defer w.WriteHeader(200)
 			defer r.Body.Close()
 
-			txt, err := ioutil.ReadAll(r)
+			txt, err := ioutil.ReadAll(r.Body)
 			if err != nil {
 				log.Println("handleCallback ReadAll:", err)
 				return
@@ -94,7 +88,7 @@ func main() {
 		var prefix string
 		for i := 0; i < 5; i++ {
 			scanId := simulatorScanId()
-			target := c.ToDnsDomain(scanId)
+			target := c.BuildDnsDomain(scanId)
 
 			//simulate dns request
 			net.LookupIP(target)
@@ -105,7 +99,7 @@ func main() {
 
 		// exactly query
 		for k, v := range store {
-			rcds, err := c.QueryDns(k)
+			rcds, err := c.QueryDns(k, false)
 			if err != nil {
 				log.Println("Query DNS:", err)
 				continue
@@ -116,10 +110,9 @@ func main() {
 		}
 		// batch query
 		{
-			rcds, err := c.QueryDns(k)
+			rcds, err := c.QueryDns(k, true)
 			if err != nil {
 				log.Println("Query DNS:", err)
-				continue
 			}
 			if len(rcds) > 0 {
 				//match vulnerable
@@ -132,7 +125,7 @@ func main() {
 		var prefix string
 		var store = make(map[string]int64)
 		for i := 0; i < 5; i++ {
-			scanId, name := simulatorScanId()
+			scanId := simulatorScanId()
 			target := fmt.Sprintf("%v.%v", name, domain)
 
 			//simulate dns request
@@ -143,7 +136,7 @@ func main() {
 		time.Sleep(10 * time.Second)
 
 		for k, v := range store {
-			rcds, err := c.QueryDns(k)
+			rcds, err := c.QueryDns(k, false)
 			if err != nil {
 				log.Println("Query DNS:", err)
 				continue
@@ -156,7 +149,7 @@ func main() {
 			rcds, err := c.QueryDns(k)
 			if err != nil {
 				log.Println("Query DNS:", err)
-				continue
+				return
 			}
 			if len(rcds) > 0 {
 				//match vulnerable

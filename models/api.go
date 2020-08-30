@@ -17,9 +17,9 @@ const (
 	CodeNoData         = 6
 	CodeExpire         = 7
 
-	RoleSuper = iota
-	RoleAdmin
-	RoleNormal
+	RoleSuper  = 0
+	RoleAdmin  = 1
+	RoleNormal = 2
 
 	GODNS_RFI_KEY   = "GODNSLOG"
 	GODNS_RFI_VALUE = "694ef536e5d0245f203a1bcf8cbf3294" // md5sum($GODNS_RFI_KEY)
@@ -105,8 +105,9 @@ type DeleteRecordRequest struct {
 }
 
 type AppSecurity struct {
-	Token  string `json:"token"`
-	Domain string `json:"domain"`
+	Token    string `json:"token"`
+	DnsAddr  string `json:"dns_addr"`
+	HttpAddr string `json:"http_addr"`
 }
 
 type AppSecuritySet struct {
@@ -117,6 +118,7 @@ type DnsRecord struct {
 	Id       int64     `json:"id,omitempty"`
 	Uid      int64     `json:"-"`
 	Callback string    `json:"-"`
+	Var      string    `json:"-"`
 	Domain   string    `json:"domain"`
 	Ip       string    `json:"addr"`
 	Ctime    time.Time `json:"ctime"`
@@ -126,7 +128,7 @@ type HttpRecord struct {
 	Id       int64     `json:"id,omitempty"`
 	Uid      int64     `json:"-"`
 	Callback string    `json:"-"`
-	Url      string    `json:"url"`
+	Path     string    `json:"path"`
 	Ip       string    `json:"addr"`
 	Method   string    `json:"method"`
 	Data     string    `json:"data"`

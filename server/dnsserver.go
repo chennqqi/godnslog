@@ -34,6 +34,12 @@ TODO:
 
 */
 
+const (
+	LOG_TTL     = 0
+	NS_TTL      = 600
+	DEFAULT_TTL = 300
+)
+
 type Resolve struct {
 	Name  string
 	Type  string
@@ -152,8 +158,15 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 		dns.HandleFailed(w, req)
 		return
 	}
-	remoteAddr, ok := w.RemoteAddr().(*net.UDPAddr)
+
+	//variables
 	var remoteIp net.IP
+	var uid int64
+	var ttl uint32
+	var ip net.IP
+	var prefix, shortId string
+
+	remoteAddr, ok := w.RemoteAddr().(*net.UDPAddr)
 	if ok {
 		remoteIp = remoteAddr.IP
 	} else {
@@ -161,7 +174,7 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 		remoteIp = remoteAddr.IP
 	}
 
-	doResp := func(ip net.IP, t uint16, ttl uint32, uid int64) {
+	doResp := func(ip net.IP, t uint16) {
 		m := new(dns.Msg)
 		m.SetReply(req)
 		rr_header := dns.RR_Header{
@@ -174,10 +187,11 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 		m.Answer = append(m.Answer, a)
 		w.WriteMsg(m)
 
-		if t == dns.TypeA || t == dns.TypeAAAA {
+		if (t == dns.TypeA || t == dns.TypeAAAA) && ttl == LOG_TTL {
 			h.log(&DnsRecord{
 				Uid:    uid,
 				Domain: strings.TrimSuffix(q.Name, "."),
+				Var:    prefix,
 				Ctime:  time.Now(),
 				Ip:     remoteIp.String(),
 			})
@@ -185,18 +199,18 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 		return
 	}
 
-	var uid int64
-	var ttl uint32
-	var ip net.IP
-
 	//r.u3yszl9nidbsx8p9.example.com.
-	_, shortId, isRebind := parseDomain(q.Name, h.Domain)
+	prefix, shortId, isRebind := parseDomain(q.Name, h.Domain)
+	if prefix == "" {
+		ttl = DEFAULT_TTL // improve performance
+	}
+
 	v, exist := store.Get(shortId + ".suser")
 	var user *models.TblUser
 	if exist {
 		user = v.(*models.TblUser)
 		uid = user.Id
-		ttl = 0
+		ttl = LOG_TTL
 		ip = h.V4
 		if isRebind && len(user.Rebind) > 0 {
 			idx := time.Now().Second() % len(user.Rebind)
@@ -211,12 +225,13 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 			ttl = r.Ttl
 		} else {
 			ip = h.V4
+			ttl = DEFAULT_TTL
 		}
 	}
 
 	switch q.Qtype {
 	case dns.TypeA:
-		doResp(ip, q.Qtype, ttl, uid)
+		doResp(ip, q.Qtype)
 		//rebinding
 		return
 
@@ -228,7 +243,8 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 	case dns.TypeNS:
 		// TODO:
 		// return V4 direct
-		doResp(h.V4, q.Qtype, 3600, uid)
+		ttl = 600
+		doResp(h.V4, q.Qtype)
 		return
 
 	default:
@@ -237,4 +253,19 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	dns.HandleFailed(w, req)
+}
+
+func (self *DnsServer) Update(rr []Resolve) {
+	fixed := make(map[string][]Resolve)
+	for i := 0; i < len(rr); i++ {
+		r := rr[i]
+		v, exist := fixed[r.Name]
+		if exist {
+			v = append(v, rr[i])
+			fixed[r.Name] = v
+		} else {
+			fixed[r.Name] = []Resolve{r}
+		}
+	}
+	self.fixed = fixed
 }

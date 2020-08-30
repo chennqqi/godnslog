@@ -29,6 +29,7 @@ type WebServerConfig struct {
 	Driver    string
 	Dsn       string
 	Domain    string
+	IP        string
 	ApiDomain string
 	WwwDomain string
 	Listen    string
@@ -88,7 +89,7 @@ func (self *WebServer) doClean() {
 	defer session.Close()
 
 	var ids []int64
-	err := session.Cols("id").Find(&ids, &models.TblUser{})
+	err := session.Table(&models.TblUser{}).Cols("id").Find(&ids)
 	if err != nil {
 		logrus.Errorf("[webserver.go::doClean] orm.Find: %v", err)
 		return
@@ -129,7 +130,7 @@ func (self *WebServer) RunStoreRoutine() {
 		errorCountKey := fmt.Sprintf("%v.errcount", rcd.Uid)
 		if err != nil {
 			store.IncrementInt64(errorCountKey, 1)
-			logrus.Infof("[webserver.go::RunStoreRoutine] dns callback:", err)
+			logrus.Infof("[webserver.go::RunStoreRoutine] dns callback: %v", err)
 			return
 		}
 		store.Delete(errorCountKey)
@@ -169,6 +170,7 @@ FOR_LOOP:
 				_, err := session.InsertOne(&models.TblDns{
 					Uid:    d.Uid,
 					Domain: d.Domain,
+					Var:    d.Var,
 					Ip:     d.Ip,
 					Ctime:  d.Ctime,
 				})
@@ -243,7 +245,7 @@ func (self *WebServer) Run() error {
 	}
 
 	//data group
-	data := api.Group("/data", self.authHandler)
+	data := api.Group("/record", self.authHandler)
 	{
 		data.GET("/dns", self.getDnsRecord)
 		data.GET("/http", self.getHttpRecord)
@@ -269,21 +271,20 @@ func (self *WebServer) Run() error {
 		admin.GET("/user/list", self.userList)
 	}
 
-	//app api handler
-	appapi := r.Group("/app", self.apiAuthHandler)
+	//record handler
+	dataApi := r.Group("/data", self.dataPreHandler, self.dataAuthHandler)
 	{
-		appapi.GET("/dns", self.queryDnsRecord)
-		appapi.GET("/http", self.queryHttpRecord)
+		dataApi.GET("/dns", self.queryDnsRecord)
+		dataApi.GET("/http", self.queryHttpRecord)
 	}
+	//http log
+	r.Any("/log/:shortId/*any", self.record)
 
 	payload := r.Group("/payload")
 	{
 		payload.GET("/xss", self.xss)
 		payload.GET("/phprfi", self.phpRFI)
 	}
-
-	//http log
-	r.Any("/log/*any", self.record)
 
 	s := &http.Server{
 		Handler: r,

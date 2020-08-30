@@ -69,7 +69,7 @@
 <script>
   import moment from 'moment'
   import { STable, Ellipsis } from '@/components'
-  import { getDnsList, deleteDnsList } from '@/api/data'
+  import { getDnsList, deleteDnsList } from '@/api/record'
     export default {
       name: 'TableList',
       components: {

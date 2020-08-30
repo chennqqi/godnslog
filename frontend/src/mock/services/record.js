@@ -75,7 +75,7 @@ const dnsRecordList = (options) => {
   })
 }
 
-Mock.mock(/\/data\/dns/, 'get', dnsRecordList)
-Mock.mock(/\/data\/http/, 'get', httpRecordList)
-Mock.mock(/\/data\/http/, 'delete', responseOk)
-Mock.mock(/\/data\/http/, 'delete', responseOk)
+Mock.mock(/\/record\/dns/, 'get', dnsRecordList)
+Mock.mock(/\/record\/http/, 'get', httpRecordList)
+Mock.mock(/\/record\/http/, 'delete', responseOk)
+Mock.mock(/\/record\/http/, 'delete', responseOk)

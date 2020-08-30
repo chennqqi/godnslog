@@ -4,7 +4,7 @@
       <a-form layout="inline">
         <a-row :gutter="48">
           <a-col :md="8" :sm="24">
-            <a-form-item :label="$t('URL')">
+            <a-form-item :label="$t('Path')">
               <a-input v-model="queryParam.id" placeholder=""/>
             </a-form-item>
           </a-col>
@@ -88,7 +88,7 @@
 <script>
 import moment from 'moment'
 import { STable, Ellipsis } from '@/components'
-import { getHttpList, deleteHttpList } from '@/api/data'
+import { getHttpList, deleteHttpList } from '@/api/record'
 
 export default {
   name: 'TableList',
@@ -116,9 +116,9 @@ export default {
           scopedSlots: { customRender: 'serial' }
         },
         {
-          title: this.$t('URL'),
-          dataIndex: 'url',
-          scopedSlots: { customRender: 'url' }
+          title: this.$t('Path'),
+          dataIndex: 'path',
+          scopedSlots: { customRender: 'path' }
         },
         {
           title: 'IP',

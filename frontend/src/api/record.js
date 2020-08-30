@@ -1,8 +1,8 @@
 import request from '@/utils/request'
 
 const api = {
-  dnsRecord: '/data/dns',
-  httpRecord: '/data/http'
+  dnsRecord: '/record/dns',
+  httpRecord: '/record/http'
 }
 
 export default api

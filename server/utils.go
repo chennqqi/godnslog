@@ -50,6 +50,8 @@ func parseDomain(name, root string) (prefix, shortId string, rebind bool) {
 	prefix = name[:index]
 	lastIdx := strings.LastIndex(prefix, ".")
 	if lastIdx <= 0 {
+		shortId = prefix
+		prefix = ""
 		return
 	}
 
