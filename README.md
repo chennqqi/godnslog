@@ -1,10 +1,10 @@
-# GDONSLOG
+# GODNSLOG
 
 ![](https://s1.ax1x.com/2020/08/31/dXFLg1.png)
 
 A dns&amp;http log server for verify SSRF/XXE/RFI/RCE vulnerability
 
-Engglish|[中文]()
+English Doc|[中文文档](https://github.com/chennqqi/godnslog/blob/master/README_CN.md)
 
 ## features
 

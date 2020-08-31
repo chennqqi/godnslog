@@ -4,7 +4,7 @@
 
 A dns&amp;http log server for verify SSRF/XXE/RFI/RCE vulnerability 
 
-[Engglish]()|中文
+[English Doc](https://github.com/chennqqi/godnslog)|中文文档
 
 ## 功能特性
 
@@ -49,6 +49,13 @@ docker build -t "user/godnslog" .
 ```bash
 docker build -t "user/godnslog" -f DockerfileCN .
 ```
+
+## 已知问题
+
+- introduce/文档的mavon-editor会遮挡下拉菜单
+- 修改语言不能保存到后端
+- 一些没必要的调试打印问题
+- 口令失效后的一些重复提示
 
 ## 关注我们
 
