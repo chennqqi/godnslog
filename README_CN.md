@@ -1,25 +1,24 @@
-# GDONSLOG
+# GODNSLOG
 
 ![](https://s1.ax1x.com/2020/08/31/dXFLg1.png)
 
-A dns&amp;http log server for verify SSRF/XXE/RFI/RCE vulnerability
+A dns&amp;http log server for verify SSRF/XXE/RFI/RCE vulnerability 
 
-Engglish|[中文]()
+[Engglish]()|中文
 
-## features
+## 功能特性
 
 - DNSLOG
 - HTTPLGO
 - Rebinding
 - Push (callback)
 - Multi-user
-- dockerlized
-- python/golang client sdk
+- 支持Docker一键运行
+- python/golang客户端代码
 
+## 编译前端
 
-## build frontend
-
-requirements: 
+依赖: 
 
 `yarn`
 
@@ -29,9 +28,9 @@ yarn install
 yarn build
 ```
 	
-## build backend
+## 编译后端
 
-requirements: 
+依赖: 
 
 `golang >= 1.13.0`
 
@@ -45,13 +44,12 @@ go build
 docker build -t "user/godnslog" .
 ```
 
-For Chinese user:
+国内用户使用下面的Dockefile:
 
 ```bash
 docker build -t "user/godnslog" -f DockerfileCN .
 ```
 
-## Follow us
+## 关注我们
 
-wechat:
 ![](https://open.weixin.qq.com/qr/code?username=gh_d110440c4890)

@@ -35,7 +35,7 @@
         value: '123456',
         infos: [
           {
-            title: this.$t('Dns Addr'),
+            title: this.$t('DNS Addr'),
             value: '-',
             key: 'dns_addr',
             actions: {
@@ -46,7 +46,7 @@
             }
           },
           {
-            title: this.$t('Http Addr'),
+            title: this.$t('HTTP Addr'),
             value: '-',
             key: 'http_addr',
             actions: {

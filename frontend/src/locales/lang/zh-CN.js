@@ -38,6 +38,10 @@ const locale = {
   'setting.system.base.unit.hour': '小时',
   'setting.system.base.rebind': '域名重绑定',
 
+  'DNS Addr': 'DNS地址',
+  'HTTP Addr': 'HTTP地址',
+  'Secret': '密钥',
+
   'auto clean in hours': '清理数小时前的记录',
   'Domain': '域名',
   'New User': '新建用户',
