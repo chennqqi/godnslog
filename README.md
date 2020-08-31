@@ -4,7 +4,7 @@
 
 A dns&amp;http log server for verify SSRF/XXE/RFI/RCE vulnerability
 
-English Doc|[中文文档](https://github.com/chennqqi/godnslog/blob/master/README_CN.md)
+English Doc | [中文文档](https://github.com/chennqqi/godnslog/blob/master/README_CN.md)
 
 ## features
 
@@ -15,6 +15,14 @@ English Doc|[中文文档](https://github.com/chennqqi/godnslog/blob/master/READ
 - Multi-user
 - dockerlized
 - python/golang client sdk
+
+
+### DNSLOG
+![](https://s1.ax1x.com/2020/08/31/dXPba4.png)
+
+
+### HTTPLOG
+![](https://s1.ax1x.com/2020/08/31/dXiiIH.png)
 
 
 ## build frontend
