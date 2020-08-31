@@ -59,6 +59,22 @@ For Chinese user:
 docker build -t "user/godnslog" -f DockerfileCN .
 ```
 
+## RUN
+
+self build
+
+```bash
+docker run -p80:8080 -p53:53/udp "user/godnslog"  -domain yourdomain.com -4 100.100.100.100
+```
+
+dockerhub
+
+```bash
+docker pull "sort/godnslog:version-0.3.0"
+docker run -p80:8080 -p53:53/udp "sort/godnslog:version-0.3.0" -domain yourdomain.com -4 100.100.100.100
+```
+
+
 ## Follow us
 
 wechat:

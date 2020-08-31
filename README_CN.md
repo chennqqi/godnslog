@@ -58,6 +58,21 @@ docker build -t "user/godnslog" .
 docker build -t "user/godnslog" -f DockerfileCN .
 ```
 
+## docker一键运行
+
+查看最新版本
+https://hub.docker.com/r/sort/godnslog/tags
+
+```bash
+docker pull "sort/godnslog:version-0.3.0"
+docker run -p80:8080 -p53:53/udp "sort/godnslog:version-0.3.0" -domain yourdomain.com -4 100.100.100.100
+```
+
+version-0.3.0 替换为最新版本号
+yourdomain.com 替换为你的域名
+100.100.100.100 替换为你的公网IP
+
+
 ## 已知问题
 
 - introduce/文档的mavon-editor会遮挡下拉菜单
