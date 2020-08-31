@@ -9,7 +9,7 @@ A dns&amp;http log server for verify SSRF/XXE/RFI/RCE vulnerability
 ## 功能特性
 
 - DNSLOG
-- HTTPLGO
+- HTTPLOG
 - Rebinding
 - Push (callback)
 - Multi-user
