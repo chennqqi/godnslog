@@ -70,12 +70,9 @@
 </template>
 
 <script>
-// import md5 from 'md5'
-// import bcrypt from 'bcryptjs'
+
 import { mapActions } from 'vuex'
 import { timeFix } from '@/utils/util'
-// import { getSmsCaptcha, get2step } from '@/api/login'
-// import TwoStepCaptcha from '@/components/tools/TwoStepCaptcha'
 
 export default {
   components: {
@@ -102,14 +99,6 @@ export default {
   },
   created () {
     console.log('login.vue:created')
-    // get2step({ })
-    //   .then(res => {
-    //     this.requiredTwoStepCaptcha = res.result.stepCode
-    //   })
-    //   .catch(() => {
-    //     this.requiredTwoStepCaptcha = false
-    //   })
-    // this.requiredTwoStepCaptcha = true
   },
   methods: {
     ...mapActions(['Login', 'Logout']),
@@ -165,49 +154,6 @@ export default {
         }
       })
     },
-    // getCaptcha (e) {
-    //   e.preventDefault()
-    //   const { form: { validateFields }, state } = this
-
-    //   validateFields(['mobile'], { force: true }, (err, values) => {
-    //     if (!err) {
-    //       state.smsSendBtn = true
-
-    //       const interval = window.setInterval(() => {
-    //         if (state.time-- <= 0) {
-    //           state.time = 60
-    //           state.smsSendBtn = false
-    //           window.clearInterval(interval)
-    //         }
-    //       }, 1000)
-
-    //       const hide = this.$message.loading('验证码发送中..', 0)
-    //       getSmsCaptcha({ mobile: values.mobile }).then(res => {
-    //         setTimeout(hide, 2500)
-    //         this.$notification['success']({
-    //           message: '提示',
-    //           description: '验证码获取成功，您的验证码为：' + res.result.captcha,
-    //           duration: 8
-    //         })
-    //       }).catch(err => {
-    //         setTimeout(hide, 1)
-    //         clearInterval(interval)
-    //         state.time = 60
-    //         state.smsSendBtn = false
-    //         this.requestFailed(err)
-    //       })
-    //     }
-    //   })
-    // },
-    // stepCaptchaSuccess () {
-    //   this.loginSuccess()
-    // },
-    // stepCaptchaCancel () {
-    //   this.Logout().then(() => {
-    //     this.loginBtn = false
-    //     this.stepCaptchaVisible = false
-    //   })
-    // },
     loginSuccess (res) {
       console.log('loginSuccess', res)
       // check res.homePage define, set $router.push name res.homePage

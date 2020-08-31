@@ -51,7 +51,7 @@ GODNSLOG 的`/log/`接口提供了HTTPLOG的功能，访问`http://*.{shortId}.g
 
 - IP
 - Method
-- URL
+- Path
 - User-Agent
 - Content-Type 类型
 - Data body数据
