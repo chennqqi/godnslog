@@ -18,6 +18,9 @@ A dns&amp;http log server for verify SSRF/XXE/RFI/RCE vulnerability
 
 
 ### DNSLOG
+
+默认账户: `admin/password`
+
 ![](https://s1.ax1x.com/2020/08/31/dXPba4.png)
 
 
@@ -60,8 +63,29 @@ docker build -t "user/godnslog" -f DockerfileCN .
 
 ## docker一键运行
 
-查看最新版本
+### I 修改域名的DNS服务器地址
+
+以阿里云为例
+
+1. 在域名-管理页面, 自定义DNS Host，定义域名的NS地址, ns1.xxx.xxx, ns2.xxx.xxx
+如果你的服务器IP有别的域名解析，可以跳过这一步，这里要配置两个不同的IP地址，你可以将其中一个临时指向一个假地址，例如100.100.100.100![](https://s1.ax1x.com/2020/09/04/wFiaM8.png)
+
+2. DNS修改，将域名的DNS服务器修改为上一步定义的DNS地址，这一步中限制只能填入域名。
+这里有个限制最少填入两个地址，而且两个地址不能是同一个IP。 
+![](https://s1.ax1x.com/2020/09/04/wFitRP.png)
+![](https://s1.ax1x.com/2020/09/04/wFiJPI.png)
+
+3. 最后回到第一步中将假地址IP也修改为真实的IP地址
+
+4. whois验证修改是否生效
+<https://lookup.icann.org/lookup>
+![](https://s1.ax1x.com/2020/09/04/wFk04s.png)
+
+
+### II. 查看获取最新版本
 https://hub.docker.com/r/sort/godnslog/tags
+
+### III.拉取并运行
 
 ```bash
 docker pull "sort/godnslog:version-0.3.0"
