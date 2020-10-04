@@ -152,3 +152,10 @@ type Pagination struct {
 	TotalCount int `json:"totalCount"`
 	TotalPage  int `json:"totalPage"`
 }
+
+type Resolv struct {
+	Host  string `json:"host"` //host record, eg. www
+	Type  string `json:"Type"` //record type
+	Value string `json:"Value"`
+	Ttl   uint32 `json:"ttl"`
+}

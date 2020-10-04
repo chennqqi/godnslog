@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"strconv"
 	"strings"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 func getSecuritySeed() string {
@@ -29,6 +31,15 @@ func genRandomString(n int) string {
 		b[i] = p[int(b[i])%len(p)]
 	}
 	return string(b)
+}
+
+func makePassword(pass string) string {
+	newpass, _ := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
+	return string(newpass)
+}
+
+func comparePassword(pass, hashpass string) error {
+	return bcrypt.CompareHashAndPassword([]byte(hashpass), []byte(pass))
 }
 
 func isWeakPass(pass string) bool {

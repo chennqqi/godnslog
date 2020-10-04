@@ -12,7 +12,6 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type MyClaims struct {
@@ -52,13 +51,13 @@ func (self *WebServer) initDatabase() error {
 		logrus.Errorf("[webui.go::initDatabase] orm.Count(user): %v", err)
 		return err
 	}
-	newpass, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
 	if count == 0 {
+		randomPass := genRandomString(12)
 		_, err = orm.InsertOne(&models.TblUser{
 			Name:          "admin",
 			Email:         "admin@godnslog.com",
 			ShortId:       genShortId(),
-			Pass:          string(newpass),
+			Pass:          makePassword(randomPass),
 			Token:         genRandomToken(),
 			Role:          roleSuper,
 			Lang:          self.DefaultLanguage,
@@ -68,6 +67,7 @@ func (self *WebServer) initDatabase() error {
 			logrus.Errorf("[webui.go::initDatabase] orm.InsertOne(user): %v", err)
 			return err
 		}
+		logrus.Printf("Init super admin user with password: %v\n", randomPass)
 	}
 
 	store := self.store
@@ -227,7 +227,7 @@ func (self *WebServer) userLogin(c *gin.Context) {
 		self.respData(c, 401, CodeBadData, "bad request", nil)
 		return
 	}
-	err = bcrypt.CompareHashAndPassword([]byte(user.Pass), []byte(req.Password))
+	err = comparePassword(req.Password, user.Pass)
 	if err != nil {
 		logrus.Infof("[webui.go::userLogin] password not match")
 		self.respData(c, 401, CodeBadData, "bad request", nil)
@@ -541,7 +541,6 @@ func (self *WebServer) addUser(c *gin.Context) {
 		})
 		return
 	}
-	hashedPass, _ := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 
 	//random api Token
 	session := self.orm.NewSession()
@@ -554,7 +553,7 @@ func (self *WebServer) addUser(c *gin.Context) {
 		Token:         genRandomToken(),
 		ShortId:       genShortId(),
 		Lang:          self.DefaultLanguage,
-		Pass:          string(hashedPass),
+		Pass:          makePassword(req.Password),
 		CleanInterval: self.DefaultCleanInterval,
 	}
 	_, err = session.InsertOne(&item)
@@ -608,20 +607,8 @@ func (self *WebServer) setUser(c *gin.Context) {
 		//change other user
 		session = session.ID(req.Id)
 		if req.Password != "" {
-			newPass, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-			if err != nil {
-				logrus.Errorf("[webapi.go::delUser] bcrypt.GenerateFromPassword: %v", err)
-				self.resp(c, 400, &CR{
-					Message: "failed",
-					Code:    CodeServerInternal,
-				})
-				self.resp(c, 400, &CR{
-					Message: "param invaid: " + err.Error(),
-					Code:    CodeBadData,
-				})
-				return
-			}
-			session = session.SetExpr(`pass`, customQuote(string(newPass)))
+			newPass := makePassword(req.Password)
+			session = session.SetExpr(`pass`, customQuote(newPass))
 		}
 		if req.Language != "" {
 			session = session.SetExpr(`lang`, customQuote(req.Language))
@@ -887,12 +874,9 @@ func (self *WebServer) setSecuritySetting(c *gin.Context) {
 	session := self.orm.NewSession()
 	defer session.Close()
 
-	newPass, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		logrus.Fatal("[webui.go] bcrypt.GenerateFromPassword", req.Password, err)
-	}
-	logrus.Infof("password:%v, hashpass=%v", req.Password, string(newPass))
-	_, err = session.ID(id).SetExpr(`pass`, customQuote(string(newPass))).Update(&models.TblUser{})
+	newPass := makePassword(req.Password)
+	//logrus.Debugf("password:%v, hashpass=%v", req.Password, string(newPass))
+	_, err = session.ID(id).SetExpr(`pass`, customQuote(newPass)).Update(&models.TblUser{})
 	if err != nil {
 		sql, _ := session.LastSQL()
 		logrus.Errorf("[webuig.go::setSecuritySetting] orm.Update(%v), last SQL: %v", err, sql)

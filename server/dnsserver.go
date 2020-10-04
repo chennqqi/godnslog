@@ -2,7 +2,7 @@ package server
 
 import (
 	"net"
-	"runtime"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -38,6 +38,11 @@ const (
 	LOG_TTL     = 0
 	NS_TTL      = 600
 	DEFAULT_TTL = 300
+	XIP_TTL     = 86400
+)
+
+var (
+	ipv6Regexp = regexp.MustCompile(`^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::(?:[0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4}$|^[0-9a-fA-F]{1,4}::(?:[0-9a-fA-F]{1,4}:){0,5}[0-9a-fA-F]{1,4}$|^[0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}::(?:[0-9a-fA-F]{1,4}:){0,4}[0-9a-fA-F]{1,4}$|^(?:[0-9a-fA-F]{1,4}:){0,2}[0-9a-fA-F]{1,4}::(?:[0-9a-fA-F]{1,4}:){0,3}[0-9a-fA-F]{1,4}$|^(?:[0-9a-fA-F]{1,4}:){0,3}[0-9a-fA-F]{1,4}::(?:[0-9a-fA-F]{1,4}:){0,2}[0-9a-fA-F]{1,4}$|^(?:[0-9a-fA-F]{1,4}:){0,4}[0-9a-fA-F]{1,4}::(?:[0-9a-fA-F]{1,4}:)?[0-9a-fA-F]{1,4}$|^(?:[0-9a-fA-F]{1,4}:){0,5}[0-9a-fA-F]{1,4}::[0-9a-fA-F]{1,4}$|^(?:[0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4}::$`)
 )
 
 type Resolve struct {
@@ -57,8 +62,9 @@ type DnsServer struct {
 	DnsServerConfig
 	store *cache.Cache
 
-	tcpServer *dns.Server
-	udpServer *dns.Server
+	tcpServer  *dns.Server
+	udpServer  *dns.Server
+	ipv4Regexp *regexp.Regexp
 
 	wg      sync.WaitGroup
 	handler dns.Handler
@@ -68,14 +74,13 @@ type DnsServer struct {
 
 func NewDnsServer(cfg *DnsServerConfig, store *cache.Cache) (*DnsServer, error) {
 	domain := cfg.Domain
-	if strings.HasSuffix(domain, ".") {
+	if !strings.HasSuffix(domain, ".") {
 		domain = domain + "."
 	}
+	ipv4Exp := `((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))`
+	ipv4Exp = ipv4Exp + strings.Replace("."+domain, ".", `\.`, -1)
 
 	addr := ""
-	if runtime.GOOS == "windows" {
-		addr = ":10053"
-	}
 	fixed := make(map[string][]Resolve)
 	for i := 0; i < len(cfg.Fixed); i++ {
 		r := cfg.Fixed[i]
@@ -110,7 +115,7 @@ func NewDnsServer(cfg *DnsServerConfig, store *cache.Cache) (*DnsServer, error) 
 		},
 		fixed: fixed,
 	}
-
+	s.ipv4Regexp = regexp.MustCompile(ipv4Exp)
 	handler.HandleFunc(domain, s.Do)
 	return s, nil
 }
@@ -203,6 +208,17 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 	prefix, shortId, isRebind := parseDomain(q.Name, h.Domain)
 	if prefix == "" {
 		ttl = DEFAULT_TTL // improve performance
+	}
+
+	//xip return custom ip
+	{
+		subs := h.ipv4Regexp.FindAllStringSubmatch(q.Name, 1)
+		if len(subs) > 0 {
+			ip := subs[0][1]
+			ttl = XIP_TTL
+			doResp(net.ParseIP(ip), q.Qtype)
+			return
+		}
 	}
 
 	v, exist := store.Get(shortId + ".suser")

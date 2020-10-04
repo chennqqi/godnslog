@@ -9,12 +9,14 @@ require (
 	github.com/gin-contrib/static v0.0.0-20200815103939-31fb0c56a3d1
 	github.com/gin-gonic/gin v1.6.3
 	github.com/go-sql-driver/mysql v1.5.0
+	github.com/google/subcommands v1.2.0
 	github.com/hashicorp/go-retryablehttp v0.6.7
 	github.com/mattn/go-sqlite3 v1.14.2
 	github.com/miekg/dns v1.1.31
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sirupsen/logrus v1.6.0
+	github.com/slonzok/getpass v0.0.0-20170424161223-6d86ecc93d07
 	github.com/swaggo/files v0.0.0-20190704085106-630677cd5c14
 	github.com/swaggo/gin-swagger v1.2.0
 	github.com/swaggo/swag v1.6.7

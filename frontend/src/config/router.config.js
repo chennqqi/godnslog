@@ -66,6 +66,28 @@ export const asyncRouterMap = [
               keepAlive: true,
               permission: ['document']
             }
+          },
+          // rebinding
+          {
+            path: '/document/history',
+            name: 'History',
+            component: () => import('@/views/doc/History'),
+            meta: {
+              title: 'menu.document.history',
+              keepAlive: true,
+              permission: ['document']
+            }
+          },
+          // rebinding
+          {
+              path: '/document/install',
+              name: 'Install',
+              component: () => import('@/views/doc/Install'),
+              meta: {
+                title: 'menu.document.install',
+                keepAlive: true,
+                permission: ['document']
+              }
           }
         ]
       },

@@ -30,6 +30,8 @@ const locale = {
   'menu.record.dns': 'dns',
   'menu.record.http': 'http',
   'menu.document.rebinding': '重绑定',
+  'menu.document.install': '安装',
+  'menu.document.history': '历史',
 
   // setting.system
   'setting.system.base.callback': '回调地址',
