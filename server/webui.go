@@ -67,7 +67,7 @@ func (self *WebServer) initDatabase() error {
 			logrus.Errorf("[webui.go::initDatabase] orm.InsertOne(user): %v", err)
 			return err
 		}
-		logrus.Printf("Init super admin user with password: %v\n", randomPass)
+		fmt.Printf("Init super admin user with password: %v\n", randomPass)
 	}
 
 	store := self.store
