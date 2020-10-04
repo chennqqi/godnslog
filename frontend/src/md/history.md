@@ -4,7 +4,7 @@
 
 New Features:
 
-1. 支持[xip](http://godnslog.com/)功能
+1. Support [xip](http://godnslog.com/)
     10.0.0.1.godnslog.com   resolves to   10.0.0.1
     www.10.0.0.1.godnslog.com   resolves to   10.0.0.1
     mysite.10.0.0.1.godnslog.com   resolves to   10.0.0.1
