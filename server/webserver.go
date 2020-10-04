@@ -329,3 +329,19 @@ func (self *WebServer) IsDuplicate(err error) bool {
 	}
 	return false
 }
+
+func (self *WebServer) ResetPassword(user, password string) error {
+	if isWeakPass(password) {
+		return fmt.Errorf("Password(%v) too weak!", password)
+	}
+
+	orm := self.orm
+	session := orm.NewSession()
+	defer session.Close()
+
+	_, err := session.Where(`role = ?`, roleSuper).Cols("pass").
+		Update(&models.TblUser{
+			Pass: makePassword(password),
+		})
+	return err
+}
