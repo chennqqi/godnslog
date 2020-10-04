@@ -19,7 +19,9 @@ English Doc | [中文文档](https://github.com/chennqqi/godnslog/blob/master/RE
 
 ### DNSLOG
 
-default account: `admin/password`
+super admin user: `admin`
+password will be showed in console logs when first run.
+you can change it by subcommand `resetpw`
 
 ![](https://s1.ax1x.com/2020/08/31/dXPba4.png)
 

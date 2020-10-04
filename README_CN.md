@@ -19,7 +19,9 @@ A dns&amp;http log server for verify SSRF/XXE/RFI/RCE vulnerability
 
 ### DNSLOG
 
-默认账户: `admin/password`
+默认账户: `admin`
+首次运行程序时会创建随机密码，可以在控制台打印获取到该密码。
+也可以使用`resetpw`子命令来自定义密码
 
 ![](https://s1.ax1x.com/2020/08/31/dXPba4.png)
 
