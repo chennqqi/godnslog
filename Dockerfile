@@ -14,7 +14,7 @@ RUN apk add build-base git musl-dev
 COPY models /src/godnslog/models
 COPY server /src/godnslog/server
 COPY cache /src/godnslog/cache
-COPY main.go go.mod /src/godnslog/
+COPY *.go go.mod /src/godnslog/
 WORKDIR /src/godnslog
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o /go/bin/godnslog
 
