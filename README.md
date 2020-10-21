@@ -81,8 +81,8 @@ docker run -p80:8080 -p53:53/udp "user/godnslog"  -domain yourdomain.com -4 100.
 or use dockerhub
 
 ```bash
-docker pull "sort/godnslog:version-0.3.0"
-docker run -p80:8080 -p53:53/udp "sort/godnslog:version-0.3.0" -domain yourdomain.com -4 100.100.100.100
+docker pull "sort/godnslog"
+docker run -p80:8080 -p53:53/udp "sort/godnslog" serve -domain yourdomain.com -4 100.100.100.100
 ```
 
 ## Follow us
