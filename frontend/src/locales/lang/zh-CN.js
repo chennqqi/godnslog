@@ -25,6 +25,7 @@ const locale = {
   'menu.setting.system.base': '基础设置',
   'menu.setting.system': '系统',
   'menu.setting.user': '用户',
+  'menu.setting.resolve': '解析',
 
   'menu.record': '记录',
   'menu.record.dns': 'dns',

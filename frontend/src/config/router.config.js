@@ -155,6 +155,12 @@ export const asyncRouterMap = [
             name: 'UserSetting',
             component: () => import('@/views/account/user/Index'),
             meta: { title: 'menu.setting.user', hideHeader: true, permission: [ 'manage' ] }
+          },
+          {
+            path: '/setting/resolve',
+            name: 'ResolveSetting',
+            component: () => import('@/views/account/resolve/Index'),
+            meta: { title: 'menu.setting.resolve', hideHeader: true, permission: [ 'manage' ] }
           }
         ]
       }
