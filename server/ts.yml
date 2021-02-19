@@ -1,0 +1,101 @@
+Bad Resolve Data:
+    en-US: Bad Resolve Data
+    zh-CN: 数据格式不正确
+Bad param:
+    en-US: Bad param
+    zh-CN: 无效参数
+Can't Change Host/Type:
+    en-US: Can't Change Host/Type
+    zh-CN: 不能更改主机/类型
+Can't change:
+    en-US: Can't change
+    zh-CN: 无法修改
+Can't handle this token:
+    en-US: Can't handle this token
+    zh-CN: 无法解析token
+'Delete Record: %v':
+    en-US: '删除记录: %v'
+Delete resolve(%v), but not exist:
+    en-US: Delete resolve(%v), but not exist
+Failed:
+    en-US: Failed
+    zh-CN: 失败
+'Insert record: %v':
+    en-US: 'Insert record: %v'
+    zh-CN: '插入记录: %v'
+No such user:
+    en-US: No such user
+    zh-CN: 用户不存在
+OK:
+    en-US: OK
+    zh-CN: 成功
+'Query Record: %v':
+    en-US: 'Query Record: %v'
+    zh-CN: '查询记录: %v'
+'Query record: %v':
+    en-US: 'Query record: %v'
+Record not exist:
+    en-US: Record not exist
+    zh-CN: 记录不存在
+Token Expire:
+    en-US: Token Expire
+    zh-CN: token已过期
+Token Expired or not active yet:
+    en-US: Token Expired or not active yet
+    zh-CN: token已过期或者未激活
+Token Required:
+    en-US: Token Required
+    zh-CN: 没有获取到token
+Token invalid:
+    en-US: Token invalid
+    zh-CN: token无效
+Type:(%v) conflict with %v:
+    en-US: Type:(%v) conflict with %v
+    zh-CN: 类型:(%v) 与%v冲突
+'Update record: %v':
+    en-US: 'Update record: %v'
+Value(%v) already exists:
+    en-US: Value(%v) already exists
+    zh-CN: 值(%v)已存在
+bad input:
+    en-US: bad input
+    zh-CN: 输入不合法
+bad param:
+    en-US: bad param
+    zh-CN: 参数错误
+bad permission:
+    en-US: bad permission
+    zh-CN: 没有权限
+bad request:
+    en-US: bad request
+    zh-CN: 不合法的请求
+bad service:
+    en-US: bad service
+    zh-CN: 内部错误
+'delete: %v':
+    en-US: 'delete: %v'
+    zh-CN: '已删除: %v'
+failed:
+    en-US: failed
+    zh-CN: 失败
+invalid Param:
+    en-US: invalid Param
+    zh-CN: 无效参数
+not login:
+    en-US: not login
+    zh-CN: 尚未登录
+'param invaid: ':
+    en-US: 'param invaid: '
+    zh-CN: '参数无效: '
+param required:
+    en-US: param required
+    zh-CN: 未输入必要参数
+parameter id is required:
+    en-US: parameter id is required
+    zh-CN: 参数id必须传入
+password too weak:
+    en-US: password too weak
+    zh-CN: 密码过于简单
+update Failed:
+    en-US: update Failed
+    zh-CN: 更新失败

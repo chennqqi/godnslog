@@ -24,7 +24,12 @@ export function isIPv6 (str) {
 
 export function isURL (strUrl) {
   const urlReg = /(https?:\/\/)?.*/ig
-  return strUrl.match(urlReg)
+  return urlReg.test(strUrl)
+}
+
+export function isDomain (str) {
+  const re = /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9](?:\.[a-zA-Z]{1,})+$/
+  return re.test(str)
 }
 
 /**

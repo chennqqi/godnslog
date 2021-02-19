@@ -9,22 +9,22 @@
         :disabled="true"
         v-if="!createMode"
       >
-      <a-input
-        disabled
-        v-decorator="[
-        'id',
-          {
-            initialValue: '-',
-            rules: [
-            ]
-          }
-        ]"
-      >ID: {{}}</a-input>
+        <a-input
+          disabled
+          v-decorator="[
+            'id',
+            {
+              initialValue: '-',
+              rules: [
+              ]
+            }
+          ]"
+        >ID: {{}}</a-input>
       </a-form-item>
       <a-form-item
         :labelCol="labelCol"
         :wrapperCol="wrapperCol"
-        :label="$t('username')"
+        :label="$t('Username')"
         hasFeedback
       >
         <a-input
@@ -44,7 +44,7 @@
       <a-form-item
         :labelCol="labelCol"
         :wrapperCol="wrapperCol"
-        :label="$t('email')"
+        :label="$t('Email')"
         hasFeedback
       >
         <a-input

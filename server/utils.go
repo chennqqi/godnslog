@@ -76,3 +76,13 @@ func parseDomain(name, root string) (prefix, shortId string, rebind bool) {
 	rebind = prefix == "r" || strings.HasSuffix(prefix, ".r")
 	return
 }
+
+func parseQuestionName(name, root string) (q string) {
+	index := strings.Index(name, "."+root)
+	if index <= 0 {
+		return
+	}
+
+	q = name[:index]
+	return
+}

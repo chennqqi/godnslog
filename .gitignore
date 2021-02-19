@@ -42,3 +42,4 @@ package-lock.json
 *.sum
 dist
 godnslog.db
+/.gitee

@@ -78,7 +78,18 @@ export const asyncRouterMap = [
               permission: ['document']
             }
           },
-          // rebinding
+          // resolve
+          {
+              path: '/document/resolve',
+              name: 'Resolve',
+              component: () => import('@/views/doc/Resolve'),
+              meta: {
+                title: 'menu.document.resolve',
+                keepAlive: true,
+                permission: ['document']
+              }
+          },
+          // install
           {
               path: '/document/install',
               name: 'Install',
@@ -155,6 +166,12 @@ export const asyncRouterMap = [
             name: 'UserSetting',
             component: () => import('@/views/account/user/Index'),
             meta: { title: 'menu.setting.user', hideHeader: true, permission: [ 'manage' ] }
+          },
+          {
+              path: '/setting/resolve',
+              name: 'ResolveSetting',
+              component: () => import('@/views/account/resolve/Index'),
+              meta: { title: 'menu.setting.resolve', hideHeader: true, permission: [ 'manage' ] }
           }
         ]
       }

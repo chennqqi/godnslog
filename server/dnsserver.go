@@ -10,6 +10,7 @@ import (
 	"github.com/chennqqi/godnslog/cache"
 	"github.com/chennqqi/godnslog/models"
 	"github.com/miekg/dns"
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -31,7 +32,9 @@ import (
 
 TODO:
 1. 支持IPv6
-
+2. 支持A记录通配
+3. 支持SRV记录
+4. 支持NS记录
 */
 
 const (
@@ -55,7 +58,7 @@ type DnsServerConfig struct {
 	Domain             string
 	RTimeout, WTimeout time.Duration
 	V4, V6             net.IP
-	Fixed              []Resolve
+	Upstream           string
 }
 
 type DnsServer struct {
@@ -68,8 +71,7 @@ type DnsServer struct {
 
 	wg      sync.WaitGroup
 	handler dns.Handler
-
-	fixed map[string][]Resolve
+	client  *dns.Client
 }
 
 func NewDnsServer(cfg *DnsServerConfig, store *cache.Cache) (*DnsServer, error) {
@@ -81,20 +83,13 @@ func NewDnsServer(cfg *DnsServerConfig, store *cache.Cache) (*DnsServer, error) 
 	ipv4Exp = ipv4Exp + strings.Replace("."+domain, ".", `\.`, -1)
 
 	addr := ""
-	fixed := make(map[string][]Resolve)
-	for i := 0; i < len(cfg.Fixed); i++ {
-		r := cfg.Fixed[i]
-		v, exist := fixed[r.Name]
-		if exist {
-			v = append(v, cfg.Fixed[i])
-			fixed[r.Name] = v
-		} else {
-			fixed[r.Name] = []Resolve{r}
-		}
-	}
-
+	// debug
+	// addr = ":10053"
 	handler := dns.NewServeMux()
 	var s = &DnsServer{
+		client: &dns.Client{
+			SingleInflight: true,
+		},
 		DnsServerConfig: *cfg,
 		store:           store,
 		handler:         handler,
@@ -113,7 +108,6 @@ func NewDnsServer(cfg *DnsServerConfig, store *cache.Cache) (*DnsServer, error) 
 			ReadTimeout:  cfg.RTimeout,
 			WriteTimeout: cfg.WTimeout,
 		},
-		fixed: fixed,
 	}
 	s.ipv4Regexp = regexp.MustCompile(ipv4Exp)
 	handler.HandleFunc(domain, s.Do)
@@ -153,11 +147,215 @@ func (s *DnsServer) log(rcd *DnsRecord) {
 	}()
 }
 
+// for standard dns
+func (self *DnsServer) responseStandard(w dns.ResponseWriter, req *dns.Msg) {
+	store := self.store
+	q := req.Question[0]
+
+	origin := parseQuestionName(q.Name, self.Domain)
+	// fmt.Println("query origin:", origin)
+
+	m := new(dns.Msg)
+	m.SetReply(req)
+
+	resolveToAnswer := func(q string, r *Resolve) dns.RR {
+		switch r.Type {
+		case "A":
+			return &dns.A{
+				Hdr: dns.RR_Header{
+					Name:   q,
+					Rrtype: dns.TypeA,
+					Class:  dns.ClassINET,
+					Ttl:    r.Ttl,
+				},
+				A: net.ParseIP(r.Value),
+			}
+		case "CNAME":
+			return &dns.CNAME{
+				Hdr: dns.RR_Header{
+					Name:   q,
+					Rrtype: dns.TypeCNAME,
+					Class:  dns.ClassINET,
+					Ttl:    r.Ttl,
+				},
+				Target: r.Value + ".",
+			}
+
+		case "MX":
+			return &dns.MX{
+				Hdr: dns.RR_Header{
+					Name:   q,
+					Rrtype: dns.TypeMX,
+					Class:  dns.ClassINET,
+					Ttl:    r.Ttl,
+				},
+				Preference: 0,
+				Mx:         r.Value,
+			}
+
+		case "TXT":
+			return &dns.TXT{
+				Hdr: dns.RR_Header{
+					Name:   q,
+					Rrtype: dns.TypeTXT,
+					Class:  dns.ClassINET,
+					Ttl:    r.Ttl,
+				},
+				Txt: []string{r.Value},
+			}
+
+		default:
+			return nil
+		}
+		return nil
+	}
+
+	findResolves := func(origin, t string) []*Resolve {
+		v, exist := store.Get(origin + t)
+		if exist {
+			return v.([]*Resolve)
+		}
+		subs := strings.Split(origin, ".")
+		for i := 0; i < len(subs); i++ {
+			subs[i] = "*"
+			altquery := strings.Join(subs[i:], ".")
+			store.Get(altquery)
+			if exist {
+				return v.([]*Resolve)
+			}
+		}
+		return nil
+	}
+
+	c := self.client
+	cnameToAnswer := func(cname string) []dns.RR {
+		v, exist := store.Get(cname + "#A")
+		if exist {
+			rr := v.([]*Resolve)
+			var r []dns.RR
+			for i := 0; i < len(rr); i++ {
+				r = append(r, resolveToAnswer(cname, rr[i]))
+			}
+			return r
+		}
+
+		// singleflight
+		{
+			m := new(dns.Msg)
+			m.Id = dns.Id()
+			m.RecursionDesired = true
+			m.Question = []dns.Question{
+				dns.Question{
+					Name:   cname + ".",
+					Qtype:  dns.TypeA,
+					Qclass: dns.ClassINET,
+				},
+			}
+
+			rm, _, err := c.Exchange(m, self.Upstream)
+			if err != nil {
+				logrus.Errorf("[dnsserver.go::responseStandard.cnameToAnswer] client.Exchange(%v): %v", cname, err)
+				return nil
+			}
+			if len(rm.Answer) > 0 {
+				var toStore []*Resolve
+				for i := 0; i < len(rm.Answer); i++ {
+					a := rm.Answer[i]
+					if a.Header().Rrtype == dns.TypeA {
+						at := a.(*dns.A)
+						toStore = append(toStore, &Resolve{
+							Name:  at.Hdr.Name,
+							Value: at.A.String(),
+							Type:  "A",
+							Ttl:   at.Hdr.Ttl,
+						})
+					}
+				}
+				//store answer to []*Resolve
+				if len(toStore) > 0 {
+					store.Set(cname+"#A", toStore, time.Duration(rm.Answer[0].Header().Ttl)*time.Second)
+				}
+			}
+			return rm.Answer
+		}
+	}
+
+	switch q.Qtype {
+	case dns.TypeA:
+		// A记录
+		rr := findResolves(origin, "#A")
+		if len(rr) > 0 {
+			for i := 0; i < len(rr); i++ {
+				m.Answer = append(m.Answer, resolveToAnswer(q.Name, rr[i]))
+			}
+			w.WriteMsg(m)
+			return
+		}
+
+		// 查找CNAME
+		rrc := findResolves(origin, "#CNAME")
+		if len(rrc) > 0 {
+			// CNAME 只支持1个
+			a := &dns.CNAME{
+				Hdr: dns.RR_Header{
+					Name:   q.Name,
+					Rrtype: dns.TypeCNAME,
+					Class:  dns.ClassINET,
+					Ttl:    rrc[0].Ttl,
+				},
+				Target: rrc[0].Value + ".",
+			}
+			m.Answer = append(m.Answer, a)
+			ca := cnameToAnswer(rrc[0].Value)
+			if len(ca) > 0 {
+				m.Answer = append(m.Answer, ca...)
+			}
+			w.WriteMsg(m)
+			return
+		}
+
+	case dns.TypeCNAME:
+		rr := findResolves(origin, "#CNAME")
+		if len(rr) > 0 {
+			for i := 0; i < len(rr); i++ {
+				m.Answer = append(m.Answer, resolveToAnswer(q.Name, rr[i]))
+			}
+			w.WriteMsg(m)
+			return
+		}
+
+	case dns.TypeTXT:
+		rr := findResolves(origin, "#TXT")
+		if rr == nil {
+			break
+		}
+		for i := 0; i < len(rr); i++ {
+			m.Answer = append(m.Answer, resolveToAnswer(q.Name, rr[i]))
+		}
+		w.WriteMsg(m)
+		return
+
+	case dns.TypeMX:
+		rr := findResolves(origin, "#MX")
+		if rr == nil {
+			break
+		}
+		for i := 0; i < len(rr); i++ {
+			m.Answer = append(m.Answer, resolveToAnswer(q.Name, rr[i]))
+		}
+		w.WriteMsg(m)
+		return
+
+	default:
+	}
+
+	dns.HandleFailed(w, req)
+}
+
 func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 	// only handler first
 	q := req.Question[0]
 	store := h.store
-	fixed := h.fixed
 
 	if q.Qclass != dns.ClassINET {
 		dns.HandleFailed(w, req)
@@ -223,26 +421,18 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 
 	v, exist := store.Get(shortId + ".suser")
 	var user *models.TblUser
-	if exist {
-		user = v.(*models.TblUser)
-		uid = user.Id
-		ttl = LOG_TTL
-		ip = h.V4
-		if isRebind && len(user.Rebind) > 0 {
-			idx := time.Now().Second() % len(user.Rebind)
-			ip = net.ParseIP(user.Rebind[idx])
-		}
-	} else {
-		rrs, exist := fixed[shortId]
-		if exist {
-			idx := time.Now().Second() % len(rrs)
-			r := &rrs[idx]
-			ip = net.ParseIP(r.Value)
-			ttl = r.Ttl
-		} else {
-			ip = h.V4
-			ttl = DEFAULT_TTL
-		}
+	if !exist {
+		h.responseStandard(w, req)
+		return
+	}
+
+	user = v.(*models.TblUser)
+	uid = user.Id
+	ttl = LOG_TTL
+	ip = h.V4
+	if isRebind && len(user.Rebind) > 0 {
+		idx := time.Now().Second() % len(user.Rebind)
+		ip = net.ParseIP(user.Rebind[idx])
 	}
 
 	switch q.Qtype {
@@ -263,25 +453,17 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 		doResp(h.V4, q.Qtype)
 		return
 
+	// for standard dns
+	case dns.TypeTXT:
+
+	case dns.TypeCNAME:
+
+	case dns.TypeMX:
+
 	default:
 		dns.HandleFailed(w, req)
 		return
 	}
 
 	dns.HandleFailed(w, req)
-}
-
-func (self *DnsServer) Update(rr []Resolve) {
-	fixed := make(map[string][]Resolve)
-	for i := 0; i < len(rr); i++ {
-		r := rr[i]
-		v, exist := fixed[r.Name]
-		if exist {
-			v = append(v, rr[i])
-			fixed[r.Name] = v
-		} else {
-			fixed[r.Name] = []Resolve{r}
-		}
-	}
-	self.fixed = fixed
 }

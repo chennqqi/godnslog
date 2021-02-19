@@ -1,9 +1,15 @@
 # 更新日志
 
+## v0.5.0
+
+新特性：
+1. 可以当成一个普通DNS服务器使用，支持A,TXT,CNAME,MX四种类型的记录，不支持泛解析
+2. 完善前端和后端的翻译
+
 ## v0.4.0
 
 新特性：
-1. 支持[xip](http://godnslog.com/)功能
+1. 支持[xip](http://xip.io/)功能
     10.0.0.1.godnslog.com   resolves to   10.0.0.1
     www.10.0.0.1.godnslog.com   resolves to   10.0.0.1
     mysite.10.0.0.1.godnslog.com   resolves to   10.0.0.1
