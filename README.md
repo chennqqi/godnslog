@@ -15,6 +15,7 @@ English Doc | [中文文档](https://github.com/chennqqi/godnslog/blob/master/RE
 - Multi-user
 - dockerlized
 - python/golang client sdk
+- as a standard name resolve service with support `A,CNAME,TXT,MX`
 
 
 ### DNSLOG
@@ -75,7 +76,7 @@ Some registrar to ns host must be different ip address, you can set one to a fak
 ii. self build
 
 ```bash
-docker run -p80:8080 -p53:53/udp "user/godnslog"  -domain yourdomain.com -4 100.100.100.100
+docker run -p80:8080 -p53:53/udp "user/godnslog"  serve -domain yourdomain.com -4 100.100.100.100
 ```
 
 or use dockerhub
@@ -85,7 +86,7 @@ docker pull "sort/godnslog"
 docker run -p80:8080 -p53:53/udp "sort/godnslog" serve -domain yourdomain.com -4 100.100.100.100
 ```
 
-## Follow us
+## Follow me
 
 
-![](https://open.weixin.qq.com/qr/code?username=gh_d110440c4890)
+![](https://open.weixin.qq.com/qr/code?username=gh_4a48daaf398b)

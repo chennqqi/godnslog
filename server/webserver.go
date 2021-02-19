@@ -1,3 +1,4 @@
+//go:gernerate swag init
 package server
 
 import (
@@ -26,14 +27,12 @@ import (
 )
 
 type WebServerConfig struct {
-	Driver    string
-	Dsn       string
-	Domain    string
-	IP        string
-	ApiDomain string
-	WwwDomain string
-	Listen    string
-	Swagger   bool
+	Driver  string
+	Dsn     string
+	Domain  string
+	IP      string
+	Listen  string
+	Swagger bool
 
 	AuthExpire                   time.Duration
 	DefaultCleanInterval         int64
@@ -48,6 +47,8 @@ type WebServer struct {
 	engine *gin.Engine
 	orm    *xorm.Engine
 	store  *cache.Cache
+
+	uiMutex sync.Mutex
 
 	//internal
 	s         *http.Server
@@ -260,6 +261,10 @@ func (self *WebServer) Run() error {
 
 		setting.GET("/security", self.getSecuritySetting)
 		setting.POST("/security", self.setSecuritySetting)
+
+		setting.GET("/resolve", self.getResolveRecord)
+		setting.POST("/resolve", self.setResolveRecord)
+		setting.DELETE("/resolve", self.delResolveRecord)
 	}
 
 	//admin

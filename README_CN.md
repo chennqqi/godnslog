@@ -15,6 +15,7 @@ A dns&amp;http log server for verify SSRF/XXE/RFI/RCE vulnerability
 - Multi-user
 - 支持Docker一键运行
 - python/golang客户端代码
+- 标准DNS解析功能，支持A,CNAME,MX,TXT四种类型
 
 
 ### DNSLOG
@@ -94,7 +95,6 @@ docker pull "sort/godnslog"
 docker run -p80:8080 -p53:53/udp "sort/godnslog" serve -domain yourdomain.com -4 100.100.100.100
 ```
 
-version-0.3.0 替换为最新版本号
 yourdomain.com 替换为你的域名
 100.100.100.100 替换为你的公网IP
 
@@ -102,10 +102,9 @@ yourdomain.com 替换为你的域名
 ## 已知问题
 
 - introduce/文档的mavon-editor会遮挡下拉菜单
-- 修改语言不能保存到后端
 - 一些没必要的调试打印问题
 - 口令失效后的一些重复提示
 
-## 关注我们
+## 关注我
 
-![](https://open.weixin.qq.com/qr/code?username=gh_d110440c4890)
+![](https://open.weixin.qq.com/qr/code?username=gh_4a48daaf398b)

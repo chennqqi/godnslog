@@ -153,9 +153,11 @@ type Pagination struct {
 	TotalPage  int `json:"totalPage"`
 }
 
-type Resolv struct {
-	Host  string `json:"host"` //host record, eg. www
-	Type  string `json:"Type"` //record type
-	Value string `json:"Value"`
-	Ttl   uint32 `json:"ttl"`
+type Resolve struct {
+	Id         int64  `json:"id,omitempty"`
+	Host       string `json:"host"` //host record, eg. www
+	Type       string `json:"type"` //record type, eg. CNAME/A/MX/TXT/SRV/NS.
+	Value      string `json:"value"`
+	Ttl        uint32 `json:"ttl"`
+	Utimestamp int64  `json:"timestamp"`
 }

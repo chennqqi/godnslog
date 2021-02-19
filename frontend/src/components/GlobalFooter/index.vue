@@ -6,7 +6,7 @@
       <a href="https://github.com/chennqqi/" target="_blank">@chennqqi</a>
     </template>
     <template v-slot:copyright>
-      <a href="https://www.shellpub.com" target="_blank">SHELLPUB.COM</a>
+      <a href="https://www.godnslog.com" target="_blank">GODNSLOG.COM</a>
     </template>
   </global-footer>
 </template>

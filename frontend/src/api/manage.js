@@ -6,6 +6,7 @@ const manageApi = {
 
   SettingApp: '/setting/app',
   SettingSecurity: '/setting/security',
+  SettingResolve: '/setting/resolve',
 
   Permission: '/permission',
   PermissionNoPager: '/permission/no-pager',
@@ -36,19 +37,6 @@ export function saveUser (user) {
     url: manageApi.User,
     method: user.id === 0 ? 'put' : 'post',
     data: user,
-    headers: {
-      'Content-Type': 'application/json;charset=UTF-8'
-    }
-  })
-}
-
-export function switchLanguage (user) {
-  return request({
-    url: manageApi.User,
-    method: 'post',
-    data: {
-      language: user.language
-    },
     headers: {
       'Content-Type': 'application/json;charset=UTF-8'
     }
@@ -103,6 +91,30 @@ export function getOrgTree (parameter) {
   return request({
     url: manageApi.OrgTree,
     method: 'get',
+    params: parameter
+  })
+}
+
+export function getResolves (parameter) {
+  return request({
+    url: manageApi.SettingResolve,
+    method: 'get',
+    params: parameter
+  })
+}
+
+export function setResolve (parameter) {
+  return request({
+    url: manageApi.SettingResolve,
+    method: 'post',
+    data: parameter
+  })
+}
+
+export function delResolve (parameter) {
+  return request({
+    url: manageApi.SettingResolve,
+    method: 'delete',
     params: parameter
   })
 }

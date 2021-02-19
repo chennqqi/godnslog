@@ -32,6 +32,7 @@ const locale = {
   'menu.document.rebinding': '重绑定',
   'menu.document.install': '安装',
   'menu.document.history': '历史',
+  'menu.document.resolve': '解析',
 
   // setting.system
   'setting.system.base.callback': '回调地址',
@@ -43,6 +44,7 @@ const locale = {
   'DNS Addr': 'DNS地址',
   'HTTP Addr': 'HTTP地址',
   'Secret': '密钥',
+  'Edit User': '编辑用户',
 
   'auto clean in hours': '清理数小时前的记录',
   'Domain': '域名',
@@ -83,7 +85,13 @@ const locale = {
   'Auto login': '自动登录',
   'I forget password': '忘记密码',
   'Login': '登录',
-  'An exquisite dns&http log server for verify SSRF/XXE/RFI/RCE vulnerability': '一个精致的SSRF/XXE/RFI/RCE漏洞dns&http LOG验证服务器'
+  'An exquisite dns&http log server for verify SSRF/XXE/RFI/RCE vulnerability': '一个精致的SSRF/XXE/RFI/RCE漏洞dns&http LOG验证服务器',
+
+  'menu.setting.resolve': '解析',
+  'Host': '主机',
+  'Type': '类型',
+  'Value': '值',
+  'New': '新建'
 }
 
 export default {

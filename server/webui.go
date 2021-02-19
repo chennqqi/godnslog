@@ -2,12 +2,13 @@ package server
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/chennqqi/godnslog/cache"
 	"github.com/chennqqi/godnslog/models"
 
-	"github.com/chennqqi/godnslog/cache"
 	"github.com/chennqqi/goutils/ginutils"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
@@ -41,7 +42,10 @@ func (self *WebServer) initDatabase() error {
 	orm.SetTZDatabase(time.Local)
 	orm.SetTZLocation(time.Local)
 
-	err := orm.Sync(&models.TblDns{}, &models.TblHttp{}, &models.TblUser{})
+	err := orm.Sync(&models.TblDns{},
+		&models.TblHttp{},
+		&models.TblUser{},
+		&models.TblResolve{})
 	if err != nil {
 		logrus.Errorf("[webui.go::initDatabase] orm.Sync: %v", err)
 		return err
@@ -71,7 +75,7 @@ func (self *WebServer) initDatabase() error {
 	}
 
 	store := self.store
-	//sync user
+	// sync user
 	orm.Iterate(new(models.TblUser), func(idx int, bean interface{}) error {
 		user := bean.(*models.TblUser)
 		userKey := fmt.Sprintf("%v.user", user.Id)
@@ -81,14 +85,31 @@ func (self *WebServer) initDatabase() error {
 		return nil
 	})
 
+	// sync standard dns service data
+	var hosts []string
+	err = orm.Table(&models.TblResolve{}).GroupBy("host").Cols("host").Find(&hosts)
+	if err != nil {
+		logrus.Panicf("[webui.go::initDatabase] orm.GroupBy: %v", err)
+	}
+
+	for i := 0; i < len(hosts); i++ {
+		var all []models.TblResolve
+		err := orm.Where(`host=?`, hosts[i]).Find(&all)
+		if err != nil {
+			logrus.Panicf("[webui.go::initDatabase] orm.Find(%v): %v", hosts[i], err)
+		}
+		self.updateResolveCache(hosts[i], "", all)
+	}
+
 	return nil
 }
 
 func (self *WebServer) authHandler(c *gin.Context) {
+	T := getTranslateFunc(c)
 	tokenString := c.GetHeader("Access-Token")
 	if tokenString == "" {
 		c.JSON(401, CR{
-			Message: "Token Required",
+			Message: T("Token Required"),
 			Code:    CodeNoAuth,
 		})
 		c.Abort()
@@ -107,7 +128,7 @@ func (self *WebServer) authHandler(c *gin.Context) {
 		if !exist {
 			logrus.Infof("That's not even a token")
 			c.JSON(401, CR{
-				Message: "not login",
+				Message: T("not login"),
 				Code:    CodeNoAuth,
 			})
 			c.Abort()
@@ -115,7 +136,7 @@ func (self *WebServer) authHandler(c *gin.Context) {
 		} else if realSeed.(string) != claim.Seed {
 			logrus.Infof("That's not even a token")
 			c.JSON(401, CR{
-				Message: "Token Expire",
+				Message: T("Token Expire"),
 				Code:    CodeNoAuth,
 			})
 			c.Abort()
@@ -125,7 +146,7 @@ func (self *WebServer) authHandler(c *gin.Context) {
 		if !exist {
 			logrus.Infof("[webui.go::authHandler] cache.Get(user), not exist")
 			c.JSON(401, CR{
-				Message: "not login",
+				Message: T("not login"),
 				Code:    CodeNoAuth,
 			})
 			c.Abort()
@@ -146,7 +167,7 @@ func (self *WebServer) authHandler(c *gin.Context) {
 		if ve.Errors&jwt.ValidationErrorMalformed != 0 {
 			logrus.Infof("That's not even a token")
 			c.JSON(401, CR{
-				Message: "Token invalid",
+				Message: T("Token invalid"),
 				Code:    CodeNoAuth,
 			})
 			c.Abort()
@@ -155,7 +176,7 @@ func (self *WebServer) authHandler(c *gin.Context) {
 			// Token is either expired or not active yet
 			logrus.Infof("Timing is everything")
 			c.JSON(401, CR{
-				Message: "Token Expired or not active yet",
+				Message: T("Token Expired or not active yet"),
 				Code:    CodeNoAuth,
 			})
 			c.Abort()
@@ -163,7 +184,7 @@ func (self *WebServer) authHandler(c *gin.Context) {
 		} else {
 			logrus.Warnf("Couldn't handle this token: %v", err)
 			c.JSON(401, CR{
-				Message: "Can't handle this token",
+				Message: T("Can't handle this token"),
 				Code:    0,
 			})
 			c.Abort()
@@ -173,13 +194,15 @@ func (self *WebServer) authHandler(c *gin.Context) {
 }
 
 func (self *WebServer) verifyAdminPermission(c *gin.Context) {
+	T := getTranslateFunc(c)
+
 	role := c.GetInt("role")
 	switch role {
 	case roleAdmin, roleSuper:
 		return
 	default:
 		self.resp(c, 403, &CR{
-			Message: "bad permission",
+			Message: T("bad permission"),
 			Code:    CodeNoPermission,
 		})
 		c.Abort()
@@ -202,13 +225,15 @@ func (self *WebServer) verifyAdminPermission(c *gin.Context) {
 // @Failure 401 {object} CR "Unauthorized"
 // @Router /user/login [post]
 func (self *WebServer) userLogin(c *gin.Context) {
+	T := getTranslateFunc(c)
+
 	var req LoginRequest
 	err := c.BindJSON(&req)
 	if err != nil {
 		logrus.Infof("[webui.go::userLogin] bad input param")
 		self.resp(c, 400, &CR{
 			Code:    CodeBadData,
-			Message: "bad input",
+			Message: T("bad input"),
 		})
 		return
 	}
@@ -220,17 +245,17 @@ func (self *WebServer) userLogin(c *gin.Context) {
 
 	if err != nil {
 		logrus.Errorf("[webui.go::userLogin] orm.Get: %v", err)
-		self.respData(c, 502, CodeServerInternal, "bad service", nil)
+		self.respData(c, 502, CodeServerInternal, T("bad service"), nil)
 		return
 	} else if !exist {
 		logrus.Infof("[webui.go::userLogin] not found: %v", req)
-		self.respData(c, 401, CodeBadData, "bad request", nil)
+		self.respData(c, 401, CodeBadData, T("bad request"), nil)
 		return
 	}
 	err = comparePassword(req.Password, user.Pass)
 	if err != nil {
 		logrus.Infof("[webui.go::userLogin] password not match")
-		self.respData(c, 401, CodeBadData, "bad request", nil)
+		self.respData(c, 401, CodeBadData, T("bad request"), nil)
 		return
 	}
 
@@ -251,8 +276,7 @@ func (self *WebServer) userLogin(c *gin.Context) {
 	tokenString, err := token.SignedString([]byte(self.verifyKey))
 	if err != nil {
 		logrus.Errorf("[webui.go::userLogin] token.SignedString: %v", err)
-
-		self.respData(c, 502, CodeServerInternal, "bad service", nil)
+		self.respData(c, 502, CodeServerInternal, T("bad service"), nil)
 		return
 	}
 	store := self.store
@@ -261,7 +285,7 @@ func (self *WebServer) userLogin(c *gin.Context) {
 	store.Set(fmt.Sprintf("%v.user", user.Id), user, cache.NoExpiration)
 
 	self.resp(c, 200, &CR{
-		Message: "OK",
+		Message: T("OK"),
 		Result: LoginResponse{
 			Islogin: true,
 			Token:   tokenString,
@@ -280,12 +304,14 @@ func (self *WebServer) userLogin(c *gin.Context) {
 // @Failure 401 {object} CR "Unauthorized"
 // @Router /user/logout [post]
 func (self *WebServer) userLogout(c *gin.Context) {
+	T := getTranslateFunc(c)
+
 	store := self.store
 	id := c.GetInt64("id")
 	store.Delete(fmt.Sprintf("%v.seed", id))
 	store.Delete(fmt.Sprintf("%v.user", id))
 	self.resp(c, 200, &CR{
-		Message: "OK",
+		Message: T("OK"),
 	})
 }
 
@@ -300,6 +326,7 @@ func (self *WebServer) userLogout(c *gin.Context) {
 // @Failure 401 {object} CR "Can not find ID"
 // @Router /user/info [get]
 func (self *WebServer) userInfo(c *gin.Context) {
+	T := getTranslateFunc(c)
 	id := c.GetInt64("id")
 	session := self.orm.NewSession()
 	defer session.Close()
@@ -314,7 +341,7 @@ func (self *WebServer) userInfo(c *gin.Context) {
 		if err != nil {
 			logrus.Errorf("[webui.go::userInfo] orm.Get: %v", err)
 			self.resp(c, 502, &CR{
-				Message: "Failed",
+				Message: T("Failed"),
 				Code:    CodeServerInternal,
 			})
 			return
@@ -322,7 +349,7 @@ func (self *WebServer) userInfo(c *gin.Context) {
 		if !exist {
 			logrus.Errorf("[webui.go::userInfo] No such user")
 			self.resp(c, 400, &CR{
-				Message: "No such user",
+				Message: T("No such user"),
 				Code:    CodeBadData,
 			})
 			return
@@ -376,7 +403,7 @@ func (self *WebServer) userInfo(c *gin.Context) {
 
 	//TODO: UserInfo from cache, role & permissions
 	self.resp(c, 200, &CR{
-		Message: "OK",
+		Message: T("OK"),
 		Code:    CodeOK,
 		Result: UserInfo{
 			Id:    user.Id,
@@ -398,6 +425,8 @@ func (self *WebServer) userInfo(c *gin.Context) {
 // @Failure 401 {object} CR "Can not find ID"
 // @Router /admin/user/list [get]
 func (self *WebServer) userList(c *gin.Context) {
+	T := getTranslateFunc(c)
+
 	pageNo, pageNoErr := ginutils.GetQueryInt(c, "pageNo")
 	if pageNoErr != nil || pageNo <= 0 {
 		pageNo = 1
@@ -416,7 +445,7 @@ func (self *WebServer) userList(c *gin.Context) {
 	if err != nil {
 		self.resp(c, 502, &CR{
 			Code:    CodeServerInternal,
-			Message: "Failed",
+			Message: T("Failed"),
 		})
 		return
 	}
@@ -438,7 +467,7 @@ func (self *WebServer) userList(c *gin.Context) {
 	}
 
 	self.resp(c, 200, &CR{
-		Message: "OK",
+		Message: T("OK"),
 		Result:  &resp,
 	})
 }
@@ -471,12 +500,14 @@ func (self *WebServer) userNav(c *gin.Context) {
 // @Failure 401 {object} CR "Can not find ID"
 // @Router /user/nav [get]
 func (self *WebServer) delUser(c *gin.Context) {
+	T := getTranslateFunc(c)
+
 	var req DeleteRecordRequest
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
 		logrus.Infof("[webapi.go::delUser] parameter required")
 		self.resp(c, 400, &CR{
-			Message: "param required",
+			Message: T("param required"),
 			Code:    CodeBadData,
 		})
 		return
@@ -494,7 +525,7 @@ func (self *WebServer) delUser(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[webapi.go::delUser] orm.Delete: %v", err)
 		self.resp(c, 502, &CR{
-			Message: "failed",
+			Message: T("failed"),
 			Code:    CodeServerInternal,
 		})
 		return
@@ -518,17 +549,29 @@ func (self *WebServer) delUser(c *gin.Context) {
 	}
 
 	self.resp(c, 200, &CR{
-		Message: "OK",
+		Message: T("OK"),
 	})
 }
 
+// @Summary addUser
+// @Description add a new User
+// @Accept  json
+// @Produce  json
+// @Param   some_id     path    int     true        "Some ID"
+// @Success 200 {string} CR	"OK"
+// @Failure 502 {object} CR "BadService"
+// @Failure 403 {object} CR "Forbidden"
+// @Failure 401 {object} CR "Unauthorized"
+// @Router /user/logout [post]
 func (self *WebServer) addUser(c *gin.Context) {
+	T := getTranslateFunc(c)
+
 	var req UserRequest
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
 		logrus.Infof("[webui.go::addUser] parameter format invalid")
 		self.resp(c, 400, &CR{
-			Message: "Bad param",
+			Message: T("Bad param"),
 			Code:    CodeBadData,
 		})
 		return
@@ -536,7 +579,7 @@ func (self *WebServer) addUser(c *gin.Context) {
 
 	if isWeakPass(req.Password) {
 		self.resp(c, 400, &CR{
-			Message: "password too weak",
+			Message: T("password too weak"),
 			Code:    CodeBadData,
 		})
 		return
@@ -559,36 +602,38 @@ func (self *WebServer) addUser(c *gin.Context) {
 	_, err = session.InsertOne(&item)
 	if self.IsDuplicate(err) {
 		self.resp(c, 400, &CR{
-			Message: "Failed",
+			Message: T("Failed"),
 			Code:    CodeBadData,
 		})
 		return
 	} else if err != nil {
 		self.resp(c, 502, &CR{
-			Message: "Failed",
+			Message: T("Failed"),
 			Code:    CodeServerInternal,
 		})
 		return
 	}
 	self.resp(c, 200, &CR{
-		Message: "OK",
+		Message: T("OK"),
 	})
 }
 
 func (self *WebServer) setUser(c *gin.Context) {
+	T := getTranslateFunc(c)
+
 	var req UserRequest
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
 		logrus.Infof("[webapi.go::setUser] parameter required")
 		self.resp(c, 400, &CR{
-			Message: "param invaid: " + err.Error(),
+			Message: T("param invaid: ") + err.Error(),
 			Code:    CodeBadData,
 		})
 		return
 	}
 	if req.Id < 1 {
 		self.resp(c, 400, &CR{
-			Message: "Can't change",
+			Message: T("Can't change"),
 			Code:    CodeBadData,
 		})
 		return
@@ -609,9 +654,6 @@ func (self *WebServer) setUser(c *gin.Context) {
 		if req.Password != "" {
 			newPass := makePassword(req.Password)
 			session = session.SetExpr(`pass`, customQuote(newPass))
-		}
-		if req.Language != "" {
-			session = session.SetExpr(`lang`, customQuote(req.Language))
 		}
 		if req.Email != "" {
 			session = session.SetExpr(`email`, customQuote(req.Email))
@@ -636,7 +678,7 @@ func (self *WebServer) setUser(c *gin.Context) {
 		cache.Delete(fmt.Sprintf("%v.seed", req.Id))
 		cache.Delete(fmt.Sprintf("%v.user", req.Id))
 		self.resp(c, 200, &CR{
-			Message: "OK",
+			Message: T("OK"),
 		})
 
 	case roleNormal:
@@ -650,14 +692,14 @@ func (self *WebServer) setUser(c *gin.Context) {
 				sql, _ := session.LastSQL()
 				logrus.Errorf("[webapi.go::setUser] orm.Get error: %v, sql:%v", err, sql)
 				self.resp(c, 502, &CR{
-					Message: "failed",
+					Message: T("failed"),
 					Code:    CodeServerInternal,
 				})
 				return
 			} else if !exist {
 				//this should not happend
 				self.resp(c, 400, &CR{
-					Message: "Failed",
+					Message: T("Failed"),
 					Code:    CodeBadData,
 				})
 				return
@@ -674,7 +716,7 @@ func (self *WebServer) setUser(c *gin.Context) {
 			sql, _ := session.LastSQL()
 			logrus.Errorf("[webapi.go::setUser] orm.Update error: %v, sql:%v", err, sql)
 			self.resp(c, 400, &CR{
-				Message: "failed",
+				Message: T("failed"),
 				Code:    CodeServerInternal,
 			})
 			return
@@ -682,10 +724,14 @@ func (self *WebServer) setUser(c *gin.Context) {
 		store.Set(userKey, dupUser, cache.NoExpiration)
 		domainKey := fmt.Sprintf("%v.suser", dupUser.ShortId)
 		store.Set(domainKey, dupUser, cache.NoExpiration)
+		self.resp(c, 200, &CR{
+			Message: T("OK"),
+		})
 	}
 }
 
 func (self *WebServer) getAppSetting(c *gin.Context) {
+	T := getTranslateFunc(c)
 	id := c.GetInt64("id")
 	store := self.store
 	userKey := fmt.Sprintf("%v.user", id)
@@ -701,14 +747,14 @@ func (self *WebServer) getAppSetting(c *gin.Context) {
 			sql, _ := session.LastSQL()
 			logrus.Errorf("[webui.go::getSecuritySetting] orm.Get error: %v, sql: %v", err, sql)
 			self.resp(c, 502, &CR{
-				Message: "Failed",
+				Message: T("Failed"),
 				Code:    CodeServerInternal,
 			})
 			return
 		} else if !exist {
 			logrus.Errorf("[webui.go::getSecuritySetting] not found user(id=%v), this should not happend", id)
 			self.resp(c, 502, &CR{
-				Message: "Failed",
+				Message: T("Failed"),
 				Code:    CodeServerInternal,
 			})
 			return
@@ -731,12 +777,13 @@ func (self *WebServer) getAppSetting(c *gin.Context) {
 }
 
 func (self *WebServer) setAppSetting(c *gin.Context) {
+	T := getTranslateFunc(c)
 	var req AppSetting
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
 		logrus.Infof("[webui.go::setAppSetting] parameter format invalid")
 		self.resp(c, 400, &CR{
-			Message: "Bad param",
+			Message: T("Bad param"),
 			Code:    CodeBadData,
 		})
 		return
@@ -756,14 +803,14 @@ func (self *WebServer) setAppSetting(c *gin.Context) {
 		if err != nil {
 			logrus.Errorf("[webuig.go::setAppSetting] orm.Get error: %v", err)
 			self.resp(c, 502, &CR{
-				Message: "Failed",
+				Message: T("Failed"),
 				Code:    CodeServerInternal,
 			})
 			return
 		} else if !exist {
 			logrus.Errorf("[webuig.go::setAppSetting] not found user(id=%v), this should not happend", id)
 			self.resp(c, 502, &CR{
-				Message: "Failed",
+				Message: T("Failed"),
 				Code:    CodeServerInternal,
 			})
 			return
@@ -784,7 +831,7 @@ func (self *WebServer) setAppSetting(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[webuig.go::setAppSetting] orm.Update error: %v", err)
 		self.resp(c, 502, &CR{
-			Message: "Failed",
+			Message: T("Failed"),
 			Code:    CodeServerInternal,
 		})
 		return
@@ -799,12 +846,13 @@ func (self *WebServer) setAppSetting(c *gin.Context) {
 	}
 
 	self.resp(c, 200, &CR{
-		Message: "OK",
+		Message: T("OK"),
 	})
 }
 
 //change self password
 func (self *WebServer) getSecuritySetting(c *gin.Context) {
+	T := getTranslateFunc(c)
 	id := c.GetInt64("id")
 	store := self.store
 	userKey := fmt.Sprintf("%v.user", id)
@@ -819,14 +867,14 @@ func (self *WebServer) getSecuritySetting(c *gin.Context) {
 			sql, _ := session.LastSQL()
 			logrus.Errorf("[webuig.go::getSecuritySetting] orm.Get error: %v, sql: %v", err, sql)
 			self.resp(c, 502, &CR{
-				Message: "Failed",
+				Message: T("Failed"),
 				Code:    CodeServerInternal,
 			})
 			return
 		} else if !exist {
 			logrus.Errorf("[webuig.go::getSecuritySetting] not found user(id=%v), this should not happend", id)
 			self.resp(c, 502, &CR{
-				Message: "Failed",
+				Message: T("Failed"),
 				Code:    CodeServerInternal,
 			})
 			return
@@ -839,7 +887,7 @@ func (self *WebServer) getSecuritySetting(c *gin.Context) {
 	}
 
 	self.resp(c, 200, &CR{
-		Message: "OK",
+		Message: T("OK"),
 		Result: AppSecurity{
 			HttpAddr: fmt.Sprintf("http://%v/log/%v/", self.IP, user.ShortId),
 			DnsAddr:  user.ShortId + "." + self.Domain,
@@ -850,12 +898,13 @@ func (self *WebServer) getSecuritySetting(c *gin.Context) {
 
 //change self password
 func (self *WebServer) setSecuritySetting(c *gin.Context) {
+	T := getTranslateFunc(c)
 	var req AppSecuritySet
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
 		logrus.Infof("[webuig.go::setSecuritySetting] bad data")
 		self.resp(c, 400, &CR{
-			Message: "bad param",
+			Message: T("bad param"),
 			Code:    CodeBadData,
 		})
 		return
@@ -863,7 +912,7 @@ func (self *WebServer) setSecuritySetting(c *gin.Context) {
 	if isWeakPass(req.Password) {
 		logrus.Warnf("[webuig.go::setSecuritySetting] weak password data")
 		self.resp(c, 400, &CR{
-			Message: "password too weak",
+			Message: T("password too weak"),
 			Code:    CodeBadData,
 		})
 		return
@@ -880,7 +929,7 @@ func (self *WebServer) setSecuritySetting(c *gin.Context) {
 		sql, _ := session.LastSQL()
 		logrus.Errorf("[webuig.go::setSecuritySetting] orm.Update(%v), last SQL: %v", err, sql)
 		self.resp(c, 502, &CR{
-			Message: "update Failed",
+			Message: T("update Failed"),
 			Code:    CodeServerInternal,
 		})
 		return
@@ -905,6 +954,7 @@ func (self *WebServer) setSecuritySetting(c *gin.Context) {
 // @Failure 401 {object} CR "Can not find ID"
 // @Router /testapi/get-string-by-int/{some_id} [get]
 func (self *WebServer) getDnsRecord(c *gin.Context) {
+	T := getTranslateFunc(c)
 	ip, ipExist := c.GetQuery("ip")
 	domain, domainExist := c.GetQuery("domain")
 	date, dateExist := c.GetQuery("date")
@@ -950,7 +1000,7 @@ func (self *WebServer) getDnsRecord(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[webui.go::getDnsRecord] orm.FindAndCount: %v", err)
 		self.resp(c, 502, &CR{
-			Message: "Failed",
+			Message: T("Failed"),
 			Code:    CodeServerInternal,
 		})
 		return
@@ -972,7 +1022,7 @@ func (self *WebServer) getDnsRecord(c *gin.Context) {
 	}
 
 	self.resp(c, 200, &CR{
-		Message: "OK",
+		Message: T("OK"),
 		Result:  &resp,
 	})
 }
@@ -987,12 +1037,13 @@ func (self *WebServer) getDnsRecord(c *gin.Context) {
 // @Failure 404 {object} CR "Can not find ID"
 // @Router /testapi/get-string-by-int/{some_id} [get]
 func (self *WebServer) delDnsRecord(c *gin.Context) {
+	T := getTranslateFunc(c)
 	var req DeleteRecordRequest
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
 		logrus.Errorf("[webui.go::delDnsRecord] orm.Delete: %v", err)
 		self.resp(c, 400, &CR{
-			Message: "invalid Param",
+			Message: T("invalid Param"),
 			Code:    CodeServerInternal,
 			Error:   err,
 		})
@@ -1010,16 +1061,15 @@ func (self *WebServer) delDnsRecord(c *gin.Context) {
 		if len(req.Ids) == 0 {
 			_, err := session.In(`uid`, id, 0).Delete(&models.TblDns{})
 			if err != nil {
-				//TODO:
 				logrus.Errorf("[webui.go::delDnsRecord] orm.Delete: %v", err)
 				self.resp(c, 502, &CR{
-					Message: "Failed",
+					Message: T("Failed"),
 					Code:    CodeServerInternal,
 				})
 				return
 			}
 			self.resp(c, 200, &CR{
-				Message: "OK",
+				Message: T("OK"),
 			})
 			return
 		} else {
@@ -1031,13 +1081,13 @@ func (self *WebServer) delDnsRecord(c *gin.Context) {
 			if err != nil {
 				logrus.Errorf("[webui.go::delDnsRecord] orm.Delete: %v", err)
 				self.resp(c, 502, &CR{
-					Message: "Failed",
+					Message: T("Failed"),
 					Code:    CodeServerInternal,
 				})
 				return
 			}
 			self.resp(c, 200, &CR{
-				Message: "OK",
+				Message: T("OK"),
 			})
 			return
 		}
@@ -1047,13 +1097,13 @@ func (self *WebServer) delDnsRecord(c *gin.Context) {
 			if err != nil {
 				logrus.Errorf("[webui.go::delDnsRecord] orm.Delete: %v", err)
 				self.resp(c, 502, &CR{
-					Message: "Failed",
+					Message: T("Failed"),
 					Code:    CodeServerInternal,
 				})
 				return
 			}
 			self.resp(c, 200, &CR{
-				Message: "OK",
+				Message: T("OK"),
 			})
 			return
 		} else {
@@ -1065,13 +1115,13 @@ func (self *WebServer) delDnsRecord(c *gin.Context) {
 			if err != nil {
 				logrus.Errorf("[webui.go::delDnsRecord] orm.Delete: %v", err)
 				self.resp(c, 502, &CR{
-					Message: "Failed",
+					Message: T("Failed"),
 					Code:    CodeServerInternal,
 				})
 				return
 			}
 			self.resp(c, 200, &CR{
-				Message: "OK",
+				Message: T("OK"),
 			})
 			return
 		}
@@ -1079,6 +1129,7 @@ func (self *WebServer) delDnsRecord(c *gin.Context) {
 }
 
 func (self *WebServer) getHttpRecord(c *gin.Context) {
+	T := getTranslateFunc(c)
 	ip, ipExist := c.GetQuery("ip")
 	domain, domainExist := c.GetQuery("domain")
 	date, dateExist := c.GetQuery("date")
@@ -1134,11 +1185,10 @@ func (self *WebServer) getHttpRecord(c *gin.Context) {
 	var items []models.TblHttp
 	count, err := session.Desc("id").Limit(pageSize, (pageNo-1)*pageSize).FindAndCount(&items)
 	if err != nil {
-		//TODO:
 		logrus.Errorf("[webui.go::getHttpRecord] orm.FindAndCount: %v", err)
 		self.resp(c, 502, &CR{
 			Code:    CodeServerInternal,
-			Message: "Faild",
+			Message: T("Failed"),
 		})
 		return
 	}
@@ -1163,18 +1213,19 @@ func (self *WebServer) getHttpRecord(c *gin.Context) {
 		rcd.Ua = item.Ua
 	}
 	self.resp(c, 200, &CR{
-		Message: "OK",
+		Message: T("OK"),
 		Result:  &resp,
 	})
 }
 
 func (self *WebServer) delHttpRecord(c *gin.Context) {
+	T := getTranslateFunc(c)
 	var req DeleteRecordRequest
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
 		logrus.Errorf("[webui.go::delHttpRecord] orm.Delete: %v", err)
 		self.resp(c, 400, &CR{
-			Message: "invalid Param",
+			Message: T(`invalid Param`),
 			Code:    CodeServerInternal,
 			Error:   err,
 		})
@@ -1195,13 +1246,13 @@ func (self *WebServer) delHttpRecord(c *gin.Context) {
 				//TODO:
 				logrus.Errorf("[webui.go::delHttpRecord] orm.Delete: %v", err)
 				self.resp(c, 502, &CR{
-					Message: "Failed",
+					Message: T("Failed"),
 					Code:    CodeServerInternal,
 				})
 				return
 			}
 			self.resp(c, 200, &CR{
-				Message: "OK",
+				Message: T("OK"),
 			})
 			return
 		} else {
@@ -1213,13 +1264,13 @@ func (self *WebServer) delHttpRecord(c *gin.Context) {
 			if err != nil {
 				logrus.Errorf("[webui.go::delHttpRecord] orm.Delete: %v", err)
 				self.resp(c, 502, &CR{
-					Message: "Failed",
+					Message: T("Failed"),
 					Code:    CodeServerInternal,
 				})
 				return
 			}
 			self.resp(c, 200, &CR{
-				Message: "OK",
+				Message: T("OK"),
 			})
 			return
 		}
@@ -1230,13 +1281,13 @@ func (self *WebServer) delHttpRecord(c *gin.Context) {
 				//TODO:
 				logrus.Errorf("[webui.go::delHttpRecord] orm.Delete: %v", err)
 				self.resp(c, 502, &CR{
-					Message: "Failed",
+					Message: fmt.Sprintf(T("Delete Record: %v"), err),
 					Code:    CodeServerInternal,
 				})
 				return
 			}
 			self.resp(c, 200, &CR{
-				Message: "OK",
+				Message: T("OK"),
 			})
 			return
 		} else {
@@ -1248,15 +1299,371 @@ func (self *WebServer) delHttpRecord(c *gin.Context) {
 			if err != nil {
 				logrus.Errorf("[webui.go::delHttpRecord] orm.Delete: %v", err)
 				self.resp(c, 502, &CR{
-					Message: "Failed",
+					Message: T("Failed"),
 					Code:    CodeServerInternal,
 				})
 				return
 			}
 			self.resp(c, 200, &CR{
-				Message: "OK",
+				Message: T("OK"),
 			})
 			return
 		}
+	}
+}
+
+// POST
+// TYPE=[CNAME/A/MX/TXT], HOST={}, RECORD={}, TTL={}
+func (self *WebServer) getResolveRecord(c *gin.Context) {
+	T := getTranslateFunc(c)
+	pageNo, pageNoErr := ginutils.GetQueryInt(c, "pageNo")
+	if pageNoErr != nil || pageNo <= 0 {
+		pageNo = 1
+	}
+	pageSize, pageSizeErr := ginutils.GetQueryInt(c, "pageSize")
+	if pageSizeErr != nil || pageSize <= 0 {
+		pageSize = 10
+	}
+	field, fieldExist := c.GetQuery("sortField")
+	order, _ := c.GetQuery("sortOrder")
+
+	host, hostExist := c.GetQuery("keyword")
+	orm := self.orm
+	session := orm.NewSession()
+	defer session.Close()
+	session = session.Where(`id>0`)
+	if hostExist {
+		session = session.And(`host like ?`, "%"+host+"%")
+	}
+	if fieldExist {
+		if field == "timestamp" {
+			field = "utime"
+		}
+
+		if order != "ascend" {
+			session = session.Desc(field)
+		} else {
+			session = session.Asc(field)
+		}
+	}
+
+	var resolves []models.TblResolve
+	count, err := session.Limit(pageSize, (pageNo-1)*pageSize).FindAndCount(&resolves)
+	if err != nil {
+		logrus.Errorf("[webui.go::delResolveRecord] orm.Delete: %v", err)
+		self.resp(c, 502, &CR{
+			Message: T("Failed"),
+			Code:    CodeServerInternal,
+		})
+		return
+	}
+	var ret ResolveResult
+	ret.Pagination.PageNo = pageNo
+	ret.Pagination.PageSize = pageSize
+	ret.Pagination.TotalCount = int(count)
+	ret.Pagination.TotalPage = (int(count) + pageSize - 1) / pageSize
+	for i := 0; i < len(resolves); i++ {
+		r := &resolves[i]
+		ret.Data = append(ret.Data, &ResolveItem{
+			Id:         r.Id,
+			Type:       r.Type,
+			Host:       r.Host,
+			Value:      r.Value,
+			Ttl:        r.Ttl,
+			Utimestamp: r.Utime.Unix(),
+		})
+	}
+	c.JSON(200, &ret)
+}
+
+func (self *WebServer) updateResolveCache(host, rType string, all []models.TblResolve) {
+	if rType != "" {
+		var rr []*Resolve
+		for i := 0; i < len(all); i++ {
+			rcd := &all[i]
+			r := &Resolve{
+				Type:  rcd.Type,
+				Name:  rcd.Host,
+				Value: rcd.Value,
+				Ttl:   rcd.Ttl,
+			}
+			rr = append(rr, r)
+		}
+		key := fmt.Sprintf("%v#%v", host, rType)
+		self.store.Delete(key)
+
+		if len(rr) > 0 {
+			self.store.Set(key, rr, cache.NoExpiration)
+		}
+		return
+	}
+
+	var rrMap = make(map[string][]*Resolve)
+	for i := 0; i < len(all); i++ {
+		rcd := &all[i]
+		r := &Resolve{
+			Type:  rcd.Type,
+			Name:  rcd.Host,
+			Value: rcd.Value,
+			Ttl:   rcd.Ttl,
+		}
+		if rr, exist := rrMap[rcd.Type]; exist {
+			rrMap[rcd.Type] = append(rr, r)
+		} else {
+			rrMap[rcd.Type] = []*Resolve{r}
+		}
+	}
+	// clear old cache
+	for _, t := range []string{"A", "TXT", "CNAME", "SRV", "NS", "MX"} {
+		key := fmt.Sprintf("%v#%v", host, t)
+		self.store.Delete(key)
+	}
+
+	for k, v := range rrMap {
+		key := fmt.Sprintf("%v#%v", host, k)
+		self.store.Set(key, v, cache.NoExpiration)
+	}
+	return
+}
+
+func (self *WebServer) setResolveRecord(c *gin.Context) {
+	T := getTranslateFunc(c)
+
+	self.uiMutex.Lock()
+	defer self.uiMutex.Unlock()
+
+	var rcd models.Resolve
+	err := c.ShouldBindJSON(&rcd)
+	if err != nil {
+		logrus.Errorf("[webui.go::setResolveRecord] orm.Delete: %v", err)
+		self.resp(c, 400, &CR{
+			Message: T("Failed"),
+			Code:    CodeServerInternal,
+		})
+		return
+	}
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	// verify input
+	if rcd.Host == "" || len(rcd.Host) > 128 ||
+		rcd.Value == "" || len(rcd.Value) > 128 {
+		self.resp(c, 400, &CR{
+			Message: T("Bad Resolve Data"),
+			Code:    CodeServerInternal,
+		})
+		return
+	}
+
+	// branch 1: create new
+	if rcd.Id == 0 {
+		// check confilct
+		var rcds []models.TblResolve
+		err = session.Where(`host = ?`, rcd.Host).Find(&rcds)
+		if err != nil {
+			logrus.Errorf("[webui.go::setResolveRecord] orm.Find: %v", err)
+			self.resp(c, 502, &CR{
+				Message: T("Failed"),
+				Code:    CodeServerInternal,
+			})
+			return
+		}
+
+		// check conflict by type
+		conflict, groups := models.Resolves(rcds).GetTypeConflict(&rcd)
+		if conflict != nil {
+			logrus.Errorf("[webui.go::setResolveRecord] record(%v) conflict with (%v)",
+				rcd.Type, conflict.Type)
+			self.resp(c, 400, &CR{
+				Message: fmt.Sprintf(T("Type:(%v) conflict with %v"),
+					rcd.Type, conflict.Type),
+				Code: CodeServerInternal,
+			})
+			return
+		} //1.24  3.30
+
+		// check conflict by value, 不允许插入相同值
+		if len(groups) >= 1 {
+			sort.Sort(models.Resolves(groups))
+			conflictV := groups.GetValueConflict(&rcd)
+			if conflictV != nil {
+				self.resp(c, 400, &CR{
+					Message: fmt.Sprintf(T("Value(%v) already exists"), rcd.Value),
+					Code:    CodeServerInternal,
+				})
+				return
+			}
+		}
+
+		// insert into orm
+		_, err = session.InsertOne(&models.TblResolve{
+			Type:  rcd.Type,
+			Host:  rcd.Host,
+			Value: rcd.Value,
+			Ttl:   rcd.Ttl,
+		})
+		if err != nil {
+			logrus.Errorf("[webui.go::setResolveRecord] orm.InsertOne: %v", err)
+			self.resp(c, 502, &CR{
+				Message: fmt.Sprintf(T("Insert record: %v"), err),
+				Code:    CodeServerInternal,
+			})
+			return
+		}
+		// update cache by type
+		groups = append(groups, models.TblResolve{
+			Type:  rcd.Type,
+			Host:  rcd.Host,
+			Value: rcd.Value,
+			Ttl:   rcd.Ttl,
+		})
+		self.updateResolveCache(rcd.Host, rcd.Type, groups)
+
+		c.JSON(200, CR{
+			Message: T("OK"),
+		})
+		return
+	}
+
+	// branch 2: modify exist
+	// check confilct
+	var oldRcd models.TblResolve
+	exist, err := session.ID(rcd.Id).Get(&oldRcd)
+	if err != nil {
+		logrus.Errorf("[webui.go::setResolveRecord] orm.Get: %v", err)
+		self.resp(c, 502, &CR{
+			Message: fmt.Sprintf(T("Query record: %v"), err),
+			Code:    CodeServerInternal,
+		})
+		return
+	} else if !exist {
+		self.resp(c, 400, &CR{
+			Message: fmt.Sprintf(T("Record not exist"), err),
+			Code:    CodeServerInternal,
+		})
+		return
+	} else if oldRcd.Host != rcd.Host || oldRcd.Type != rcd.Type {
+		self.resp(c, 400, &CR{
+			Message: fmt.Sprintf(T("Can't Change Host/Type"), err),
+			Code:    CodeServerInternal,
+		})
+		return
+	}
+
+	var rcds []models.TblResolve
+	err = session.Where(`host = ?`, rcd.Host).
+		And(`type = ?`, rcd.Type).
+		And(`id != ?`, oldRcd.Id).
+		Find(&rcds)
+	if err != nil {
+		logrus.Errorf("[webui.go::setResolveRecord] orm.Find: %v", err)
+		self.resp(c, 502, &CR{
+			Message: fmt.Sprintf(T("Query Record: %v"), err),
+			Code:    CodeServerInternal,
+		})
+		return
+	} else if len(rcds) > 0 { // not exist groups
+		// 1. conflict check by type
+		// ... skip
+
+		// 2. conflict check by value, distinct, 不允许将记录修改为已有值
+		sort.Sort(models.Resolves(rcds))
+
+		conflictV := models.Resolves(rcds).GetValueConflict(&rcd)
+		if conflictV != nil {
+			self.resp(c, 400, &CR{
+				Message: fmt.Sprintf(T("Value(%v) already exists"), rcd.Value),
+				Code:    CodeServerInternal,
+			})
+			return
+		}
+	}
+
+	oldRcd.Ttl = rcd.Ttl
+	oldRcd.Value = rcd.Value
+	_, err = session.ID(oldRcd.Id).Cols("ttl", "value").Update(&oldRcd)
+	if err != nil {
+		logrus.Errorf("[webui.go::setResolveRecord] orm.InsertOne: %v", err)
+		self.resp(c, 502, &CR{
+			Message: fmt.Sprintf(T("Update record: %v"), err),
+			Code:    CodeServerInternal,
+		})
+		return
+	}
+
+	// update cache by type
+	rcds = append(rcds, models.TblResolve{
+		Type:  rcd.Type,
+		Host:  rcd.Host,
+		Value: rcd.Value,
+		Ttl:   rcd.Ttl,
+	})
+
+	// update cache
+	self.updateResolveCache(rcd.Host, rcd.Type, rcds)
+
+	c.JSON(200, CR{
+		Message: T("OK"),
+	})
+}
+
+// DELETE
+func (self *WebServer) delResolveRecord(c *gin.Context) {
+	T := getTranslateFunc(c)
+	id, err := ginutils.GetQueryInt64(c, "id")
+	if err != nil {
+		logrus.Errorf("[webui.go::delResolveRecord] not input id")
+		self.resp(c, 502, &CR{
+			Message: T("parameter id is required"),
+			Code:    CodeServerInternal,
+		})
+		return
+	}
+	orm := self.orm
+	session := orm.NewSession()
+	defer session.Close()
+
+	var rcd models.TblResolve
+	exist, err := session.ID(id).Get(&rcd)
+	if err != nil {
+		logrus.Errorf("[webui.go::delResolveRecord] orm.Delete: %v", err)
+		self.resp(c, 502, &CR{
+			Message: fmt.Sprintf(T("delete: %v"), err),
+			Code:    CodeServerInternal,
+		})
+		return
+	} else if !exist {
+		logrus.Errorf("[webui.go::delResolveRecord] orm.Delete: %v", err)
+		self.resp(c, 400, &CR{
+			Message: fmt.Sprintf(T("Delete resolve(%v), but not exist"), rcd.Id),
+			Code:    CodeServerInternal,
+		})
+		return
+	}
+
+	_, err = session.ID(id).Delete(&models.TblResolve{})
+	if err != nil {
+		logrus.Errorf("[webui.go::delResolveRecord] orm.Delete: %v", err)
+		self.resp(c, 502, &CR{
+			Message: fmt.Sprintf(T("delete: %v"), err),
+			Code:    CodeServerInternal,
+		})
+		return
+	}
+
+	// delete -> update cache
+	var all []models.TblResolve
+	session.Where(`host=?`, rcd.Host).Find(&all)
+	self.updateResolveCache(rcd.Host, rcd.Type, all)
+
+	c.JSON(200, CR{
+		Message: T("OK"),
+	})
+}
+
+func getTranslateFunc(c *gin.Context) func(id string) string {
+	lang := c.GetHeader("Language")
+	return func(id string) string {
+		return translateByLang(lang, id)
 	}
 }

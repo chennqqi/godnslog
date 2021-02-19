@@ -44,3 +44,9 @@ type HttpRecord models.HttpRecord
 // commone response
 type CR models.CR
 type Pagination models.Pagination
+type ResolveItem models.Resolve
+type ResolveList []*ResolveItem
+type ResolveResult struct {
+	Pagination
+	Data ResolveList `json:"data"`
+}

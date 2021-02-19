@@ -140,7 +140,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: get Dns Record by user query
+      description: add a new User
       parameters:
       - description: Some ID
         in: path
@@ -166,7 +166,7 @@ paths:
           description: BadService
           schema:
             $ref: '#/definitions/server.CR'
-      summary: userLogout
+      summary: addUser
   /user/nav:
     get:
       consumes:

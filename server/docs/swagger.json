@@ -202,14 +202,14 @@
         },
         "/user/logout": {
             "post": {
-                "description": "get Dns Record by user query",
+                "description": "add a new User",
                 "consumes": [
                     "application/json"
                 ],
                 "produces": [
                     "application/json"
                 ],
-                "summary": "userLogout",
+                "summary": "addUser",
                 "parameters": [
                     {
                         "type": "integer",

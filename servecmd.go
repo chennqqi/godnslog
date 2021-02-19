@@ -23,6 +23,7 @@ type servePwCmd struct {
 	ipv4, ipv6,
 	defaultLanguage string
 	httpListen string
+	upstream   string
 }
 
 func (*servePwCmd) Name() string     { return "serve" }
@@ -42,13 +43,13 @@ func (p *servePwCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&p.dsn, "dsn", "file:godnslog.db?cache=shared&mode=rwc", "set database source name, option")
 	f.StringVar(&p.driver, "driver", "sqlite3", "set database driver, [sqlite3/mysql], option")
 
+	f.StringVar(&p.upstream, "upstreamp", "8.8.8.8:53", "set upstream dns")
 	f.BoolVar(&p.swagger, "swagger", false, "with swagger, option")
 	f.StringVar(&p.defaultLanguage, "lang", DefaultLanguage, "set default language, [en-US/zh-CN], option")
 	f.StringVar(&p.httpListen, "http", ":8080", "set http listen, option")
 }
 
 func (p *servePwCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
-
 	// verify input
 	{
 		if p.ipv4 == "" || p.domain == "" {
@@ -107,12 +108,7 @@ func (p *servePwCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 		WTimeout: 3 * time.Second,
 		V4:       net.ParseIP(p.ipv4),
 		V6:       net.ParseIP(p.ipv6),
-
-		// custom resolve
-		Fixed: []server.Resolve{
-			server.Resolve{"www", "A", p.ipv4, 600},
-			server.Resolve{"api", "A", p.ipv4, 600},
-		},
+		Upstream: p.upstream,
 	}, store)
 	if err != nil {
 		logrus.Fatalf("[main.go::main] NewWebServer: %v", err)
