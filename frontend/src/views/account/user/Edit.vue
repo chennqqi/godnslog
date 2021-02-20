@@ -63,6 +63,36 @@
       <a-form-item
         :labelCol="labelCol"
         :wrapperCol="wrapperCol"
+        :label="$t('Role')"
+        hasFeedback>
+        <a-radio-group
+          style="width: 100%;"
+          v-decorator="[
+            'role', {
+              rules: [
+                {
+                  required: true,
+                  type: 'integer',
+                  transform(value) { return Number(value) }
+                }
+              ],
+              initialValue: '2'
+            }]">
+          <a-radio value="1">
+            {{ $t('Admin User') }}
+          </a-radio>
+          <a-radio value="2">
+            {{ $t('Normal User') }}
+          </a-radio>
+          <a-radio value="3">
+            {{ $t('Guest User') }}
+          </a-radio>
+        </a-radio-group>
+      </a-form-item>
+
+      <a-form-item
+        :labelCol="labelCol"
+        :wrapperCol="wrapperCol"
         :label="$t('password')"
         hasFeedback>
         <a-input-password
@@ -193,20 +223,23 @@ export default {
           this.$message.warn(err)
           return
         }
+        values.role = Number(values.role)
         const req = {}
         Object.assign(req, values)
 
-        console.log('saveUser req:', req)
         if (this.createMode) {
           // eslint-disable-next-line no-console
           if (req.id === undefined || req.id === '-') {
             req.id = 0
           }
         }
+        const { $message } = this
         saveUser(req).then(res => {
           console.log('saveUser:', res)
+          this.$emit('onGoBack', true)
+        }).then(err => {
+          $message.error(`${err.response.data.message}`)
         })
-        this.$emit('onGoBack', true)
       })
     },
     loadEditInfo (data) {
@@ -217,7 +250,24 @@ export default {
           this.createMode = true
         } else {
           this.createMode = false
-          const formData = pick(data, [ 'id', 'username', 'email', 'password' ])
+          let role = '1'
+          switch (data.role.id) {
+            case 'normal':
+              role = '2'
+              break
+            case 'admin':
+            case 'super':
+              role = '1'
+              break
+            case 'guest':
+              role = '3'
+              break
+          }
+          const dupvalue = {}
+          Object.assign(dupvalue, data)
+          dupvalue.role = role
+          debugger
+          const formData = pick(dupvalue, [ 'id', 'username', 'email', 'password', 'role' ])
           form.setFieldsValue(formData)
         }
     }

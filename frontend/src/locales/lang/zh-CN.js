@@ -45,6 +45,11 @@ const locale = {
   'HTTP Addr': 'HTTP地址',
   'Secret': '密钥',
   'Edit User': '编辑用户',
+  'Admin User': '管理员',
+  'Normal User': '普通用户',
+  'Guest User': '访客',
+  'Role': '角色',
+  'Search': '搜索',
 
   'auto clean in hours': '清理数小时前的记录',
   'Domain': '域名',

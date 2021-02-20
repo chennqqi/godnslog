@@ -87,8 +87,8 @@
           v-decorator="['ttl', {rules: [
                                   {
                                     required: true,
-                                    type: 'number',
-                                    transform(value) { return Number(value) }
+                                    type: 'integer',
+                                    transform: (value) => { return Number(value) }
                                   },
                                 ],
                                 initialValue: 600,

@@ -86,6 +86,18 @@ docker pull "sort/godnslog"
 docker run -p80:8080 -p53:53/udp "sort/godnslog" serve -domain yourdomain.com -4 100.100.100.100
 ```
 
+iii. access http://100.100.100.100
+
+## Doc
+
+guest/guest123
+
+[introduce](https://www.godnslog.com/document/introduce)
+[payload](https://www.godnslog.com/document/payload)
+[api](https://www.godnslog.com/document/api)
+[rebiding](https://www.godnslog.com/document/rebinding)
+[resolve](https://www.godnslog.com/document/resolve)
+
 ## Follow me
 
 

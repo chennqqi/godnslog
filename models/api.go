@@ -20,6 +20,7 @@ const (
 	RoleSuper  = 0
 	RoleAdmin  = 1
 	RoleNormal = 2
+	RoleGuest  = 3
 
 	GODNS_RFI_KEY   = "GODNSLOG"
 	GODNS_RFI_VALUE = "694ef536e5d0245f203a1bcf8cbf3294" // md5sum($GODNS_RFI_KEY)
