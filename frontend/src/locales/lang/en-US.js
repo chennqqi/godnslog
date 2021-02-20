@@ -20,6 +20,9 @@ const locale = {
   'menu.document.payload': 'Payload',
   'menu.document.api': 'Api',
   'menu.document.rebinding': 'Rebinding',
+  'menu.document.history': 'History',
+  'menu.document.resolve': 'Resolve',
+  'menu.document.install': 'Install',
 
   'menu.record': 'Record',
   'menu.record.dns': 'DNS',

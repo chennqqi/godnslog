@@ -73,6 +73,7 @@ docker build -t "user/godnslog" -f DockerfileCN .
 1. 在域名-管理页面, 自定义DNS Host，定义域名的NS地址, ns1.xxx.xxx, ns2.xxx.xxx
 如果你的服务器IP有别的域名解析，可以跳过这一步，这里要配置两个不同的IP地址，你可以将其中一个临时指向一个假地址，例如100.100.100.100![](https://s1.ax1x.com/2020/09/04/wFiaM8.png)
 
+
 2. DNS修改，将域名的DNS服务器修改为上一步定义的DNS地址，这一步中限制只能填入域名。
 这里有个限制最少填入两个地址，而且两个地址不能是同一个IP。 
 ![](https://s1.ax1x.com/2020/09/04/wFitRP.png)
@@ -84,6 +85,7 @@ docker build -t "user/godnslog" -f DockerfileCN .
 <https://lookup.icann.org/lookup>
 ![](https://s1.ax1x.com/2020/09/04/wFk04s.png)
 
+如果使用腾讯云(DNSPOD), 需要使用第二个域名的NS记录(如ns1.seconddomain.com,ns2.seconddomain)指向100.100.100.100并修改域名解析服务器为第二个域名的NS地址(如ns1.seconddomain.com,ns2.seconddomain).
 
 ### II. 查看获取最新版本
 https://hub.docker.com/r/sort/godnslog/tags
@@ -98,12 +100,26 @@ docker run -p80:8080 -p53:53/udp "sort/godnslog" serve -domain yourdomain.com -4
 yourdomain.com 替换为你的域名
 100.100.100.100 替换为你的公网IP
 
+打开浏览器访问 http://100.100.100.100, 你也可以用0.5.0新增的标准DNS解析功能，将www.<youdomain>指向100.100.100.100来通过域名访问呢
+
 
 ## 已知问题
 
 - introduce/文档的mavon-editor会遮挡下拉菜单
 - 一些没必要的调试打印问题
 - 口令失效后的一些重复提示
+
+## 文档
+
+详细信息可以阅读自述文档
+
+guest/guest123
+
+[introduce](https://www.godnslog.com/document/introduce)
+[payload](https://www.godnslog.com/document/payload)
+[api](https://www.godnslog.com/document/api)
+[rebiding](https://www.godnslog.com/document/rebinding)
+[resolve](https://www.godnslog.com/document/resolve)
 
 ## 关注我
 

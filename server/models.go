@@ -22,6 +22,7 @@ const (
 	roleSuper  = models.RoleSuper
 	roleAdmin  = models.RoleAdmin
 	roleNormal = models.RoleNormal
+	roleGuest  = models.RoleGuest
 )
 
 type LoginRequest models.LoginRequest

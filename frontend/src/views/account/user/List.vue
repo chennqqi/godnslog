@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div class="table-page-search-wrapper">
+<!--    <div class="table-page-search-wrapper">
       <a-form layout="inline">
         <a-row :gutter="48">
           <a-col :md="8" :sm="24">
@@ -18,9 +18,15 @@
               <a-date-picker v-model="queryParam.date" style="width: 100%" placeholder="请输入更新日期"/>
             </a-form-item>
           </a-col>
+          <a-col :md="!advanced && 8 || 24" :sm="24">
+            <span class="table-page-search-submitButtons" :style="advanced && { float: 'right', overflow: 'hidden' } || {} ">
+              <a-button type="primary" @click="$refs.table.refresh(true)">{{ $t('Query') }}</a-button>
+              <a-button style="margin-left: 8px" @click="() => queryParam = {}">{{ $t('Reset') }}</a-button>
+            </span>
+          </a-col>
         </a-row>
       </a-form>
-    </div>
+    </div> -->
 
     <div class="table-operator">
       <a-button type="primary" icon="plus" @click="handleEdit()">{{ $t('New User') }}</a-button>
@@ -84,6 +90,17 @@ export default {
         {
           title: this.$t('Email'),
           dataIndex: 'email'
+        },
+        {
+          title: this.$t('Role'),
+          dataIndex: 'role',
+          customRender: (text, record, index) => {
+            if (this.$i18n.locale === 'zh-CN') {
+              return text.name
+            } else {
+              return text.id
+            }
+          }
         },
         {
           title: this.$t('UpdateTime'),

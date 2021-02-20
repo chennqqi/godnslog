@@ -315,6 +315,59 @@ func (self *WebServer) userLogout(c *gin.Context) {
 	})
 }
 
+func parseRole(roleValue int) models.Role {
+	var role models.Role
+	role.Id = "normal"
+	role.Name = "普通用户"
+	role.Permissions = []models.Permission{
+		models.Permission{
+			RoleId:         roleNormal,
+			PermissionId:   "document",
+			PermissionName: "文档",
+		},
+	}
+	switch roleValue {
+	case roleAdmin, roleSuper:
+		role.Id = "admin"
+		role.Name = "管理员"
+		role.Permissions = append(role.Permissions, []models.Permission{
+			models.Permission{
+				RoleId:         roleNormal,
+				PermissionId:   "setting",
+				PermissionName: "设置",
+			},
+			models.Permission{
+				RoleId:         roleAdmin,
+				PermissionId:   "manage",
+				PermissionName: "管理用户",
+			},
+			models.Permission{
+				RoleId:         roleNormal,
+				PermissionId:   "record",
+				PermissionName: "记录",
+			},
+		}...)
+
+	case roleNormal:
+		role.Permissions = append(role.Permissions, []models.Permission{
+			models.Permission{
+				RoleId:         roleNormal,
+				PermissionId:   "setting",
+				PermissionName: "设置",
+			},
+			models.Permission{
+				RoleId:         roleNormal,
+				PermissionId:   "record",
+				PermissionName: "记录",
+			},
+		}...)
+	case roleGuest:
+		role.Id = "guest"
+		role.Name = "访客"
+	}
+	return role
+}
+
 // @Summary userInfo
 // @Description get Dns Record by user query
 // @Accept  json
@@ -361,46 +414,6 @@ func (self *WebServer) userInfo(c *gin.Context) {
 		user = v.(*models.TblUser)
 	}
 
-	var role models.Role
-	role.Id = "normal"
-	role.Name = "用户"
-	role.Permissions = []models.Permission{
-		models.Permission{
-			RoleId:         roleNormal,
-			PermissionId:   "document",
-			PermissionName: "文档",
-		},
-		models.Permission{
-			RoleId:         roleNormal,
-			PermissionId:   "record",
-			PermissionName: "记录",
-		},
-	}
-	switch user.Role {
-	case roleAdmin, roleSuper:
-		role.Id = "admin"
-		role.Name = "管理员"
-		role.Permissions = append(role.Permissions, []models.Permission{
-			models.Permission{
-				RoleId:         roleNormal,
-				PermissionId:   "setting",
-				PermissionName: "设置",
-			},
-			models.Permission{
-				RoleId:         roleAdmin,
-				PermissionId:   "manage",
-				PermissionName: "管理用户",
-			},
-		}...)
-
-	default:
-		role.Permissions = append(role.Permissions, models.Permission{
-			RoleId:         roleNormal,
-			PermissionId:   "setting",
-			PermissionName: "设置",
-		})
-	}
-
 	//TODO: UserInfo from cache, role & permissions
 	self.resp(c, 200, &CR{
 		Message: T("OK"),
@@ -409,7 +422,7 @@ func (self *WebServer) userInfo(c *gin.Context) {
 			Id:    user.Id,
 			Name:  user.Name,
 			Email: user.Email,
-			Role:  role,
+			Role:  parseRole(user.Role),
 		},
 	})
 }
@@ -463,7 +476,7 @@ func (self *WebServer) userList(c *gin.Context) {
 		rcd.Name = item.Name
 		rcd.Email = item.Email
 		rcd.Utime = item.Utime
-		//TODO: others...
+		rcd.Role = parseRole(item.Role)
 	}
 
 	self.resp(c, 200, &CR{
@@ -585,6 +598,8 @@ func (self *WebServer) addUser(c *gin.Context) {
 		return
 	}
 
+	// TODO: other checks
+
 	//random api Token
 	session := self.orm.NewSession()
 	defer session.Close()
@@ -592,7 +607,7 @@ func (self *WebServer) addUser(c *gin.Context) {
 	var item = models.TblUser{
 		Name:          req.Name,
 		Email:         req.Email,
-		Role:          roleNormal,
+		Role:          req.Role,
 		Token:         genRandomToken(),
 		ShortId:       genShortId(),
 		Lang:          self.DefaultLanguage,

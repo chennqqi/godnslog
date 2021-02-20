@@ -4,7 +4,7 @@
       <a-form layout="inline">
         <a-row :gutter="48">
           <a-col :md="8" :sm="24">
-            <a-form-item label="搜索">
+            <a-form-item :label="$t('Search')">
               <a-input v-model="queryParam.keyword" placeholder=""/>
             </a-form-item>
           </a-col>
@@ -147,7 +147,7 @@ export default {
   },
   created () {
     this.tableOption()
-    getResolves({})
+    // getResolves({})
   },
   methods: {
     tableOption () {
