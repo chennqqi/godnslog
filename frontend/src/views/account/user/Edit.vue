@@ -266,7 +266,6 @@ export default {
           const dupvalue = {}
           Object.assign(dupvalue, data)
           dupvalue.role = role
-          debugger
           const formData = pick(dupvalue, [ 'id', 'username', 'email', 'password', 'role' ])
           form.setFieldsValue(formData)
         }
