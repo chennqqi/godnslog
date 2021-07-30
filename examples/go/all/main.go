@@ -85,6 +85,7 @@ func main() {
 	//dig xxx.n128b25b768knzdz.godnslog.com
 	{
 		var store = make(map[string]int64)
+		var name = "testdnsxx" // custom prefix
 		var prefix string
 		for i := 0; i < 5; i++ {
 			scanId := simulatorScanId()
@@ -110,7 +111,7 @@ func main() {
 		}
 		// batch query
 		{
-			rcds, err := c.QueryDns(k, true)
+			rcds, err := c.QueryDns(name, true)
 			if err != nil {
 				log.Println("Query DNS:", err)
 			}
@@ -123,6 +124,7 @@ func main() {
 	//http example
 	{
 		var prefix string
+		var name = "testhttpxx" // custom prefix
 		var store = make(map[string]int64)
 		for i := 0; i < 5; i++ {
 			scanId := simulatorScanId()
@@ -146,7 +148,7 @@ func main() {
 		}
 		// batch query
 		{
-			rcds, err := c.QueryDns(k)
+			rcds, err := c.QueryDns(name, true)
 			if err != nil {
 				log.Println("Query DNS:", err)
 				return
