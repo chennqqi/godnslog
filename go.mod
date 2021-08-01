@@ -21,7 +21,6 @@ require (
 	github.com/swaggo/gin-swagger v1.2.0
 	github.com/swaggo/swag v1.6.7
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
-
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	xorm.io/xorm v1.0.3
 )

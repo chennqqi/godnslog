@@ -6,10 +6,10 @@ RUN yarn config set registry https://registry.npm.taobao.org && yarn install
 RUN yarn build
 
 # build backend
-FROM golang:1.14.7-alpine3.12 as backend-builder
+FROM golang:1.16.4 as backend-builder
 
 RUN echo "https://mirror.tuna.tsinghua.edu.cn/alpine/v3.12/main" > /etc/apk/repositories
-RUN apk add build-base git musl-dev
+#RUN apk add build-base git musl-dev
 
 COPY models /src/godnslog/models
 COPY server /src/godnslog/server
@@ -19,7 +19,7 @@ WORKDIR /src/godnslog
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o /go/bin/godnslog
 
 # build app
-FROM alpine:3.12
+FROM alpine:3.13.5
 
 RUN apk add --no-cache -U tzdata ca-certificates libcap && \
 	update-ca-certificates
