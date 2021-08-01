@@ -859,7 +859,7 @@ func (self *WebServer) setAppSetting(c *gin.Context) {
 	dupUser.CleanInterval = req.CleanHour * 3600
 	_, err = session.ID(id).Cols("rebind", "callback", "clean_interval").Update(dupUser)
 	if err != nil {
-		logrus.Errorf("[webuig.go::setAppSetting] orm.Update error: %v", err)
+		logrus.Errorf("[webui.go::setAppSetting] orm.Update error: %v", err)
 		self.resp(c, 502, &CR{
 			Message: T("Failed"),
 			Code:    CodeServerInternal,
