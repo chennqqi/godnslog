@@ -73,6 +73,21 @@ func (self *WebServer) initDatabase() error {
 		}
 		fmt.Printf("Init super admin user with password: %v\n", randomPass)
 	}
+	var wwwRcd models.TblResolve
+	exist, err := orm.Where(`host=?`, `www`).And(`type=?`, `A`).Get(&wwwRcd)
+	if err != nil {
+		logrus.Errorf("[webui.go::initDatabase] orm.Get(resolve): %v", err)
+		return err
+	} else if !exist {
+		wwwRcd.Host = "www"
+		wwwRcd.Value = self.IP
+		wwwRcd.Type = "A"
+		wwwRcd.Ttl = 600 // default 600s
+		orm.InsertOne(&wwwRcd)
+	} else if wwwRcd.Value != self.IP {
+		wwwRcd.Value = self.IP
+		orm.Update(&wwwRcd)
+	}
 
 	store := self.store
 	// sync user

@@ -403,6 +403,7 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	//r.u3yszl9nidbsx8p9.example.com.
+	//127.0.0.1-100.100.100.100.cr.u3yszl9nidbsx8p9.example.com.
 	prefix, shortId, isRebind := parseDomain(q.Name, h.Domain)
 	if prefix == "" {
 		ttl = DEFAULT_TTL // improve performance

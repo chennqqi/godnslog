@@ -52,3 +52,29 @@ func TestParseDomain(t *testing.T) {
 		}
 	}
 }
+
+func TestParsePrefix(t *testing.T) {
+	var tests = []struct {
+		Input        string
+		ExpectFirst  string
+		ExpectSecond string
+		ExpectRebind bool
+	}{
+		{"aaaa.cr", "", "", false},
+		{"1-1.cr", "", "", false},
+		{"127.0.0.1-100.100.100.100.cr", "127.0.0.1", "100.100.100.100", true},
+	}
+	for i := 0; i < len(tests); i++ {
+		test := &tests[i]
+		first, second, rebind := parsePrefix(test.Input)
+		if first != test.ExpectFirst {
+			t.Fatalf("test shortId(%v)!=expect(%v)", first, test.ExpectFirst)
+		}
+		if second != test.ExpectSecond {
+			t.Fatalf("test shortId(%v)!=expect(%v)", second, test.ExpectSecond)
+		}
+		if rebind != test.ExpectRebind {
+			t.Fatalf("test rebind(%v)!=ExpectRebind(%v)", rebind, test.ExpectRebind)
+		}
+	}
+}
