@@ -1,65 +1,65 @@
 <template>
   <div class="account-settings-info-view">
-        <a-form layout="vertical" :form="form">
-          <a-form-item :label="$t('setting.system.base.callback')" >
-            <a-textarea
-              rows="4"
-              v-decorator="[
-                'callback',
-                { rules: [
-                    { validator: (rule, value, callback) => {
-                        if (typeof value !== 'string') {
-                          callback($t('should be a valid url'))
-                        }
-                        if (!isURL(value)) {
-                          callback($t('should be a valid url'))
-                        }
-                        callback()
-                      }
-                    }
-                  ]
+    <a-form layout="vertical" :form="form">
+      <a-form-item :label="$t('setting.system.base.callback')" >
+        <a-textarea
+          rows="4"
+          v-decorator="[
+            'callback',
+            { rules: [
+              { validator: (rule, value, callback) => {
+                if (typeof value !== 'string') {
+                  callback($t('should be a valid url'))
                 }
-              ]"
-            />
-          </a-form-item>
-          <a-form-item
-            :label="$t('setting.system.base.cleanInterval(hour)')"
-            required>
-            <a-input-number
-              v-decorator="[
-                'cleanHour',
-                {
-                  initialValue: cleanHour,
-                  rules: [
-                    { validator: (rule, value, callback) => {
-                        if (typeof value !== 'number') {
-                          callback($t('should be a valid number'))
-                        }
-                        if (value < 1) {
-                           callback($t('can\'t less than 1 hour'))
-                        }
-                        if (value > 48) {
-                           callback($t('can\'t less than 48 hours'))
-                        }
-                        callback()
-                      }
-                    }
-                  ]
+                if (!isURL(value)) {
+                  callback($t('should be a valid url'))
                 }
-              ]"
-            />
-          </a-form-item>
-          <a-form-item
-            :label="$t('setting.system.base.rebind')"
-          >
-            <InputTag
-              :values.sync="rebind"
-            ></InputTag>
-          </a-form-item>
-          <a-form-item>
-            <a-button type="primary" @click="handleSubmit">{{ $t('Submit') }}</a-button>
-          </a-form-item>
-        </a-form>
+                callback()
+              }
+              }
+            ]
+            }
+          ]"
+        />
+      </a-form-item>
+      <a-form-item
+        :label="$t('setting.system.base.cleanInterval(hour)')"
+        required>
+        <a-input-number
+          v-decorator="[
+            'cleanHour',
+            {
+              initialValue: cleanHour,
+              rules: [
+                { validator: (rule, value, callback) => {
+                  if (typeof value !== 'number') {
+                    callback($t('should be a valid number'))
+                  }
+                  if (value < 1) {
+                    callback($t('can\'t less than 1 hour'))
+                  }
+                  if (value > 1000) {
+                    callback($t('can\'t greater than 48 hours'))
+                  }
+                  callback()
+                }
+                }
+              ]
+            }
+          ]"
+        />
+      </a-form-item>
+      <a-form-item
+        :label="$t('setting.system.base.rebind')"
+      >
+        <InputTag
+          :values.sync="rebind"
+        ></InputTag>
+      </a-form-item>
+      <a-form-item>
+        <a-button type="primary" @click="handleSubmit">{{ $t('Submit') }}</a-button>
+      </a-form-item>
+    </a-form>
   </div>
 </template>
 
@@ -69,6 +69,7 @@
   import { isURL } from '@/utils/util'
   import InputTag from './InputTag'
   import InputUnit from './InputUnit'
+
   export default {
     components: {
       InputTag,

@@ -3,10 +3,23 @@ package server
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
+)
+
+var (
+	customRebindExp = regexp.MustCompile(`([\d|\.]+)-([\d|\.]+).cr`)
+)
+
+type RebindType int
+
+const (
+	NotRebind RebindType = iota
+	Rebind
+	CustomeRebind
 )
 
 func getSecuritySeed() string {
@@ -48,6 +61,17 @@ func isWeakPass(pass string) bool {
 
 func customQuote(s string) string {
 	return `'` + s + `'`
+}
+
+func parseCustomRebind(prefix string) (isCustomRebind bool, first, second string) {
+	matched := customRebindExp.FindAllStringSubmatch(prefix, -1)
+	if len(matched) == 1 {
+		isCustom = true
+		first = matched[0][1]
+		second = matched[0][1]
+		return
+	}
+	return
 }
 
 func parseDomain(name, root string) (prefix, shortId string, rebind bool) {

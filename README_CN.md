@@ -100,16 +100,17 @@ docker run -p80:8080 -p53:53/udp "sort/godnslog" serve -domain yourdomain.com -4
 yourdomain.com 替换为你的域名
 100.100.100.100 替换为你的公网IP
 
-打开浏览器访问 http://100.100.100.100, 你也可以用0.5.0新增的标准DNS解析功能，将www.<youdomain>指向100.100.100.100来通过域名访问呢
 
 ## TODO
 
 - docker-compose文件 
-- 默认添加www解析
-- 自定义清理周期
+- ~~默认添加www解析~~
+- ~~自定义清理周期限制~~
+- 重绑定增强 https://github.com/chennqqi/godnslog/issues/14
 - 增强反向代理场景
 - 管理员查看所有用户
 - ~~demo编译通过~~
+- 允许未登录用户访问文档
 
 ## 已知问题
 
