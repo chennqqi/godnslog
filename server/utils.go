@@ -3,6 +3,8 @@ package server
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"fmt"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -11,15 +13,8 @@ import (
 )
 
 var (
-	customRebindExp = regexp.MustCompile(`([\d|\.]+)-([\d|\.]+).cr`)
-)
-
-type RebindType int
-
-const (
-	NotRebind RebindType = iota
-	Rebind
-	CustomeRebind
+	binaryIPExp = regexp.MustCompile(`(?:0b)?((?:0|1){25,32})`)
+	hexIPExp    = regexp.MustCompile(`(?i:0x)?([0-f]?[0-f]{7})`)
 )
 
 func getSecuritySeed() string {
@@ -63,19 +58,21 @@ func customQuote(s string) string {
 	return `'` + s + `'`
 }
 
-func parseCustomRebind(prefix string) (isCustomRebind bool, first, second string) {
-	matched := customRebindExp.FindAllStringSubmatch(prefix, -1)
-	if len(matched) == 1 {
-		isCustom = true
-		first = matched[0][1]
-		second = matched[0][1]
+func parsePrefix(prefix string) (pprefix, mode string) {
+	index := strings.LastIndex(prefix, ".")
+	if index <= 0 {
+		pprefix = prefix
 		return
 	}
+	mode = prefix[index+1:]
+	pprefix = prefix[:index]
 	return
 }
 
 func parseDomain(name, root string) (prefix, shortId string, rebind bool) {
 	//r.u3yszl9nidbsx8p9.example.com.
+	//abc.r.u3yszl9nidbsx8p9.example.com.
+	//127.0.0.1-100.100.100.cr.u3yszl9nidbsx8p9.example.com.
 	index := strings.Index(name, "."+root)
 	if index <= 0 {
 		return
@@ -109,4 +106,38 @@ func parseQuestionName(name, root string) (q string) {
 
 	q = name[:index]
 	return
+}
+
+func parseBinaryIP(ip string) (net.IP, error) {
+	uip, err := strconv.ParseUint(ip, 2, 64)
+	if err != nil {
+		return nil, err
+	}
+	return net.ParseIP(fmt.Sprintf("%d.%d.%d.%d",
+		(uip>>24)&0xFF, (uip>>16)&0xFF, (uip>>8)&0xFF, uip&0xFF)), nil
+}
+
+func parseHexIP(ip string) (net.IP, error) {
+	uip, err := strconv.ParseUint(ip, 16, 32)
+	if err != nil {
+		return nil, err
+	}
+	return net.ParseIP(fmt.Sprintf("%d.%d.%d.%d",
+		(uip>>24)&0xFF, (uip>>16)&0xFF, (uip>>8)&0xFF, uip&0xFF)), nil
+}
+
+func parseIP(ip string) (net.IP, error) {
+	{
+		subs := hexIPExp.FindAllStringSubmatch(ip, 1)
+		if len(subs) == 1 {
+			return parseHexIP(subs[0][1])
+		}
+	}
+	{
+		subs := binaryIPExp.FindAllStringSubmatch(ip, 1)
+		if len(subs) == 1 {
+			return parseHexIP(subs[0][1])
+		}
+	}
+	return net.ParseIP(ip), nil
 }

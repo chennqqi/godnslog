@@ -103,22 +103,19 @@ yourdomain.com 替换为你的域名
 
 ## TODO
 
-- docker-compose文件 
+- ~~修复demo程序编译不过的问题~~
+- ~~docker-compose文件 ~~
 - ~~默认添加www解析~~
 - ~~自定义清理周期限制~~
-- 重绑定增强 https://github.com/chennqqi/godnslog/issues/14
-- 增强反向代理场景
+- ~~重绑定增强 https://github.com/chennqqi/godnslog/issues/14 ~~
+- ~~增强反向代理场景~~
 - 管理员查看所有用户
-- ~~demo编译通过~~
 - 允许未登录用户访问文档
 
 ## 已知问题
 
 - introduce/文档的mavon-editor会遮挡下拉菜单
-- 一些没必要的调试打印问题
-- 口令失效后的一些重复提示
-
-
+- 前端页面口令失效后的一些重复提示
 
 ## 文档
 
