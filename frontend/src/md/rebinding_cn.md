@@ -4,8 +4,18 @@
 
 `r.${shortId}.godnslog.com`及其子域名作为Rebinding域名, 每次请求随机返回一个配置的结果
 
+
+从v0.7.x起，新增了自定义rebinding功能
+
+127.0.0.1-100.100.100.100.cr.godnslog.com
+
+
+
 ## 配置rebinding
 ![](https://s1.ax1x.com/2020/08/31/dOO6fO.png)
+
+
+
 
 ## 使用
 

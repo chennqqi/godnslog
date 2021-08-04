@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net"
 	"regexp"
 	"strings"
@@ -38,10 +39,11 @@ TODO:
 */
 
 const (
-	LOG_TTL     = 0
-	NS_TTL      = 600
-	DEFAULT_TTL = 300
-	XIP_TTL     = 86400
+	LOG_TTL              = 0
+	NS_TTL               = 600
+	DEFAULT_TTL          = 300
+	XIP_TTL              = 86400 * 7 // one week
+	CUSTOM_REBIND_EXPIRE = 3600 * time.Second
 )
 
 var (
@@ -65,9 +67,12 @@ type DnsServer struct {
 	DnsServerConfig
 	store *cache.Cache
 
-	tcpServer  *dns.Server
-	udpServer  *dns.Server
-	ipv4Regexp *regexp.Regexp
+	tcpServer *dns.Server
+	udpServer *dns.Server
+
+	ipv4Regexp  *regexp.Regexp
+	ipv4uRegexp *regexp.Regexp
+	ipv4bRegexp *regexp.Regexp
 
 	wg      sync.WaitGroup
 	handler dns.Handler
@@ -81,6 +86,10 @@ func NewDnsServer(cfg *DnsServerConfig, store *cache.Cache) (*DnsServer, error) 
 	}
 	ipv4Exp := `((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))`
 	ipv4Exp = ipv4Exp + strings.Replace("."+domain, ".", `\.`, -1)
+	ipv4uExp := `(?i:0x)?([0-f]?[0-f]{7})`
+	ipv4uExp = ipv4uExp + strings.Replace("."+domain, ".", `\.`, -1)
+	ipv4bExp := `(?:0b)?((?:0|1){25,32})`
+	ipv4bExp = ipv4bExp + strings.Replace("."+domain, ".", `\.`, -1)
 
 	addr := ""
 	// debug
@@ -110,6 +119,9 @@ func NewDnsServer(cfg *DnsServerConfig, store *cache.Cache) (*DnsServer, error) 
 		},
 	}
 	s.ipv4Regexp = regexp.MustCompile(ipv4Exp)
+	s.ipv4uRegexp = regexp.MustCompile(ipv4uExp)
+	s.ipv4bRegexp = regexp.MustCompile(ipv4bExp)
+
 	handler.HandleFunc(domain, s.Do)
 	return s, nil
 }
@@ -408,14 +420,37 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 	if prefix == "" {
 		ttl = DEFAULT_TTL // improve performance
 	}
+	doResponseError := func() {
+		doResp(net.ParseIP("255.255.255.255"), q.Qtype)
+	}
+
+	doResponseCustomRebind := func(prefix string) {
+		key := prefix + shortId
+
+		// go-cache not like redis.Incr
+		last, _ := store.IncrementInt(key, 1)
+		if last == 0 {
+			store.Set(key, 0, CUSTOM_REBIND_EXPIRE)
+		}
+		ips := strings.Split(prefix, "-")
+		if len(ips) > 0 {
+			ip, err := parseIP(ips[last%len(ips)])
+			if err != nil {
+				doResponseError()
+				return
+			}
+			doResp(ip, q.Qtype)
+			return
+		}
+		doResponseError()
+	}
 
 	//xip return custom ip
 	{
-		subs := h.ipv4Regexp.FindAllStringSubmatch(q.Name, 1)
-		if len(subs) > 0 {
-			ip := subs[0][1]
+		xip, err := h.parseXip(q.Name)
+		if err == nil {
 			ttl = XIP_TTL
-			doResp(net.ParseIP(ip), q.Qtype)
+			doResp(xip, q.Qtype)
 			return
 		}
 	}
@@ -434,6 +469,10 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 	if isRebind && len(user.Rebind) > 0 {
 		idx := time.Now().Second() % len(user.Rebind)
 		ip = net.ParseIP(user.Rebind[idx])
+	} else if pprefix, mode := parsePrefix(prefix); mode == "cr" {
+		// custom rebind
+		doResponseCustomRebind(pprefix)
+		return
 	}
 
 	switch q.Qtype {
@@ -467,4 +506,35 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	dns.HandleFailed(w, req)
+}
+
+func (h *DnsServer) parseXip(qName string) (net.IP, error) {
+	// 127.0.0.1.example.com
+	if h.ipv4Regexp.MatchString(qName) {
+		subs := h.ipv4Regexp.FindAllStringSubmatch(qName, 1)
+		if len(subs) > 0 {
+			ip := subs[0][1]
+			return net.ParseIP(ip), nil
+		}
+	}
+	// binary maybe match hex, try first
+	if h.ipv4bRegexp.MatchString(qName) {
+		// 0b1111111000000000000000000000001.example.com
+		subs := h.ipv4bRegexp.FindAllStringSubmatch(qName, 1)
+		if len(subs) > 0 {
+			ip := subs[0][1]
+			return parseBinaryIP(ip)
+		}
+	}
+	if h.ipv4uRegexp.MatchString(qName) {
+		// 0x7f000001.example.com
+		// 7f000001.example.com
+		fmt.Println(h.ipv4uRegexp.String(), "match", qName)
+		subs := h.ipv4uRegexp.FindAllStringSubmatch(qName, 1)
+		if len(subs) > 0 {
+			ip := subs[0][1]
+			return parseHexIP(ip)
+		}
+	}
+	return nil, fmt.Errorf("not xip")
 }
