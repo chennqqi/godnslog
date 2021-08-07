@@ -50,29 +50,58 @@ func (self *WebServer) initDatabase() error {
 		logrus.Errorf("[webui.go::initDatabase] orm.Sync: %v", err)
 		return err
 	}
-	count, err := orm.Count(&models.TblUser{})
-	if err != nil {
-		logrus.Errorf("[webui.go::initDatabase] orm.Count(user): %v", err)
-		return err
-	}
-	if count == 0 {
-		randomPass := genRandomString(12)
-		_, err = orm.InsertOne(&models.TblUser{
-			Name:          "admin",
-			Email:         "admin@godnslog.com",
-			ShortId:       genShortId(),
-			Pass:          makePassword(randomPass),
-			Token:         genRandomToken(),
-			Role:          roleSuper,
-			Lang:          self.DefaultLanguage,
-			CleanInterval: self.DefaultCleanInterval,
-		})
+
+	// check superUser
+	{
+		count, err := orm.Count(&models.TblUser{})
 		if err != nil {
-			logrus.Errorf("[webui.go::initDatabase] orm.InsertOne(user): %v", err)
+			logrus.Errorf("[webui.go::initDatabase] orm.Count(user): %v", err)
 			return err
 		}
-		fmt.Printf("Init super admin user with password: %v\n", randomPass)
+		// if there is no supser user when system first init
+		if count == 0 {
+			randomPass := genRandomString(12)
+			_, err = orm.InsertOne(&models.TblUser{
+				Name:          "admin",
+				Email:         "admin@godnslog.com",
+				ShortId:       genShortId(),
+				Pass:          makePassword(randomPass),
+				Token:         genRandomToken(),
+				Role:          roleSuper,
+				Lang:          self.DefaultLanguage,
+				CleanInterval: self.DefaultCleanInterval,
+			})
+			if err != nil {
+				logrus.Errorf("[webui.go::initDatabase] orm.InsertOne(user): %v", err)
+				return err
+			}
+			fmt.Printf("Init super admin user with password: %v\n", randomPass)
+		}
 	}
+
+	// check and add guest user
+	if self.WithGuest {
+		var guestUser models.TblUser
+		exist, err := orm.Where(`name=?`, "guest").Get(&guestUser)
+		if err != nil {
+			logrus.Errorf("[webui.go::initDatabase] orm.Get(user.name='guest'): %v", err)
+			return err
+		} else if !exist {
+			guestUser.Name = "guest"
+			guestUser.Email = "guest@godnslog.com"
+			guestUser.Pass = makePassword("guest123")
+			guestUser.Token = genRandomToken()
+			guestUser.Role = roleGuest
+			guestUser.Lang = self.DefaultLanguage
+			guestUser.CleanInterval = self.DefaultCleanInterval
+			_, err = orm.InsertOne(&guestUser)
+			if err != nil {
+				logrus.Errorf("[webui.go::initDatabase] orm.InsertOne(user.name=guest): %v", err)
+				return err
+			}
+		}
+	}
+
 	var wwwRcd models.TblResolve
 	exist, err := orm.Where(`host=?`, `www`).And(`type=?`, `A`).Get(&wwwRcd)
 	if err != nil {

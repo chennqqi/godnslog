@@ -17,7 +17,9 @@ import (
 )
 
 type servePwCmd struct {
-	swagger bool
+	swagger   bool
+	withGuest bool
+
 	domain,
 	driver, dsn,
 	ipv4, ipv6,
@@ -45,6 +47,8 @@ func (p *servePwCmd) SetFlags(f *flag.FlagSet) {
 
 	f.StringVar(&p.upstream, "upstreamp", "8.8.8.8:53", "set upstream dns")
 	f.BoolVar(&p.swagger, "swagger", false, "with swagger, option")
+	f.BoolVar(&p.withGuest, "guest", false, "init with guest user")
+
 	f.StringVar(&p.defaultLanguage, "lang", DefaultLanguage, "set default language, [en-US/zh-CN], option")
 	f.StringVar(&p.httpListen, "http", ":8080", "set http listen, option")
 }
@@ -74,6 +78,7 @@ func (p *servePwCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 		IP:                           p.ipv4,
 		Listen:                       p.httpListen,
 		Swagger:                      p.swagger,
+		WithGuest:                    p.withGuest,
 		AuthExpire:                   AuthExpire,
 		DefaultCleanInterval:         DefaultCleanInterval,
 		DefaultQueryApiMaxItem:       DefaultQueryApiMaxItem,
