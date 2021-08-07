@@ -26,12 +26,13 @@ import (
 )
 
 type WebServerConfig struct {
-	Driver  string
-	Dsn     string
-	Domain  string
-	IP      string
-	Listen  string
-	Swagger bool
+	Driver    string
+	Dsn       string
+	Domain    string
+	IP        string
+	Listen    string
+	Swagger   bool
+	WithGuest bool
 
 	AuthExpire                   time.Duration
 	DefaultCleanInterval         int64
