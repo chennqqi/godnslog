@@ -28,10 +28,10 @@ services:
     networks:
       - overlay
     volumes:
-       - db-data:/var/lib/mysql/data    	
+       - godnslog-mysql-data:/var/lib/mysql/data    	
   
 networks:
   overlay:
 
 volumes:
-  godnslog-data:
+  godnslog-mysql-data:
