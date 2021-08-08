@@ -58,6 +58,7 @@ const locale = {
   'app.setting.production.hint': 'Setting panel shows in development environment only, please manually modify',
 
   'menu.setting.resolve': 'Resolve',
+  'menu.document.xip': 'xip',
   'Host': 'Host',
   'Type': 'Type',
   'Value': 'Value'

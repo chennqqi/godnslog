@@ -1,12 +1,17 @@
 # Rebinding
 
+## 1. Global Rebinding
+
 Like <http://ceye.io>, random policy。 
 
 `r.${shortId}.godnslog.com` and it's subdomain as rebind domain. Each request return a random response which you have set.
 
-## Configure
+### Configure
 ![](https://s1.ax1x.com/2020/08/31/dOO6fO.png)
 
-## Usage
+### Usage
 
 ![](https://s1.ax1x.com/2020/08/31/dOOgpD.png)
+
+
+## 2. Custom Rebinding

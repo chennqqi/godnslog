@@ -22,7 +22,7 @@
           <a href="https://github.com/chennqqi" target="_blank">@chennqqi</a>
         </div>
         <div class="copyright">
-          <a href="https://www.godnslog.com">Copyright &copy; 2020 godnslog.com</a>
+          <a href="https://www.godnslog.com">Copyright &copy; 2021 godnslog.com</a>
         </div>
       </div>
     </div>

@@ -49,18 +49,16 @@ yum install docker -y
 
 
 ```bash
-docker pull "sort/godnslog:version-0.3.0"
-docker run -p80:8080 -p53:53/udp "sort/godnslog:version-0.4.0" serve -domain yourdomain.com -4 100.100.100.100
+docker pull "sort/godnslog"
+docker run -p80:8080 -p53:53/udp "sort/godnslog:version-0.4.0" serve -domain yourdomain.com -4 100.100.100.100 -guest
 ```
 
-version-0.3.0 替换为最新版本号
 yourdomain.com 替换为你的域名
 100.100.100.100 替换为你的公网IP
 
 如果想执行编译镜像，请参考根目录下的`Dockerfile`
 
 首次运行后会在控制台打印超级用户密码，使用`docker logs  ${containterId}`获取
-
 
 ## 源代码直接编译
 
@@ -69,7 +67,6 @@ yourdomain.com 替换为你的域名
 - yarn
 - go(https://golang.google.cn/dl/)
 - gcc
-- 
 
 ### II. 编译代码 
 

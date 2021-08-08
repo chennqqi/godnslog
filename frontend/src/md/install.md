@@ -46,14 +46,13 @@ Some registrar to ns host must be different ip address, you can set one to a fak
 ii. self build
 
 ```bash
-docker run -p80:8080 -p53:53/udp "user/godnslog" serve -domain yourdomain.com -4 100.100.100.100
+docker build -t "user/godnslog" -f Dockerfile .
 ```
-
 or use dockerhub
 
 ```bash
-docker pull "sort/godnslog:version-0.3.0"
-docker run -p80:8080 -p53:53/udp "sort/godnslog:version-0.4.0" serve -domain yourdomain.com -4 100.100.100.100
+docker pull "sort/godnslog"
+docker run -p80:8080 -p53:53/udp "sort/godnslog:version-0.4.0" serve -domain yourdomain.com -4 100.100.100.100 -guest
 ```
 
 Super user's password would be created when run in first time. And it will be showed in docker logs.

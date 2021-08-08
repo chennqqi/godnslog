@@ -35,6 +35,26 @@ import GlobalFooter from '@/components/GlobalFooter'
 // import LogoSvg from '../assets/logo.svg?inline'
 import LogoSvg from '../assets/banner.svg?inline'
 
+// const links = [
+//   {
+//     key: '帮助',
+//     title: '帮助',
+//     href: ''
+//   },
+//   {
+//     key: 'github',
+//     title: <Icon type="github" />,
+//     href: 'https://github.com/ant-design/ant-design-pro',
+//     blankTarget: true
+//   },
+//   {
+//     key: '条款',
+//     title: '条款',
+//     href: '',
+//     blankTarget: true
+//   }
+// ]
+
 export default {
   name: 'BasicLayout',
   components: {

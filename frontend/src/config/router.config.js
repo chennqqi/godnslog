@@ -7,7 +7,6 @@ const RouteView = {
 }
 
 export const asyncRouterMap = [
-
   {
     path: '/',
     name: 'index',
@@ -34,6 +33,17 @@ export const asyncRouterMap = [
               permission: ['document']
             }
           },
+          // install
+          {
+              path: '/document/install',
+              name: 'Install',
+              component: () => import('@/views/doc/Install'),
+              meta: {
+                title: 'menu.document.install',
+                keepAlive: true,
+                permission: ['document']
+              }
+          },
           // payload
           {
             path: '/document/payload',
@@ -45,7 +55,7 @@ export const asyncRouterMap = [
               permission: ['document']
             }
           },
-          // payload
+          // api
           {
             path: '/document/api',
             name: 'Api',
@@ -67,7 +77,7 @@ export const asyncRouterMap = [
               permission: ['document']
             }
           },
-          // rebinding
+          // history
           {
             path: '/document/history',
             name: 'History',
@@ -89,16 +99,16 @@ export const asyncRouterMap = [
                 permission: ['document']
               }
           },
-          // install
+          // xip
           {
-              path: '/document/install',
-              name: 'Install',
-              component: () => import('@/views/doc/Install'),
-              meta: {
-                title: 'menu.document.install',
-                keepAlive: true,
-                permission: ['document']
-              }
+            path: '/document/xip',
+            name: 'Xip',
+            component: () => import('@/views/doc/Xip'),
+            meta: {
+              title: 'menu.document.xip',
+              keepAlive: true,
+              permission: ['document']
+            }
           }
         ]
       },
