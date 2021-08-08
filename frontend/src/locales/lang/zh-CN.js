@@ -93,6 +93,7 @@ const locale = {
   'An exquisite dns&http log server for verify SSRF/XXE/RFI/RCE vulnerability': '一个精致的SSRF/XXE/RFI/RCE漏洞dns&http LOG验证服务器',
 
   'menu.setting.resolve': '解析',
+  'menu.document.xip': 'xip',
   'Host': '主机',
   'Type': '类型',
   'Value': '值',

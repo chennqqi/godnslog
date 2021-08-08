@@ -1,14 +1,23 @@
 # Rebinding
 
+## 1. 自定义Rebindign
+
+从v0.7.x起，新增了自定义rebinding功能
+
+```bash
+	dig 127.0.0.1-100.100.100.100.cr.godnslog.com
+```
+	
+
+
+## 2. 全局配置Rebinding
+
 目前Rebinding的实现跟ceye.io一样是随机策略，多个配置随机出现。
 
 `r.${shortId}.godnslog.com`及其子域名作为Rebinding域名, 每次请求随机返回一个配置的结果
 
-
-从v0.7.x起，新增了自定义rebinding功能
-
-127.0.0.1-100.100.100.100.cr.godnslog.com
-
+```bash
+```
 
 
 ## 配置rebinding
