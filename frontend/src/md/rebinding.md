@@ -1,6 +1,21 @@
 # Rebinding
 
-## 1. Global Rebinding
+## 1. Custom Rebinding
+
+Since 0.7.0, GODNSLOG enable custom rebinding by request
+
+```bash
+	dig 127.0.0.1-100.100.100.100.cr.godnslog.com
+
+	#第一次返回:
+	127.0.0.1-10.10.10.10.cr.1frwakkp3j14.godnslog.com. 0 IN A 127.0.0.1
+
+	#第二次返回:
+	127.0.0.1-10.10.10.10.cr.1frwakkp3j14.godnslog.com. 0 IN A 10.10.10.10
+```
+
+
+## 2. Global Rebinding
 
 Like <http://ceye.io>, random policy。 
 
@@ -13,5 +28,12 @@ Like <http://ceye.io>, random policy。
 
 ![](https://s1.ax1x.com/2020/08/31/dOOgpD.png)
 
+```bash
+	dig r.godnslog.com
 
-## 2. Custom Rebinding
+	#FIRST ANSWER SECTION:
+	r.1frwakkp3j14.godnslog.com. 0 IN A 127.0.0.1
+
+	#SECOND ANSWER SECTION:
+	r.1frwakkp3j14.godnslog.com. 0 IN A 10.10.10.10
+```
