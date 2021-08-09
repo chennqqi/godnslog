@@ -52,7 +52,7 @@ or use dockerhub
 
 ```bash
 docker pull "sort/godnslog"
-docker run -p80:8080 -p53:53/udp "sort/godnslog:version-0.4.0" serve -domain yourdomain.com -4 100.100.100.100 -guest
+docker run -p80:8080 -p53:53/udp "sort/godnslog" serve -domain yourdomain.com -4 100.100.100.100 -guest
 ```
 
 Super user's password would be created when run in first time. And it will be showed in docker logs.
