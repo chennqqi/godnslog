@@ -8,6 +8,7 @@ English Doc | [中文文档](https://github.com/chennqqi/godnslog/blob/master/RE
 
 ## features
 
+- Standard Domain Resolve Service
 - DNSLOG
 - HTTPLOG
 - Rebinding/CustomRebinding
