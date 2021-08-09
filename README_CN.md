@@ -8,6 +8,7 @@ A dns&amp;http log server for verify SSRF/XXE/RFI/RCE vulnerability
 
 ## 功能特性
 
+- 标准DNS解析服务
 - DNSLOG
 - HTTPLOG
 - Rebinding/CustomRebinding
