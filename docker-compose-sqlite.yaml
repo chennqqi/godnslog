@@ -1,0 +1,27 @@
+version: "3.3"  #docker version>=18.02.0+
+
+services:
+  init-godnslog:
+    image: busybox
+    container_name: busybox
+    command: /bin/sh -c 'touch /app/db/godnslog.db && ls /app/db && chown -R 1000:1000 /app/db'
+    restart: "no"
+    volumes:
+      - godnslog-sqlite-data:/app/db
+
+  godnslog:
+    image: sort/godnslog
+    container_name: godnslog
+    restart: always
+    environment:
+      - GIN_MODE=release
+    ports:
+      - "8080:8080"    # 反向代理模式
+      - "53:53/udp"
+    restart: always
+    command: serve -domain example.com -4 100.100.100.100 -dsn 'file:/app/db/godnslog.db?cache=shared&mode=rwc'
+    volumes:
+      - godnslog-sqlite-data:/app/db   # 持久化存储
+  
+volumes:
+  godnslog-sqlite-data:
