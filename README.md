@@ -9,7 +9,7 @@ English Doc | [中文文档](https://github.com/chennqqi/godnslog/blob/master/RE
 ## features
 
 - DNSLOG
-- HTTPLGO
+- HTTPLOG
 - Rebinding/CustomRebinding
 - Push (callback)
 - Multi-user
