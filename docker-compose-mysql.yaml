@@ -1,37 +1,32 @@
-version: "3.6"  #docker version>=18.02.0+
+version: "3.3"  #docker version>=18.02.0+
 
 services:
   godnslog:
-    container_name: godnslog
+    depends_on:
+      - db
     image: sort/godnslog
-    command: serve -domain yourdomain.com -4 x.x.x.x -dsn 'mysql://'
+    container_name: godnslog
+    command: serve -domain yourdomain.com -4 x.x.x.x -driver mysql -dsn 'godnslog:godnslog123@tcp(db:3306)/godnslog?charset=utf8'
     ports:
-      - "127.0.0.1:10080:8080"    # reverseProxy
+      - "8080:8080"    # reverseProxy
       - "53:53/udp"
     environment:
       - GIN_MODE=release
     restart: always
-    depends_on:
-      - db
-    networks:
-      - overlay
- 	
-  db:
-    image: mysql
-    container_name: godnslog-mysql
-    restart: always    
-    environment:
-      MYSQL_ROOT_PASSWORD: example
-      MYSQL_USER: 
-      MYSQL_PASSWORD:
-      MYSQL_DATABASE:
-    networks:
-      - overlay
-    volumes:
-       - db-data:/var/lib/mysql/data    	
-  
-networks:
-  overlay:
 
+  db:
+    image: mysql:5.7
+    container_name: godnslog-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: godnslogPASS
+      MYSQL_USER: godnslog
+      MYSQL_PASSWORD: godnslog123
+      MYSQL_DATABASE: godnslog
+      MYSQL_ROOT_HOST: "0.0.0.0"
+    volumes:
+       - godnslog-mysql-data:/var/lib/mysql
+       #- ./mysql:/docker-entrypoint-initdb.d/
+  
 volumes:
-  godnslog-data:
+  godnslog-mysql-data:

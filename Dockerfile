@@ -6,7 +6,7 @@ RUN yarn config set registry https://registry.npm.taobao.org && yarn install
 RUN yarn build
 
 # build backend
-FROM golang:1.16.4 as backend-builder
+FROM golang:1.16.4-alpine as backend-builder
 
 RUN echo "https://mirror.tuna.tsinghua.edu.cn/alpine/v3.12/main" > /etc/apk/repositories
 #RUN apk add build-base git musl-dev
@@ -29,10 +29,12 @@ RUN mkdir -p /app
 COPY --from=backend-builder /go/bin/godnslog /app/godnslog
 COPY --from=frontend-builder /app/dist /app/dist
 
-RUN	addgroup -S app && \
-	adduser app -S -G app -h /app && \
-	chown -R app:app /app && \
-	setcap cap_net_bind_service=eip /app/godnslog
+ARG UID=1000
+ARG GID=1000
+
+RUN addgroup -g $GID -S app && adduser -u $UID -S -g app app && \
+  chown -R app:app /app && \
+  setcap cap_net_bind_service=eip /app/godnslog
 
 WORKDIR /app
 USER app
