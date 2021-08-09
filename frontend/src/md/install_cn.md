@@ -45,12 +45,12 @@ yum install docker -y
 
 查看新版本: <https://hub.docker.com/r/sort/godnslog/tags>
 
-拉取新版本: `docker pull sort/godnslog:v0.4.0`
+拉取新版本: `docker pull sort/godnslog`
 
 
 ```bash
 docker pull "sort/godnslog"
-docker run -p80:8080 -p53:53/udp "sort/godnslog:version-0.4.0" serve -domain yourdomain.com -4 100.100.100.100 -guest
+docker run -p80:8080 -p53:53/udp "sort/godnslog" serve -domain yourdomain.com -4 100.100.100.100 -guest
 ```
 
 yourdomain.com 替换为你的域名

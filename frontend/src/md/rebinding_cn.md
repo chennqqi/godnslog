@@ -1,6 +1,6 @@
 # Rebinding
 
-## 1. 自定义Rebindign
+## 1. 自定义Rebinding
 
 从v0.7.x起，新增了自定义rebinding功能
 

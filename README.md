@@ -1,6 +1,6 @@
 # GODNSLOG
 
-![](https://s1.ax1x.com/2020/08/31/dXFLg1.png)
+![](https://z3.ax1x.com/2021/08/10/fGd4IJ.png)
 
 A dns&amp;http log server for verify SSRF/XXE/RFI/RCE vulnerability
 
@@ -10,12 +10,13 @@ English Doc | [中文文档](https://github.com/chennqqi/godnslog/blob/master/RE
 
 - DNSLOG
 - HTTPLGO
-- Rebinding
+- Rebinding/CustomRebinding
 - Push (callback)
 - Multi-user
 - dockerlized
 - python/golang client sdk
 - as a standard name resolve service with support `A,CNAME,TXT,MX`
+- xip
 
 
 ### DNSLOG
@@ -83,7 +84,7 @@ or use dockerhub
 
 ```bash
 docker pull "sort/godnslog"
-docker run -p80:8080 -p53:53/udp "sort/godnslog" serve -domain yourdomain.com -4 100.100.100.100
+docker run -p80:8080 -p53:53/udp -p80:8080  "sort/godnslog" serve -domain yourdomain.com -4 100.100.100.100
 ```
 
 iii. access http://100.100.100.100
@@ -98,7 +99,21 @@ guest/guest123
 [rebiding](https://www.godnslog.com/document/rebinding)
 [resolve](https://www.godnslog.com/document/resolve)
 
-## Follow me
+## TODO && Known Issues
 
+- [x]fix demo code
+- [x]add docker-compose
+- [x]add default www resolve
+- [x]init guest user option
+- [x]fix custom clean interval setting
+- [x]enhance rebinding https://github.com/chennqqi/godnslog/issues/14
+- [ ]~~enhance reverse proxy~~
+- [ ]admin user can read all recordds
+- [ ]allow Anonymous user access document page
+- [ ]enable custom rebinding stage two setting
+- [ ]fix logout dialog overlap by markdown 
+- [ ]fix login logical problem
+
+## Follow me
 
 ![](https://open.weixin.qq.com/qr/code?username=gh_4a48daaf398b)
