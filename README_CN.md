@@ -104,19 +104,12 @@ yourdomain.com 替换为你的域名
 
 ## TODO && 已知问题
 
-- [x]修复demo程序编译不过的问题
-- [x]docker-compose文件
-- [x]默认添加www解析
-- [x]添加guest用户初始化
-- [x]修复自定义清理周期限制
-- [x]重绑定增强 https://github.com/chennqqi/godnslog/issues/14
-- [ ]~~增强反向代理场景~~
-- [ ]管理员查看所有用户
-- [ ]允许未登录用户访问文档
-- [ ]自定义Rebind第二阶段TTL可配置
-- [ ]introduce/文档的mavon-editor会遮挡下拉菜单
-- [ ]前端页面口令失效后的一些重复提示
-- [ ]markdown组件使用了cloudflare提供的js CDN(可以先用ReplaceCDN临时解决)，如果cf被墙会导致网页一直卡住
+- [ ] ~~增强反向代理场景~~
+- [ ] 管理员查看所有用户
+- [ ] 允许未登录用户访问文档
+- [ ] 自定义Rebind第二阶段TTL可配置
+- [ ] 前端页面口令失效后的一些重复提示
+- [ ] markdown组件使用了cloudflare提供的js CDN(可以先用ReplaceCDN临时解决)，如果cf被墙会导致网页一直卡住
 
 ## 文档
 

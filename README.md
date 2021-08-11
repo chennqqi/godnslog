@@ -102,18 +102,11 @@ guest/guest123
 
 ## TODO && Known Issues
 
-- [x]fix demo code
-- [x]add docker-compose
-- [x]add default www resolve
-- [x]init guest user option
-- [x]fix custom clean interval setting
-- [x]enhance rebinding https://github.com/chennqqi/godnslog/issues/14
 - [ ]~~enhance reverse proxy~~
-- [ ]admin user can read all recordds
-- [ ]allow Anonymous user access document page
-- [ ]enable custom rebinding stage two setting
-- [ ]fix logout dialog overlap by markdown 
-- [ ]fix login logical problem
+- [ ] admin user can read all recordds
+- [ ] allow Anonymous user access document page
+- [ ] enable custom rebinding stage two setting
+- [ ] fix login logical problem
 
 ## Follow me
 
