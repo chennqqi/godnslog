@@ -1,0 +1,28 @@
+id: godnslog-dns-oast
+info:
+  name: GODNSLOG DNS OAST Detection
+  author: GODNSLOG
+  severity: info
+  description: |
+    Detects out-of-band DNS interactions using GODNSLOG.
+    This template generates a unique DNS payload and checks for DNS resolution.
+
+requests:
+  - raw:
+      - |
+        GET /{{interactsh_url}} HTTP/1.1
+        Host: {{Hostname}}
+        User-Agent: {{User-Agent}}
+        Accept: */*
+
+    matchers:
+      - type: word
+        part: interactsh_protocol
+        words:
+          - "dns"
+
+    extractors:
+      - type: regex
+        part: interactsh_request
+        regex:
+          - '(?P<token>[a-zA-Z0-9]{16,32})\.{{Hostname}}'

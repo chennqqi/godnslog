@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,7 +19,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-sql-driver/mysql"
 	"github.com/hashicorp/go-retryablehttp"
-	"github.com/mattn/go-sqlite3"
 	"github.com/sirupsen/logrus"
 	swaggerFiles "github.com/swaggo/files"
 	"github.com/swaggo/gin-swagger"
@@ -96,7 +96,8 @@ func (self *WebServer) doClean() {
 		return
 	}
 	now := time.Now()
-	if self.orm.DriverName() == "sqlite3" {
+	driver := self.orm.DriverName()
+	if driver == "sqlite3" || driver == "sqlite" {
 		now = now.Local()
 	}
 
@@ -318,13 +319,28 @@ func (self *WebServer) IsDuplicate(err error) bool {
 
 	orm := self.orm
 	switch orm.DriverName() {
-	case "sqlite3":
-		e, ok := err.(sqlite3.Error)
-		if !ok {
-			logrus.Printf("[IsDuplicate] convert sqlite error: typeof(err)")
+	case "sqlite3", "sqlite":
+		if err == nil {
+			return false
 		}
-		if e.Code == sqlite3.ErrConstraint {
+		// modernc.org/sqlite error checking
+		errStr := err.Error()
+		// Check for constraint violation in error message
+		// modernc.org/sqlite format: "constraint failed: UNIQUE constraint failed: table.column (2067)"
+		if strings.Contains(errStr, "constraint failed") &&
+			(strings.Contains(errStr, "UNIQUE constraint") ||
+				strings.Contains(errStr, "PRIMARY KEY constraint") ||
+				strings.Contains(errStr, "FOREIGN KEY constraint")) {
 			return true
+		}
+		// Also check the error code if available
+		// modernc.org/sqlite Error type has Code() method
+		if sqliteErr, ok := err.(interface{ Code() int }); ok {
+			code := sqliteErr.Code()
+			// SQLITE_CONSTRAINT = 19, extended codes include 2067 (UNIQUE), etc.
+			if code == 19 || code >= 2067 && code <= 2099 {
+				return true
+			}
 		}
 	case "mysql":
 		e := err.(*mysql.MySQLError)

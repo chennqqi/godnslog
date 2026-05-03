@@ -20,9 +20,9 @@ type MyClaims struct {
 	jwt.StandardClaims
 }
 
-//==============================================================================
+// ==============================================================================
 // ui standard api
-//==============================================================================
+// ==============================================================================
 func (self *WebServer) respData(c *gin.Context, status, code int,
 	message string, data interface{}) {
 	c.JSON(status, &CR{
@@ -909,7 +909,7 @@ func (self *WebServer) setAppSetting(c *gin.Context) {
 	})
 }
 
-//change self password
+// change self password
 func (self *WebServer) getSecuritySetting(c *gin.Context) {
 	T := getTranslateFunc(c)
 	id := c.GetInt64("id")
@@ -955,7 +955,7 @@ func (self *WebServer) getSecuritySetting(c *gin.Context) {
 	})
 }
 
-//change self password
+// change self password
 func (self *WebServer) setSecuritySetting(c *gin.Context) {
 	T := getTranslateFunc(c)
 	var req AppSecuritySet
@@ -1047,7 +1047,8 @@ func (self *WebServer) getDnsRecord(c *gin.Context) {
 	}
 	if dateExist {
 		t, _ := time.Parse(time.RFC3339, strings.Trim(date, `"`))
-		if self.orm.DriverName() == "sqlite3" { //sqlite not support timezone
+		driver := self.orm.DriverName()
+		if driver == "sqlite3" || driver == "sqlite" { //sqlite not support timezone
 			t = t.Local()
 		}
 		session = session.And(`ctime > ?`, t)
@@ -1226,7 +1227,8 @@ func (self *WebServer) getHttpRecord(c *gin.Context) {
 	}
 	if dateExist {
 		t, _ := time.Parse(time.RFC3339, strings.Trim(date, `"`))
-		if self.orm.DriverName() == "sqlite3" { //sqlite不支持时区
+		driver := self.orm.DriverName()
+		if driver == "sqlite3" || driver == "sqlite" { //sqlite不支持时区
 			t = t.Local()
 		}
 		session = session.And(`ctime > ?`, t)

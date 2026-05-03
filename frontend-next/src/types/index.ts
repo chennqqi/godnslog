@@ -1,0 +1,154 @@
+// API Response types
+export interface ApiResponse<T = any> {
+  code: number
+  message: string
+  timestamp?: number
+  data?: T
+}
+
+// User types
+export interface User {
+  id: string
+  username: string
+  email: string
+  role: 'super' | 'admin' | 'normal' | 'guest'
+  created_at: string
+}
+
+export interface LoginRequest {
+  username: string
+  password: string
+}
+
+export interface LoginResponse {
+  token: string
+  refresh_token: string
+  expires_in: number
+  user: User
+}
+
+// Case types
+export interface Case {
+  id: string
+  title: string
+  description: string
+  target: string
+  status: 'active' | 'archived' | 'completed'
+  tags: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CaseCreateRequest {
+  title: string
+  description?: string
+  target?: string
+  tags?: string[]
+}
+
+export interface CaseUpdateRequest {
+  title?: string
+  description?: string
+  target?: string
+  status?: 'active' | 'archived' | 'completed'
+  tags?: string[]
+}
+
+export interface CaseListResponse {
+  items: Case[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+// Payload types
+export interface Payload {
+  id: string
+  case_id: string
+  token: string
+  template: string
+  rendered_payload: string
+  variables: Record<string, string>
+  status: 'draft' | 'deployed' | 'hit' | 'archived' | 'expired'
+  expected_protocol?: 'dns' | 'http' | 'smtp' | 'ldap'
+  expires_at?: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface PayloadCreateRequest {
+  case_id: string
+  template: string
+  variables?: Record<string, string>
+  expires_at?: string
+  expected_protocol?: 'dns' | 'http' | 'smtp' | 'ldap'
+}
+
+export interface PayloadListResponse {
+  items: Payload[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+// Interaction types
+export interface Interaction {
+  id: string
+  type: 'dns' | 'http' | 'smtp' | 'ldap' | 'smb' | 'ftp'
+  case_id?: string
+  payload_id?: string
+  token?: string
+  timestamp: string
+  source_ip: string
+  domain?: string
+  dns_type?: string
+  method?: string
+  path?: string
+  headers?: Record<string, string>
+  body?: string
+  user_agent?: string
+  content_type?: string
+  raw_data: string
+  created_at: string
+}
+
+export interface InteractionListResponse {
+  items: Interaction[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+// APIKey types
+export interface APIKey {
+  id: string
+  key: string
+  key_prefix: string
+  name: string
+  scopes: string[]
+  expires_at?: string
+  last_used_at?: string
+  created_by: string
+  created_at: string
+  revoked_at?: string
+  is_revoked: boolean
+}
+
+export interface APIKeyCreateRequest {
+  name: string
+  scopes: string[]
+  expires_at?: string
+}
+
+export interface APIKeyListResponse {
+  items: APIKey[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}

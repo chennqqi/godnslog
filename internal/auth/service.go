@@ -1,0 +1,242 @@
+package auth
+
+import (
+	"crypto/rand"
+	"encoding/base32"
+	"encoding/hex"
+	"errors"
+	"time"
+
+	"xorm.io/xorm"
+)
+
+var (
+	ErrAPIKeyNotFound = errors.New("api key not found")
+	ErrAPIKeyRevoked  = errors.New("api key is revoked")
+	ErrAPIKeyExpired  = errors.New("api key is expired")
+	ErrInvalidScope   = errors.New("invalid scope")
+)
+
+// Service provides authentication and authorization services
+type Service struct {
+	engine *xorm.Engine
+}
+
+// NewService creates a new auth service
+func NewService(engine *xorm.Engine) *Service {
+	return &Service{engine: engine}
+}
+
+// ValidScopes defines all valid API key scopes
+var ValidScopes = map[string]bool{
+	"case:read":         true,
+	"case:write":        true,
+	"payload:read":      true,
+	"payload:write":     true,
+	"interaction:read":  true,
+	"interaction:write": true,
+	"evidence:read":     true,
+	"evidence:write":    true,
+	"admin:all":         true,
+}
+
+// generateAPIKey generates a new API key
+func generateAPIKey() (string, string, error) {
+	// Generate 32 random bytes
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", "", err
+	}
+
+	// Encode to hex
+	key := hex.EncodeToString(bytes)
+
+	// Return key and prefix (first 8 characters)
+	prefix := key[:8]
+	return key, prefix, nil
+}
+
+// CreateAPIKey creates a new API key
+func (s *Service) CreateAPIKey(req *APIKeyCreateRequest, userID string) (*APIKey, error) {
+	// Validate scopes
+	for _, scope := range req.Scopes {
+		if !ValidScopes[scope] {
+			return nil, ErrInvalidScope
+		}
+	}
+
+	key, prefix, err := generateAPIKey()
+	if err != nil {
+		return nil, err
+	}
+
+	apiKey := &APIKey{
+		ID:        generateID(),
+		Key:       key,
+		KeyPrefix: prefix,
+		Name:      req.Name,
+		Scopes:    Scopes(req.Scopes),
+		ExpiresAt: req.ExpiresAt,
+		CreatedBy: userID,
+	}
+
+	if _, err := s.engine.Insert(apiKey); err != nil {
+		return nil, err
+	}
+
+	return apiKey, nil
+}
+
+// GetAPIKeyByPrefix retrieves an API key by its prefix
+func (s *Service) GetAPIKeyByPrefix(prefix string) (*APIKey, error) {
+	var apiKey APIKey
+	has, err := s.engine.Where("key_prefix = ? AND is_revoked = ?", prefix, false).Get(&apiKey)
+	if err != nil {
+		return nil, err
+	}
+	if !has {
+		return nil, ErrAPIKeyNotFound
+	}
+	return &apiKey, nil
+}
+
+// GetAPIKeyByID retrieves an API key by its ID
+func (s *Service) GetAPIKeyByID(id string) (*APIKey, error) {
+	var apiKey APIKey
+	has, err := s.engine.ID(id).Get(&apiKey)
+	if err != nil {
+		return nil, err
+	}
+	if !has {
+		return nil, ErrAPIKeyNotFound
+	}
+	return &apiKey, nil
+}
+
+// ListAPIKeys retrieves API keys for a user
+func (s *Service) ListAPIKeys(userID string, page, pageSize int) (*APIKeyListResponse, error) {
+	var apiKeys []APIKey
+	offset := (page - 1) * pageSize
+
+	total, err := s.engine.Where("created_by = ?", userID).Count(&APIKey{})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.engine.Where("created_by = ?", userID).
+		Desc("created_at").
+		Limit(pageSize, offset).
+		Find(&apiKeys); err != nil {
+		return nil, err
+	}
+
+	totalPages := int(total) / pageSize
+	if int(total)%pageSize > 0 {
+		totalPages++
+	}
+
+	return &APIKeyListResponse{
+		Items:      apiKeys,
+		Total:      total,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: totalPages,
+	}, nil
+}
+
+// RevokeAPIKey revokes an API key
+func (s *Service) RevokeAPIKey(id string) error {
+	now := time.Now()
+	_, err := s.engine.ID(id).Cols("is_revoked", "revoked_at").Update(&APIKey{
+		IsRevoked: true,
+		RevokedAt: &now,
+	})
+	return err
+}
+
+// UpdateLastUsed updates the last used timestamp for an API key
+func (s *Service) UpdateLastUsed(prefix string) error {
+	now := time.Now()
+	_, err := s.engine.Where("key_prefix = ?", prefix).
+		Cols("last_used_at").
+		Update(&APIKey{LastUsedAt: &now})
+	return err
+}
+
+// ValidateAPIKey validates an API key and returns it if valid
+func (s *Service) ValidateAPIKey(prefix string) (*APIKey, error) {
+	apiKey, err := s.GetAPIKeyByPrefix(prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	if !apiKey.IsValid() {
+		if apiKey.IsRevoked {
+			return nil, ErrAPIKeyRevoked
+		}
+		return nil, ErrAPIKeyExpired
+	}
+
+	return apiKey, nil
+}
+
+// CreateAuditLog creates an audit log entry
+func (s *Service) CreateAuditLog(log *AuditLog) error {
+	if _, err := s.engine.Insert(log); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ListAuditLogs retrieves audit logs with filtering
+func (s *Service) ListAuditLogs(userID, action, resourceType string, startTime, endTime *time.Time, page, pageSize int) (*AuditLogListResponse, error) {
+	var logs []AuditLog
+	session := s.engine.NewSession()
+	defer session.Close()
+
+	if userID != "" {
+		session = session.Where("user_id = ?", userID)
+	}
+	if action != "" {
+		session = session.Where("action = ?", action)
+	}
+	if resourceType != "" {
+		session = session.Where("resource_type = ?", resourceType)
+	}
+	if startTime != nil {
+		session = session.Where("timestamp >= ?", startTime)
+	}
+	if endTime != nil {
+		session = session.Where("timestamp <= ?", endTime)
+	}
+
+	total, err := session.Count(&AuditLog{})
+	if err != nil {
+		return nil, err
+	}
+
+	offset := (page - 1) * pageSize
+	if err := session.Desc("timestamp").Limit(pageSize, offset).Find(&logs); err != nil {
+		return nil, err
+	}
+
+	totalPages := int(total) / pageSize
+	if int(total)%pageSize > 0 {
+		totalPages++
+	}
+
+	return &AuditLogListResponse{
+		Items:      logs,
+		Total:      total,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: totalPages,
+	}, nil
+}
+
+// generateID generates a unique ID using base32 encoding
+func generateID() string {
+	bytes := make([]byte, 16)
+	rand.Read(bytes)
+	return base32.StdEncoding.EncodeToString(bytes)
+}

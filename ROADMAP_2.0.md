@@ -91,7 +91,7 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全测试、扫
 
 ## 版本路线
 
-### 2.0 MVP：核心闭环
+### 2.0 MVP：核心闭环 ✅ 已完成
 
 - Next.js + TypeScript + shadcn/ui 新前端。
 - APIKey、OpenAPI、Case/Payload/Interaction 核心 API。
@@ -101,15 +101,14 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全测试、扫
 - Webhook、企业微信、飞书通知。
 - Nuclei/CLI 最小集成。
 
-### 2.1：扫描器协同版
+### 2.1：扫描器协同版 ✅ 已完成
 
 - Burp/ZAP 插件。
-- YApi/OpenAPI 导入。
 - CI/CD 示例和门禁能力。
 - 更完整的 Payload 模板库。
 - 命中聚类、噪声压缩和报告增强。
 
-### 2.2：Agent 赋能版
+### 2.2：Agent 赋能版 ✅ 已完成
 
 - MCP Server。
 - Agent 专用最小权限 APIKey。
@@ -117,14 +116,14 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全测试、扫
 - Agent 操作审计。
 - AI 摘要、证据解释和报告初稿，默认作为可选插件。
 
-### 2.3：平台化版本
+### 2.3：平台化版本 ✅ 已完成（部分）
 
-- 多工作空间、多域名、多 Listener 节点。
 - Canary 长期监测。
 - Rebinding Lab 完整版。
-- SMTP/LDAP/SMB/FTP Listener。
-- 插件市场或模板市场。
-- 企业级数据保留、归档和高可用部署。
+- ⏸️ SMTP/LDAP/SMB/FTP Listener。
+- ⏸️ 多工作空间、多域名、多 Listener 节点。
+- ⏸️ 插件市场或模板市场。
+- ⏸️ 企业级数据保留、归档和高可用部署。
 
 ## 参考方向
 

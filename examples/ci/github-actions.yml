@@ -1,0 +1,98 @@
+name: OAST Security Scan with GODNSLOG
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  GODNSLOG_API_URL: ${{ secrets.GODNSLOG_API_URL }}
+  GODNSLOG_API_KEY: ${{ secrets.GODNSLOG_API_KEY }}
+
+jobs:
+  oast-scan:
+    name: OAST Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      
+      - name: Install GODNSLOG CLI
+        run: |
+          go install github.com/chennqqi/godnslog/cmd/cli@latest
+      
+      - name: Create Case
+        run: |
+          CASE_ID=$(godnslog case create \
+            --title "CI/CD Scan - ${{ github.repository }}" \
+            --description "Automated OAST scan triggered by ${{ github.event_name }}" \
+            --target "${{ github.server_url }}/${{ github.repository }}" \
+            --tags "ci-cd,github-actions" | grep "ID:" | awk '{print $2}')
+          echo "CASE_ID=$CASE_ID" >> $GITHUB_ENV
+          echo "Created case: $CASE_ID"
+      
+      - name: Generate Payload
+        run: |
+          PAYLOAD=$(godnslog payload create \
+            --template "{{.Token}}.oast.example.com" \
+            --case-id ${{ env.CASE_ID }} \
+            --expires 24h | grep "Token:" | awk '{print $2}')
+          echo "PAYLOAD=$PAYLOAD" >> $GITHUB_ENV
+          echo "Generated payload: $PAYLOAD"
+      
+      - name: Run Nuclei Scan with OAST
+        run: |
+          docker run projectdiscovery/nuclei:latest \
+            -u ${{ github.event.repository.html_url }} \
+            -t oast-templates/ \
+            -var "payload=${{ env.PAYLOAD }}" \
+            -o nuclei-results.json
+      
+      - name: Poll for Interactions
+        run: |
+          godnslog interaction poll ${{ env.PAYLOAD }} \
+            --timeout 10m \
+            --interval 30s
+      
+      - name: Export Report
+        run: |
+          godnslog report export ${{ env.CASE_ID }} \
+            --format markdown \
+            --output oast-report.md
+      
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: oast-report
+          path: oast-report.md
+      
+      - name: Check for High-Risk Interactions
+        run: |
+          INTERACTIONS=$(godnslog interaction list \
+            --case-id ${{ env.CASE_ID }} \
+            --limit 100)
+          
+          # Check for suspicious patterns
+          if echo "$INTERACTIONS" | grep -q "metadata\|169.254\|internal"; then
+            echo "::warning::High-risk OAST interactions detected!"
+            echo "::warning::Manual review required for case ${{ env.CASE_ID }}"
+            exit 1  # Fail the pipeline for high-risk findings
+          fi
+          
+          echo "No high-risk interactions detected"
+      
+      - name: Post Summary
+        if: always()
+        run: |
+          echo "## OAST Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Case ID: ${{ env.CASE_ID }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Payload: ${{ env.PAYLOAD }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Report: [oast-report.md](artifacts/oast-report)" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,92 @@
+pipeline {
+    agent any
+    
+    environment {
+        GODNSLOG_API_URL = credentials('godnslog-api-url')
+        GODNSLOG_API_KEY = credentials('godnslog-api-key')
+    }
+    
+    stages {
+        stage('OAST Scan') {
+            steps {
+                script {
+                    // Install GODNSLOG CLI
+                    sh 'go install github.com/chennqqi/godnslog/cmd/cli@latest'
+                    
+                    // Create Case
+                    def caseId = sh(
+                        script: """
+                            godnslog case create \
+                                --title "CI/CD Scan - ${env.JOB_NAME}" \
+                                --description "Automated OAST scan triggered by Jenkins" \
+                                --target "${env.GIT_URL}" \
+                                --tags "ci-cd,jenkins" | grep "ID:" | awk '{print \$2}'
+                        """,
+                        returnStdout: true
+                    ).trim()
+                    env.CASE_ID = caseId
+                    echo "Created case: ${caseId}"
+                    
+                    // Generate Payload
+                    def payload = sh(
+                        script: """
+                            godnslog payload create \
+                                --template "{{.Token}}.oast.example.com" \
+                                --case-id ${caseId} \
+                                --expires 24h | grep "Token:" | awk '{print \$2}'
+                        """,
+                        returnStdout: true
+                    ).trim()
+                    env.PAYLOAD = payload
+                    echo "Generated payload: ${payload}"
+                    
+                    // Run Nuclei Scan with OAST
+                    sh """
+                        docker run --rm projectdiscovery/nuclei:latest \
+                            -u ${env.GIT_URL} \
+                            -t oast-templates/ \
+                            -var "payload=${payload}" \
+                            -o nuclei-results.json
+                    """
+                    
+                    // Poll for Interactions
+                    sh "godnslog interaction poll ${payload} --timeout 10m --interval 30s"
+                    
+                    // Export Report
+                    sh "godnslog report export ${caseId} --format markdown --output oast-report.md"
+                    
+                    // Check for High-Risk Interactions
+                    def interactions = sh(
+                        script: "godnslog interaction list --case-id ${caseId} --limit 100",
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (interactions.contains("metadata") || interactions.contains("169.254") || interactions.contains("internal")) {
+                        echo "High-risk OAST interactions detected!"
+                        echo "Manual review required for case ${caseId}"
+                        currentBuild.result = 'FAILURE'
+                        error("High-risk interactions detected")
+                    }
+                    
+                    echo "No high-risk interactions detected"
+                }
+                
+                // Archive artifacts
+                archiveArtifacts artifacts: 'oast-report.md,nuclei-results.json', fingerprint: true
+            }
+        }
+    }
+    
+    post {
+        always {
+            // Publish report
+            publishHTML([
+                reportDir: '.',
+                reportFiles: 'oast-report.md',
+                reportName: 'OAST Scan Report',
+                keepAll: true,
+                alwaysLinkToLastBuild: true
+            ])
+        }
+    }
+}

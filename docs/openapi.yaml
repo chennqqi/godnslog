@@ -1,0 +1,1623 @@
+openapi: 3.0.3
+info:
+  title: GODNSLOG 2.0 API
+  description: |
+    GODNSLOG 2.0 API - OAST Interaction Verification & Evidence Platform
+    
+    This API provides endpoints for:
+    - Case management (test tasks, vulnerability verification)
+    - Payload generation and tracking
+    - Interaction capture (DNS, HTTP, SMTP, LDAP, etc.)
+    - Evidence chain generation
+    - APIKey management with scopes
+    - Audit logging
+    
+    ## Authentication
+    Most endpoints require authentication via:
+    - JWT Token (user login)
+    - APIKey (programmatic access)
+    
+    ## Version
+    Current version: 2.0.0
+    
+    ## Base URL
+    Production: https://api.godnslog.com/v2
+    Development: http://localhost:8080/api/v2
+  version: 2.0.0
+  contact:
+    name: GODNSLOG Team
+    email: support@godnslog.com
+  license:
+    name: MIT
+    url: https://github.com/chennqqi/godnslog/blob/master/LICENSE
+
+servers:
+  - url: http://localhost:8080/api/v2
+    description: Development server
+  - url: https://api.godnslog.com/v2
+    description: Production server
+
+tags:
+  - name: auth
+    description: Authentication operations
+  - name: cases
+    description: Case management
+  - name: payloads
+    description: Payload operations
+  - name: interactions
+    description: Interaction capture and query
+  - name: evidence
+    description: Evidence chain operations
+  - name: apikeys
+    description: APIKey management
+  - name: audit
+    description: Audit log operations
+  - name: users
+    description: User management
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - auth
+      summary: User login
+      description: Authenticate user and return JWT token
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/logout:
+    post:
+      tags:
+        - auth
+      summary: User logout
+      description: Invalidate current session
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/refresh:
+    post:
+      tags:
+        - auth
+      summary: Refresh token
+      description: Refresh JWT token using refresh token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /cases:
+    get:
+      tags:
+        - cases
+      summary: List cases
+      description: Retrieve list of cases with filtering and pagination
+      operationId: listCases
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          description: Filter by status
+          schema:
+            type: string
+            enum: [active, archived, completed]
+        - name: search
+          in: query
+          description: Search in title and description
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of cases
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      tags:
+        - cases
+      summary: Create case
+      description: Create a new case for tracking test tasks
+      operationId: createCase
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaseCreateRequest'
+      responses:
+        '201':
+          description: Case created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /cases/{case_id}:
+    get:
+      tags:
+        - cases
+      summary: Get case details
+      description: Retrieve detailed information about a specific case
+      operationId: getCase
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: case_id
+          in: path
+          required: true
+          description: Case ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Case details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseResponse'
+        '404':
+          description: Case not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      tags:
+        - cases
+      summary: Update case
+      description: Update case information
+      operationId: updateCase
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: case_id
+          in: path
+          required: true
+          description: Case ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaseUpdateRequest'
+      responses:
+        '200':
+          description: Case updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseResponse'
+        '404':
+          description: Case not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags:
+        - cases
+      summary: Delete case
+      description: Delete a case and all associated payloads
+      operationId: deleteCase
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: case_id
+          in: path
+          required: true
+          description: Case ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Case deleted
+        '404':
+          description: Case not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /payloads:
+    get:
+      tags:
+        - payloads
+      summary: List payloads
+      description: Retrieve list of payloads with filtering
+      operationId: listPayloads
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: case_id
+          in: query
+          description: Filter by case ID
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by status
+          schema:
+            type: string
+            enum: [draft, deployed, hit, archived, expired]
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: List of payloads
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayloadListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      tags:
+        - payloads
+      summary: Create payload
+      description: Create a new payload with template and variables
+      operationId: createPayload
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PayloadCreateRequest'
+      responses:
+        '201':
+          description: Payload created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayloadResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /payloads/{payload_id}:
+    get:
+      tags:
+        - payloads
+      summary: Get payload details
+      description: Retrieve detailed information about a payload
+      operationId: getPayload
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: payload_id
+          in: path
+          required: true
+          description: Payload ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payload details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayloadResponse'
+        '404':
+          description: Payload not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /payloads/{payload_id}/revoke:
+    post:
+      tags:
+        - payloads
+      summary: Revoke payload
+      description: Revoke a payload token to prevent further hits
+      operationId: revokePayload
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: payload_id
+          in: path
+          required: true
+          description: Payload ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payload revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          description: Payload not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /interactions:
+    get:
+      tags:
+        - interactions
+      summary: List interactions
+      description: Retrieve list of interactions with filtering
+      operationId: listInteractions
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: case_id
+          in: query
+          description: Filter by case ID
+          schema:
+            type: string
+        - name: payload_id
+          in: query
+          description: Filter by payload ID
+          schema:
+            type: string
+        - name: type
+          in: query
+          description: Filter by interaction type
+          schema:
+            type: string
+            enum: [dns, http, smtp, ldap, smb, ftp]
+        - name: start_time
+          in: query
+          description: Filter by start time (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          description: Filter by end time (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: List of interactions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InteractionListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags:
+        - interactions
+      summary: Delete interactions
+      description: Delete interactions by IDs
+      operationId: deleteInteractions
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteRequest'
+      responses:
+        '204':
+          description: Interactions deleted
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /interactions/{interaction_id}:
+    get:
+      tags:
+        - interactions
+      summary: Get interaction details
+      description: Retrieve detailed information about an interaction
+      operationId: getInteraction
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: interaction_id
+          in: path
+          required: true
+          description: Interaction ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Interaction details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InteractionResponse'
+        '404':
+          description: Interaction not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /interactions/export:
+    post:
+      tags:
+        - interactions
+      summary: Export interactions
+      description: Export interactions to various formats
+      operationId: exportInteractions
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportRequest'
+      responses:
+        '200':
+          description: Export data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  format:
+                    type: string
+                  data:
+                    type: string
+                  filename:
+                    type: string
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /evidence:
+    get:
+      tags:
+        - evidence
+      summary: Generate evidence report
+      description: Generate evidence chain for a case or payload
+      operationId: generateEvidence
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: case_id
+          in: query
+          description: Case ID
+          schema:
+            type: string
+        - name: payload_id
+          in: query
+          description: Payload ID
+          schema:
+            type: string
+        - name: format
+          in: query
+          description: Output format
+          schema:
+            type: string
+            enum: [json, markdown, csv]
+            default: json
+      responses:
+        '200':
+          description: Evidence report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /apikeys:
+    get:
+      tags:
+        - apikeys
+      summary: List API keys
+      description: Retrieve list of API keys for current user
+      operationId: listApiKeys
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      tags:
+        - apikeys
+      summary: Create API key
+      description: Create a new API key with specified scopes
+      operationId: createApiKey
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiKeyCreateRequest'
+      responses:
+        '201':
+          description: API key created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /apikeys/{api_key_id}:
+    delete:
+      tags:
+        - apikeys
+      summary: Delete API key
+      description: Revoke and delete an API key
+      operationId: deleteApiKey
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: api_key_id
+          in: path
+          required: true
+          description: API Key ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: API key deleted
+        '404':
+          description: API key not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /audit/logs:
+    get:
+      tags:
+        - audit
+      summary: List audit logs
+      description: Retrieve audit logs with filtering
+      operationId: listAuditLogs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: user_id
+          in: query
+          description: Filter by user ID
+          schema:
+            type: string
+        - name: action
+          in: query
+          description: Filter by action
+          schema:
+            type: string
+        - name: resource_type
+          in: query
+          description: Filter by resource type
+          schema:
+            type: string
+        - name: start_time
+          in: query
+          description: Filter by start time (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          description: Filter by end time (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: List of audit logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden (admin only)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users:
+    get:
+      tags:
+        - users
+      summary: List users
+      description: Retrieve list of users (admin only)
+      operationId: listUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden (admin only)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Token from login
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API Key for programmatic access
+
+  schemas:
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          description: Error code
+        message:
+          type: string
+          description: Error message
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix timestamp
+
+    SuccessResponse:
+      type: object
+      required:
+        - message
+        - code
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: OK
+        timestamp:
+          type: integer
+          format: int64
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          description: Username or email
+        password:
+          type: string
+          format: password
+          description: User password
+
+    LoginResponse:
+      type: object
+      required:
+        - token
+        - refresh_token
+        - expires_in
+      properties:
+        token:
+          type: string
+          description: JWT access token
+        refresh_token:
+          type: string
+          description: JWT refresh token
+        expires_in:
+          type: integer
+          description: Token expiration time in seconds
+        user:
+          $ref: '#/components/schemas/User'
+
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          description: JWT refresh token
+
+    CaseCreateRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          description: Case title
+        description:
+          type: string
+          description: Case description
+        target:
+          type: string
+          description: Target system or domain
+        tags:
+          type: array
+          items:
+            type: string
+          description: Case tags
+
+    CaseUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        target:
+          type: string
+        status:
+          type: string
+          enum: [active, archived, completed]
+        tags:
+          type: array
+          items:
+            type: string
+
+    Case:
+      type: object
+      required:
+        - id
+        - title
+        - created_by
+        - created_at
+      properties:
+        id:
+          type: string
+          description: Case ID
+        title:
+          type: string
+          description: Case title
+        description:
+          type: string
+          description: Case description
+        target:
+          type: string
+          description: Target system or domain
+        status:
+          type: string
+          enum: [active, archived, completed]
+          description: Case status
+        tags:
+          type: array
+          items:
+            type: string
+        created_by:
+          type: string
+          description: User ID who created the case
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CaseResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: OK
+        data:
+          $ref: '#/components/schemas/Case'
+
+    CaseListResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: OK
+        data:
+          type: object
+          required:
+            - items
+            - total
+            - page
+            - page_size
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Case'
+            total:
+              type: integer
+            page:
+              type: integer
+            page_size:
+              type: integer
+
+    PayloadCreateRequest:
+      type: object
+      required:
+        - case_id
+        - template
+      properties:
+        case_id:
+          type: string
+          description: Associated case ID
+        template:
+          type: string
+          description: Payload template (SSRF, XXE, RCE, etc.)
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+          description: Custom variables for template rendering
+        expires_at:
+          type: string
+          format: date-time
+          description: Payload expiration time
+        expected_protocol:
+          type: string
+          enum: [dns, http, smtp, ldap]
+          description: Expected interaction protocol
+
+    Payload:
+      type: object
+      required:
+        - id
+        - case_id
+        - token
+        - template
+        - created_by
+        - created_at
+      properties:
+        id:
+          type: string
+          description: Payload ID
+        case_id:
+          type: string
+          description: Associated case ID
+        token:
+          type: string
+          description: Unique tracking token
+        template:
+          type: string
+          description: Payload template type
+        rendered_payload:
+          type: string
+          description: Rendered payload with variables
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+        status:
+          type: string
+          enum: [draft, deployed, hit, archived, expired]
+        expected_protocol:
+          type: string
+          enum: [dns, http, smtp, ldap]
+        expires_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PayloadResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: OK
+        data:
+          $ref: '#/components/schemas/Payload'
+
+    PayloadListResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: OK
+        data:
+          type: object
+          required:
+            - items
+            - total
+            - page
+            - page_size
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Payload'
+            total:
+              type: integer
+            page:
+              type: integer
+            page_size:
+              type: integer
+
+    Interaction:
+      type: object
+      required:
+        - id
+        - type
+        - timestamp
+        - source_ip
+      properties:
+        id:
+          type: string
+          description: Interaction ID
+        type:
+          type: string
+          enum: [dns, http, smtp, ldap, smb, ftp]
+        case_id:
+          type: string
+        payload_id:
+          type: string
+        token:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        source_ip:
+          type: string
+        # DNS specific
+        domain:
+          type: string
+        dns_type:
+          type: string
+        # HTTP specific
+        method:
+          type: string
+        path:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        body:
+          type: string
+        user_agent:
+          type: string
+        content_type:
+          type: string
+        # Common
+        raw_data:
+          type: string
+          description: Raw interaction data
+
+    InteractionResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: OK
+        data:
+          $ref: '#/components/schemas/Interaction'
+
+    InteractionListResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: OK
+        data:
+          type: object
+          required:
+            - items
+            - total
+            - page
+            - page_size
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Interaction'
+            total:
+              type: integer
+            page:
+              type: integer
+            page_size:
+              type: integer
+
+    DeleteRequest:
+      type: object
+      required:
+        - ids
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+          description: List of IDs to delete
+
+    ExportRequest:
+      type: object
+      required:
+        - format
+      properties:
+        format:
+          type: string
+          enum: [json, markdown, csv]
+        case_id:
+          type: string
+        payload_id:
+          type: string
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        include_raw:
+          type: boolean
+          default: false
+
+    EvidenceResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: OK
+        data:
+          type: object
+          properties:
+            format:
+              type: string
+            content:
+              type: string
+            metadata:
+              type: object
+
+    ApiKeyCreateRequest:
+      type: object
+      required:
+        - name
+        - scopes
+      properties:
+        name:
+          type: string
+          description: API key name
+        scopes:
+          type: array
+          items:
+            type: string
+          description: API key scopes
+        expires_at:
+          type: string
+          format: date-time
+          description: Expiration time
+
+    ApiKey:
+      type: object
+      required:
+        - id
+        - key
+        - name
+        - scopes
+        - created_by
+        - created_at
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+          description: API key value (only shown on creation)
+        key_prefix:
+          type: string
+          description: API key prefix for identification
+        name:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        expires_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    ApiKeyResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: OK
+        data:
+          $ref: '#/components/schemas/ApiKey'
+
+    ApiKeyListResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: OK
+        data:
+          type: object
+          required:
+            - items
+            - total
+            - page
+            - page_size
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ApiKey'
+            total:
+              type: integer
+            page:
+              type: integer
+            page_size:
+              type: integer
+
+    AuditLog:
+      type: object
+      required:
+        - id
+        - action
+        - resource_type
+        - timestamp
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        action:
+          type: string
+        resource_type:
+          type: string
+        resource_id:
+          type: string
+        ip_address:
+          type: string
+        user_agent:
+          type: string
+        details:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+
+    AuditLogListResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: OK
+        data:
+          type: object
+          required:
+            - items
+            - total
+            - page
+            - page_size
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/AuditLog'
+            total:
+              type: integer
+            page:
+              type: integer
+            page_size:
+              type: integer
+
+    User:
+      type: object
+      required:
+        - id
+        - username
+        - email
+        - role
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [super, admin, normal, guest]
+        created_at:
+          type: string
+          format: date-time
+
+    UserListResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: OK
+        data:
+          type: object
+          required:
+            - items
+            - total
+            - page
+            - page_size
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+            total:
+              type: integer
+            page:
+              type: integer
+            page_size:
+              type: integer

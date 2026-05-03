@@ -1,0 +1,81 @@
+# GitLab CI/CD Pipeline for OAST Security Scan with GODNSLOG
+
+variables:
+  GODNSLOG_API_URL: $GODNSLOG_API_URL
+  GODNSLOG_API_KEY: $GODNSLOG_API_KEY
+
+stages:
+  - oast-scan
+  - report
+
+oast_scan:
+  stage: oast-scan
+  image: golang:1.23
+  before_script:
+    - go install github.com/chennqqi/godnslog/cmd/cli@latest
+  script:
+    # Create Case
+    - |
+      CASE_ID=$(godnslog case create \
+        --title "CI/CD Scan - $CI_PROJECT_PATH" \
+        --description "Automated OAST scan triggered by $CI_PIPELINE_SOURCE" \
+        --target "$CI_PROJECT_URL" \
+        --tags "ci-cd,gitlab-ci" | grep "ID:" | awk '{print $2}')
+      echo "CASE_ID=$CASE_ID" >> build.env
+      echo "Created case: $CASE_ID"
+    
+    # Generate Payload
+    - |
+      PAYLOAD=$(godnslog payload create \
+        --template "{{.Token}}.oast.example.com" \
+        --case-id $CASE_ID \
+        --expires 24h | grep "Token:" | awk '{print $2}')
+      echo "PAYLOAD=$PAYLOAD" >> build.env
+      echo "Generated payload: $PAYLOAD"
+    
+    # Run Nuclei Scan with OAST
+    - |
+      docker run --rm projectdiscovery/nuclei:latest \
+        -u $CI_PROJECT_URL \
+        -t oast-templates/ \
+        -var "payload=$PAYLOAD" \
+        -o nuclei-results.json
+    
+    # Poll for Interactions
+    - godnslog interaction poll $PAYLOAD --timeout 10m --interval 30s
+    
+    # Export Report
+    - godnslog report export $CASE_ID --format markdown --output oast-report.md
+    
+    # Check for High-Risk Interactions
+    - |
+      INTERACTIONS=$(godnslog interaction list --case-id $CASE_ID --limit 100)
+      if echo "$INTERACTIONS" | grep -q "metadata\|169.254\|internal"; then
+        echo "High-risk OAST interactions detected!"
+        echo "Manual review required for case $CASE_ID"
+        exit 1
+      fi
+      echo "No high-risk interactions detected"
+  artifacts:
+    paths:
+      - oast-report.md
+      - nuclei-results.json
+      - build.env
+    reports:
+      artifact_report: oast-report.md
+  only:
+    - main
+    - develop
+    - merge_requests
+
+generate_report:
+  stage: report
+  image: alpine:latest
+  needs:
+    - oast_scan
+  script:
+    - cat oast-report.md
+  artifacts:
+    paths:
+      - oast-report.md
+  when: on_success

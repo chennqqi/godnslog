@@ -1,0 +1,112 @@
+{
+  "templates": [
+    {
+      "id": "ssrf-http",
+      "name": "SSRF HTTP",
+      "description": "Server-Side Request Forgery detection via HTTP",
+      "template": "{{.Token}}.oast.example.com",
+      "variables": {},
+      "category": "ssrf",
+      "risk": "high"
+    },
+    {
+      "id": "ssrf-cloud-metadata",
+      "name": "SSRF Cloud Metadata",
+      "description": "Cloud metadata endpoint detection",
+      "template": "{{.Token}}.169.254.169.254",
+      "variables": {},
+      "category": "ssrf",
+      "risk": "critical"
+    },
+    {
+      "id": "xxe-external-entity",
+      "name": "XXE External Entity",
+      "description": "XML External Entity injection",
+      "template": "{{.Token}}.oast.example.com/xxe.dtd",
+      "variables": {},
+      "category": "injection",
+      "risk": "high"
+    },
+    {
+      "id": "rfi-remote-file",
+      "name": "RFI Remote File Inclusion",
+      "description": "Remote File Inclusion detection",
+      "template": "http://{{.Token}}.oast.example.com/file.php",
+      "variables": {},
+      "category": "injection",
+      "risk": "high"
+    },
+    {
+      "id": "rce-command",
+      "name": "RCE Command Injection",
+      "description": "Remote Code Execution via command injection",
+      "template": "curl http://{{.Token}}.oast.example.com",
+      "variables": {},
+      "category": "rce",
+      "risk": "critical"
+    },
+    {
+      "id": "blind-sqli-dns",
+      "name": "Blind SQLi DNS",
+      "description": "Blind SQL injection via DNS exfiltration",
+      "template": "{{.Token}}.oast.example.com",
+      "variables": {},
+      "category": "sqli",
+      "risk": "high"
+    },
+    {
+      "id": "ssti-template",
+      "name": "SSTI Template Injection",
+      "description": "Server-Side Template Injection",
+      "template": "{{.Token}}.oast.example.com",
+      "variables": {},
+      "category": "injection",
+      "risk": "high"
+    },
+    {
+      "id": "cors-jsonp",
+      "name": "CORS/JSONP",
+      "description": "CORS misconfiguration and JSONP detection",
+      "template": "{{.Token}}.oast.example.com/callback",
+      "variables": {},
+      "category": "misconfiguration",
+      "risk": "medium"
+    },
+    {
+      "id": "smtp-injection",
+      "name": "SMTP Injection",
+      "description": "SMTP header injection",
+      "template": "{{.Token}}.oast.example.com",
+      "variables": {},
+      "category": "injection",
+      "risk": "medium"
+    },
+    {
+      "id": "pdf-html-rendering",
+      "name": "PDF/HTML Rendering",
+      "description": "PDF or HTML rendering with external resources",
+      "template": "http://{{.Token}}.oast.example.com/resource",
+      "variables": {},
+      "category": "client-side",
+      "risk": "medium"
+    },
+    {
+      "id": "webhook",
+      "name": "Webhook",
+      "description": "Webhook endpoint detection",
+      "template": "https://{{.Token}}.oast.example.com/webhook",
+      "variables": {},
+      "category": "api",
+      "risk": "low"
+    },
+    {
+      "id": "ci-cd-variable",
+      "name": "CI/CD Variable",
+      "description": "CI/CD pipeline variable injection",
+      "template": "{{.Token}}.oast.example.com",
+      "variables": {},
+      "category": "devops",
+      "risk": "high"
+    }
+  ]
+}

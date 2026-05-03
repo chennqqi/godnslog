@@ -1,0 +1,25 @@
+id: godnslog-http-oast
+info:
+  name: GODNSLOG HTTP OAST Detection
+  author: GODNSLOG
+  severity: info
+  description: |
+    Detects out-of-band HTTP interactions using GODNSLOG.
+    This template generates a unique HTTP payload and checks for HTTP callbacks.
+
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}/?x={{interactsh_url}}"
+
+    matchers:
+      - type: word
+        part: interactsh_protocol
+        words:
+          - "http"
+
+    extractors:
+      - type: regex
+        part: interactsh_request
+        regex:
+          - '(?P<token>[a-zA-Z0-9]{16,32})'

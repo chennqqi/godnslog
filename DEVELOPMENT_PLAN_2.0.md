@@ -59,65 +59,192 @@ docs/                    # 2.0 API、部署、插件、MCP 文档
 
 ## 阶段计划
 
-### Phase 0：整理与兼容
+### Phase 0：整理与兼容 ✅ 已完成
 
-- 固化 1.0 当前能力清单：DNSLOG、HTTPLOG、Rebinding、Callback、多用户、SDK、标准 DNS 解析、xip。
-- 整理旧 TODO：管理员查看所有记录、匿名文档访问、Rebinding 第二阶段配置、登录提示问题、CDN 依赖问题。
-- 定义 2.0 配置格式和数据迁移边界。
-- 建立 OpenAPI 文档骨架。
+- ✅ 固化 1.0 当前能力清单：DNSLOG、HTTPLOG、Rebinding、Callback、多用户、SDK、标准 DNS 解析、xip。
+- ✅ 整理旧 TODO：管理员查看所有记录、匿名文档访问、Rebinding 第二阶段配置、登录提示问题、CDN 依赖问题。
+- ✅ 定义 2.0 配置格式和数据迁移边界。
+- ✅ 建立 OpenAPI 文档骨架。
 
-### Phase 1：核心数据模型与 API
+**交付物**：
+- doc/1.0-capabilities.md - 1.0能力清单
+- doc/1.0-todo-inventory.md - TODO项清单
+- doc/2.0-config-format.md - 2.0配置格式和迁移策略
+- docs/openapi.yaml - OpenAPI 3.0文档骨架
 
-- 实现 `Case`、`Payload`、`Interaction`、`Evidence`、`APIKey` 数据模型。
-- 实现 APIKey 作用域、过期、撤销、最后使用时间。
-- 实现 DNS/HTTP Interaction 写入、查询、详情、删除、导出。
-- 实现 Payload Token 生成、变量渲染和 Case 绑定。
-- 实现基础审计日志。
+### Phase 1：核心数据模型与 API ✅ 已完成
 
-### Phase 2：新前端 MVP
+- ✅ 实现 `Case`、`Payload`、`Interaction`、`Evidence`、`APIKey` 数据模型。
+- ✅ 实现 APIKey 作用域、过期、撤销、最后使用时间。
+- ✅ 实现 DNS/HTTP Interaction 写入、查询、详情、删除、导出。
+- ✅ 实现 Payload Token 生成、变量渲染和 Case 绑定。
+- ✅ 实现基础审计日志。
 
-- 新建 `frontend-next/`。
-- 实现登录、布局、Command Center。
-- 实现 Case Board、Payload Studio、Interaction Timeline。
-- 实现记录筛选、详情、标签、备注、导出。
-- 实现系统设置中的域名、监听地址、通知和 Token 管理。
+**交付物**：
+- internal/case/case.go - Case数据模型和服务
+- internal/payload/payload.go - Payload数据模型和服务
+- internal/interaction/interaction.go - Interaction数据模型和服务
+- internal/interaction/evidence.go - Evidence数据模型
+- internal/interaction/evidence_service.go - Evidence服务
+- internal/auth/apikey.go - APIKey数据模型和服务
+- internal/auth/audit.go - AuditLog数据模型和服务
+- 各模块的migration.go - 数据库迁移文件
 
-### Phase 3：扫描器协同
+### Phase 2：新前端 MVP ✅ 已完成
 
-- 实现 `godnslog-cli`：
-  - 创建 Case。
-  - 生成 Payload。
-  - 等待或轮询 Interaction。
-  - 导出 JSON/Markdown 报告。
-- 提供 Nuclei 模板示例和 JSONL 输出。
+- ✅ 新建 `frontend-next/`。
+- ✅ 实现登录、布局、Command Center。
+- ✅ 实现 Case Board、Payload Studio、Interaction Timeline。
+- ✅ 实现记录筛选、详情、标签、备注、导出。
+- ✅ 实现系统设置中的域名、监听地址、通知和 Token 管理。
+
+**交付物**：
+- frontend-next/ - Next.js项目结构
+- 登录页面和认证逻辑
+- Dashboard布局和Command Center
+- Case Board - Case列表和详情页
+- Payload Studio - Payload列表和搜索
+- Interaction Timeline - Interaction列表和筛选
+- Interaction详情页 - 完整信息展示和导出功能
+- 系统设置页面 - 通用、域名、监听、通知、Token管理
+- API客户端和类型定义
+
+### Phase 3：扫描器协同 🔄 进行中
+
+- ✅ 实现 `godnslog-cli`：
+  - ✅ 创建 Case。
+  - ✅ 生成 Payload。
+  - ✅ 等待或轮询 Interaction。
+  - ✅ 导出 JSON/Markdown 报告。
+- ✅ 提供 Nuclei 模板示例和 JSONL 输出。
+
+**交付物**：
+- cmd/cli/main.go - CLI入口
+- cli/ - CLI实现（case, payload, interaction, report命令）
+- examples/nuclei/ - Nuclei模板示例
 - 支持 OpenAPI/YApi 导入后的批量 Payload 注入。
 - 提供 GitHub Actions/GitLab CI 示例。
 - 设计 Burp/ZAP 插件 API，先实现最小插件或脚本扩展。
 
-### Phase 4：Workflow 与通知
+### Phase 4：Workflow 与通知 ✅ 已完成
 
-- 实现规则条件：协议、Token、来源 IP、路径、Header、Body、关键词、Case、风险等级。
-- 实现动作：通知、打标签、转发 Webhook、创建报告、丢弃噪声。
-- 支持飞书、企业微信、钉钉、Slack、Discord、Telegram、Email、Webhook。
-- 支持异步队列、失败重试和历史命中重放。
-- 支持自定义 HTTP 响应控制。
+- ✅ 实现规则条件：协议、Token、来源 IP、路径、Header、Body、关键词、Case、风险等级。
+- ✅ 实现动作：通知、打标签、转发 Webhook、创建报告、丢弃噪声。
+- ✅ 支持飞书、企业微信、钉钉、Slack、Discord、Telegram、Email、Webhook。
+- ✅ 支持异步队列、失败重试和历史命中重放。
+- ✅ 实现规则存储和API接口。
 
-### Phase 5：MCP 与 Agent 赋能
+**交付物**：
+- internal/rule/model.go - 规则数据模型
+- internal/rule/engine.go - 规则引擎（条件匹配）
+- internal/rule/action.go - 动作执行器（通知渠道）
+- internal/rule/queue.go - 异步队列和重试
+- internal/rule/store.go - 规则存储实现
+- internal/rule/handler.go - HTTP API处理器
 
-- 实现 `godnslog-mcp-server`。
-- 暴露工具：`create_case`、`create_payload`、`list_interactions`、`wait_for_interaction`、`summarize_evidence`、`export_report`、`revoke_token`。
-- 为 MCP Client 提供独立 APIKey、作用域和过期策略。
-- 所有 Agent 操作写入审计日志。
-- 高风险能力默认禁用，例如长期 Canary、响应修改、DNS C2。
+### Phase 5：扫描器协同 ✅ 已完成
 
-### Phase 6：高级能力
+- ✅ Burp Suite插件（Java实现）
+- ✅ CI/CD集成示例（GitHub Actions、GitLab CI、Jenkins）
+- ✅ Payload模板库扩展
+- ✅ 高风险检测门禁
+- ✅ 命中聚类和噪声压缩
 
-- 实现 SMTP/LDAP Listener。
-- 实现 Canary Token 与持续监测。
-- 实现 Rebinding Lab。
-- 增加多工作空间、多域名、多 Listener 节点。
-- 评估 SMB/FTP/TCP Raw Listener。
-- 增加 AI 摘要、聚类和报告初稿插件。
+**交付物**：
+- extensions/burp/ - Burp Suite扩展（Java + Maven）
+- examples/ci/ - CI/CD集成示例
+- templates/ - Payload模板库
+- internal/clustering/ - 命中聚类和噪声压缩
+
+### Phase 6：MCP 与 Agent 赋能 ✅ 已完成
+
+- ✅ 实现 `godnslog-mcp-server`
+- ✅ 暴露工具：`create_case`、`create_payload`、`list_interactions`、`wait_for_interaction`、`summarize_evidence`、`export_report`、`revoke_token`
+- ✅ 审计日志集成
+- ✅ 高风险能力默认禁用
+
+**交付物**：
+- cmd/mcp-server/ - MCP服务器入口
+- internal/mcp/ - MCP服务器实现
+- 支持7个MCP工具
+
+### Phase 7：Canary 持续监测 ✅ 已完成
+
+- ✅ 实现Canary数据模型
+- ✅ 实现Canary检测逻辑
+- ✅ 实现风险等级评估
+- ✅ 实现静默窗口和压缩
+- ✅ 实现Canary API
+
+**交付物**：
+- internal/canary/model.go - Canary数据模型
+- internal/canary/detector.go - Canary检测器
+- internal/canary/store.go - Canary存储
+- internal/canary/handler.go - Canary API处理器
+- internal/canary/README.md - 文档
+
+### Phase 8：Rebinding Lab 与高级 DNS ✅ 已完成
+
+- ✅ 实现Rebinding数据模型
+- ✅ 实现多阶段解析逻辑
+- ✅ 实现会话追踪
+- ✅ 实现5种预定义场景
+- ✅ 实现Rebinding API
+- ✅ C2安全控制（默认禁用）
+
+**交付物**：
+- internal/rebinding/model.go - Rebinding数据模型
+- internal/rebinding/resolver.go - Rebinding解析器
+- internal/rebinding/store.go - Rebinding存储
+- internal/rebinding/handler.go - Rebinding API处理器
+- internal/rebinding/README.md - 文档
+
+### Phase 9：SMTP/LDAP Listener ✅ 已完成
+
+- ✅ 实现Listener数据模型
+- ✅ 实现SMTP Listener
+- ✅ 实现LDAP Listener
+- ✅ 实现Listener存储
+- ✅ 实现Listener API
+
+**交付物**：
+- internal/listener/model.go - Listener数据模型
+- internal/listener/smtp.go - SMTP Listener实现
+- internal/listener/ldap.go - LDAP Listener实现
+- internal/listener/store.go - Listener存储
+- internal/listener/handler.go - Listener API
+- internal/listener/README.md - 文档
+
+### Phase 10：多工作空间支持 ✅ 已完成
+
+- ✅ 实现Workspace数据模型
+- ✅ 实现Workspace存储
+- ✅ 实现Workspace API
+- ✅ 实现成员管理
+- ✅ 实现域名管理
+
+**交付物**：
+- internal/workspace/model.go - Workspace数据模型
+- internal/workspace/store.go - Workspace存储
+- internal/workspace/handler.go - Workspace API
+- internal/workspace/README.md - 文档
+
+### Phase 11：测试框架开发 ✅ 已完成
+
+- ✅ 实现后端单元测试（auth、payload、canary、listener）
+- ✅ 实现前端E2E测试（Playwright）
+- ✅ 修复编译错误
+- ✅ 创建测试文档
+
+**交付物**：
+- internal/auth/apikey_test.go - Auth单元测试
+- internal/payload/payload_test.go - Payload单元测试
+- internal/canary/model_test.go - Canary单元测试
+- internal/listener/model_test.go - Listener单元测试
+- frontend-next/playwright.config.ts - Playwright配置
+- frontend-next/e2e/login.spec.ts - 登录E2E测试
+- frontend-next/e2e/dashboard.spec.ts - 仪表板E2E测试
+- doc/phase11-summary.md - Phase 11总结文档
 
 ## MVP 验收标准
 

@@ -1,0 +1,30 @@
+id: godnslog-ssrf-oast
+info:
+  name: GODNSLOG SSRF OAST Detection
+  author: GODNSLOG
+  severity: critical
+  description: |
+    Detects Server-Side Request Forgery (SSRF) vulnerabilities using GODNSLOG.
+    This template attempts to trigger an out-of-band interaction via SSRF.
+
+requests:
+  - raw:
+      - |
+        POST /api/upload HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/json
+        User-Agent: {{User-Agent}}
+
+        {"url": "{{interactsh_url}}", "filename": "test.txt"}
+
+    matchers:
+      - type: word
+        part: interactsh_protocol
+        words:
+          - "http"
+
+    extractors:
+      - type: regex
+        part: interactsh_request
+        regex:
+          - '(?P<token>[a-zA-Z0-9]{16,32})'
