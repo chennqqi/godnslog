@@ -6,6 +6,51 @@ A dns&amp;http log server for verify SSRF/XXE/RFI/RCE vulnerability
 
 English Doc | [中文文档](https://github.com/chennqqi/godnslog/blob/master/README_CN.md)
 
+## Roadmap
+
+### 易用性
+
+- [ ] 前端重构
+- [ ] 基于APIkey的验证，swagger UI
+- [ ] 更多SDK
+- [ ] 支持firebase之类的SaaS服务
+
+### 通知
+
+- [ ] 邮件通知
+- [ ] 微信通知
+- [ ] 企业微信通知
+- [ ] slack通知
+- [ ] discord通知
+- [ ] webhook通知
+
+### 检测能力
+- [ ] ssrf
+- [ ] xxe
+- [ ] rfi
+- [ ] rce
+- [ ] Blind SQL injection
+- [ ] deserialization
+- [ ] cors/jsonp
+- [ ] smtp injection
+
+### 工具
+
+- [ ] DNS ReverseProxy
+- [ ] DNS C2
+- [ ] EMAIL
+- [ ] SMS
+
+### 集成
+- [ ] nuclei
+- [ ] burp suite/​Burp Collaborator
+- [ ] yapi
+
+### MCP/A2A：连接大模型与其他Agent
+- [ ] 创建APIKey
+- [ ] 获取DNSLog日志记录
+- [ ] 创建绑定
+
 ## features
 
 - Standard Domain Resolve Service
