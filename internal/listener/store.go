@@ -18,21 +18,36 @@ type Store interface {
 	DeleteListener(ctx context.Context, id string) error
 
 	// Listener interaction operations
+	CreateListenerInteraction(ctx context.Context, interaction *ListenerInteraction) error
 	SaveListenerInteraction(ctx context.Context, interaction *ListenerInteraction) error
 	GetListenerInteractions(ctx context.Context, listenerID string) ([]ListenerInteraction, error)
 	DeleteListenerInteraction(ctx context.Context, id string) error
 
 	// SMTP message operations
+	CreateSMTPMessage(ctx context.Context, message *SMTPMessage) error
 	SaveSMTPMessage(ctx context.Context, message *SMTPMessage) error
 	GetSMTPMessages(ctx context.Context, listenerID string) ([]SMTPMessage, error)
 	GetSMTPMessage(ctx context.Context, id string) (*SMTPMessage, error)
 	DeleteSMTPMessage(ctx context.Context, id string) error
 
 	// LDAP query operations
+	CreateLDAPQuery(ctx context.Context, query *LDAPQuery) error
 	SaveLDAPQuery(ctx context.Context, query *LDAPQuery) error
 	GetLDAPQueries(ctx context.Context, listenerID string) ([]LDAPQuery, error)
 	GetLDAPQuery(ctx context.Context, id string) (*LDAPQuery, error)
 	DeleteLDAPQuery(ctx context.Context, id string) error
+
+	// SMB request operations
+	CreateSMBRequest(ctx context.Context, request *SMBRequest) error
+	GetSMBRequests(ctx context.Context, listenerID string) ([]SMBRequest, error)
+	GetSMBRequest(ctx context.Context, id string) (*SMBRequest, error)
+	DeleteSMBRequest(ctx context.Context, id string) error
+
+	// FTP command operations
+	CreateFTPCommand(ctx context.Context, command *FTPCommand) error
+	GetFTPCommands(ctx context.Context, listenerID string) ([]FTPCommand, error)
+	GetFTPCommand(ctx context.Context, id string) (*FTPCommand, error)
+	DeleteFTPCommand(ctx context.Context, id string) error
 }
 
 // XormStore implements Store using XORM
@@ -167,5 +182,81 @@ func (s *XormStore) GetLDAPQuery(ctx context.Context, id string) (*LDAPQuery, er
 // DeleteLDAPQuery deletes an LDAP query
 func (s *XormStore) DeleteLDAPQuery(ctx context.Context, id string) error {
 	_, err := s.engine.ID(id).Delete(&LDAPQuery{})
+	return err
+}
+
+// CreateListenerInteraction creates a listener interaction
+func (s *XormStore) CreateListenerInteraction(ctx context.Context, interaction *ListenerInteraction) error {
+	_, err := s.engine.Insert(interaction)
+	return err
+}
+
+// CreateSMTPMessage creates an SMTP message
+func (s *XormStore) CreateSMTPMessage(ctx context.Context, message *SMTPMessage) error {
+	_, err := s.engine.Insert(message)
+	return err
+}
+
+// CreateLDAPQuery creates an LDAP query
+func (s *XormStore) CreateLDAPQuery(ctx context.Context, query *LDAPQuery) error {
+	_, err := s.engine.Insert(query)
+	return err
+}
+
+// CreateSMBRequest creates an SMB request
+func (s *XormStore) CreateSMBRequest(ctx context.Context, request *SMBRequest) error {
+	_, err := s.engine.Insert(request)
+	return err
+}
+
+// GetSMBRequests retrieves SMB requests for a listener
+func (s *XormStore) GetSMBRequests(ctx context.Context, listenerID string) ([]SMBRequest, error) {
+	var requests []SMBRequest
+	err := s.engine.Where("listener_id = ?", listenerID).Desc("timestamp").Find(&requests)
+	return requests, err
+}
+
+// GetSMBRequest retrieves an SMB request by ID
+func (s *XormStore) GetSMBRequest(ctx context.Context, id string) (*SMBRequest, error) {
+	var request SMBRequest
+	_, err := s.engine.ID(id).Get(&request)
+	if err != nil {
+		return nil, err
+	}
+	return &request, nil
+}
+
+// DeleteSMBRequest deletes an SMB request
+func (s *XormStore) DeleteSMBRequest(ctx context.Context, id string) error {
+	_, err := s.engine.ID(id).Delete(&SMBRequest{})
+	return err
+}
+
+// CreateFTPCommand creates an FTP command
+func (s *XormStore) CreateFTPCommand(ctx context.Context, command *FTPCommand) error {
+	_, err := s.engine.Insert(command)
+	return err
+}
+
+// GetFTPCommands retrieves FTP commands for a listener
+func (s *XormStore) GetFTPCommands(ctx context.Context, listenerID string) ([]FTPCommand, error) {
+	var commands []FTPCommand
+	err := s.engine.Where("listener_id = ?", listenerID).Desc("timestamp").Find(&commands)
+	return commands, err
+}
+
+// GetFTPCommand retrieves an FTP command by ID
+func (s *XormStore) GetFTPCommand(ctx context.Context, id string) (*FTPCommand, error) {
+	var command FTPCommand
+	_, err := s.engine.ID(id).Get(&command)
+	if err != nil {
+		return nil, err
+	}
+	return &command, nil
+}
+
+// DeleteFTPCommand deletes an FTP command
+func (s *XormStore) DeleteFTPCommand(ctx context.Context, id string) error {
+	_, err := s.engine.ID(id).Delete(&FTPCommand{})
 	return err
 }

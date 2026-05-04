@@ -242,6 +242,46 @@ func (h *Handler) ListLDAPQueries(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": queries})
 }
 
+// ListSMBRequests lists SMB requests for a listener
+// @Summary List SMB requests
+// @Description Get all SMB requests for a specific listener
+// @Tags listener
+// @Produce json
+// @Param id path string true "Listener ID"
+// @Success 200 {object} Response{data=[]SMBRequest}
+// @Router /listeners/{id}/smb [get]
+func (h *Handler) ListSMBRequests(c *gin.Context) {
+	id := c.Param("id")
+
+	requests, err := h.store.GetSMBRequests(c, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": -1, "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": requests})
+}
+
+// ListFTPCommands lists FTP commands for a listener
+// @Summary List FTP commands
+// @Description Get all FTP commands for a specific listener
+// @Tags listener
+// @Produce json
+// @Param id path string true "Listener ID"
+// @Success 200 {object} Response{data=[]FTPCommand}
+// @Router /listeners/{id}/ftp [get]
+func (h *Handler) ListFTPCommands(c *gin.Context) {
+	id := c.Param("id")
+
+	commands, err := h.store.GetFTPCommands(c, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": -1, "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": commands})
+}
+
 // GetConfig returns the current listener configuration
 // @Summary Get listener config
 // @Description Get the current listener configuration

@@ -3,6 +3,7 @@ package clustering
 import (
 	"net/http"
 
+	"github.com/chennqqi/godnslog/internal/interaction"
 	"github.com/gin-gonic/gin"
 )
 
@@ -49,7 +50,7 @@ func (h *Handler) ClusterInteractions(c *gin.Context) {
 	}
 
 	clusters := h.clusterer.ClusterInteractions(req.Interactions)
-	
+
 	noiseCount := 0
 	for _, cluster := range clusters {
 		if cluster.IsNoise {

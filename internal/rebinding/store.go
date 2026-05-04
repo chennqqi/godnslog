@@ -40,22 +40,22 @@ func NewXormStore(engine *xorm.Engine) *XormStore {
 func (s *XormStore) CreateRebindingRule(ctx context.Context, rule *RebindingRule) error {
 	rule.CreatedAt = time.Now()
 	rule.UpdatedAt = time.Now()
-	
+
 	// Serialize stages to JSON
-	stagesJSON, err := json.Marshal(rule.Stages)
+	_, err := json.Marshal(rule.Stages)
 	if err != nil {
 		return err
 	}
-	
+
 	// Use a custom field for JSON storage
 	// In production, use XORM's JSON support
 	rule.Stages = nil // Will be stored separately
-	
+
 	_, err = s.engine.Insert(rule)
 	if err != nil {
 		return err
 	}
-	
+
 	// Store stages separately (simplified for MVP)
 	return nil
 }
@@ -67,10 +67,10 @@ func (s *XormStore) GetRebindingRule(ctx context.Context, id string) (*Rebinding
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// In production, deserialize stages from JSON
 	// For MVP, stages would be stored separately
-	
+
 	return &rule, nil
 }
 
@@ -81,7 +81,7 @@ func (s *XormStore) GetRebindingRuleByDomain(ctx context.Context, domain string)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &rule, nil
 }
 
@@ -95,14 +95,14 @@ func (s *XormStore) GetAllRebindingRules(ctx context.Context) ([]RebindingRule, 
 // UpdateRebindingRule updates a rebinding rule
 func (s *XormStore) UpdateRebindingRule(ctx context.Context, rule *RebindingRule) error {
 	rule.UpdatedAt = time.Now()
-	
+
 	// Serialize stages
 	stagesJSON, err := json.Marshal(rule.Stages)
 	if err != nil {
 		return err
 	}
 	_ = stagesJSON
-	
+
 	_, err = s.engine.ID(rule.ID).Update(rule)
 	return err
 }

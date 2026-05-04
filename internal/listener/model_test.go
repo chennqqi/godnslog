@@ -127,20 +127,83 @@ func TestSMTPMessageModel(t *testing.T) {
 // TestLDAPQueryModel tests LDAP query model
 func TestLDAPQueryModel(t *testing.T) {
 	now := time.Now()
-	q := LDAPQuery{
-		ID:         "test-query-1",
-		ListenerID: "test-listener-1",
+	query := &LDAPQuery{
+		ID:         "query-1",
+		ListenerID: "listener-1",
 		BaseDN:     "dc=example,dc=com",
 		Filter:     "(objectClass=user)",
+		Attributes: `["cn", "mail"]`,
+		BindDN:     "cn=admin,dc=example,dc=com",
 		SourceIP:   "192.168.1.1",
 		Timestamp:  now,
 	}
 
-	if q.ID == "" {
+	if query.ID == "" {
 		t.Fatal("ID should not be empty")
 	}
 
-	if q.BaseDN == "" {
+	if query.BaseDN == "" {
 		t.Fatal("BaseDN should not be empty")
+	}
+
+	if query.Filter == "" {
+		t.Fatal("Filter should not be empty")
+	}
+}
+
+// TestSMBRequestModel tests SMB request model
+func TestSMBRequestModel(t *testing.T) {
+	now := time.Now()
+	request := &SMBRequest{
+		ID:         "smb-1",
+		ListenerID: "listener-1",
+		Command:    "TREE_CONNECT",
+		ShareName:  "share",
+		FilePath:   "\\path\\to\\file",
+		Username:   "user",
+		Data:       `{"test": "data"}`,
+		SourceIP:   "192.168.1.1",
+		SourcePort: 445,
+		Timestamp:  now,
+	}
+
+	if request.ID == "" {
+		t.Fatal("ID should not be empty")
+	}
+
+	if request.Command == "" {
+		t.Fatal("Command should not be empty")
+	}
+
+	if request.SourceIP == "" {
+		t.Fatal("SourceIP should not be empty")
+	}
+}
+
+// TestFTPCommandModel tests FTP command model
+func TestFTPCommandModel(t *testing.T) {
+	now := time.Now()
+	command := &FTPCommand{
+		ID:         "ftp-1",
+		ListenerID: "listener-1",
+		Command:    "RETR",
+		Argument:   "/path/to/file.txt",
+		Username:   "user",
+		Data:       "file content",
+		SourceIP:   "192.168.1.1",
+		SourcePort: 21,
+		Timestamp:  now,
+	}
+
+	if command.ID == "" {
+		t.Fatal("ID should not be empty")
+	}
+
+	if command.Command == "" {
+		t.Fatal("Command should not be empty")
+	}
+
+	if command.SourceIP == "" {
+		t.Fatal("SourceIP should not be empty")
 	}
 }

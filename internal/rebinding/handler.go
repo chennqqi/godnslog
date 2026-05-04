@@ -2,7 +2,6 @@ package rebinding
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -38,7 +37,7 @@ type UpdateRuleRequest struct {
 
 // CreateScenarioRequest represents the request to create a rule from scenario
 type CreateScenarioRequest struct {
-	Domain   string          `json:"domain" binding:"required"`
+	Domain   string            `json:"domain" binding:"required"`
 	Scenario RebindingScenario `json:"scenario" binding:"required"`
 }
 
@@ -139,7 +138,7 @@ func (h *Handler) ListRules(c *gin.Context) {
 // @Router /rebinding/rules/{id} [get]
 func (h *Handler) GetRule(c *gin.Context) {
 	id := c.Param("id")
-	
+
 	rule, err := h.store.GetRebindingRule(c, id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"code": -1, "message": "Rule not found"})
@@ -161,7 +160,7 @@ func (h *Handler) GetRule(c *gin.Context) {
 // @Router /rebinding/rules/{id} [put]
 func (h *Handler) UpdateRule(c *gin.Context) {
 	id := c.Param("id")
-	
+
 	var req UpdateRuleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": -1, "message": err.Error()})
@@ -198,7 +197,7 @@ func (h *Handler) UpdateRule(c *gin.Context) {
 // @Router /rebinding/rules/{id} [delete]
 func (h *Handler) DeleteRule(c *gin.Context) {
 	id := c.Param("id")
-	
+
 	if err := h.store.DeleteRebindingRule(c, id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": -1, "message": err.Error()})
 		return
@@ -217,7 +216,7 @@ func (h *Handler) DeleteRule(c *gin.Context) {
 // @Router /rebinding/rules/{id}/sessions [get]
 func (h *Handler) ListSessions(c *gin.Context) {
 	id := c.Param("id")
-	
+
 	sessions, err := h.store.GetRebindingSessionsByRule(c, id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": -1, "message": err.Error()})

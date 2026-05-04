@@ -27,22 +27,28 @@ func NewServer(apiURL, apiKey string) *Server {
 // Run starts the MCP server
 func (s *Server) Run(ctx context.Context) error {
 	// Register tools
-	tools := map[string]Tool{
-		"create_case":          s.createCase,
-		"create_payload":       s.createPayload,
-		"list_interactions":    s.listInteractions,
-		"wait_for_interaction": s.waitForInteraction,
-		"summarize_evidence":   s.summarizeEvidence,
-		"export_report":        s.exportReport,
-		"revoke_token":         s.revokeToken,
+	tools := []Tool{
+		{Name: "create_case", Description: "Create a new case", Execute: s.createCase},
+		{Name: "create_payload", Description: "Create a new payload", Execute: s.createPayload},
+		{Name: "list_interactions", Description: "List interactions", Execute: s.listInteractions},
+		{Name: "wait_for_interaction", Description: "Wait for interaction", Execute: s.waitForInteraction},
+		{Name: "summarize_evidence", Description: "Summarize evidence", Execute: s.summarizeEvidence},
+		{Name: "export_report", Description: "Export report", Execute: s.exportReport},
+		{Name: "revoke_token", Description: "Revoke API token", Execute: s.revokeToken},
 	}
 
 	// Start stdio transport (simplified for MVP)
 	log.Printf("MCP Server listening on stdio with %d tools", len(tools))
 
+	// Convert to map for lookup
+	toolMap := make(map[string]Tool)
+	for _, tool := range tools {
+		toolMap[tool.Name] = tool
+	}
+
 	// In production, use proper MCP transport (stdio or SSE)
 	// For MVP, we'll implement a simple HTTP server
-	return s.runHTTPServer(ctx, tools)
+	return s.runHTTPServer(ctx, toolMap, tools)
 }
 
 // Tool represents an MCP tool
@@ -243,7 +249,7 @@ func (s *Server) pollInteractions(ctx context.Context, token string, timeout int
 }
 
 // runHTTPServer runs a simple HTTP server for MCP (MVP)
-func (s *Server) runHTTPServer(ctx context.Context, tools map[string]Tool) error {
+func (s *Server) runHTTPServer(ctx context.Context, toolMap map[string]Tool, tools []Tool) error {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -259,7 +265,7 @@ func (s *Server) runHTTPServer(ctx context.Context, tools map[string]Tool) error
 	mux.HandleFunc("/tool/", func(w http.ResponseWriter, r *http.Request) {
 		// Tool execution endpoint
 		toolName := r.URL.Path[len("/tool/"):]
-		tool, ok := tools[toolName]
+		tool, ok := toolMap[toolName]
 		if !ok {
 			http.Error(w, "Tool not found", http.StatusNotFound)
 			return
@@ -291,11 +297,11 @@ func (s *Server) runHTTPServer(ctx context.Context, tools map[string]Tool) error
 }
 
 // listTools returns a list of available tools
-func (s *Server) listTools(tools map[string]Tool) []map[string]interface{} {
+func (s *Server) listTools(tools []Tool) []map[string]interface{} {
 	list := make([]map[string]interface{}, 0, len(tools))
-	for name, tool := range tools {
+	for _, tool := range tools {
 		list = append(list, map[string]interface{}{
-			"name":        name,
+			"name":        tool.Name,
 			"description": tool.Description,
 		})
 	}

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net"
 	"time"
-
-	"github.com/chennqqi/godnslog/internal/interaction"
 )
 
 // Resolver handles DNS rebinding resolution logic
@@ -29,11 +27,11 @@ func NewResolver(config *RebindingConfig, store Store) *Resolver {
 // DefaultRebindingConfig returns default rebinding configuration
 func DefaultRebindingConfig() *RebindingConfig {
 	return &RebindingConfig{
-		DefaultTTL:      60,
-		MaxStages:       5,
-		EnableC2:        false,
-		RequireAuth:     true,
-		AuditC2:         true,
+		DefaultTTL:  60,
+		MaxStages:   5,
+		EnableC2:    false,
+		RequireAuth: true,
+		AuditC2:     true,
 	}
 }
 

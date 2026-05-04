@@ -1,22 +1,20 @@
 package openapi
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
 // Importer handles OpenAPI spec imports for OAST payload injection
 type Importer struct {
-	apiURL     string
-	apiKey     string
-	caseID     string
-	template   string
-	expiresIn  string
+	apiURL    string
+	apiKey    string
+	caseID    string
+	template  string
+	expiresIn string
 }
 
 // NewImporter creates a new OpenAPI importer
@@ -40,10 +38,10 @@ func (i *Importer) ImportSpec(specURL string) (*ImportResult, error) {
 	}
 
 	result := &ImportResult{
-		SpecURL:    specURL,
-		CaseID:     i.caseID,
-		Payloads:   []GeneratedPayload{},
-		Endpoints:  []Endpoint{},
+		SpecURL:   specURL,
+		CaseID:    i.caseID,
+		Payloads:  []GeneratedPayload{},
+		Endpoints: []Endpoint{},
 	}
 
 	// Iterate through all paths
@@ -175,7 +173,7 @@ func (i *Importer) generatePayloadsForSchema(schema *openapi3.Schema, path, meth
 			ParameterName:   propName,
 			Endpoint:        fmt.Sprintf("%s %s", method, path),
 			RenderedPayload: rendered,
-			ContentType:    contentType,
+			ContentType:     contentType,
 			Description:     fmt.Sprintf("Inject into %s property '%s'", location, propName),
 		}
 
@@ -201,10 +199,10 @@ func (i *Importer) ImportFromJSON(jsonStr string) (*ImportResult, error) {
 // processDoc processes an OpenAPI document
 func (i *Importer) processDoc(doc *openapi3.T, source string) (*ImportResult, error) {
 	result := &ImportResult{
-		SpecURL:    source,
-		CaseID:     i.caseID,
-		Payloads:   []GeneratedPayload{},
-		Endpoints:  []Endpoint{},
+		SpecURL:   source,
+		CaseID:    i.caseID,
+		Payloads:  []GeneratedPayload{},
+		Endpoints: []Endpoint{},
 	}
 
 	for path, pathItem := range doc.Paths {
@@ -258,20 +256,20 @@ func (i *Importer) processDoc(doc *openapi3.T, source string) (*ImportResult, er
 
 // ImportResult represents the result of an OpenAPI import
 type ImportResult struct {
-	SpecURL    string               `json:"spec_url"`
-	CaseID     string               `json:"case_id"`
-	Payloads   []GeneratedPayload   `json:"payloads"`
-	Endpoints  []Endpoint           `json:"endpoints"`
+	SpecURL   string             `json:"spec_url"`
+	CaseID    string             `json:"case_id"`
+	Payloads  []GeneratedPayload `json:"payloads"`
+	Endpoints []Endpoint         `json:"endpoints"`
 }
 
 // GeneratedPayload represents a generated OAST payload
 type GeneratedPayload struct {
 	Token           string `json:"token"`
-	Location        string `json:"location"`        // query, header, path, body
+	Location        string `json:"location"` // query, header, path, body
 	ParameterName   string `json:"parameter_name"`
 	Endpoint        string `json:"endpoint"`
 	RenderedPayload string `json:"rendered_payload"`
-	ContentType    string `json:"content_type,omitempty"`
+	ContentType     string `json:"content_type,omitempty"`
 	Description     string `json:"description"`
 }
 
