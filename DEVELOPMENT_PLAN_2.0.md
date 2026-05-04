@@ -199,9 +199,9 @@ docs/                    # 2.0 API、部署、插件、MCP 文档
 - internal/rebinding/handler.go - Rebinding API处理器
 - internal/rebinding/README.md - 文档
 
-### Phase 9：SMTP/LDAP Listener ✅ 已完成
+### Phase 9：SMTP/LDAP/SMB/FTP Listener ✅ 已完成
 
-- ✅ 实现Listener数据模型
+- ✅ 多工作空间、多域名、多 Listener 节点。数据模型
 - ✅ 实现SMTP Listener
 - ✅ 实现LDAP Listener
 - ✅ 实现Listener存储
@@ -246,6 +246,99 @@ docs/                    # 2.0 API、部署、插件、MCP 文档
 - frontend-next/e2e/dashboard.spec.ts - 仪表板E2E测试
 - doc/phase11-summary.md - Phase 11总结文档
 
+### Phase 12：测试框架扩展 ✅ 已完成
+
+- ✅ 扩展interaction模块测试
+- ✅ 扩展mcp模块测试
+- ✅ 扩展listener模块测试
+- ✅ 添加CLI测试
+- ✅ 修复所有编译错误
+- ✅ 清理测试缓存
+- ✅ 创建Phase 12总结文档
+
+**交付物**：
+- internal/interaction/interaction_test.go - Interaction单元测试
+- internal/mcp/server_test.go - MCP服务器单元测试
+- internal/listener/model_test.go - Listener模型测试
+- cmd/cli/main_test.go - CLI测试
+- doc/phase12-summary.md - Phase 12总结文档
+
+### Phase 13：文档完善 ✅ 已完成
+
+- ✅ 修复所有编译错误
+- ✅ 扩展测试覆盖（interaction、mcp、cli）
+- ✅ 创建CLI使用文档
+- ✅ 创建MCP Server使用文档
+- ✅ 更新开发计划标记交付物完成
+- ✅ 验证MVP验收标准
+- ✅ 创建Phase 13总结文档
+
+**交付物**：
+- docs/CLI_USAGE.md - CLI使用文档
+- docs/MCP_SERVER_USAGE.md - MCP Server使用文档
+- doc/phase13-summary.md - Phase 13总结文档
+
+### Phase 14：SMB/FTP Listener ✅ 已完成
+
+- ✅ 扩展数据模型（SMBRequest、FTPCommand）
+- ✅ 实现SMB Listener逻辑
+- ✅ 实现FTP Listener逻辑
+- ✅ 扩展Store接口
+- ✅ 添加Handler端点
+- ✅ 添加模型测试
+- ✅ 更新文档
+- ✅ 创建Phase 14总结文档
+
+**交付物**：
+- internal/listener/model.go - 扩展的数据模型
+- internal/listener/smb.go - SMB Listener实现
+- internal/listener/ftp.go - FTP Listener实现
+- internal/listener/store.go - 扩展的Store接口
+- internal/listener/handler.go - 扩展的Handler端点
+- internal/listener/model_test.go - SMB/FTP测试
+- internal/listener/README.md - 更新的文档
+- doc/phase14-summary.md - Phase 14总结文档
+
+### Phase 15：企业级功能 ✅ 已完成
+
+- ✅ 实现数据保留策略
+- ✅ 实现数据归档功能
+- ✅ 实现高可用配置
+- ✅ 添加企业级测试
+- ✅ 创建文档
+- ✅ 创建Phase 15总结文档
+
+**交付物**：
+- internal/retention/model.go - 数据保留和归档模型
+- internal/retention/service.go - 保留和归档服务
+- internal/retention/store.go - XORM存储实现
+- internal/retention/model_test.go - 模型测试
+- internal/retention/README.md - 数据保留和归档文档
+- internal/ha/model.go - 高可用模型
+- internal/ha/service.go - 高可用服务
+- internal/ha/store.go - XORM存储实现
+- internal/ha/model_test.go - 模型测试
+- internal/ha/README.md - 高可用文档
+- doc/phase15-summary.md - Phase 15总结文档
+
+### Phase 16：插件市场/模板市场 ✅ 已完成
+
+- ✅ 实现插件模型
+- ✅ 实现模板模型
+- ✅ 实现插件服务
+- ✅ 实现模板服务
+- ✅ 添加插件/模板测试
+- ✅ 创建文档
+- ✅ 创建Phase 16总结文档
+
+**交付物**：
+- internal/marketplace/model.go - 插件和模板数据模型
+- internal/marketplace/service.go - 市场服务实现
+- internal/marketplace/store.go - XORM存储实现
+- internal/marketplace/model_test.go - 模型测试
+- internal/marketplace/README.md - 市场文档
+- doc/phase16-summary.md - Phase 16总结文档
+
 ## MVP 验收标准
 
 - 新前端不依赖旧 Vue 代码，可独立构建。
@@ -285,10 +378,10 @@ docs/                    # 2.0 API、部署、插件、MCP 文档
 
 ## 交付物
 
-- `ROADMAP_2.0.md`：产品路线图。
-- `DEVELOPMENT_PLAN_2.0.md`：工程开发计划。
-- OpenAPI 文档。
-- Docker Compose 示例。
-- CLI 使用文档。
-- MCP Server 使用文档。
-- Nuclei、Burp/ZAP、CI/CD 集成示例。
+- ✅ `ROADMAP_2.0.md`：产品路线图
+- ✅ `DEVELOPMENT_PLAN_2.0.md`：工程开发计划
+- ✅ OpenAPI 文档：`docs/openapi.yaml`
+- ✅ Docker Compose 示例：`docker-compose.yml`
+- ✅ CLI 使用文档：`docs/CLI_USAGE.md`
+- ✅ MCP Server 使用文档：`docs/MCP_SERVER_USAGE.md`
+- ✅ Nuclei、Burp/ZAP、CI/CD 集成示例：`examples/nuclei/`, `examples/ci/`, `extensions/burp/`

@@ -21,8 +21,10 @@ export default function InteractionDetailPage() {
   const loadInteraction = async () => {
     try {
       const response = await interactionApi.get(params.id as string)
-      if (response.data) {
-        setInteraction(response.data)
+      // Handle nested response structure
+      const interactionData = response.data && 'data' in response.data ? response.data.data : response.data
+      if (interactionData) {
+        setInteraction(interactionData as Interaction)
       }
     } catch (error) {
       console.error('Failed to load interaction:', error)
@@ -39,8 +41,11 @@ export default function InteractionDetailPage() {
         format,
         include_raw: true,
       })
-      if (response.data) {
-        const blob = new Blob([response.data], { type: 'text/plain' })
+      // Handle nested response structure
+      const responseData = response.data as any
+      const exportData = responseData && typeof responseData === 'object' && 'data' in responseData ? responseData.data : responseData
+      if (exportData) {
+        const blob = new Blob([typeof exportData === 'string' ? exportData : JSON.stringify(exportData)], { type: 'text/plain' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url

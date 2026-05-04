@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  godnslog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: godnslog
+    ports:
+      - "53:53/udp"
+      - "53:53/tcp"
+      - "8080:8080"
+    environment:
+      - GIN_MODE=release
+      - GODNSLOG_DOMAIN=dns.example.com
+      - GODNSLOG_DB_PATH=/data/godnslog.db
+    volumes:
+      - godnslog-data:/data
+    restart: unless-stopped
+    networks:
+      - godnslog-net
+
+  # Optional: MySQL for production
+  mysql:
+    image: mysql:8.0
+    container_name: godnslog-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=godnslog
+      - MYSQL_USER=godnslog
+      - MYSQL_PASSWORD=godnspass
+    volumes:
+      - mysql-data:/var/lib/mysql
+    restart: unless-stopped
+    networks:
+      - godnslog-net
+
+  # Optional: Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: godnslog-redis
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - godnslog-net
+
+volumes:
+  godnslog-data:
+  mysql-data:
+  redis-data:
+
+networks:
+  godnslog-net:
+    driver: bridge

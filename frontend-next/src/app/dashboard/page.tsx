@@ -26,13 +26,13 @@ export default function DashboardPage() {
       ])
 
       if (casesResp.data) {
-        setStats((prev) => ({ ...prev, activeCases: casesResp.data.total }))
-        setRecentCases(casesResp.data.items)
+        setStats((prev) => ({ ...prev, activeCases: casesResp.data?.total || 0 }))
+        setRecentCases(casesResp.data?.items || [])
       }
 
       if (interactionsResp.data) {
-        setStats((prev) => ({ ...prev, recentInteractions: interactionsResp.data.total }))
-        setRecentInteractions(interactionsResp.data.items)
+        setStats((prev) => ({ ...prev, recentInteractions: interactionsResp.data?.total || 0 }))
+        setRecentInteractions(interactionsResp.data?.items || [])
       }
     } catch (error) {
       console.error('Failed to load dashboard data:', error)

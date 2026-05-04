@@ -116,14 +116,14 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全测试、扫
 - Agent 操作审计。
 - AI 摘要、证据解释和报告初稿，默认作为可选插件。
 
-### 2.3：平台化版本 ✅ 已完成（部分）
+### 2.3：平台化版本 ✅ 已完成
 
-- Canary 长期监测。
-- Rebinding Lab 完整版。
-- ⏸️ SMTP/LDAP/SMB/FTP Listener。
-- ⏸️ 多工作空间、多域名、多 Listener 节点。
-- ⏸️ 插件市场或模板市场。
-- ⏸️ 企业级数据保留、归档和高可用部署。
+- ✅ Canary 长期监测。
+- ✅ Rebinding Lab 完整版。
+- ✅ SMTP/LDAP/SMB/FTP Listener。
+- ✅ 多工作空间、多域名、多 Listener 节点。
+- ✅ 企业级数据保留、归档和高可用部署。
+- ✅ 插件市场或模板市场。
 
 ## 参考方向
 

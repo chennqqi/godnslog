@@ -25,8 +25,10 @@ export default function CaseDetailPage() {
         payloadApi.list({ case_id: params.id as string, page: 1, page_size: 100 }),
       ])
 
-      if (caseResp.data) {
-        setCase(caseResp.data)
+      // Handle nested response structure
+      const caseData = caseResp.data && 'data' in caseResp.data ? caseResp.data.data : caseResp.data
+      if (caseData) {
+        setCase(caseData as Case)
       }
 
       if (payloadsResp.data) {

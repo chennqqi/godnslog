@@ -24,15 +24,19 @@ Multi-protocol listener system for OAST (Out-of-Band Application Security Testin
 - Records base DN, filters, attributes
 - Source IP tracking
 
-### SMB Listener (Planned)
+### SMB Listener
 - SMB server implementation
-- Captures file access, authentication
-- Records share names, operations
+- Captures connection attempts and basic SMB commands
+- Records share names, file paths, and operations
+- Source IP and port tracking
+- Simplified SMB protocol parsing
 
-### FTP Listener (Planned)
+### FTP Listener
 - FTP server implementation
-- Captures login, file operations
-- Records commands, transfers
+- Captures login, commands, and file operations
+- Records USER, PASS, LIST, RETR, STOR commands
+- Source IP and port tracking
+- Basic FTP protocol support
 
 ## Usage
 
@@ -66,6 +70,36 @@ curl -X POST http://localhost:8080/api/v2/listeners \
   }'
 ```
 
+### Create SMB Listener
+
+```bash
+curl -X POST http://localhost:8080/api/v2/listeners \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "protocol": "smb",
+    "host": "0.0.0.0",
+    "port": 445,
+    "token": "smb-token-abc123",
+    "is_enabled": true
+  }'
+```
+
+### Create FTP Listener
+
+```bash
+curl -X POST http://localhost:8080/api/v2/listeners \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "protocol": "ftp",
+    "host": "0.0.0.0",
+    "port": 21,
+    "token": "ftp-token-abc123",
+    "is_enabled": true
+  }'
+```
+
 ### List Listeners
 
 ```bash
@@ -84,6 +118,20 @@ curl http://localhost:8080/api/v2/listeners/{id}/smtp \
 
 ```bash
 curl http://localhost:8080/api/v2/listeners/{id}/ldap \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+### Get SMB Requests
+
+```bash
+curl http://localhost:8080/api/v2/listeners/{id}/smb \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+### Get FTP Commands
+
+```bash
+curl http://localhost:8080/api/v2/listeners/{id}/ftp \
   -H "Authorization: Bearer $API_KEY"
 ```
 
@@ -130,6 +178,55 @@ if err := ldapListener.Start(ctx); err != nil {
     log.Fatal(err)
 }
 ```
+
+### Start SMB Listener
+
+```go
+listener := &listener.Listener{
+    ID:        "listener-3",
+    Protocol:  listener.ProtocolSMB,
+    Host:      "0.0.0.0",
+    Port:      445,
+    Token:     "smb-token-abc123",
+    IsEnabled: true,
+}
+
+config := &listener.ListenerConfig{
+    MaxConnections: 10,
+    Timeout:        30 * time.Second,
+    BufferSize:     4096,
+}
+smbListener := listener.NewSMBListener(config, store, listener)
+
+ctx := context.Background()
+if err := smbListener.Start(ctx); err != nil {
+    log.Fatal(err)
+}
+```
+
+### Start FTP Listener
+
+```go
+listener := &listener.Listener{
+    ID:        "listener-4",
+    Protocol:  listener.ProtocolFTP,
+    Host:      "0.0.0.0",
+    Port:      21,
+    Token:     "ftp-token-abc123",
+    IsEnabled: true,
+}
+
+config := &listener.ListenerConfig{
+    MaxConnections: 10,
+    Timeout:        30 * time.Second,
+    BufferSize:     4096,
+}
+ftpListener := listener.NewFTPListener(config, store, listener)
+
+ctx := context.Background()
+if err := ftpListener.Start(ctx); err != nil {
+    log.Fatal(err)
+}
 
 ## Configuration
 
@@ -210,6 +307,18 @@ config := &listener.ListenerConfig{
 - Authentication bypass testing
 - Attribute disclosure
 
+### SMB Testing
+- SMB file access testing
+- Share enumeration
+- Authentication testing
+- Lateral movement detection
+
+### FTP Testing
+- FTP credential testing
+- File upload/download testing
+- Command injection testing
+- Anonymous access detection
+
 ### Integration with Payload Studio
 - Generate SMTP/LDAP payloads
 - Associate with specific cases
@@ -277,6 +386,12 @@ List SMTP messages for a listener
 
 ### GET /listeners/{id}/ldap
 List LDAP queries for a listener
+
+### GET /listeners/{id}/smb
+List SMB requests for a listener
+
+### GET /listeners/{id}/ftp
+List FTP commands for a listener
 
 ### GET /listeners/config
 Get listener configuration
