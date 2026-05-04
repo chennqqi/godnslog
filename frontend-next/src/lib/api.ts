@@ -29,7 +29,23 @@ class ApiClient {
         if (error.response?.status === 401) {
           // Handle unauthorized
           localStorage.removeItem('token')
+          localStorage.removeItem('user')
           window.location.href = '/login'
+        }
+        // Handle API-level errors from response body
+        if (error.response?.data?.code !== undefined) {
+          const errorCode = error.response.data.code
+          const errorMessage = error.response.data.message || 'Unknown error'
+          
+          // Log error for debugging
+          console.error(`API Error [${errorCode}]: ${errorMessage}`)
+          
+          // Return a formatted error
+          return Promise.reject({
+            code: errorCode,
+            message: errorMessage,
+            originalError: error
+          })
         }
         return Promise.reject(error)
       }

@@ -8,11 +8,33 @@ export interface ApiResponse<T = any> {
 
 // User types
 export interface User {
-  id: string
+  id: number
   username: string
   email: string
-  role: 'super' | 'admin' | 'normal' | 'guest'
-  created_at: string
+  avatar?: string
+  lang?: string
+  role: Role
+  utime?: string
+}
+
+export interface Role {
+  id: string
+  name: string
+  description: string
+  permissions: Permission[]
+}
+
+export interface Permission {
+  roleId: number
+  permissionId: string
+  permissionName: string
+  ActionEntitySet: PermissionActionSet[]
+}
+
+export interface PermissionActionSet {
+  action: string
+  description: string
+  defaultCheck: boolean
 }
 
 export interface LoginRequest {
@@ -22,8 +44,6 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   token: string
-  refresh_token: string
-  expires_in: number
   user: User
 }
 
@@ -34,7 +54,7 @@ export interface Case {
   description: string
   target: string
   status: 'active' | 'archived' | 'completed'
-  tags: string
+  tags: string[]
   created_by: string
   created_at: string
   updated_at: string

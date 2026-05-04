@@ -156,6 +156,13 @@ func (self *WebServer) authHandler(c *gin.Context) {
 	T := getTranslateFunc(c)
 	tokenString := c.GetHeader("Access-Token")
 	if tokenString == "" {
+		// Try Authorization header with Bearer token
+		authHeader := c.GetHeader("Authorization")
+		if authHeader != "" && len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+			tokenString = authHeader[7:]
+		}
+	}
+	if tokenString == "" {
 		c.JSON(401, CR{
 			Message: T("Token Required"),
 			Code:    CodeNoAuth,
@@ -208,6 +215,7 @@ func (self *WebServer) authHandler(c *gin.Context) {
 		c.Set("email", claim.Subject)
 		c.Set("seed", claim.Seed)
 		c.Set("role", u.(*models.TblUser).Role)
+		c.Set("user", u.(*models.TblUser)) // Set full user object for v2 APIs
 
 		//TODO: permission
 		return
@@ -474,7 +482,7 @@ func (self *WebServer) userInfo(c *gin.Context) {
 	self.resp(c, 200, &CR{
 		Message: T("OK"),
 		Code:    CodeOK,
-		Result: UserInfo{
+		Data: UserInfo{
 			Id:    user.Id,
 			Name:  user.Name,
 			Email: user.Email,
@@ -537,7 +545,7 @@ func (self *WebServer) userList(c *gin.Context) {
 
 	self.resp(c, 200, &CR{
 		Message: T("OK"),
-		Result:  &resp,
+		Data:    &resp,
 	})
 }
 
@@ -839,7 +847,7 @@ func (self *WebServer) getAppSetting(c *gin.Context) {
 
 	self.resp(c, 200, &CR{
 		Message: "OK",
-		Result: AppSetting{
+		Data: AppSetting{
 			Rebind:    user.Rebind,
 			Callback:  user.Callback,
 			CleanHour: user.CleanInterval / 3600,
@@ -959,7 +967,7 @@ func (self *WebServer) getSecuritySetting(c *gin.Context) {
 
 	self.resp(c, 200, &CR{
 		Message: T("OK"),
-		Result: AppSecurity{
+		Data: AppSecurity{
 			HttpAddr: fmt.Sprintf("http://%v/log/%v/", self.IP, user.ShortId),
 			DnsAddr:  user.ShortId + "." + self.Domain,
 			Token:    user.Token,
@@ -1095,7 +1103,7 @@ func (self *WebServer) getDnsRecord(c *gin.Context) {
 
 	self.resp(c, 200, &CR{
 		Message: T("OK"),
-		Result:  &resp,
+		Data:    &resp,
 	})
 }
 
@@ -1287,7 +1295,7 @@ func (self *WebServer) getHttpRecord(c *gin.Context) {
 	}
 	self.resp(c, 200, &CR{
 		Message: T("OK"),
-		Result:  &resp,
+		Data:    &resp,
 	})
 }
 

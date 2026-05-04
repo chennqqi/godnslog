@@ -17,9 +17,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-//==============================================================================
+// ==============================================================================
 // web api
-//==============================================================================
+// ==============================================================================
 func (self *WebServer) dataPreHandler(c *gin.Context) {
 	host := c.GetHeader("X-Forwarded-Host")
 
@@ -165,7 +165,7 @@ func (self *WebServer) queryDnsRecord(c *gin.Context) {
 
 	self.resp(c, 200, &CR{
 		Message: "OK",
-		Result:  items,
+		Data:    items,
 	})
 }
 
@@ -219,7 +219,7 @@ func (self *WebServer) queryHttpRecord(c *gin.Context) {
 
 	self.resp(c, 200, &CR{
 		Message: "OK",
-		Result:  items,
+		Data:    items,
 	})
 }
 
