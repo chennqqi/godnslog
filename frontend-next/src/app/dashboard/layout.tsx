@@ -70,28 +70,26 @@ export default function DashboardLayout({
                 </a>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleLanguageChange('en-US')}
-                  className={`px-2 py-1 text-sm rounded ${lang === 'en-US' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-                >
-                  EN
-                </button>
-                <button
-                  onClick={() => handleLanguageChange('zh-CN')}
-                  className={`px-2 py-1 text-sm rounded ${lang === 'zh-CN' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-                >
-                  中
-                </button>
-              </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleLanguageChange('en-US')}
+                className={`px-2 py-1 text-xs rounded ${lang === 'en-US' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+              >
+                EN
+              </button>
+              <button
+                onClick={() => handleLanguageChange('zh-CN')}
+                className={`px-2 py-1 text-xs rounded ${lang === 'zh-CN' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+              >
+                中
+              </button>
               <button
                 onClick={() => {
                   localStorage.removeItem('token')
                   localStorage.removeItem('user')
                   router.push('/login')
                 }}
-                className="text-gray-500 hover:text-gray-700 text-sm font-medium"
+                className="text-gray-500 hover:text-gray-700 text-xs font-medium ml-2"
               >
                 {t('dashboard.menu.logout', lang)}
               </button>

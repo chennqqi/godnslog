@@ -18,17 +18,25 @@ export default function CasesPage() {
   })
 
   useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/login')
+      return
+    }
     loadCases()
-  }, [])
+  }, [router])
 
   const loadCases = async () => {
     try {
+      console.log('Loading cases...')
       const response = await caseApi.list({ page: 1, page_size: 50 })
+      console.log('Cases response:', response)
       if (response.data) {
-        setCases(response.data.items)
+        setCases(response.data.items || [])
       }
     } catch (error) {
       console.error('Failed to load cases:', error)
+      setCases([])
     } finally {
       setLoading(false)
     }

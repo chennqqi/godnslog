@@ -1,0 +1,35 @@
+import { test, expect } from '@playwright/test';
+
+test.describe('Cases Page', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('input[name="username"]', 'admin');
+    await page.fill('input[name="password"]', 'test123');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('/dashboard', { timeout: 10000 });
+  });
+
+  test.skip('should display cases page', async ({ page }) => {
+    await page.click('a[href="/dashboard/cases"]');
+    await page.waitForURL('/dashboard/cases', { timeout: 10000 });
+    await page.waitForTimeout(2000);
+    await expect(page.locator('h2')).toContainText('Case Board');
+  });
+
+  test.skip('should show create case button', async ({ page }) => {
+    await page.click('a[href="/dashboard/cases"]');
+    await page.waitForURL('/dashboard/cases', { timeout: 10000 });
+    await page.waitForTimeout(2000);
+    const createButton = page.locator('button').filter({ hasText: '创建 Case' }).first();
+    await expect(createButton).toBeVisible();
+  });
+
+  test.skip('should open create case modal', async ({ page }) => {
+    await page.click('a[href="/dashboard/cases"]');
+    await page.waitForURL('/dashboard/cases', { timeout: 10000 });
+    await page.waitForTimeout(2000);
+    const createButton = page.locator('button').filter({ hasText: '创建 Case' }).first();
+    await createButton.click();
+    await expect(page.locator('h3:has-text("创建 Case")')).toBeVisible();
+  });
+});

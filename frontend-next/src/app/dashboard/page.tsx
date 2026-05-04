@@ -15,15 +15,18 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadData()
+    loadCases()
   }, [])
 
-  const loadData = async () => {
+  const loadCases = async () => {
     try {
+      console.log('Loading dashboard data...')
       const [casesResp, interactionsResp] = await Promise.all([
         caseApi.list({ status: 'active', page: 1, page_size: 5 }),
         interactionApi.list({ page: 1, page_size: 10 }),
       ])
+      console.log('Cases response:', casesResp)
+      console.log('Interactions response:', interactionsResp)
 
       if (casesResp.data) {
         setStats((prev) => ({ ...prev, activeCases: casesResp.data?.total || 0 }))
@@ -36,6 +39,9 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error('Failed to load dashboard data:', error)
+      setStats((prev) => ({ ...prev, activeCases: 0, recentInteractions: 0 }))
+      setRecentCases([])
+      setRecentInteractions([])
     } finally {
       setLoading(false)
     }
