@@ -9,21 +9,21 @@ test.describe('Interactions Page', () => {
     await page.waitForURL('/dashboard', { timeout: 10000 });
   });
 
-  test.skip('should display interactions page', async ({ page }) => {
+  test('should display interactions page', async ({ page }) => {
     await page.goto('/dashboard/interactions');
     await page.waitForTimeout(2000);
-    await expect(page.locator('h2').or(page.locator('h1'))).toBeVisible();
+    await expect(page.locator('h2').first()).toBeVisible();
   });
 
-  test.skip('should display empty state for interactions', async ({ page }) => {
+  test('should display empty state for interactions', async ({ page }) => {
     await page.goto('/dashboard/interactions');
     await page.waitForTimeout(2000);
-    await expect(page.locator('text=暂无 Interactions').or(page.locator('text=Interaction Timeline')).or(page.locator('text=加载中'))).toBeVisible();
+    await expect(page.locator('text=暂无命中记录').first()).toBeVisible();
   });
 
-  test.skip('should display filter controls', async ({ page }) => {
+  test('should display filter controls', async ({ page }) => {
     await page.goto('/dashboard/interactions');
     await page.waitForTimeout(2000);
-    await expect(page.locator('select').or(page.locator('input[type="text"]')).or(page.locator('text=加载中'))).toBeVisible();
+    await expect(page.locator('select').first()).toBeVisible();
   });
 });

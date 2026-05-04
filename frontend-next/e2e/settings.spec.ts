@@ -9,26 +9,26 @@ test.describe('Settings Page', () => {
     await page.waitForURL('/dashboard', { timeout: 10000 });
   });
 
-  test.skip('should display settings page', async ({ page }) => {
+  test('should display settings page', async ({ page }) => {
     await page.goto('/dashboard/settings');
     await page.waitForTimeout(2000);
-    await expect(page.locator('h2')).toContainText('系统设置');
+    await expect(page.locator('h2').first()).toContainText('系统设置');
   });
 
-  test.skip('should display tab buttons', async ({ page }) => {
+  test('should display tab buttons', async ({ page }) => {
     await page.goto('/dashboard/settings');
     await page.waitForTimeout(2000);
-    await expect(page.locator('button:has-text("通用设置")')).toBeVisible();
-    await expect(page.locator('button:has-text("域名设置")')).toBeVisible();
-    await expect(page.locator('button:has-text("监听配置")')).toBeVisible();
+    await expect(page.locator('button:has-text("通用设置")').first()).toBeVisible();
+    await expect(page.locator('button:has-text("域名设置")').first()).toBeVisible();
+    await expect(page.locator('button:has-text("监听配置")').first()).toBeVisible();
   });
 
-  test.skip('should switch tabs', async ({ page }) => {
+  test('should switch tabs', async ({ page }) => {
     await page.goto('/dashboard/settings');
     await page.waitForTimeout(2000);
     
     await page.click('button:has-text("域名设置")');
     await page.waitForTimeout(500);
-    await expect(page.locator('button:has-text("域名设置")')).toHaveClass(/bg-indigo-600/);
+    await expect(page.locator('button:has-text("域名设置")').first()).toHaveClass(/bg-indigo-600/);
   });
 });

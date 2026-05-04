@@ -9,21 +9,21 @@ test.describe('Rebinding Page', () => {
     await page.waitForURL('/dashboard', { timeout: 10000 });
   });
 
-  test.skip('should display rebinding page', async ({ page }) => {
+  test('should display rebinding page', async ({ page }) => {
     await page.goto('/dashboard/rebinding');
     await page.waitForTimeout(2000);
-    await expect(page.locator('h2').or(page.locator('h1'))).toBeVisible();
+    await expect(page.locator('h2').first()).toBeVisible();
   });
 
-  test.skip('should display scenario cards', async ({ page }) => {
+  test('should display scenario cards', async ({ page }) => {
     await page.goto('/dashboard/rebinding');
     await page.waitForTimeout(2000);
-    await expect(page.locator('text=浏览器').or(page.locator('text=云元数据'))).toBeVisible();
+    await expect(page.locator('text=浏览器').first()).toBeVisible();
   });
 
-  test.skip('should display add stage button', async ({ page }) => {
+  test('should display add stage button', async ({ page }) => {
     await page.goto('/dashboard/rebinding');
     await page.waitForTimeout(2000);
-    await expect(page.locator('button').filter({ hasText: /添加/i }).or(page.locator('button').first())).toBeVisible();
+    await expect(page.locator('button').filter({ hasText: /添加/i }).first()).toBeVisible();
   });
 });

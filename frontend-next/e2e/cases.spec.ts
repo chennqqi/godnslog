@@ -15,17 +15,15 @@ test.describe('Cases Page', () => {
     await expect(page.locator('h2')).toContainText('Case Board');
   });
 
-  test.skip('should show create case button', async ({ page }) => {
-    await page.click('a[href="/dashboard/cases"]');
-    await page.waitForURL('/dashboard/cases', { timeout: 10000 });
+  test('should show create case button', async ({ page }) => {
+    await page.goto('/dashboard/cases');
     await page.waitForTimeout(2000);
     const createButton = page.locator('button').filter({ hasText: '创建 Case' }).first();
     await expect(createButton).toBeVisible();
   });
 
-  test.skip('should open create case modal', async ({ page }) => {
-    await page.click('a[href="/dashboard/cases"]');
-    await page.waitForURL('/dashboard/cases', { timeout: 10000 });
+  test('should open create case modal', async ({ page }) => {
+    await page.goto('/dashboard/cases');
     await page.waitForTimeout(2000);
     const createButton = page.locator('button').filter({ hasText: '创建 Case' }).first();
     await createButton.click();

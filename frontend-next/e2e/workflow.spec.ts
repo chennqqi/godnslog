@@ -9,21 +9,21 @@ test.describe('Workflow Page', () => {
     await page.waitForURL('/dashboard', { timeout: 10000 });
   });
 
-  test.skip('should display workflow page', async ({ page }) => {
+  test('should display workflow page', async ({ page }) => {
     await page.goto('/dashboard/workflow');
     await page.waitForTimeout(2000);
-    await expect(page.locator('h2').or(page.locator('h1'))).toBeVisible();
+    await expect(page.locator('h2').first()).toBeVisible();
   });
 
-  test.skip('should display condition list', async ({ page }) => {
+  test('should display condition list', async ({ page }) => {
     await page.goto('/dashboard/workflow');
     await page.waitForTimeout(2000);
-    await expect(page.locator('text=协议').or(page.locator('text=来源IP'))).toBeVisible();
+    await expect(page.locator('text=规则列表').first()).toBeVisible();
   });
 
-  test.skip('should display action list', async ({ page }) => {
+  test('should display action list', async ({ page }) => {
     await page.goto('/dashboard/workflow');
     await page.waitForTimeout(2000);
-    await expect(page.locator('text=发送通知').or(page.locator('text=打标签'))).toBeVisible();
+    await expect(page.locator('text=选择一个规则进行编辑').or(page.locator('text=新建')).first()).toBeVisible();
   });
 });

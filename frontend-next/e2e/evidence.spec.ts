@@ -9,21 +9,21 @@ test.describe('Evidence Page', () => {
     await page.waitForURL('/dashboard', { timeout: 10000 });
   });
 
-  test.skip('should display evidence page', async ({ page }) => {
+  test('should display evidence page', async ({ page }) => {
     await page.goto('/dashboard/evidence');
     await page.waitForTimeout(2000);
-    await expect(page.locator('h2')).toContainText('证据报告');
+    await expect(page.locator('h2').first()).toContainText('证据报告');
   });
 
-  test.skip('should display generate report section', async ({ page }) => {
+  test('should display generate report section', async ({ page }) => {
     await page.goto('/dashboard/evidence');
     await page.waitForTimeout(2000);
-    await expect(page.locator('text=生成报告').or(page.locator('h3'))).toBeVisible();
+    await expect(page.locator('text=生成报告').first()).toBeVisible();
   });
 
-  test.skip('should display case selector', async ({ page }) => {
+  test('should display case selector', async ({ page }) => {
     await page.goto('/dashboard/evidence');
     await page.waitForTimeout(2000);
-    await expect(page.locator('select').or(page.locator('text=项目'))).toBeVisible();
+    await expect(page.locator('select').first()).toBeVisible();
   });
 });

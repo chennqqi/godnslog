@@ -9,21 +9,21 @@ test.describe('Payloads Page', () => {
     await page.waitForURL('/dashboard', { timeout: 10000 });
   });
 
-  test.skip('should display payloads page', async ({ page }) => {
+  test('should display payloads page', async ({ page }) => {
     await page.goto('/dashboard/payloads');
     await page.waitForTimeout(2000);
-    await expect(page.locator('h2').or(page.locator('h1'))).toBeVisible();
+    await expect(page.locator('h2').first()).toBeVisible();
   });
 
-  test.skip('should display empty state for payloads', async ({ page }) => {
+  test('should display empty state for payloads', async ({ page }) => {
     await page.goto('/dashboard/payloads');
     await page.waitForTimeout(2000);
-    await expect(page.locator('text=暂无 Payloads').or(page.locator('text=Payload Studio')).or(page.locator('text=加载中'))).toBeVisible();
+    await expect(page.locator('text=暂无 Payloads').first()).toBeVisible();
   });
 
-  test.skip('should display search input', async ({ page }) => {
+  test('should display search input', async ({ page }) => {
     await page.goto('/dashboard/payloads');
     await page.waitForTimeout(2000);
-    await expect(page.locator('input[type="text"]').or(page.locator('input[placeholder*="搜索"]'))).toBeVisible();
+    await expect(page.locator('input[type="text"]').first()).toBeVisible();
   });
 });
