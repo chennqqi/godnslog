@@ -332,11 +332,19 @@ func (self *WebServer) userLogin(c *gin.Context) {
 	store.Set(fmt.Sprintf("%v.seed", user.Id), seed, self.AuthExpire)
 	store.Set(fmt.Sprintf("%v.user", user.Id), user, cache.NoExpiration)
 
+	// Return data in format expected by frontend: { code: 0, data: { token, user } }
 	self.resp(c, 200, &CR{
+		Code:    CodeOK,
 		Message: T("OK"),
-		Result: LoginResponse{
-			Islogin: true,
-			Token:   tokenString,
+		Data: map[string]interface{}{
+			"token": tokenString,
+			"user": map[string]interface{}{
+				"id":       user.Id,
+				"username": user.Name,
+				"email":    user.Email,
+				"role":     user.Role,
+				"lang":     user.Lang,
+			},
 		},
 	})
 }

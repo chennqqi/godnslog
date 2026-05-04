@@ -221,7 +221,23 @@ FOR_LOOP:
 }
 
 func (self *WebServer) Run() error {
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(gin.Logger())
+
+	// CORS middleware - must be first
+	r.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusOK)
+			return
+		}
+
+		c.Next()
+	})
 
 	if self.Swagger {
 		// use localhost
@@ -232,6 +248,10 @@ func (self *WebServer) Run() error {
 	//static handler
 	r.Use(static.Serve("/", static.LocalFile("dist", false)))
 	r.NoRoute(func(c *gin.Context) {
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusOK)
+			return
+		}
 		c.File("dist/index.html")
 	})
 

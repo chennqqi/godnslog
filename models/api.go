@@ -4,9 +4,9 @@ import (
 	"time"
 )
 
-//==============================================================================
+// ==============================================================================
 // api models
-//==============================================================================
+// ==============================================================================
 const (
 	CodeOK             = 0
 	CodeBadPermission  = 1
@@ -144,7 +144,9 @@ type CR struct {
 	Code      int         `json:"code"`
 	Error     error       `json:"error,omitempty"`
 	Timestamp int64       `json:"timestemp"`
-	Result    interface{} `json:"result,omitempty"`
+	Data      interface{} `json:"data,omitempty"`
+	// Keep Result for backward compatibility
+	Result interface{} `json:"result,omitempty"`
 }
 
 type Pagination struct {
