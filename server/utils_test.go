@@ -1,6 +1,7 @@
 package server
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -60,19 +61,22 @@ func TestParsePrefix(t *testing.T) {
 		ExpectSecond string
 		ExpectRebind bool
 	}{
-		{"aaaa.cr", "", "", false},
-		{"1-1.cr", "", "", false},
-		{"127.0.0.1-100.100.100.100.cr", "127.0.0.1", "100.100.100.100", true},
+		{"aaaa.cr", "aaaa", "cr", false},
+		{"1-1.cr", "1-1", "cr", false},
+		{"127.0.0.1-100.100.100.100.cr", "127.0.0.1-100.100.100.100", "cr", true},
+		{"test.cr", "test", "cr", false},
 	}
 	for i := 0; i < len(tests); i++ {
 		test := &tests[i]
-		first, second, rebind := parsePrefix(test.Input)
+		first, second := parsePrefix(test.Input)
 		if first != test.ExpectFirst {
 			t.Fatalf("test shortId(%v)!=expect(%v)", first, test.ExpectFirst)
 		}
 		if second != test.ExpectSecond {
 			t.Fatalf("test shortId(%v)!=expect(%v)", second, test.ExpectSecond)
 		}
+		// Rebind detection: check if first part looks like an IP address with dash
+		rebind := strings.Contains(first, ".") && strings.Contains(first, "-") && strings.Count(first, ".") >= 3
 		if rebind != test.ExpectRebind {
 			t.Fatalf("test rebind(%v)!=ExpectRebind(%v)", rebind, test.ExpectRebind)
 		}

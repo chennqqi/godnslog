@@ -51,7 +51,7 @@ func main() {
 		if logFile != "" {
 			f, err := os.Create(logFile)
 			if err != nil {
-				log.Panicf("Open", logFile, err)
+				log.Panicf("Open %s: %v", logFile, err)
 			}
 			defer f.Close()
 			buf := bufio.NewWriter(f)

@@ -1,36 +1,38 @@
 package clustering
 
 import (
+	"time"
+
 	"github.com/chennqqi/godnslog/internal/interaction"
 )
 
 // Cluster groups similar interactions together
 type Cluster struct {
-	ID          string         `json:"id"`
-	Type        string         `json:"type"`        // dns, http, etc.
-	SourceIP    string         `json:"source_ip"`
-	Token       string         `json:"token"`
-	Pattern     string         `json:"pattern"`     // Common pattern (e.g., domain, path)
-	Count       int            `json:"count"`
-	FirstSeen   string         `json:"first_seen"`
-	LastSeen    string         `json:"last_seen"`
+	ID           string                    `json:"id"`
+	Type         string                    `json:"type"` // dns, http, etc.
+	SourceIP     string                    `json:"source_ip"`
+	Token        string                    `json:"token"`
+	Pattern      string                    `json:"pattern"` // Common pattern (e.g., domain, path)
+	Count        int                       `json:"count"`
+	FirstSeen    string                    `json:"first_seen"`
+	LastSeen     string                    `json:"last_seen"`
 	Interactions []interaction.Interaction `json:"interactions"`
-	IsNoise     bool           `json:"is_noise"`
-	NoiseReason string         `json:"noise_reason,omitempty"`
+	IsNoise      bool                      `json:"is_noise"`
+	NoiseReason  string                    `json:"noise_reason,omitempty"`
 }
 
 // ClusteringConfig holds configuration for interaction clustering
 type ClusteringConfig struct {
-	MaxClusterSize      int           `json:"max_cluster_size"`       // Max interactions per cluster
-	TimeWindow          string        `json:"time_window"`             // Time window for clustering (e.g., "5m", "1h")
-	NoiseThreshold      int           `json:"noise_threshold"`         // Count threshold for noise detection
-	NoisePatterns       []NoisePattern `json:"noise_patterns"`         // Known noise patterns
+	MaxClusterSize int            `json:"max_cluster_size"` // Max interactions per cluster
+	TimeWindow     string         `json:"time_window"`      // Time window for clustering (e.g., "5m", "1h")
+	NoiseThreshold int            `json:"noise_threshold"`  // Count threshold for noise detection
+	NoisePatterns  []NoisePattern `json:"noise_patterns"`   // Known noise patterns
 }
 
 // NoisePattern defines a pattern that should be treated as noise
 type NoisePattern struct {
-	Type        string `json:"type"`        // dns, http
-	Pattern     string `json:"pattern"`     // Regex pattern
+	Type        string `json:"type"`    // dns, http
+	Pattern     string `json:"pattern"` // Regex pattern
 	Description string `json:"description"`
 }
 
@@ -81,31 +83,32 @@ func NewClusterer(config *ClusteringConfig) *Clusterer {
 // ClusterInteractions groups interactions into clusters
 func (c *Clusterer) ClusterInteractions(interactions []interaction.Interaction) []*Cluster {
 	clusters := make(map[string]*Cluster)
-	
+
 	for _, inter := range interactions {
 		// Generate cluster key
 		key := c.generateClusterKey(inter)
-		
+
 		if cluster, exists := clusters[key]; exists {
 			// Add to existing cluster
 			cluster.Count++
 			cluster.Interactions = append(cluster.Interactions, inter)
-			if inter.Timestamp.After(cluster.LastSeen) {
+			lastSeen, err := time.Parse(time.RFC3339, cluster.LastSeen)
+			if err == nil && inter.Timestamp.After(lastSeen) {
 				cluster.LastSeen = inter.Timestamp.String()
 			}
 		} else {
 			// Create new cluster
 			cluster := &Cluster{
-				ID:          generateClusterID(),
-				Type:        inter.Type,
-				SourceIP:    inter.SourceIP,
-				Token:       "",
-				Pattern:     c.extractPattern(inter),
-				Count:       1,
-				FirstSeen:   inter.Timestamp.String(),
-				LastSeen:    inter.Timestamp.String(),
+				ID:           generateClusterID(),
+				Type:         inter.Type,
+				SourceIP:     inter.SourceIP,
+				Token:        "",
+				Pattern:      c.extractPattern(inter),
+				Count:        1,
+				FirstSeen:    inter.Timestamp.String(),
+				LastSeen:     inter.Timestamp.String(),
 				Interactions: []interaction.Interaction{inter},
-				IsNoise:     false,
+				IsNoise:      false,
 			}
 			if inter.Token != nil {
 				cluster.Token = *inter.Token
@@ -113,7 +116,7 @@ func (c *Clusterer) ClusterInteractions(interactions []interaction.Interaction) 
 			clusters[key] = cluster
 		}
 	}
-	
+
 	// Convert to slice
 	result := make([]*Cluster, 0, len(clusters))
 	for _, cluster := range clusters {
@@ -121,7 +124,7 @@ func (c *Clusterer) ClusterInteractions(interactions []interaction.Interaction) 
 		c.checkNoise(cluster)
 		result = append(result, cluster)
 	}
-	
+
 	return result
 }
 
@@ -156,7 +159,7 @@ func (c *Clusterer) checkNoise(cluster *Cluster) {
 		cluster.NoiseReason = "High frequency"
 		return
 	}
-	
+
 	// Check against noise patterns
 	for _, pattern := range c.config.NoisePatterns {
 		if pattern.Type == cluster.Type {

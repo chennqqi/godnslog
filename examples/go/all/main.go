@@ -17,7 +17,6 @@ import (
 
 func main() {
 	var (
-		host   string
 		domain string
 		secret string
 		ssl    bool
@@ -33,9 +32,9 @@ func main() {
 		return
 	}
 
-	c, err := client.NewClient(host, secret, ssl)
+	c, err := client.NewClient(domain, secret, ssl)
 	if err != nil {
-		log.Println("NewClient: %v", err)
+		log.Printf("NewClient: %v\n", err)
 		return
 	}
 
@@ -45,7 +44,7 @@ func main() {
 			defer w.WriteHeader(200)
 			defer r.Body.Close()
 
-			txt, err := ioutil.ReadAll(r.Body)
+			_, err := ioutil.ReadAll(r.Body)
 			if err != nil {
 				log.Println("handleCallback ReadAll:", err)
 				return
@@ -86,7 +85,6 @@ func main() {
 	{
 		var store = make(map[string]int64)
 		var name = "testdnsxx" // custom prefix
-		var prefix string
 		for i := 0; i < 5; i++ {
 			scanId := simulatorScanId()
 			target := c.BuildDnsDomain(scanId)
@@ -99,7 +97,7 @@ func main() {
 		time.Sleep(10 * time.Second)
 
 		// exactly query
-		for k, v := range store {
+		for k := range store {
 			rcds, err := c.QueryDns(k, false)
 			if err != nil {
 				log.Println("Query DNS:", err)
@@ -123,7 +121,6 @@ func main() {
 
 	//http example
 	{
-		var prefix string
 		var name = "testhttpxx" // custom prefix
 		var store = make(map[string]int64)
 		for i := 0; i < 5; i++ {
@@ -137,7 +134,7 @@ func main() {
 		// simulate wait..
 		time.Sleep(10 * time.Second)
 
-		for k, v := range store {
+		for k, _ := range store {
 			rcds, err := c.QueryDns(k, false)
 			if err != nil {
 				log.Println("Query DNS:", err)

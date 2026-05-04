@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -32,7 +33,11 @@ func NewImporter(apiURL, apiKey, caseID, template, expiresIn string) *Importer {
 func (i *Importer) ImportSpec(specURL string) (*ImportResult, error) {
 	// Load OpenAPI spec
 	loader := openapi3.NewLoader()
-	doc, err := loader.LoadFromURI(specURL)
+	u, err := url.Parse(specURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse spec URL: %w", err)
+	}
+	doc, err := loader.LoadFromURI(u)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load OpenAPI spec: %w", err)
 	}
@@ -45,7 +50,7 @@ func (i *Importer) ImportSpec(specURL string) (*ImportResult, error) {
 	}
 
 	// Iterate through all paths
-	for path, pathItem := range doc.Paths {
+	for path, pathItem := range doc.Paths.Map() {
 		if pathItem == nil {
 			continue
 		}
@@ -159,7 +164,7 @@ func (i *Importer) generatePayloadsForSchema(schema *openapi3.Schema, path, meth
 		}
 
 		// Check if property is a string type suitable for injection
-		if prop.Type != "string" {
+		if prop.Type == nil || !prop.Type.Is("string") {
 			continue
 		}
 
@@ -205,7 +210,7 @@ func (i *Importer) processDoc(doc *openapi3.T, source string) (*ImportResult, er
 		Endpoints: []Endpoint{},
 	}
 
-	for path, pathItem := range doc.Paths {
+	for path, pathItem := range doc.Paths.Map() {
 		if pathItem == nil {
 			continue
 		}

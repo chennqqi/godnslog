@@ -33,7 +33,7 @@ func main() {
 
 	c, err := client.NewClient(domain, secret, ssl)
 	if err != nil {
-		log.Println("NewClient: %v", err)
+		log.Printf("NewClient: %v\n", err)
 		return
 	}
 	switch class {

@@ -64,7 +64,7 @@ func (p *resetPwCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{
 	}
 	err = web.ResetPassword(p.user, newPass2)
 	if err != nil {
-		fmt.Println("reset password: %v", err)
+		fmt.Printf("reset password: %v\n", err)
 		return subcommands.ExitFailure
 	}
 	fmt.Println("Sucess!")
