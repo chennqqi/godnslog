@@ -20,6 +20,7 @@ import type {
 export const authApi = {
   login: (data: LoginRequest) => api.post<LoginResponse>('/auth/login', data),
   logout: () => api.post('/auth/logout'),
+  info: () => api.get('/auth/info'),
 }
 
 // Case API
