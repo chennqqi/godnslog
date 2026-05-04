@@ -21,7 +21,8 @@ import (
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/sirupsen/logrus"
 	swaggerFiles "github.com/swaggo/files"
-	"github.com/swaggo/gin-swagger"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	_ "modernc.org/sqlite"
 	"xorm.io/xorm"
 )
 
@@ -245,6 +246,9 @@ func (self *WebServer) Run() error {
 		auth.GET("/info", self.authHandler, self.userInfo)
 		auth.GET("/nav", self.authHandler, self.userNav)
 	}
+
+	// Register v2 API
+	self.registerV2API(r)
 
 	//data group
 	data := api.Group("/record", self.authHandler)
