@@ -1,17 +1,24 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { payloadApi } from '@/lib/api-client'
 import type { Payload } from '@/types'
 
 export default function PayloadsPage() {
+  const router = useRouter()
   const [payloads, setPayloads] = useState<Payload[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
 
   useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/login')
+      return
+    }
     loadPayloads()
-  }, [])
+  }, [router])
 
   const loadPayloads = async () => {
     try {

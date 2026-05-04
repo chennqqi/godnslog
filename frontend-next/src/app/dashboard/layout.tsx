@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { t, getCurrentLanguage, Language } from '@/lib/i18n'
 
 export default function DashboardLayout({
@@ -38,36 +39,36 @@ export default function DashboardLayout({
                 <h1 className="text-xl font-bold text-gray-900">{t('dashboard.title', lang)}</h1>
               </div>
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                <a href="/dashboard" className="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                <Link href="/dashboard" className="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   {t('dashboard.menu.dashboard', lang)}
-                </a>
-                <a href="/dashboard/cases" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                </Link>
+                <Link href="/dashboard/cases" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   {t('dashboard.menu.cases', lang)}
-                </a>
-                <a href="/dashboard/payloads" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                </Link>
+                <Link href="/dashboard/payloads" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   {t('dashboard.menu.payloads', lang)}
-                </a>
-                <a href="/dashboard/interactions" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                </Link>
+                <Link href="/dashboard/interactions" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   {t('dashboard.menu.interactions', lang)}
-                </a>
-                <a href="/dashboard/workflow" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                </Link>
+                <Link href="/dashboard/workflow" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   {t('dashboard.menu.workflow', lang)}
-                </a>
-                <a href="/dashboard/rebinding" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                </Link>
+                <Link href="/dashboard/rebinding" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   {t('dashboard.menu.rebinding', lang)}
-                </a>
-                <a href="/dashboard/canary" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                </Link>
+                <Link href="/dashboard/canary" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   {t('dashboard.menu.canary', lang)}
-                </a>
-                <a href="/dashboard/marketplace" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                </Link>
+                <Link href="/dashboard/marketplace" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   {t('dashboard.menu.marketplace', lang)}
-                </a>
-                <a href="/dashboard/evidence" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                </Link>
+                <Link href="/dashboard/evidence" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   {t('dashboard.menu.evidence', lang)}
-                </a>
-                <a href="/dashboard/settings" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                </Link>
+                <Link href="/dashboard/settings" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   {t('dashboard.menu.settings', lang)}
-                </a>
+                </Link>
               </div>
             </div>
             <div className="flex items-center gap-2">

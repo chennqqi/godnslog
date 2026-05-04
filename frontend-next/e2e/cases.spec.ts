@@ -9,9 +9,8 @@ test.describe('Cases Page', () => {
     await page.waitForURL('/dashboard', { timeout: 10000 });
   });
 
-  test.skip('should display cases page', async ({ page }) => {
-    await page.click('a[href="/dashboard/cases"]');
-    await page.waitForURL('/dashboard/cases', { timeout: 10000 });
+  test('should display cases page', async ({ page }) => {
+    await page.goto('/dashboard/cases');
     await page.waitForTimeout(2000);
     await expect(page.locator('h2')).toContainText('Case Board');
   });

@@ -1,8 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function RebindingLabPage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/login')
+    }
+  }, [router])
   const [stages, setStages] = useState<any[]>([
     { id: 1, name: '首次解析', target_ip: '127.0.0.1', ttl: 10, condition: 'first_visit' },
     { id: 2, name: '后续解析', target_ip: '192.168.1.1', ttl: 60, condition: 'always' },

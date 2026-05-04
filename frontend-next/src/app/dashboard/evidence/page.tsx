@@ -1,8 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function EvidenceReportPage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/login')
+    }
+  }, [router])
   const [selectedCase, setSelectedCase] = useState<string>('')
   const [format, setFormat] = useState('markdown')
   const [includeRaw, setIncludeRaw] = useState(false)

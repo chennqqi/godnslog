@@ -16,7 +16,7 @@ test.describe('Dashboard', () => {
 
   test.skip('should display empty state for cases', async ({ page }) => {
     await page.waitForTimeout(5000);
-    await expect(page.locator('text=暂无 Cases').or(page.locator('text=最近 Cases'))).toBeVisible();
+    await expect(page.locator('text=暂无 Cases').first()).toBeVisible();
   });
 
   test.skip('should display empty state for interactions', async ({ page }) => {

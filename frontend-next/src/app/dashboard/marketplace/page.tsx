@@ -1,8 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function MarketplacePage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/login')
+    }
+  }, [router])
   const [activeTab, setActiveTab] = useState('plugins')
   const [plugins, setPlugins] = useState<any[]>([
     { id: '1', name: 'SSRF Scanner', type: 'listener', author: 'Security Team', downloads: 1250, rating: 4.5, is_official: true, is_published: true },

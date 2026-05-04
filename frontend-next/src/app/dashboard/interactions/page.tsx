@@ -1,18 +1,25 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { interactionApi } from '@/lib/api-client'
 import type { Interaction } from '@/types'
 
 export default function InteractionsPage() {
+  const router = useRouter()
   const [interactions, setInteractions] = useState<Interaction[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
 
   useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/login')
+      return
+    }
     loadInteractions()
-  }, [])
+  }, [router])
 
   const loadInteractions = async () => {
     try {

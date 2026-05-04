@@ -1,8 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function CanaryPage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/login')
+    }
+  }, [router])
   const [canaries, setCanaries] = useState<any[]>([
     { id: '1', type: 'dns', token: 'canary-abc123', context: '项目A-数据库配置', status: 'active', created_at: '2024-01-01' },
     { id: '2', type: 'http', token: 'canary-def456', context: '项目B-API密钥', status: 'active', created_at: '2024-01-15' },
