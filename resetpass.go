@@ -31,7 +31,7 @@ func (*resetPwCmd) Usage() string {
 func (p *resetPwCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&p.user, "u", "admin", "set user name")
 	f.StringVar(&p.dsn, "dsn", "file:godnslog.db?cache=shared&mode=rwc", "set database source name, option")
-	f.StringVar(&p.driver, "driver", "sqlite3", "set database driver, [sqlite3/mysql], option")
+	f.StringVar(&p.driver, "driver", "sqlite", "set database driver, [sqlite/mysql], option")
 }
 
 func (p *resetPwCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {

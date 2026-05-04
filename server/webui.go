@@ -65,6 +65,10 @@ func (self *WebServer) initDatabase() error {
 		// if there is no supser user when system first init
 		if count == 0 {
 			randomPass := genRandomString(12)
+			// In test mode, use fixed password
+			if self.TestMode {
+				randomPass = "test123"
+			}
 			_, err = orm.InsertOne(&models.TblUser{
 				Name:          "admin",
 				Email:         "admin@godnslog.com",

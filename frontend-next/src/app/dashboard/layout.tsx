@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { t, getCurrentLanguage, Language } from '@/lib/i18n'
 
 export default function DashboardLayout({
   children,
@@ -9,13 +10,22 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
+  const [lang, setLang] = useState<Language>('en-US')
 
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) {
       router.push('/login')
     }
+    setLang(getCurrentLanguage())
   }, [router])
+
+  const handleLanguageChange = (newLang: Language) => {
+    setLang(newLang)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('language', newLang)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -25,42 +35,56 @@ export default function DashboardLayout({
           <div className="flex justify-between h-16">
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-gray-900">GODNSLOG 2.0</h1>
+                <h1 className="text-xl font-bold text-gray-900">{t('dashboard.title', lang)}</h1>
               </div>
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
                 <a href="/dashboard" className="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  仪表盘
+                  {t('dashboard.menu.dashboard', lang)}
                 </a>
                 <a href="/dashboard/cases" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  Cases
+                  {t('dashboard.menu.cases', lang)}
                 </a>
                 <a href="/dashboard/payloads" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  Payloads
+                  {t('dashboard.menu.payloads', lang)}
                 </a>
                 <a href="/dashboard/interactions" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  Interactions
+                  {t('dashboard.menu.interactions', lang)}
                 </a>
                 <a href="/dashboard/workflow" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  Workflow
+                  {t('dashboard.menu.workflow', lang)}
                 </a>
                 <a href="/dashboard/rebinding" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  Rebinding
+                  {t('dashboard.menu.rebinding', lang)}
                 </a>
                 <a href="/dashboard/canary" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  Canary
+                  {t('dashboard.menu.canary', lang)}
                 </a>
                 <a href="/dashboard/marketplace" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  市场
+                  {t('dashboard.menu.marketplace', lang)}
                 </a>
                 <a href="/dashboard/evidence" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  证据报告
+                  {t('dashboard.menu.evidence', lang)}
                 </a>
                 <a href="/dashboard/settings" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  设置
+                  {t('dashboard.menu.settings', lang)}
                 </a>
               </div>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center gap-4">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleLanguageChange('en-US')}
+                  className={`px-2 py-1 text-sm rounded ${lang === 'en-US' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                >
+                  EN
+                </button>
+                <button
+                  onClick={() => handleLanguageChange('zh-CN')}
+                  className={`px-2 py-1 text-sm rounded ${lang === 'zh-CN' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                >
+                  中
+                </button>
+              </div>
               <button
                 onClick={() => {
                   localStorage.removeItem('token')
@@ -69,7 +93,7 @@ export default function DashboardLayout({
                 }}
                 className="text-gray-500 hover:text-gray-700 text-sm font-medium"
               >
-                登出
+                {t('dashboard.menu.logout', lang)}
               </button>
             </div>
           </div>

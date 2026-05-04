@@ -19,6 +19,7 @@ import (
 type servePwCmd struct {
 	swagger   bool
 	withGuest bool
+	testMode  bool
 
 	domain,
 	driver, dsn,
@@ -43,11 +44,12 @@ func (p *servePwCmd) SetFlags(f *flag.FlagSet) {
 
 	//https://github.com/mattn/go-sqlite3/issues/39
 	f.StringVar(&p.dsn, "dsn", "file:godnslog.db?cache=shared&mode=rwc", "set database source name, option")
-	f.StringVar(&p.driver, "driver", "sqlite3", "set database driver, [sqlite3/mysql], option")
+	f.StringVar(&p.driver, "driver", "sqlite", "set database driver, [sqlite/mysql], option")
 
 	f.StringVar(&p.upstream, "upstreamp", "8.8.8.8:53", "set upstream dns")
 	f.BoolVar(&p.swagger, "swagger", false, "with swagger, option")
 	f.BoolVar(&p.withGuest, "guest", false, "init with guest user")
+	f.BoolVar(&p.testMode, "test", false, "enable test mode with fixed password")
 
 	f.StringVar(&p.defaultLanguage, "lang", DefaultLanguage, "set default language, [en-US/zh-CN], option")
 	f.StringVar(&p.httpListen, "http", ":8080", "set http listen, option")
@@ -79,6 +81,7 @@ func (p *servePwCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 		Listen:                       p.httpListen,
 		Swagger:                      p.swagger,
 		WithGuest:                    p.withGuest,
+		TestMode:                     p.testMode,
 		AuthExpire:                   AuthExpire,
 		DefaultCleanInterval:         DefaultCleanInterval,
 		DefaultQueryApiMaxItem:       DefaultQueryApiMaxItem,

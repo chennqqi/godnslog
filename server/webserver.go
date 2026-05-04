@@ -34,6 +34,7 @@ type WebServerConfig struct {
 	Listen    string
 	Swagger   bool
 	WithGuest bool
+	TestMode  bool
 
 	AuthExpire                   time.Duration
 	DefaultCleanInterval         int64
