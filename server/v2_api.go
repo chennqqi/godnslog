@@ -843,7 +843,7 @@ func (self *WebServer) v2CreatePayload(c *gin.Context) {
 		"message": "success",
 		"data": models.Payload{
 			Id:               strconv.FormatInt(payloadItem.Id, 10),
-			CaseID:           strconv.FormatInt(payloadItem.CaseId, 10),
+			CaseId:           strconv.FormatInt(payloadItem.CaseId, 10),
 			Token:            payloadItem.Token,
 			Template:         payloadItem.Template,
 			RenderedPayload:  payloadItem.RenderedPayload,
@@ -2665,7 +2665,7 @@ func (self *WebServer) v2ListSettings(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 
-	var settings []models.Settings
+	var settings []v2models.Settings
 	total, err := self.orm.Limit(pageSize, (page-1)*pageSize).FindAndCount(&settings)
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListSettings] error: %v", err)
@@ -2698,7 +2698,7 @@ func (self *WebServer) v2ListSettings(c *gin.Context) {
 func (self *WebServer) v2GetSetting(c *gin.Context) {
 	key := c.Param("key")
 
-	var setting models.Settings
+	var setting v2models.Settings
 	_, err := self.orm.Where("key = ?", key).Get(&setting)
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetSetting] error: %v", err)
@@ -2740,7 +2740,7 @@ func (self *WebServer) v2UpdateSetting(c *gin.Context) {
 	session := self.orm.NewSession()
 	defer session.Close()
 
-	var setting models.Settings
+	var setting v2models.Settings
 	_, err := session.Where("key = ?", key).Get(&setting)
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2UpdateSetting] error: %v", err)
@@ -2791,7 +2791,7 @@ func (self *WebServer) v2CreateSetting(c *gin.Context) {
 	session := self.orm.NewSession()
 	defer session.Close()
 
-	setting := models.Settings{
+	setting := v2models.Settings{
 		ID:    v2models.GenerateID(),
 		Key:   req.Key,
 		Value: req.Value,
@@ -2821,7 +2821,7 @@ func (self *WebServer) v2DeleteSetting(c *gin.Context) {
 	session := self.orm.NewSession()
 	defer session.Close()
 
-	_, err := session.Where("key = ?", key).Delete(&models.Settings{})
+	_, err := session.Where("key = ?", key).Delete(&v2models.Settings{})
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2DeleteSetting] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{

@@ -32,6 +32,8 @@ export default function InteractionsPage() {
   const [viewMode, setViewMode] = useState<'table' | 'timeline'>('table')
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null)
   const [stats, setStats] = useState({ total: 0, dns_count: 0, http_count: 0, smtp_count: 0, ldap_count: 0 })
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [refreshInterval, setRefreshInterval] = useState(5000)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -42,6 +44,18 @@ export default function InteractionsPage() {
     loadInteractions()
     loadStats()
   }, [router])
+
+  // Auto-refresh polling
+  useEffect(() => {
+    if (!autoRefresh) return
+
+    const interval = setInterval(() => {
+      loadInteractions()
+      loadStats()
+    }, refreshInterval)
+
+    return () => clearInterval(interval)
+  }, [autoRefresh, refreshInterval])
 
   const loadInteractions = async () => {
     try {
@@ -102,6 +116,26 @@ export default function InteractionsPage() {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Interaction Timeline</h2>
         <div className="flex space-x-2">
+          <Button
+            variant={autoRefresh ? "default" : "outline"}
+            size="sm"
+            onClick={() => setAutoRefresh(!autoRefresh)}
+          >
+            {autoRefresh ? "自动刷新: 开" : "自动刷新: 关"}
+          </Button>
+          {autoRefresh && (
+            <Select value={refreshInterval.toString()} onValueChange={(v) => setRefreshInterval(parseInt(v))}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="3000">3秒</SelectItem>
+                <SelectItem value="5000">5秒</SelectItem>
+                <SelectItem value="10000">10秒</SelectItem>
+                <SelectItem value="30000">30秒</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="所有类型" />
