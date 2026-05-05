@@ -2,28 +2,75 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { caseApi, interactionApi } from '@/lib/api-client'
+import type { Case } from '@/types'
 
 export default function EvidenceReportPage() {
   const router = useRouter()
+  const [cases, setCases] = useState<Case[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedCase, setSelectedCase] = useState<string>('')
+  const [format, setFormat] = useState('markdown')
+  const [includeRaw, setIncludeRaw] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [reportContent, setReportContent] = useState('')
 
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) {
       router.push('/login')
+      return
     }
+    loadCases()
   }, [router])
-  const [selectedCase, setSelectedCase] = useState<string>('')
-  const [format, setFormat] = useState('markdown')
-  const [includeRaw, setIncludeRaw] = useState(false)
 
-  const cases = [
-    { id: '1', title: '项目A SSRF测试', status: 'active' },
-    { id: '2', title: '项目B XXE验证', status: 'completed' },
-    { id: '3', title: '项目C RCE检测', status: 'active' },
-  ]
+  const loadCases = async () => {
+    try {
+      const response = await caseApi.list({ page: 1, page_size: 100 })
+      if (response.data) {
+        setCases(response.data.items || [])
+      }
+    } catch (error) {
+      console.error('Failed to load cases:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const handleGenerate = () => {
-    alert(`生成报告: Case ${selectedCase}, 格式: ${format}`)
+  const handleGenerate = async () => {
+    if (!selectedCase) return
+    setGenerating(true)
+    try {
+      const response = await interactionApi.export({
+        case_id: selectedCase,
+        format: format,
+        include_raw: includeRaw,
+      })
+      if (response.code === 0 && response.data) {
+        setReportContent(String(response.data))
+      }
+    } catch (error) {
+      console.error('Failed to generate report:', error)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const handleDownload = () => {
+    if (!reportContent) return
+    const blob = new Blob([reportContent], { type: format === 'json' ? 'application/json' : 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `evidence-${selectedCase}.${format === 'json' ? 'json' : 'md'}`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  if (loading) {
+    return <div className="text-center py-12">加载中...</div>
   }
 
   return (
@@ -65,8 +112,7 @@ export default function EvidenceReportPage() {
                 >
                   <option value="markdown">Markdown</option>
                   <option value="json">JSON</option>
-                  <option value="html">HTML</option>
-                  <option value="pdf">PDF</option>
+                  <option value="csv">CSV</option>
                 </select>
               </div>
 
@@ -82,61 +128,36 @@ export default function EvidenceReportPage() {
                 </label>
               </div>
 
-              <div>
-                <label className="flex items-center">
-                  <input type="checkbox" className="mr-2" defaultChecked />
-                  <span className="text-sm text-gray-700">包含时间线</span>
-                </label>
+              <div className="flex space-x-2">
+                <button
+                  onClick={handleGenerate}
+                  disabled={!selectedCase || generating}
+                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {generating ? '生成中...' : '生成报告'}
+                </button>
+                {reportContent && (
+                  <button
+                    onClick={handleDownload}
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                  >
+                    下载
+                  </button>
+                )}
               </div>
-
-              <div>
-                <label className="flex items-center">
-                  <input type="checkbox" className="mr-2" defaultChecked />
-                  <span className="text-sm text-gray-700">包含分析总结</span>
-                </label>
-              </div>
-
-              <button
-                onClick={handleGenerate}
-                disabled={!selectedCase}
-                className="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-              >
-                生成报告
-              </button>
             </div>
           </div>
         </div>
 
         <div className="bg-white shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">报告模板</h3>
-
-            <div className="space-y-3">
-              <div className="border border-gray-200 rounded p-3 hover:border-indigo-600 cursor-pointer">
-                <p className="font-medium text-sm">标准渗透测试报告</p>
-                <p className="text-xs text-gray-500">包含完整的漏洞详情和证据链</p>
-              </div>
-              <div className="border border-gray-200 rounded p-3 hover:border-indigo-600 cursor-pointer">
-                <p className="font-medium text-sm">快速验证报告</p>
-                <p className="text-xs text-gray-500">简洁的证据汇总和结论</p>
-              </div>
-              <div className="border border-gray-200 rounded p-3 hover:border-indigo-600 cursor-pointer">
-                <p className="font-medium text-sm">合规审计报告</p>
-                <p className="text-xs text-gray-500">符合行业标准的审计格式</p>
-              </div>
-              <div className="border border-gray-200 rounded p-3 hover:border-indigo-600 cursor-pointer">
-                <p className="font-medium text-sm">自定义模板</p>
-                <p className="text-xs text-gray-500">上传自定义报告模板</p>
-              </div>
-            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">报告预览</h3>
+            {reportContent ? (
+              <pre className="bg-gray-50 p-4 rounded text-xs overflow-auto max-h-96">{reportContent}</pre>
+            ) : (
+              <p className="text-gray-500 text-center py-4">生成报告后在此预览</p>
+            )}
           </div>
-        </div>
-      </div>
-
-      <div className="mt-6 bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">最近生成的报告</h3>
-          <p className="text-gray-500 text-center py-4">暂无生成的报告</p>
         </div>
       </div>
     </div>

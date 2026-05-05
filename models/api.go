@@ -164,3 +164,15 @@ type Resolve struct {
 	Ttl        uint32 `json:"ttl"`
 	Utimestamp int64  `json:"timestamp"`
 }
+
+type PayloadUpdateRequest struct {
+	Status           string     `json:"status" binding:"omitempty,oneof=draft deployed hit archived expired"`
+	ExpiresAt        *time.Time `json:"expires_at"`
+	ExpectedProtocol string     `json:"expected_protocol" binding:"omitempty,oneof=dns http smtp ldap"`
+}
+
+type APIKeyUpdateRequest struct {
+	Name      string   `json:"name"`
+	Scopes    []string `json:"scopes"`
+	ExpiresAt string   `json:"expires_at"`
+}

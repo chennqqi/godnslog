@@ -1,11 +1,14 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"time"
 )
 
 // Server implements the MCP server for GODNSLOG
@@ -222,30 +225,92 @@ func (s *Server) revokeToken(ctx context.Context, args map[string]interface{}) (
 func (s *Server) apiCall(method, path string, body interface{}) (interface{}, error) {
 	url := s.apiURL + path
 
-	var reqBody interface{}
+	var reqBody *bytes.Buffer
 	if body != nil {
-		reqBody = body
+		reqBody = new(bytes.Buffer)
+		if err := json.NewEncoder(reqBody).Encode(body); err != nil {
+			return nil, fmt.Errorf("failed to encode request body: %w", err)
+		}
 	}
 
-	// Simplified HTTP client
-	// In production, use proper HTTP client with error handling
-	return map[string]interface{}{
-		"message": "API call simulated",
-		"url":     url,
-		"method":  method,
-		"body":    reqBody,
-	}, nil
+	var req *http.Request
+	var err error
+
+	if method == "GET" && body == nil {
+		req, err = http.NewRequest(method, url, nil)
+	} else if body != nil {
+		req, err = http.NewRequest(method, url, reqBody)
+	} else {
+		req, err = http.NewRequest(method, url, nil)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+s.apiKey)
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("API call failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("API returned error %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result interface{}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result, nil
 }
 
 // pollInteractions polls for interactions
 func (s *Server) pollInteractions(ctx context.Context, token string, timeout int) (interface{}, error) {
-	// Simplified polling
-	// In production, implement proper polling with timeout
-	return map[string]interface{}{
-		"message": "Polling simulated",
-		"token":   token,
-		"timeout": timeout,
-	}, nil
+	deadline := time.After(time.Duration(timeout) * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("context cancelled")
+		case <-deadline:
+			return map[string]interface{}{
+				"message": "Timeout waiting for interaction",
+				"token":   token,
+			}, nil
+		case <-ticker.C:
+			// Check for interactions with this token
+			query := fmt.Sprintf("?token=%s&page_size=10", token)
+			result, err := s.apiCall("GET", "/interactions"+query, nil)
+			if err != nil {
+				continue // Retry on error
+			}
+
+			// Check if we have any interactions
+			if resp, ok := result.(map[string]interface{}); ok {
+				if data, ok := resp["data"].(map[string]interface{}); ok {
+					if items, ok := data["items"].([]interface{}); ok && len(items) > 0 {
+						return map[string]interface{}{
+							"message":      "Interaction detected",
+							"token":        token,
+							"interactions": items,
+						}, nil
+					}
+				}
+			}
+		}
+	}
 }
 
 // runHTTPServer runs a simple HTTP server for MCP (MVP)

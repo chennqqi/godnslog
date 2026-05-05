@@ -13,6 +13,7 @@ import type {
   InteractionListResponse,
   APIKey,
   APIKeyCreateRequest,
+  APIKeyUpdateRequest,
   APIKeyListResponse,
 } from '@/types'
 
@@ -63,6 +64,8 @@ export const apiKeyApi = {
   list: (params?: { page?: number; page_size?: number }) =>
     api.get<APIKeyListResponse>('/apikeys', params),
   create: (data: APIKeyCreateRequest) => api.post<{ data: APIKey }>('/apikeys', data),
+  get: (id: string) => api.get<{ data: APIKey }>(`/apikeys/${id}`),
+  update: (id: string, data: APIKeyUpdateRequest) => api.put<{ data: APIKey }>(`/apikeys/${id}`, data),
   delete: (id: string) => api.delete(`/apikeys/${id}`),
 }
 

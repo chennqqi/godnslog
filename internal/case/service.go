@@ -104,6 +104,19 @@ func (s *Service) ListCases(status, search string, page, pageSize int) (*CaseLis
 
 // UpdateCase updates a case
 func (s *Service) UpdateCase(id string, req *CaseUpdateRequest) error {
+	// Get existing case to validate status transition
+	existingCase, err := s.GetCaseByID(id)
+	if err != nil {
+		return err
+	}
+
+	// Validate status transition
+	if req.Status != "" && req.Status != existingCase.Status {
+		if !isValidStatusTransition(existingCase.Status, req.Status) {
+			return errors.New("invalid status transition")
+		}
+	}
+
 	// Serialize tags to JSON
 	tagsJSON := ""
 	if len(req.Tags) > 0 {
@@ -122,14 +135,64 @@ func (s *Service) UpdateCase(id string, req *CaseUpdateRequest) error {
 		Tags:        tagsJSON,
 	}
 
-	_, err := s.engine.ID(id).Cols("title", "description", "target", "status", "tags").Update(caseRecord)
+	_, err = s.engine.ID(id).Cols("title", "description", "target", "status", "tags").Update(caseRecord)
 	return err
+}
+
+// isValidStatusTransition validates if a status transition is allowed
+func isValidStatusTransition(from, to string) bool {
+	validTransitions := map[string][]string{
+		"active":    {"archived", "completed"},
+		"archived":  {"active"},
+		"completed": {"archived"},
+	}
+
+	allowed, ok := validTransitions[from]
+	if !ok {
+		return false
+	}
+
+	for _, status := range allowed {
+		if status == to {
+			return true
+		}
+	}
+
+	return false
 }
 
 // DeleteCase deletes a case
 func (s *Service) DeleteCase(id string) error {
 	_, err := s.engine.ID(id).Delete(&Case{})
 	return err
+}
+
+// GetCaseStats retrieves statistics for a case
+func (s *Service) GetCaseStats(id string) (*CaseStats, error) {
+	var stats CaseStats
+
+	// Count payloads
+	payloadCount, err := s.engine.Table("payloads").Where("case_id = ?", id).Count()
+	if err != nil {
+		return nil, err
+	}
+	stats.PayloadCount = int(payloadCount)
+
+	// Count interactions
+	interactionCount, err := s.engine.Table("interactions").Where("case_id = ?", id).Count()
+	if err != nil {
+		return nil, err
+	}
+	stats.InteractionCount = int(interactionCount)
+
+	// Count hit payloads
+	hitCount, err := s.engine.Table("payloads").Where("case_id = ? AND status = ?", id, "hit").Count()
+	if err != nil {
+		return nil, err
+	}
+	stats.HitPayloadCount = int(hitCount)
+
+	return &stats, nil
 }
 
 // generateID generates a unique ID

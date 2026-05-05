@@ -6,23 +6,33 @@ info:
   description: |
     Detects out-of-band DNS interactions using GODNSLOG.
     This template generates a unique DNS payload and checks for DNS resolution.
+    Usage: nuclei -u <target> -t godnslog-dns-oast.yaml -var token=<godnslog_token> -var domain=<godnslog_domain>
+
+variables:
+  - name: token
+    description: GODNSLOG token for tracking
+    required: true
+  - name: domain
+    description: GODNSLOG domain
+    required: true
 
 requests:
   - raw:
       - |
-        GET /{{interactsh_url}} HTTP/1.1
-        Host: {{Hostname}}
+        GET / HTTP/1.1
+        Host: {{token}}.{{domain}}
         User-Agent: {{User-Agent}}
         Accept: */*
 
+    matchers-condition: and
     matchers:
       - type: word
-        part: interactsh_protocol
+        part: body
         words:
           - "dns"
 
     extractors:
       - type: regex
-        part: interactsh_request
+        part: header
         regex:
-          - '(?P<token>[a-zA-Z0-9]{16,32})\.{{Hostname}}'
+          - '(?P<token>[a-zA-Z0-9]{16,32})\.{{domain}}'

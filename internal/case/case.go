@@ -47,3 +47,10 @@ type CaseListResponse struct {
 	PageSize   int    `json:"page_size"`
 	TotalPages int    `json:"total_pages"`
 }
+
+// CaseStats represents statistics for a case
+type CaseStats struct {
+	PayloadCount     int `json:"payload_count"`
+	InteractionCount int `json:"interaction_count"`
+	HitPayloadCount  int `json:"hit_payload_count"`
+}

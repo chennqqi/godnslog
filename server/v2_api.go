@@ -10,6 +10,7 @@ import (
 	"github.com/chennqqi/godnslog/internal/canary"
 	"github.com/chennqqi/godnslog/internal/interaction"
 	"github.com/chennqqi/godnslog/internal/listener"
+	"github.com/chennqqi/godnslog/internal/notification"
 
 	v2models "github.com/chennqqi/godnslog/internal/models"
 	"github.com/chennqqi/godnslog/internal/rebinding"
@@ -36,6 +37,9 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			cases.GET("/:id", self.v2GetCase)
 			cases.PUT("/:id", self.v2UpdateCase)
 			cases.DELETE("/:id", self.v2DeleteCase)
+			cases.GET("/:id/stats", self.v2GetCaseStats)
+			cases.GET("/:id/payloads", self.v2GetCasePayloads)
+			cases.GET("/:id/interactions", self.v2GetCaseInteractions)
 		}
 
 		// Payloads
@@ -44,7 +48,10 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			payloads.GET("", self.v2ListPayloads)
 			payloads.POST("", self.v2CreatePayload)
 			payloads.GET("/:id", self.v2GetPayload)
+			payloads.PUT("/:id", self.v2UpdatePayload)
 			payloads.POST("/:id/revoke", self.v2RevokePayload)
+			payloads.POST("/:id/preview", self.v2PreviewPayload)
+			payloads.POST("/batch", self.v2BatchCreatePayloads)
 		}
 
 		// Interactions
@@ -52,6 +59,8 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		{
 			interactions.GET("", self.v2ListInteractions)
 			interactions.GET("/:id", self.v2GetInteraction)
+			interactions.GET("/stats", self.v2InteractionStats)
+			interactions.GET("/timeline", self.v2InteractionTimeline)
 			interactions.POST("/delete", self.v2DeleteInteractions)
 			interactions.POST("/export", self.v2ExportInteractions)
 		}
@@ -61,7 +70,20 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		{
 			apikeys.GET("", self.v2ListAPIKeys)
 			apikeys.POST("", self.v2CreateAPIKey)
+			apikeys.GET("/:id", self.v2GetAPIKey)
+			apikeys.PUT("/:id", self.v2UpdateAPIKey)
 			apikeys.DELETE("/:id", self.v2DeleteAPIKey)
+		}
+
+		// Notifications
+		notifications := v2.Group("/notifications", self.authHandler)
+		{
+			notifications.GET("/channels", self.v2ListNotificationChannels)
+			notifications.POST("/channels", self.v2CreateNotificationChannel)
+			notifications.GET("/channels/:id", self.v2GetNotificationChannel)
+			notifications.PUT("/channels/:id", self.v2UpdateNotificationChannel)
+			notifications.DELETE("/channels/:id", self.v2DeleteNotificationChannel)
+			notifications.GET("/logs", self.v2ListNotificationLogs)
 		}
 
 		// Users (admin only)
@@ -469,6 +491,205 @@ func (self *WebServer) v2DeleteCase(c *gin.Context) {
 	})
 }
 
+// v2GetCaseStats gets case statistics
+func (self *WebServer) v2GetCaseStats(c *gin.Context) {
+	id := c.Param("id")
+	caseId, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    2,
+			"message": "invalid case id",
+		})
+		return
+	}
+
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	var caseItem models.TblCase
+	has, err := session.ID(caseId).Get(&caseItem)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2GetCaseStats] get error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+	if !has {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    4,
+			"message": "case not found",
+		})
+		return
+	}
+
+	// Count payloads
+	payloadCount, err := session.Where("case_id = ?", caseId).Count(new(models.TblPayload))
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2GetCaseStats] count payloads error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	// Count interactions
+	interactionCount, err := session.Table("interactions").Where("case_id = ?", id).Count()
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2GetCaseStats] count interactions error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	// Count hit payloads
+	hitCount, err := session.Where("case_id = ? AND status = ?", caseId, "hit").Count(new(models.TblPayload))
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2GetCaseStats] count hit payloads error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"payload_count":     payloadCount,
+			"interaction_count": interactionCount,
+			"hit_payload_count": hitCount,
+		},
+	})
+}
+
+// v2GetCasePayloads gets payloads associated with a case
+func (self *WebServer) v2GetCasePayloads(c *gin.Context) {
+	id := c.Param("id")
+	caseId, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    2,
+			"message": "invalid case id",
+		})
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	status := c.Query("status")
+
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	var payloads []models.TblPayload
+	query := session.Where("case_id = ?", caseId)
+
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+
+	total, err := query.Count(new(models.TblPayload))
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2GetCasePayloads] count error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	offset := (page - 1) * pageSize
+	err = query.OrderBy("created_at DESC").Limit(pageSize, offset).Find(&payloads)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2GetCasePayloads] find error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	totalPages := int(total) / pageSize
+	if int(total)%pageSize > 0 {
+		totalPages++
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"items":       payloads,
+			"total":       total,
+			"page":        page,
+			"page_size":   pageSize,
+			"total_pages": totalPages,
+		},
+	})
+}
+
+// v2GetCaseInteractions gets interactions associated with a case
+func (self *WebServer) v2GetCaseInteractions(c *gin.Context) {
+	id := c.Param("id")
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	protocol := c.Query("protocol")
+
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	var interactions []v2models.Interaction
+	query := session.Table("interactions").Where("case_id = ?", id)
+
+	if protocol != "" {
+		query = query.Where("type = ?", protocol)
+	}
+
+	total, err := query.Count()
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2GetCaseInteractions] count error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	offset := (page - 1) * pageSize
+	err = query.OrderBy("timestamp DESC").Limit(pageSize, offset).Find(&interactions)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2GetCaseInteractions] find error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	totalPages := int(total) / pageSize
+	if int(total)%pageSize > 0 {
+		totalPages++
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"items":       interactions,
+			"total":       total,
+			"page":        page,
+			"page_size":   pageSize,
+			"total_pages": totalPages,
+		},
+	})
+}
+
 // v2ListPayloads lists payloads
 func (self *WebServer) v2ListPayloads(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -726,6 +947,158 @@ func (self *WebServer) v2RevokePayload(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
+	})
+}
+
+// v2UpdatePayload updates a payload
+func (self *WebServer) v2UpdatePayload(c *gin.Context) {
+	id := c.Param("id")
+	payloadId, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    2,
+			"message": "invalid payload id",
+		})
+		return
+	}
+
+	var req models.PayloadUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    2,
+			"message": "invalid request body",
+		})
+		return
+	}
+
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	_, err = session.ID(payloadId).Cols("status", "expected_protocol").Update(&models.TblPayload{
+		Status:           req.Status,
+		ExpectedProtocol: req.ExpectedProtocol,
+	})
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2UpdatePayload] update error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+	})
+}
+
+// v2PreviewPayload previews payload rendering
+func (self *WebServer) v2PreviewPayload(c *gin.Context) {
+	id := c.Param("id")
+	payloadId, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    2,
+			"message": "invalid payload id",
+		})
+		return
+	}
+
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	var payload models.TblPayload
+	has, err := session.ID(payloadId).Get(&payload)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2PreviewPayload] get error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+	if !has {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    4,
+			"message": "payload not found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"rendered_payload": payload.RenderedPayload,
+		},
+	})
+}
+
+// v2BatchCreatePayloads creates multiple payloads
+func (self *WebServer) v2BatchCreatePayloads(c *gin.Context) {
+	var req struct {
+		CaseID    string            `json:"case_id" binding:"required"`
+		Template  string            `json:"template" binding:"required"`
+		Count     int               `json:"count" binding:"required,min=1,max=100"`
+		Variables map[string]string `json:"variables"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    2,
+			"message": "invalid request body",
+		})
+		return
+	}
+
+	caseId, err := strconv.ParseInt(req.CaseID, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    2,
+			"message": "invalid case id",
+		})
+		return
+	}
+
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	var payloads []models.TblPayload
+	for i := 0; i < req.Count; i++ {
+		token := genRandomString(8)
+		renderedPayload := fmt.Sprintf("http://%s.%s", token, self.Domain)
+
+		payload := models.TblPayload{
+			CaseId:          caseId,
+			Token:           token,
+			Template:        req.Template,
+			RenderedPayload: renderedPayload,
+			Status:          "draft",
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+		}
+
+		payloads = append(payloads, payload)
+	}
+
+	_, err = session.Insert(&payloads)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2BatchCreatePayloads] insert error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"items": payloads,
+			"count": len(payloads),
+		},
 	})
 }
 
@@ -1126,6 +1499,105 @@ func (self *WebServer) v2DeleteAPIKey(c *gin.Context) {
 	})
 }
 
+// v2GetAPIKey gets an API key by ID
+func (self *WebServer) v2GetAPIKey(c *gin.Context) {
+	id := c.Param("id")
+	apiKeyId, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    2,
+			"message": "invalid api key id",
+		})
+		return
+	}
+
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	var apiKey models.TblAPIKey
+	has, err := session.ID(apiKeyId).Get(&apiKey)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2GetAPIKey] get error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+	if !has {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    4,
+			"message": "api key not found",
+		})
+		return
+	}
+
+	// Mask the key for security
+	apiKey.Key = apiKey.KeyPrefix + "********"
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    apiKey,
+	})
+}
+
+// v2UpdateAPIKey updates an API key
+func (self *WebServer) v2UpdateAPIKey(c *gin.Context) {
+	id := c.Param("id")
+	apiKeyId, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    2,
+			"message": "invalid api key id",
+		})
+		return
+	}
+
+	var req models.APIKeyUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    2,
+			"message": "invalid request body",
+		})
+		return
+	}
+
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	// Build update fields
+	updateData := &models.TblAPIKey{}
+	if req.Name != "" {
+		updateData.Name = req.Name
+	}
+	if req.Scopes != nil {
+		scopesJson, _ := json.Marshal(req.Scopes)
+		updateData.Scopes = string(scopesJson)
+	}
+	if req.ExpiresAt != "" {
+		expiresAt, err := time.Parse(time.RFC3339, req.ExpiresAt)
+		if err == nil {
+			updateData.ExpiresAt = expiresAt
+		}
+	}
+
+	_, err = session.ID(apiKeyId).Cols("name", "scopes", "expires_at").Update(updateData)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2UpdateAPIKey] update error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+	})
+}
+
 func generateAPIKey() string {
 	return "gdl_" + generateRandomString(32)
 }
@@ -1197,6 +1669,142 @@ func (self *WebServer) v2ListUsers(c *gin.Context) {
 			"total_pages": totalPages,
 		},
 	})
+}
+
+// v2InteractionStats gets interaction statistics
+func (self *WebServer) v2InteractionStats(c *gin.Context) {
+	caseId := c.Query("case_id")
+	payloadId := c.Query("payload_id")
+
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	query := session.Table(new(models.TblInteraction))
+
+	if caseId != "" {
+		query = query.Where("case_id = ?", caseId)
+	}
+	if payloadId != "" {
+		query = query.Where("payload_id = ?", payloadId)
+	}
+
+	// Count total interactions
+	total, err := query.Count()
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2InteractionStats] count error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	// Count by type
+	type InteractionTypeStats struct {
+		Type  string `xorm:"type"`
+		Count int64  `xorm:"count"`
+	}
+	var typeStats []InteractionTypeStats
+	err = query.GroupBy("type").Select("type, count(*) as count").Find(&typeStats)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2InteractionStats] group by type error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	// Convert to map
+	typeCountMap := make(map[string]int64)
+	for _, stat := range typeStats {
+		typeCountMap[stat.Type] = stat.Count
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"total":      total,
+			"by_type":    typeCountMap,
+			"dns_count":  typeCountMap["dns"],
+			"http_count": typeCountMap["http"],
+			"smtp_count": typeCountMap["smtp"],
+			"ldap_count": typeCountMap["ldap"],
+		},
+	})
+}
+
+// v2InteractionTimeline gets interaction timeline
+func (self *WebServer) v2InteractionTimeline(c *gin.Context) {
+	caseId := c.Query("case_id")
+	payloadId := c.Query("payload_id")
+	interval := c.DefaultQuery("interval", "hour")
+
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	query := session.Table(new(models.TblInteraction))
+
+	if caseId != "" {
+		query = query.Where("case_id = ?", caseId)
+	}
+	if payloadId != "" {
+		query = query.Where("payload_id = ?", payloadId)
+	}
+
+	var interactions []models.TblInteraction
+	if err := query.OrderBy("timestamp ASC").Find(&interactions); err != nil {
+		logrus.Errorf("[v2_api.go::v2InteractionTimeline] find error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	// Group by time interval
+	groupedEvents := make(map[string][]models.TblInteraction)
+	for _, interaction := range interactions {
+		key := getIntervalKey(interaction.Timestamp, interval)
+		groupedEvents[key] = append(groupedEvents[key], interaction)
+	}
+
+	// Convert to array
+	var timelineGroups []gin.H
+	for key, items := range groupedEvents {
+		timelineGroups = append(timelineGroups, gin.H{
+			"time":   key,
+			"count":  len(items),
+			"events": items,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"total":          len(interactions),
+			"grouped_events": timelineGroups,
+		},
+	})
+}
+
+// getIntervalKey returns the time interval key for grouping
+func getIntervalKey(t time.Time, interval string) string {
+	switch interval {
+	case "hour":
+		return t.Format("2006-01-02 15:00")
+	case "day":
+		return t.Format("2006-01-02")
+	case "week":
+		year, week := t.ISOWeek()
+		return fmt.Sprintf("%d-W%02d", year, week)
+	case "month":
+		return t.Format("2006-01")
+	default:
+		return t.Format("2006-01-02 15:04")
+	}
 }
 
 // v2ListPlugins lists marketplace plugins
@@ -1854,6 +2462,200 @@ func (self *WebServer) v2ListListenerInteractions(c *gin.Context) {
 			"listener_id":  id,
 			"interactions": interactions,
 			"total":        len(interactions),
+		},
+	})
+}
+
+// v2ListNotificationChannels lists notification channels
+func (self *WebServer) v2ListNotificationChannels(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+
+	notifyService := notification.NewService(self.orm)
+	channels, total, err := notifyService.ListChannels(page, pageSize)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2ListNotificationChannels] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"items":       channels,
+			"total":       total,
+			"page":        page,
+			"page_size":   pageSize,
+			"total_pages": (total + int64(pageSize) - 1) / int64(pageSize),
+		},
+	})
+}
+
+// v2CreateNotificationChannel creates a notification channel
+func (self *WebServer) v2CreateNotificationChannel(c *gin.Context) {
+	var req models.NotificationChannelCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    2,
+			"message": "invalid request body",
+		})
+		return
+	}
+
+	user := c.MustGet("user").(*models.TblUser)
+	notifyService := notification.NewService(self.orm)
+	channel, err := notifyService.CreateChannel(req.Name, req.Type, req.Config, user.Id)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2CreateNotificationChannel] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    channel,
+	})
+}
+
+// v2GetNotificationChannel gets a notification channel
+func (self *WebServer) v2GetNotificationChannel(c *gin.Context) {
+	id := c.Param("id")
+	channelId, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    2,
+			"message": "invalid channel id",
+		})
+		return
+	}
+
+	notifyService := notification.NewService(self.orm)
+	channel, err := notifyService.GetChannel(channelId)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2GetNotificationChannel] error: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    4,
+			"message": "channel not found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    channel,
+	})
+}
+
+// v2UpdateNotificationChannel updates a notification channel
+func (self *WebServer) v2UpdateNotificationChannel(c *gin.Context) {
+	id := c.Param("id")
+	channelId, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    2,
+			"message": "invalid channel id",
+		})
+		return
+	}
+
+	var req models.NotificationChannelUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    2,
+			"message": "invalid request body",
+		})
+		return
+	}
+
+	notifyService := notification.NewService(self.orm)
+	err = notifyService.UpdateChannel(channelId, req.Name, req.Config, req.Enabled)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2UpdateNotificationChannel] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+	})
+}
+
+// v2DeleteNotificationChannel deletes a notification channel
+func (self *WebServer) v2DeleteNotificationChannel(c *gin.Context) {
+	id := c.Param("id")
+	channelId, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    2,
+			"message": "invalid channel id",
+		})
+		return
+	}
+
+	notifyService := notification.NewService(self.orm)
+	err = notifyService.DeleteChannel(channelId)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2DeleteNotificationChannel] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+	})
+}
+
+// v2ListNotificationLogs lists notification logs
+func (self *WebServer) v2ListNotificationLogs(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	channelIdStr := c.Query("channel_id")
+
+	var channelId *int64
+	if channelIdStr != "" {
+		id, err := strconv.ParseInt(channelIdStr, 10, 64)
+		if err == nil {
+			channelId = &id
+		}
+	}
+
+	notifyService := notification.NewService(self.orm)
+	logs, total, err := notifyService.ListLogs(page, pageSize, channelId)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2ListNotificationLogs] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"items":       logs,
+			"total":       total,
+			"page":        page,
+			"page_size":   pageSize,
+			"total_pages": (total + int64(pageSize) - 1) / int64(pageSize),
 		},
 	})
 }

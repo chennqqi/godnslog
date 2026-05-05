@@ -31,17 +31,18 @@ func (s Scopes) Value() (driver.Value, error) {
 
 // APIKey represents an API key for programmatic access
 type APIKey struct {
-	ID           string     `xorm:"pk varchar(36) notnull" json:"id"`
-	Key          string     `xorm:"varchar(128) notnull unique" json:"key"` // Only shown on creation
-	KeyPrefix    string     `xorm:"varchar(16) notnull index" json:"key_prefix"`
-	Name         string     `xorm:"varchar(128) notnull" json:"name"`
-	Scopes       Scopes     `xorm:"json" json:"scopes"`
-	ExpiresAt    *time.Time `xorm:"datetime" json:"expires_at"`
-	LastUsedAt   *time.Time `xorm:"datetime" json:"last_used_at"`
-	CreatedBy    string     `xorm:"varchar(36) notnull" json:"created_by"`
-	CreatedAt    time.Time  `xorm:"datetime created" json:"created_at"`
-	RevokedAt    *time.Time `xorm:"datetime" json:"revoked_at"`
-	IsRevoked    bool       `xorm:"bool notnull default(false)" json:"is_revoked"`
+	ID         string     `xorm:"pk varchar(36) notnull" json:"id"`
+	Key        string     `xorm:"varchar(128) notnull unique" json:"key"` // Only shown on creation
+	KeyPrefix  string     `xorm:"varchar(16) notnull index" json:"key_prefix"`
+	Name       string     `xorm:"varchar(128) notnull" json:"name"`
+	Scopes     Scopes     `xorm:"json" json:"scopes"`
+	IsAgent    bool       `xorm:"bool notnull default(false)" json:"is_agent"` // Agent-specific key
+	ExpiresAt  *time.Time `xorm:"datetime" json:"expires_at"`
+	LastUsedAt *time.Time `xorm:"datetime" json:"last_used_at"`
+	CreatedBy  string     `xorm:"varchar(36) notnull" json:"created_by"`
+	CreatedAt  time.Time  `xorm:"datetime created" json:"created_at"`
+	RevokedAt  *time.Time `xorm:"datetime" json:"revoked_at"`
+	IsRevoked  bool       `xorm:"bool notnull default(false)" json:"is_revoked"`
 }
 
 // TableName returns the table name for APIKey model
@@ -51,9 +52,35 @@ func (APIKey) TableName() string {
 
 // APIKeyCreateRequest represents the request to create an API key
 type APIKeyCreateRequest struct {
-	Name      string   `json:"name" binding:"required"`
-	Scopes    []string `json:"scopes" binding:"required"`
+	Name      string     `json:"name" binding:"required"`
+	Scopes    []string   `json:"scopes" binding:"required"`
+	IsAgent   bool       `json:"is_agent"` // Mark as agent-specific key
 	ExpiresAt *time.Time `json:"expires_at"`
+}
+
+// AgentScopes defines the allowed scopes for agent API keys (minimum privilege)
+var AgentScopes = []string{
+	"cases:read",
+	"payloads:read",
+	"interactions:read",
+	"evidence:read",
+}
+
+// ValidateAgentScopes validates that an agent key only has allowed scopes
+func ValidateAgentScopes(scopes []string) bool {
+	for _, scope := range scopes {
+		allowed := false
+		for _, allowedScope := range AgentScopes {
+			if scope == allowedScope {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return false
+		}
+	}
+	return true
 }
 
 // APIKeyListResponse represents the response for listing API keys

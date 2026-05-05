@@ -74,20 +74,48 @@ jobs:
           name: oast-report
           path: oast-report.md
       
-      - name: Check for High-Risk Interactions
+      - name: Check for High-Risk Interactions (Gate)
         run: |
           INTERACTIONS=$(godnslog interaction list \
             --case-id ${{ env.CASE_ID }} \
             --limit 100)
           
-          # Check for suspicious patterns
-          if echo "$INTERACTIONS" | grep -q "metadata\|169.254\|internal"; then
-            echo "::warning::High-risk OAST interactions detected!"
-            echo "::warning::Manual review required for case ${{ env.CASE_ID }}"
-            exit 1  # Fail the pipeline for high-risk findings
+          HIGH_RISK_PATTERNS="metadata|169.254|internal|192.168|10\.|admin|config|password|secret"
+          CRITICAL_PATTERNS="root|privilege|escalation|exec|cmd|shell"
+          
+          HIGH_RISK_COUNT=0
+          CRITICAL_COUNT=0
+          
+          for pattern in $HIGH_RISK_PATTERNS; do
+            COUNT=$(echo "$INTERACTIONS" | grep -i "$pattern" | wc -l)
+            HIGH_RISK_COUNT=$((HIGH_RISK_COUNT + COUNT))
+          done
+          
+          for pattern in $CRITICAL_PATTERNS; do
+            COUNT=$(echo "$INTERACTIONS" | grep -i "$pattern" | wc -l)
+            CRITICAL_COUNT=$((CRITICAL_COUNT + COUNT))
+          done
+          
+          echo "High-risk interactions: $HIGH_RISK_COUNT"
+          echo "Critical interactions: $CRITICAL_COUNT"
+          
+          if [ $CRITICAL_COUNT -gt 0 ]; then
+            echo "::error::Critical OAST interactions detected! Pipeline blocked."
+            echo "::error::Manual security review required for case ${{ env.CASE_ID }}"
+            exit 1
           fi
           
-          echo "No high-risk interactions detected"
+          if [ $HIGH_RISK_COUNT -gt 5 ]; then
+            echo "::warning::Multiple high-risk OAST interactions detected!"
+            echo "::warning::Manual review recommended for case ${{ env.CASE_ID }}"
+            exit 1  # Fail the pipeline for multiple high-risk findings
+          fi
+          
+          if [ $HIGH_RISK_COUNT -gt 0 ]; then
+            echo "::warning::High-risk OAST interactions detected. Review recommended."
+          fi
+          
+          echo "✓ Gate check passed"
       
       - name: Post Summary
         if: always()

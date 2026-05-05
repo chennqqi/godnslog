@@ -149,8 +149,10 @@ export interface APIKey {
   id: string
   key: string
   key_prefix: string
+  key_masked: string
   name: string
   scopes: string[]
+  enabled: boolean
   expires_at?: string
   last_used_at?: string
   created_by: string
@@ -162,6 +164,13 @@ export interface APIKey {
 export interface APIKeyCreateRequest {
   name: string
   scopes: string[]
+  expires_at?: string
+}
+
+export interface APIKeyUpdateRequest {
+  name?: string
+  scopes?: string[]
+  enabled?: boolean
   expires_at?: string
 }
 

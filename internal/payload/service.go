@@ -29,19 +29,19 @@ func NewService(engine *xorm.Engine) *Service {
 
 // PayloadTemplates defines available payload templates
 var PayloadTemplates = map[string]string{
-	"ssrf":         "http://{token}.example.com/",
-	"xxe":          "http://{token}.example.com/xxe",
-	"rfi":          "http://{token}.example.com/file.php",
-	"rce":          "http://{token}.example.com/cmd",
-	"blind_sqli":   "http://{token}.example.com/sql?id=1",
-	"ssti":         "http://{token}.example.com/template",
+	"ssrf":            "http://{token}.example.com/",
+	"xxe":             "http://{token}.example.com/xxe",
+	"rfi":             "http://{token}.example.com/file.php",
+	"rce":             "http://{token}.example.com/cmd",
+	"blind_sqli":      "http://{token}.example.com/sql?id=1",
+	"ssti":            "http://{token}.example.com/template",
 	"deserialization": "http://{token}.example.com/obj",
-	"cors":         "http://{token}.example.com/cors",
-	"jsonp":        "http://{token}.example.com/jsonp",
-	"smtp_injection": "{token}@example.com",
-	"webhook":      "http://{token}.example.com/webhook",
-	"ci_cd":        "http://{token}.example.com/build",
-	"metadata":     "http://{token}.example.com/latest/meta-data/",
+	"cors":            "http://{token}.example.com/cors",
+	"jsonp":           "http://{token}.example.com/jsonp",
+	"smtp_injection":  "{token}@example.com",
+	"webhook":         "http://{token}.example.com/webhook",
+	"ci_cd":           "http://{token}.example.com/build",
+	"metadata":        "http://{token}.example.com/latest/meta-data/",
 }
 
 // generateToken generates a unique token for payload tracking
@@ -60,19 +60,45 @@ func renderPayload(tmpl string, variables map[string]string, token, domain strin
 	variables["token"] = token
 	variables["domain"] = domain
 	variables["callback_url"] = fmt.Sprintf("http://%s/log/%s/", domain, token)
-	
+
 	// Parse template
 	t, err := template.New("payload").Parse(tmpl)
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Execute template
 	var buf strings.Builder
 	if err := t.Execute(&buf, variables); err != nil {
 		return "", err
 	}
-	
+
+	return buf.String(), nil
+}
+
+// renderPayloadWithCase renders a payload template with case variable
+func renderPayloadWithCase(tmpl string, variables map[string]string, token, domain, caseID string) (string, error) {
+	// Add default variables
+	if variables == nil {
+		variables = make(map[string]string)
+	}
+	variables["token"] = token
+	variables["domain"] = domain
+	variables["case"] = caseID
+	variables["callback_url"] = fmt.Sprintf("http://%s/log/%s/", domain, token)
+
+	// Parse template
+	t, err := template.New("payload").Parse(tmpl)
+	if err != nil {
+		return "", err
+	}
+
+	// Execute template
+	var buf strings.Builder
+	if err := t.Execute(&buf, variables); err != nil {
+		return "", err
+	}
+
 	return buf.String(), nil
 }
 
@@ -83,33 +109,33 @@ func (s *Service) CreatePayload(req *PayloadCreateRequest, userID, domain string
 	if !ok {
 		return nil, ErrInvalidTemplate
 	}
-	
+
 	// Generate token
 	token := generateToken()
-	
+
 	// Render payload
 	rendered, err := renderPayload(tmpl, req.Variables, token, domain)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	payload := &Payload{
-		ID:              generateID(),
-		CaseID:          req.CaseID,
-		Token:           token,
-		Template:        req.Template,
-		RenderedPayload: rendered,
-		Variables:       Variables(req.Variables),
-		Status:          "draft",
+		ID:               generateID(),
+		CaseID:           req.CaseID,
+		Token:            token,
+		Template:         req.Template,
+		RenderedPayload:  rendered,
+		Variables:        Variables(req.Variables),
+		Status:           "draft",
 		ExpectedProtocol: req.ExpectedProtocol,
-		ExpiresAt:       req.ExpiresAt,
-		CreatedBy:       userID,
+		ExpiresAt:        req.ExpiresAt,
+		CreatedBy:        userID,
 	}
-	
+
 	if _, err := s.engine.Insert(payload); err != nil {
 		return nil, err
 	}
-	
+
 	return payload, nil
 }
 
@@ -144,29 +170,29 @@ func (s *Service) ListPayloads(caseID, status string, page, pageSize int) (*Payl
 	var payloads []Payload
 	session := s.engine.NewSession()
 	defer session.Close()
-	
+
 	if caseID != "" {
 		session = session.Where("case_id = ?", caseID)
 	}
 	if status != "" {
 		session = session.Where("status = ?", status)
 	}
-	
+
 	total, err := session.Count(&Payload{})
 	if err != nil {
 		return nil, err
 	}
-	
+
 	offset := (page - 1) * pageSize
 	if err := session.Desc("created_at").Limit(pageSize, offset).Find(&payloads); err != nil {
 		return nil, err
 	}
-	
+
 	totalPages := int(total) / pageSize
 	if int(total)%pageSize > 0 {
 		totalPages++
 	}
-	
+
 	return &PayloadListResponse{
 		Items:      payloads,
 		Total:      total,
@@ -178,14 +204,51 @@ func (s *Service) ListPayloads(caseID, status string, page, pageSize int) (*Payl
 
 // UpdatePayload updates a payload
 func (s *Service) UpdatePayload(id string, req *PayloadUpdateRequest) error {
+	// Get existing payload to validate status transition
+	existingPayload, err := s.GetPayloadByID(id)
+	if err != nil {
+		return err
+	}
+
+	// Validate status transition
+	if req.Status != "" && req.Status != existingPayload.Status {
+		if !isValidPayloadStatusTransition(existingPayload.Status, req.Status) {
+			return errors.New("invalid status transition")
+		}
+	}
+
 	payload := &Payload{
 		Status:           req.Status,
 		ExpectedProtocol: req.ExpectedProtocol,
 		ExpiresAt:        req.ExpiresAt,
 	}
-	
-	_, err := s.engine.ID(id).Cols("status", "expected_protocol", "expires_at").Update(payload)
+
+	_, err = s.engine.ID(id).Cols("status", "expected_protocol", "expires_at").Update(payload)
 	return err
+}
+
+// isValidPayloadStatusTransition validates if a payload status transition is allowed
+func isValidPayloadStatusTransition(from, to string) bool {
+	validTransitions := map[string][]string{
+		"draft":    {"deployed", "archived", "expired"},
+		"deployed": {"hit", "archived", "expired"},
+		"hit":      {"archived", "expired"},
+		"archived": {"expired"},
+		"expired":  {},
+	}
+
+	allowed, ok := validTransitions[from]
+	if !ok {
+		return false
+	}
+
+	for _, status := range allowed {
+		if status == to {
+			return true
+		}
+	}
+
+	return false
 }
 
 // RevokePayload revokes a payload by marking it as expired
@@ -195,7 +258,7 @@ func (s *Service) RevokePayload(id string) error {
 		Status:    "expired",
 		ExpiresAt: &now,
 	}
-	
+
 	_, err := s.engine.ID(id).Cols("status", "expires_at").Update(payload)
 	return err
 }

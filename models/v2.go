@@ -201,3 +201,54 @@ type APIKeyListResponse struct {
 	PageSize   int      `json:"page_size"`
 	TotalPages int      `json:"total_pages"`
 }
+
+// Notification models
+type NotificationChannel struct {
+	Id        string `json:"id"`
+	Name      string `json:"name"`
+	Type      string `json:"type"`   // webhook, wechat, feishu, dingtalk
+	Config    string `json:"config"` // JSON string for channel-specific config
+	Enabled   bool   `json:"enabled"`
+	CreatedBy string `json:"created_by"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+type NotificationChannelCreateRequest struct {
+	Name   string `json:"name"`
+	Type   string `json:"type" binding:"required,oneof=webhook wechat feishu dingtalk"`
+	Config string `json:"config"`
+}
+
+type NotificationChannelUpdateRequest struct {
+	Name    string `json:"name,omitempty"`
+	Config  string `json:"config,omitempty"`
+	Enabled *bool  `json:"enabled,omitempty"`
+}
+
+type NotificationChannelListResponse struct {
+	Items      []NotificationChannel `json:"items"`
+	Total      int                   `json:"total"`
+	Page       int                   `json:"page"`
+	PageSize   int                   `json:"page_size"`
+	TotalPages int                   `json:"total_pages"`
+}
+
+type NotificationLog struct {
+	Id        string `json:"id"`
+	ChannelId string `json:"channel_id"`
+	Channel   string `json:"channel"`
+	Type      string `json:"type"`
+	Status    string `json:"status"` // success, failed
+	Message   string `json:"message"`
+	Payload   string `json:"payload"`
+	CreatedAt string `json:"created_at"`
+}
+
+type NotificationLogListResponse struct {
+	Items      []NotificationLog `json:"items"`
+	Total      int               `json:"total"`
+	Page       int               `json:"page"`
+	PageSize   int               `json:"page_size"`
+	TotalPages int               `json:"total_pages"`
+}

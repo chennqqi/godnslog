@@ -154,3 +154,35 @@ func (rs Resolves) GetValueConflict(r *Resolve) *Resolve {
 
 	return nil
 }
+
+// NotificationChannel represents a notification channel configuration
+type TblNotificationChannel struct {
+	Id        int64     `xorm:"pk autoincr" json:"id"`
+	Name      string    `xorm:"varchar(255) not null" json:"name"`
+	Type      string    `xorm:"varchar(50) not null" json:"type"` // webhook, wechat, feishu, dingtalk
+	Config    string    `xorm:"text" json:"config"`               // JSON string
+	Enabled   bool      `xorm:"bool default true" json:"enabled"`
+	CreatedBy int64     `xorm:"bigint" json:"created_by"`
+	CreatedAt time.Time `xorm:"created" json:"created_at"`
+	UpdatedAt time.Time `xorm:"updated" json:"updated_at"`
+}
+
+func (TblNotificationChannel) TableName() string {
+	return "notification_channels"
+}
+
+// NotificationLog represents a notification log entry
+type TblNotificationLog struct {
+	Id        int64     `xorm:"pk autoincr" json:"id"`
+	ChannelId int64     `xorm:"bigint" json:"channel_id"`
+	Channel   string    `xorm:"varchar(255)" json:"channel"`
+	Type      string    `xorm:"varchar(50)" json:"type"`   // interaction, payload, etc.
+	Status    string    `xorm:"varchar(20)" json:"status"` // success, failed
+	Message   string    `xorm:"text" json:"message"`
+	Payload   string    `xorm:"text" json:"payload"`
+	CreatedAt time.Time `xorm:"created" json:"created_at"`
+}
+
+func (TblNotificationLog) TableName() string {
+	return "notification_logs"
+}
