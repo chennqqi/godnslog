@@ -7,10 +7,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/chennqqi/godnslog/cache"
 	"github.com/chennqqi/godnslog/internal/canary"
 	"github.com/chennqqi/godnslog/internal/interaction"
 	"github.com/chennqqi/godnslog/internal/listener"
 	"github.com/chennqqi/godnslog/internal/notification"
+	"github.com/dgrijalva/jwt-go"
 
 	v2models "github.com/chennqqi/godnslog/internal/models"
 	"github.com/chennqqi/godnslog/internal/rebinding"
@@ -165,17 +167,142 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 
 // v2Login handles v2 login
 func (self *WebServer) v2Login(c *gin.Context) {
-	self.userLogin(c)
+	T := getTranslateFunc(c)
+
+	var req LoginRequest
+	err := c.BindJSON(&req)
+	if err != nil {
+		c.JSON(400, gin.H{
+			"code":    400,
+			"message": T("bad input"),
+		})
+		return
+	}
+	session := self.orm.NewSession()
+	defer session.Close()
+	var user = new(models.TblUser)
+	exist, err := session.Where(`name=?`, req.Username).
+		Or(`email=?`, req.Email).Get(user)
+
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2Login] orm.Get: %v", err)
+		c.JSON(502, gin.H{
+			"code":    502,
+			"message": T("bad service"),
+		})
+		return
+	} else if !exist {
+		logrus.Infof("[v2_api.go::v2Login] not found: %v", req)
+		c.JSON(401, gin.H{
+			"code":    401,
+			"message": T("bad request"),
+		})
+		return
+	}
+	err = comparePassword(req.Password, user.Pass)
+	if err != nil {
+		logrus.Infof("[v2_api.go::v2Login] password not match")
+		c.JSON(401, gin.H{
+			"code":    401,
+			"message": T("bad request"),
+		})
+		return
+	}
+
+	now := time.Now()
+	seed := getSecuritySeed()
+	token := jwt.NewWithClaims(jwt.SigningMethodHS384, MyClaims{
+		seed,
+		jwt.StandardClaims{
+			Id:        fmt.Sprintf("%v", user.Id),
+			Audience:  user.Name,
+			Subject:   user.Email,
+			ExpiresAt: now.Add(3600 * 24 * time.Second).Unix(),
+			IssuedAt:  now.Unix(),
+			Issuer:    self.Domain,
+		},
+	})
+
+	tokenString, err := token.SignedString([]byte(self.verifyKey))
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2Login] token.SignedString: %v", err)
+		c.JSON(502, gin.H{
+			"code":    502,
+			"message": T("bad service"),
+		})
+		return
+	}
+	store := self.store
+
+	store.Set(fmt.Sprintf("%v.seed", user.Id), seed, self.AuthExpire)
+	store.Set(fmt.Sprintf("%v.user", user.Id), user, cache.NoExpiration)
+
+	// Return data in format expected by frontend: { code: 0, message: "OK", data: { token, user } }
+	c.JSON(200, gin.H{
+		"code":    0,
+		"message": T("OK"),
+		"data": gin.H{
+			"token": tokenString,
+			"user": gin.H{
+				"id":       user.Id,
+				"username": user.Name,
+				"email":    user.Email,
+				"role":     user.Role,
+				"lang":     user.Lang,
+			},
+		},
+	})
 }
 
 // v2Logout handles v2 logout
 func (self *WebServer) v2Logout(c *gin.Context) {
-	self.userLogout(c)
+	T := getTranslateFunc(c)
+
+	store := self.store
+	id := c.GetInt64("id")
+	store.Delete(fmt.Sprintf("%v.seed", id))
+	store.Delete(fmt.Sprintf("%v.user", id))
+	c.JSON(200, gin.H{
+		"code":    0,
+		"message": T("OK"),
+	})
 }
 
 // v2UserInfo handles v2 user info
 func (self *WebServer) v2UserInfo(c *gin.Context) {
-	self.userInfo(c)
+	T := getTranslateFunc(c)
+
+	store := self.store
+	id := c.GetInt64("id")
+	userValue, found := store.Get(fmt.Sprintf("%v.user", id))
+	if !found {
+		c.JSON(404, gin.H{
+			"code":    404,
+			"message": T("user not found"),
+		})
+		return
+	}
+
+	user, ok := userValue.(models.TblUser)
+	if !ok {
+		c.JSON(500, gin.H{
+			"code":    500,
+			"message": "user data type error",
+		})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"code":    0,
+		"message": T("OK"),
+		"data": gin.H{
+			"id":       user.Id,
+			"username": user.Name,
+			"email":    user.Email,
+			"role":     user.Role,
+			"lang":     user.Lang,
+		},
+	})
 }
 
 // v2ListCases lists cases

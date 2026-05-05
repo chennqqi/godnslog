@@ -286,3 +286,16 @@ GODNSLOG 2.0 所有计划阶段已全部完成，共计 35 个主要功能模块
 
 ### 编译状态
 - `go build ./...` ✅ 通过
+
+---
+
+## 2026-05-05 第四轮测试整改
+
+根据doc/2.0-test-report.md第四轮测试报告进行整改：
+
+### P0严重问题
+
+1. **修复登录功能** ✅ 已完成
+   - 问题：v2Login/v2Logout/v2UserInfo使用旧的CR格式（大写字段Code/Message），前端期望ApiResponse格式（小写字段code/message）
+   - 修复：重写v2Login、v2Logout、v2UserInfo函数，直接返回前端期望的格式
+   - 修改文件：server/v2_api.go
