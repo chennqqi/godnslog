@@ -261,3 +261,28 @@ Phase 16：插件市场/模板市场
 
 ### 总结
 GODNSLOG 2.0 所有计划阶段已全部完成，共计 35 个主要功能模块，实现了从核心闭环到平台化版本的完整演进。系统现已具备 OAST 交互验证与证据平台的全部核心能力，支持安全测试、扫描器协同和 AI Agent 赋能。
+
+---
+
+## 2026-05-05 第二轮测试整改
+
+根据doc/2.0-test-report.md第二轮测试报告进行整改：
+
+### P0阻塞问题
+
+1. **注册Settings API路由** ✅ 已完成
+   - 在server/v2_api.go的registerV2API函数中添加settings路由注册
+   - 包含：GET /api/v2/settings, POST /api/v2/settings, GET /api/v2/settings/:key, PUT /api/v2/settings/:key, DELETE /api/v2/settings/:key
+
+2. **清理models/v2.go冗余定义** ⚠️ 部分完成
+   - 添加DEPRECATED标记，说明API类型与internal/models冗余
+   - 保留Tbl前缀的数据库模型（TblCase, TblPayload, TblInteraction, TblAPIKey）用于向后兼容现有数据库表
+   - 说明：需要数据库迁移到VARCHAR(36) ID后才能完全删除此文件，当前作为向后兼容保留
+
+### P1改进项（待完成）
+
+1. **重构前端表单使用shadcn/ui组件** - cases/page.tsx等页面已部分使用shadcn/ui组件
+2. **使用React Hook Form + Zod校验** - 待实现
+
+### 编译状态
+- `go build ./...` ✅ 通过

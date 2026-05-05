@@ -78,7 +78,7 @@ type TblAPIKey struct {
 	IsRevoked  bool      `xorm:"default false notnull"`
 }
 
-// v2 API request/response models
+// v2 API request/response models (DEPRECATED - use internal/models instead)
 
 type Case struct {
 	Id          string   `json:"id"`

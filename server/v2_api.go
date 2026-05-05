@@ -150,6 +150,16 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			listeners.DELETE("/:id", self.v2DeleteListener)
 			listeners.GET("/:id/interactions", self.v2ListListenerInteractions)
 		}
+
+		// Settings
+		settings := v2.Group("/settings", self.authHandler)
+		{
+			settings.GET("", self.v2ListSettings)
+			settings.POST("", self.v2CreateSetting)
+			settings.GET("/:key", self.v2GetSetting)
+			settings.PUT("/:key", self.v2UpdateSetting)
+			settings.DELETE("/:key", self.v2DeleteSetting)
+		}
 	}
 }
 
