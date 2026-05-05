@@ -265,8 +265,8 @@ func (self *WebServer) record(c *gin.Context) {
 		})
 		return
 	}
-	// Dual-write to unified interactions table
-	interaction := v2models.FromTblHttp(httpRecord)
+	// Dual-write to unified interactions table with attribution
+	interaction := v2models.FromTblHttpWithAttribution(httpRecord, self.orm)
 	if _, err2 := session.InsertOne(interaction); err2 != nil {
 		logrus.Errorf("[webapi.go::Record] dual-write interactions: %v", err2)
 	}

@@ -183,8 +183,8 @@ FOR_LOOP:
 				if err != nil {
 					logrus.Fatalf("[web.go::storeRoutine] orm.InsertOne: %v", err)
 				}
-				// Dual-write to unified interactions table
-				interaction := v2models.FromTblDns(dnsRecord)
+				// Dual-write to unified interactions table with attribution
+				interaction := v2models.FromTblDnsWithAttribution(dnsRecord, self.orm)
 				if _, err2 := session.InsertOne(interaction); err2 != nil {
 					logrus.Errorf("[web.go::storeRoutine] dual-write interactions: %v", err2)
 				}

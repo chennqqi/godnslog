@@ -4,6 +4,27 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { caseApi } from '@/lib/api-client'
 import type { Case, CaseCreateRequest, CaseUpdateRequest } from '@/types'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Badge } from '@/components/ui/badge'
 
 export default function CasesPage() {
   const router = useRouter()
@@ -154,34 +175,31 @@ export default function CasesPage() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Case Board</h2>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-        >
+        <Button onClick={() => setShowCreateModal(true)}>
           创建 Case
-        </button>
+        </Button>
       </div>
 
       {/* Search and Filter */}
       <div className="bg-white shadow rounded-lg mb-4 p-4">
         <div className="flex space-x-4">
-          <input
-            type="text"
+          <Input
             placeholder="搜索 cases..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="flex-1"
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); loadCases() }}
           />
-          <select
-            className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); loadCases() }}
-          >
-            <option value="">所有状态</option>
-            <option value="active">Active</option>
-            <option value="completed">Completed</option>
-            <option value="archived">Archived</option>
-          </select>
+          <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); loadCases() }}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="所有状态" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">所有状态</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="archived">Archived</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -189,12 +207,9 @@ export default function CasesPage() {
       {selectedCases.size > 0 && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-lg mb-4 p-4 flex justify-between items-center">
           <span className="text-sm text-indigo-700">已选择 {selectedCases.size} 个 cases</span>
-          <button
-            onClick={handleBatchDelete}
-            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-          >
+          <Button variant="destructive" size="sm" onClick={handleBatchDelete}>
             批量删除
-          </button>
+          </Button>
         </div>
       )}
 
@@ -205,10 +220,9 @@ export default function CasesPage() {
           ) : (
             <ul className="divide-y divide-gray-200">
               <li className="py-2 flex items-center">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={selectedCases.size === cases.length && cases.length > 0}
-                  onChange={toggleSelectAll}
+                  onCheckedChange={toggleSelectAll}
                   className="mr-4"
                 />
                 <span className="flex-1 font-medium text-gray-500">标题</span>
@@ -221,10 +235,9 @@ export default function CasesPage() {
                   key={case_.id}
                   className="py-4 flex items-center hover:bg-gray-50"
                 >
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selectedCases.has(case_.id)}
-                    onChange={() => toggleSelect(case_.id)}
+                    onCheckedChange={() => toggleSelect(case_.id)}
                     className="mr-4"
                   />
                   <div
@@ -238,30 +251,33 @@ export default function CasesPage() {
                     )}
                   </div>
                   <div className="w-24">
-                    <span className={`px-2 py-1 text-xs rounded ${
-                      case_.status === 'active' ? 'bg-green-100 text-green-800' :
-                      case_.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
+                    <Badge variant={
+                      case_.status === 'active' ? 'default' :
+                      case_.status === 'completed' ? 'secondary' :
+                      'outline'
+                    }>
                       {case_.status}
-                    </span>
+                    </Badge>
                   </div>
                   <div className="w-32 text-xs text-gray-400">
                     {new Date(case_.created_at).toLocaleDateString()}
                   </div>
                   <div className="w-24 flex space-x-2">
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => openEditModal(case_)}
-                      className="text-indigo-600 hover:text-indigo-800 text-sm"
                     >
                       编辑
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => openDeleteModal(case_)}
-                      className="text-red-600 hover:text-red-800 text-sm"
+                      className="text-red-600 hover:text-red-800"
                     >
                       删除
-                    </button>
+                    </Button>
                   </div>
                 </li>
               ))}
@@ -271,164 +287,129 @@ export default function CasesPage() {
       </div>
 
       {/* Create Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-medium mb-4">创建 Case</h3>
-            <form onSubmit={handleCreateCase}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  标题
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  value={newCase.title}
-                  onChange={(e) => setNewCase({ ...newCase, title: e.target.value })}
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  描述
-                </label>
-                <textarea
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  rows={3}
-                  value={newCase.description}
-                  onChange={(e) => setNewCase({ ...newCase, description: e.target.value })}
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  目标
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  value={newCase.target}
-                  onChange={(e) => setNewCase({ ...newCase, target: e.target.value })}
-                />
-              </div>
-              <div className="flex justify-end space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded"
-                >
-                  取消
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                >
-                  创建
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>创建 Case</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateCase}>
+            <div className="mb-4">
+              <Label htmlFor="title">标题</Label>
+              <Input
+                id="title"
+                required
+                value={newCase.title}
+                onChange={(e) => setNewCase({ ...newCase, title: e.target.value })}
+              />
+            </div>
+            <div className="mb-4">
+              <Label htmlFor="description">描述</Label>
+              <Textarea
+                id="description"
+                rows={3}
+                value={newCase.description}
+                onChange={(e) => setNewCase({ ...newCase, description: e.target.value })}
+              />
+            </div>
+            <div className="mb-4">
+              <Label htmlFor="target">目标</Label>
+              <Input
+                id="target"
+                value={newCase.target}
+                onChange={(e) => setNewCase({ ...newCase, target: e.target.value })}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowCreateModal(false)}>
+                取消
+              </Button>
+              <Button type="submit">
+                创建
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Modal */}
-      {showEditModal && selectedCase && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-medium mb-4">编辑 Case</h3>
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>编辑 Case</DialogTitle>
+          </DialogHeader>
+          {selectedCase && (
             <form onSubmit={handleEditCase}>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  标题
-                </label>
-                <input
-                  type="text"
+                <Label htmlFor="edit-title">标题</Label>
+                <Input
+                  id="edit-title"
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   value={editCase.title}
                   onChange={(e) => setEditCase({ ...editCase, title: e.target.value })}
                 />
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  描述
-                </label>
-                <textarea
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                <Label htmlFor="edit-description">描述</Label>
+                <Textarea
+                  id="edit-description"
                   rows={3}
                   value={editCase.description}
                   onChange={(e) => setEditCase({ ...editCase, description: e.target.value })}
                 />
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  目标
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                <Label htmlFor="edit-target">目标</Label>
+                <Input
+                  id="edit-target"
                   value={editCase.target}
                   onChange={(e) => setEditCase({ ...editCase, target: e.target.value })}
                 />
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  状态
-                </label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  value={editCase.status}
-                  onChange={(e) => setEditCase({ ...editCase, status: e.target.value as 'active' | 'completed' | 'archived' })}
-                >
-                  <option value="active">Active</option>
-                  <option value="completed">Completed</option>
-                  <option value="archived">Archived</option>
-                </select>
+                <Label htmlFor="edit-status">状态</Label>
+                <Select value={editCase.status} onValueChange={(value) => setEditCase({ ...editCase, status: value as 'active' | 'completed' | 'archived' })}>
+                  <SelectTrigger id="edit-status">
+                    <SelectValue placeholder="选择状态" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="archived">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="flex justify-end space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setShowEditModal(false)}
-                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded"
-                >
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowEditModal(false)}>
                   取消
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                >
+                </Button>
+                <Button type="submit">
                   保存
-                </button>
-              </div>
+                </Button>
+              </DialogFooter>
             </form>
-          </div>
-        </div>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Modal */}
-      {showDeleteModal && selectedCase && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-medium mb-4">确认删除</h3>
-            <p className="text-gray-600 mb-4">
-              确定要删除 case "{selectedCase.title}" 吗？此操作不可撤销。
-            </p>
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleDeleteCase}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-              >
-                删除
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>确认删除</DialogTitle>
+            <DialogDescription>
+              确定要删除 case "{selectedCase?.title}" 吗？此操作不可撤销。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
+              取消
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteCase}>
+              删除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

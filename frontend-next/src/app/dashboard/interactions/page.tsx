@@ -7,6 +7,21 @@ import type { Interaction } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 export default function InteractionsPage() {
   const router = useRouter()
@@ -87,19 +102,20 @@ export default function InteractionsPage() {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Interaction Timeline</h2>
         <div className="flex space-x-2">
-          <select
-            className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-          >
-            <option value="">所有类型</option>
-            <option value="dns">DNS</option>
-            <option value="http">HTTP</option>
-            <option value="smtp">SMTP</option>
-            <option value="ldap">LDAP</option>
-            <option value="smb">SMB</option>
-            <option value="ftp">FTP</option>
-          </select>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="所有类型" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">所有类型</SelectItem>
+              <SelectItem value="dns">DNS</SelectItem>
+              <SelectItem value="http">HTTP</SelectItem>
+              <SelectItem value="smtp">SMTP</SelectItem>
+              <SelectItem value="ldap">LDAP</SelectItem>
+              <SelectItem value="smb">SMB</SelectItem>
+              <SelectItem value="ftp">FTP</SelectItem>
+            </SelectContent>
+          </Select>
           <Input
             type="text"
             placeholder="搜索 IP、域名或token..."
@@ -107,12 +123,11 @@ export default function InteractionsPage() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
-          <button
+          <Button
             onClick={() => setViewMode(viewMode === 'table' ? 'timeline' : 'table')}
-            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
           >
             {viewMode === 'table' ? '时间线视图' : '表格视图'}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -169,17 +184,17 @@ export default function InteractionsPage() {
                 {filteredInteractions.map((interaction) => (
                   <TableRow key={interaction.id}>
                     <TableCell>
-                      <span className={`px-2 py-1 text-xs rounded font-medium ${
-                        interaction.type === 'dns' ? 'bg-purple-100 text-purple-800' :
-                        interaction.type === 'http' ? 'bg-blue-100 text-blue-800' :
-                        interaction.type === 'smtp' ? 'bg-green-100 text-green-800' :
-                        interaction.type === 'ldap' ? 'bg-yellow-100 text-yellow-800' :
-                        interaction.type === 'smb' ? 'bg-orange-100 text-orange-800' :
-                        interaction.type === 'ftp' ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
+                      <Badge variant={
+                        interaction.type === 'dns' ? 'default' :
+                        interaction.type === 'http' ? 'secondary' :
+                        interaction.type === 'smtp' ? 'outline' :
+                        interaction.type === 'ldap' ? 'outline' :
+                        interaction.type === 'smb' ? 'outline' :
+                        interaction.type === 'ftp' ? 'destructive' :
+                        'outline'
+                      }>
                         {interaction.type.toUpperCase()}
-                      </span>
+                      </Badge>
                     </TableCell>
                     <TableCell>{interaction.source_ip}</TableCell>
                     <TableCell>
@@ -196,12 +211,13 @@ export default function InteractionsPage() {
                     </TableCell>
                     <TableCell>{new Date(interaction.timestamp).toLocaleString()}</TableCell>
                     <TableCell>
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setSelectedInteraction(interaction)}
-                        className="text-indigo-600 hover:text-indigo-800 text-sm"
                       >
                         详情
-                      </button>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -225,17 +241,17 @@ export default function InteractionsPage() {
                         >
                           <div className="flex justify-between items-start">
                             <div>
-                              <span className={`px-2 py-1 text-xs rounded font-medium ${
-                                interaction.type === 'dns' ? 'bg-purple-100 text-purple-800' :
-                                interaction.type === 'http' ? 'bg-blue-100 text-blue-800' :
-                                interaction.type === 'smtp' ? 'bg-green-100 text-green-800' :
-                                interaction.type === 'ldap' ? 'bg-yellow-100 text-yellow-800' :
-                                interaction.type === 'smb' ? 'bg-orange-100 text-orange-800' :
-                                interaction.type === 'ftp' ? 'bg-red-100 text-red-800' :
-                                'bg-gray-100 text-gray-800'
-                              }`}>
+                              <Badge variant={
+                                interaction.type === 'dns' ? 'default' :
+                                interaction.type === 'http' ? 'secondary' :
+                                interaction.type === 'smtp' ? 'outline' :
+                                interaction.type === 'ldap' ? 'outline' :
+                                interaction.type === 'smb' ? 'outline' :
+                                interaction.type === 'ftp' ? 'destructive' :
+                                'outline'
+                              }>
                                 {interaction.type.toUpperCase()}
-                              </span>
+                              </Badge>
                               <span className="ml-2 text-sm text-gray-600">{interaction.source_ip}</span>
                             </div>
                             <span className="text-xs text-gray-400">
@@ -260,18 +276,12 @@ export default function InteractionsPage() {
       </Card>
 
       {/* Detail Drawer */}
-      {selectedInteraction && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">交互详情</h3>
-              <button
-                onClick={() => setSelectedInteraction(null)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                ✕
-              </button>
-            </div>
+      <Dialog open={!!selectedInteraction} onOpenChange={() => setSelectedInteraction(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>交互详情</DialogTitle>
+          </DialogHeader>
+          {selectedInteraction && (
             <div className="space-y-4">
               <div>
                 <p className="text-sm font-medium text-gray-500">类型</p>
@@ -328,9 +338,9 @@ export default function InteractionsPage() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

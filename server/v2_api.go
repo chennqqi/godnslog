@@ -843,7 +843,7 @@ func (self *WebServer) v2CreatePayload(c *gin.Context) {
 		"message": "success",
 		"data": models.Payload{
 			Id:               strconv.FormatInt(payloadItem.Id, 10),
-			CaseId:           strconv.FormatInt(payloadItem.CaseId, 10),
+			CaseID:           strconv.FormatInt(payloadItem.CaseId, 10),
 			Token:            payloadItem.Token,
 			Template:         payloadItem.Template,
 			RenderedPayload:  payloadItem.RenderedPayload,
@@ -2657,5 +2657,182 @@ func (self *WebServer) v2ListNotificationLogs(c *gin.Context) {
 			"page_size":   pageSize,
 			"total_pages": (total + int64(pageSize) - 1) / int64(pageSize),
 		},
+	})
+}
+
+// v2ListSettings lists system settings
+func (self *WebServer) v2ListSettings(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+
+	var settings []models.Settings
+	total, err := self.orm.Limit(pageSize, (page-1)*pageSize).FindAndCount(&settings)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2ListSettings] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	totalPages := int(total) / pageSize
+	if int(total)%pageSize > 0 {
+		totalPages++
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": v2models.SettingsListResponse{
+			Items:      settings,
+			Total:      total,
+			Page:       page,
+			PageSize:   pageSize,
+			TotalPages: totalPages,
+		},
+	})
+}
+
+// v2GetSetting gets a specific setting by key
+func (self *WebServer) v2GetSetting(c *gin.Context) {
+	key := c.Param("key")
+
+	var setting models.Settings
+	_, err := self.orm.Where("key = ?", key).Get(&setting)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2GetSetting] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	if setting.ID == "" {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    4,
+			"message": "setting not found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    setting,
+	})
+}
+
+// v2UpdateSetting updates a setting
+func (self *WebServer) v2UpdateSetting(c *gin.Context) {
+	key := c.Param("key")
+
+	var req v2models.SettingsUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    2,
+			"message": "invalid request body",
+		})
+		return
+	}
+
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	var setting models.Settings
+	_, err := session.Where("key = ?", key).Get(&setting)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2UpdateSetting] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	if setting.ID == "" {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    4,
+			"message": "setting not found",
+		})
+		return
+	}
+
+	setting.Value = req.Value
+	_, err = session.Cols("value").Update(&setting)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2UpdateSetting] update error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    setting,
+	})
+}
+
+// v2CreateSetting creates a new setting
+func (self *WebServer) v2CreateSetting(c *gin.Context) {
+	var req v2models.SettingsCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    2,
+			"message": "invalid request body",
+		})
+		return
+	}
+
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	setting := models.Settings{
+		ID:    v2models.GenerateID(),
+		Key:   req.Key,
+		Value: req.Value,
+	}
+
+	_, err := session.Insert(&setting)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2CreateSetting] insert error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    setting,
+	})
+}
+
+// v2DeleteSetting deletes a setting
+func (self *WebServer) v2DeleteSetting(c *gin.Context) {
+	key := c.Param("key")
+
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	_, err := session.Where("key = ?", key).Delete(&models.Settings{})
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2DeleteSetting] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
 	})
 }

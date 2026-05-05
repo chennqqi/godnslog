@@ -39,11 +39,31 @@ type Payload struct {
 	RenderedPayload  string     `json:"rendered_payload" xorm:"text"`
 	Variables        Variables  `json:"variables" xorm:"json"`
 	Status           string     `json:"status" xorm:"varchar(32) notnull default('draft') index"` // draft, deployed, hit, archived, expired
-	ExpectedProtocol string     `json:"expected_protocol" xorm:"varchar(16)"` // dns, http, smtp, ldap
+	ExpectedProtocol string     `json:"expected_protocol" xorm:"varchar(16)"`                     // dns, http, smtp, ldap
 	ExpiresAt        *time.Time `json:"expires_at" xorm:"datetime"`
 	CreatedBy        string     `json:"created_by" xorm:"varchar(36) notnull"`
 	CreatedAt        time.Time  `json:"created_at" xorm:"datetime created"`
 	UpdatedAt        time.Time  `json:"updated_at" xorm:"datetime updated"`
+}
+
+// MarshalJSON implements json.Marshaler interface for Payload
+func (p *Payload) MarshalJSON() ([]byte, error) {
+	type Alias Payload
+	expiresAt := ""
+	if p.ExpiresAt != nil {
+		expiresAt = p.ExpiresAt.Format(time.RFC3339)
+	}
+	return json.Marshal(&struct {
+		*Alias
+		CreatedAt string `json:"created_at"`
+		UpdatedAt string `json:"updated_at"`
+		ExpiresAt string `json:"expires_at,omitempty"`
+	}{
+		Alias:     (*Alias)(p),
+		CreatedAt: p.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: p.UpdatedAt.Format(time.RFC3339),
+		ExpiresAt: expiresAt,
+	})
 }
 
 // TableName returns the table name for Payload model

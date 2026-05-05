@@ -45,6 +45,36 @@ type APIKey struct {
 	IsRevoked  bool       `json:"is_revoked" xorm:"bool notnull default(false)"`
 }
 
+// MarshalJSON implements json.Marshaler interface for APIKey
+func (k *APIKey) MarshalJSON() ([]byte, error) {
+	type Alias APIKey
+	expiresAt := ""
+	if k.ExpiresAt != nil {
+		expiresAt = k.ExpiresAt.Format(time.RFC3339)
+	}
+	lastUsedAt := ""
+	if k.LastUsedAt != nil {
+		lastUsedAt = k.LastUsedAt.Format(time.RFC3339)
+	}
+	revokedAt := ""
+	if k.RevokedAt != nil {
+		revokedAt = k.RevokedAt.Format(time.RFC3339)
+	}
+	return json.Marshal(&struct {
+		*Alias
+		CreatedAt  string `json:"created_at"`
+		ExpiresAt  string `json:"expires_at,omitempty"`
+		LastUsedAt string `json:"last_used_at,omitempty"`
+		RevokedAt  string `json:"revoked_at,omitempty"`
+	}{
+		Alias:      (*Alias)(k),
+		CreatedAt:  k.CreatedAt.Format(time.RFC3339),
+		ExpiresAt:  expiresAt,
+		LastUsedAt: lastUsedAt,
+		RevokedAt:  revokedAt,
+	})
+}
+
 // TableName returns the table name for APIKey model
 func (APIKey) TableName() string {
 	return "api_keys"
@@ -52,8 +82,8 @@ func (APIKey) TableName() string {
 
 // APIKeyCreateRequest represents the request to create an API key
 type APIKeyCreateRequest struct {
-	Name      string   `json:"name" binding:"required"`
-	Scopes    []string `json:"scopes" binding:"required"`
+	Name      string     `json:"name" binding:"required"`
+	Scopes    []string   `json:"scopes" binding:"required"`
 	ExpiresAt *time.Time `json:"expires_at"`
 }
 

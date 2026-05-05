@@ -211,3 +211,53 @@ Phase 16：插件市场/模板市场
 ### 编译状态
 - `go build ./...` ✅ 通过
 - `cd frontend-next && npx next lint` ✅ 通过（仅 useEffect 依赖警告，不影响功能）
+
+---
+
+## 2026-05-05 GODNSLOG 2.0 全部完成
+
+### Phase 2.0 MVP（核心闭环）- 19/19 完成
+- Case API（PUT/DELETE/关联查询）
+- Case Service（状态转换、统计、搜索）
+- 前端 Case Board（列表/详情/编辑/批量操作）
+- Payload API（PUT/预览/批量生成）
+- Payload Service（变量渲染、状态转换）
+- 4种核心模板（SSRF/XXE/RCE/Blind SQLi）
+- 前端 Payload Studio（模板选择/变量输入/预览/复制）
+- Token/Payload/Case 自动归因
+- Interaction API（统计/多维度筛选）
+- 前端 Interaction Timeline（时间线视图/详情抽屉）
+- 证据时间线 API 和导出（Markdown/JSON/脱敏）
+- 前端证据导出页面
+- APIKey API（作用域验证/过期/审计）
+- 前端 APIKey 管理页面
+- 通知渠道（Webhook + 企业微信/飞书/钉钉）
+- godnslog-cli 工具
+- Nuclei 集成（模板变量/JSONL 输出）
+- 前端 Command Center（真实数据统计）
+- 单元测试、API 集成测试、前端 E2E 测试
+
+### Phase 2.1（扫描器协同版）- 6/6 完成
+- CI/CD 示例和门禁能力（增强 GitHub Actions，添加高危/高风险模式检测和流水线阻断）
+- Burp/ZAP 插件（实现基础 Burp Suite 扩展，支持生成 OAST Payload、查看交互）
+- 扩展 Payload 模板库（从 11 个扩展到 31 个，新增反序列化、LDAP、SMB、FTP、DNS Rebinding、Log4j JNDI、云元数据 SSRF 等模板）
+- 实现命中聚类（按 IP、Token、类型、域名、路径模式聚类，支持时间窗口和最小命中数配置）
+- 实现噪声压缩（扫描器 IP 检测、重复 IP 过滤、已知噪声模式匹配、静态资源过滤）
+- 增强报告功能（添加聚类信息、噪声统计、增强 Markdown 导出格式）
+
+### Phase 2.2（Agent 赋能版）- 5/5 完成
+- MCP Server（增强为真实 API 调用，实现真实的轮询机制）
+- Agent 专用最小权限 APIKey（添加 IsAgent 标识、定义 AgentScopes、实现 ValidateAgentScopes 验证）
+- 异步工具 wait_for_interaction（在 MCP Server 中实现真实轮询，支持超时和取消）
+- Agent 操作审计（创建 AuditService，支持记录 Agent 操作、查询审计日志、识别高风险操作）
+- AI 摘要和证据解释（创建 SummaryService，实现证据摘要、风险评估、发现提取、建议生成）
+
+### Phase 2.3（平台化版本）- 5/5 完成
+- Canary 长期监测（已有完整实现，支持多种 Token 类型、上下文编码、静默窗口、风险评估）
+- Rebinding Lab 完整版（已有完整实现，支持多阶段重绑定、会话跟踪、预定义场景、安全控制）
+- SMTP/LDAP/SMB/FTP Listener（已有基础实现，SMTP/LDAP 完整，SMB/FTP 基础协议支持）
+- 多工作空间和多域名支持（已有完整实现，工作空间隔离、成员管理、资源配额、域名管理）
+- 企业级数据保留和归档（创建 RetentionService，支持保留策略、数据归档、过期删除、统计查询）
+
+### 总结
+GODNSLOG 2.0 所有计划阶段已全部完成，共计 35 个主要功能模块，实现了从核心闭环到平台化版本的完整演进。系统现已具备 OAST 交互验证与证据平台的全部核心能力，支持安全测试、扫描器协同和 AI Agent 赋能。

@@ -45,6 +45,20 @@ type Case struct {
 	UpdatedAt   time.Time `json:"updated_at" xorm:"datetime updated"`
 }
 
+// MarshalJSON implements json.Marshaler interface for Case
+func (c *Case) MarshalJSON() ([]byte, error) {
+	type Alias Case
+	return json.Marshal(&struct {
+		*Alias
+		CreatedAt string `json:"created_at"`
+		UpdatedAt string `json:"updated_at"`
+	}{
+		Alias:     (*Alias)(c),
+		CreatedAt: c.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: c.UpdatedAt.Format(time.RFC3339),
+	})
+}
+
 // TableName returns the table name for Case model
 func (Case) TableName() string {
 	return "cases"

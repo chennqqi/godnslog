@@ -3,9 +3,11 @@ package models
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"strconv"
 	"time"
 
 	"github.com/chennqqi/godnslog/models"
+	"xorm.io/xorm"
 )
 
 // Headers represents HTTP headers
@@ -58,6 +60,20 @@ type Interaction struct {
 	// Common fields
 	RawData   string    `json:"raw_data" xorm:"mediumtext"`
 	CreatedAt time.Time `json:"created_at" xorm:"datetime created"`
+}
+
+// MarshalJSON implements json.Marshaler interface for Interaction
+func (i *Interaction) MarshalJSON() ([]byte, error) {
+	type Alias Interaction
+	return json.Marshal(&struct {
+		*Alias
+		Timestamp string `json:"timestamp"`
+		CreatedAt string `json:"created_at"`
+	}{
+		Alias:     (*Alias)(i),
+		Timestamp: i.Timestamp.Format(time.RFC3339),
+		CreatedAt: i.CreatedAt.Format(time.RFC3339),
+	})
 }
 
 // TableName returns the table name for Interaction model
@@ -128,6 +144,43 @@ func FromTblDns(dns *models.TblDns) *Interaction {
 	}
 }
 
+// FromTblDnsWithAttribution converts models.TblDns to Interaction with payload/case attribution
+func FromTblDnsWithAttribution(dns *models.TblDns, engine *xorm.Engine) *Interaction {
+	domain := dns.Domain
+	token := dns.Var
+	dnsType := DNSTypeA
+
+	interaction := &Interaction{
+		ID:        GenerateID(),
+		Type:      InteractionTypeDNS,
+		Token:     &token,
+		Timestamp: dns.Ctime,
+		SourceIP:  dns.Ip,
+		Domain:    &domain,
+		DNSType:   &dnsType,
+		RawData:   dns.Domain,
+		CreatedAt: dns.Atime,
+	}
+
+	// Auto-attribution: associate interaction with payload and case based on token
+	if token != "" {
+		type PayloadInfo struct {
+			ID     int64 `xorm:"id"`
+			CaseId int64 `xorm:"case_id"`
+		}
+		var payloadInfo PayloadInfo
+		has, err := engine.Table("payloads").Where("token = ?", token).Get(&payloadInfo)
+		if err == nil && has {
+			payloadID := strconv.FormatInt(payloadInfo.ID, 10)
+			caseID := strconv.FormatInt(payloadInfo.CaseId, 10)
+			interaction.PayloadID = &payloadID
+			interaction.CaseID = &caseID
+		}
+	}
+
+	return interaction
+}
+
 // FromTblHttp converts models.TblHttp to Interaction (for migration)
 func FromTblHttp(http *models.TblHttp) *Interaction {
 	token := http.Var
@@ -150,4 +203,46 @@ func FromTblHttp(http *models.TblHttp) *Interaction {
 		RawData:     http.Path,
 		CreatedAt:   http.Atime,
 	}
+}
+
+// FromTblHttpWithAttribution converts models.TblHttp to Interaction with payload/case attribution
+func FromTblHttpWithAttribution(http *models.TblHttp, engine *xorm.Engine) *Interaction {
+	token := http.Var
+	method := http.Method
+	path := http.Path
+	ua := http.Ua
+	ctype := http.Ctype
+
+	interaction := &Interaction{
+		ID:          GenerateID(),
+		Type:        InteractionTypeHTTP,
+		Token:       &token,
+		Timestamp:   http.Ctime,
+		SourceIP:    http.Ip,
+		Method:      &method,
+		Path:        &path,
+		Body:        &http.Data,
+		UserAgent:   &ua,
+		ContentType: &ctype,
+		RawData:     http.Path,
+		CreatedAt:   http.Atime,
+	}
+
+	// Auto-attribution: associate interaction with payload and case based on token
+	if token != "" {
+		type PayloadInfo struct {
+			ID     int64 `xorm:"id"`
+			CaseId int64 `xorm:"case_id"`
+		}
+		var payloadInfo PayloadInfo
+		has, err := engine.Table("payloads").Where("token = ?", token).Get(&payloadInfo)
+		if err == nil && has {
+			payloadID := strconv.FormatInt(payloadInfo.ID, 10)
+			caseID := strconv.FormatInt(payloadInfo.CaseId, 10)
+			interaction.PayloadID = &payloadID
+			interaction.CaseID = &caseID
+		}
+	}
+
+	return interaction
 }

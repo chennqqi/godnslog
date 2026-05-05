@@ -2,6 +2,19 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -12,104 +25,81 @@ export default function SettingsPage() {
       router.push('/login')
     }
   }, [router])
-  const [activeTab, setActiveTab] = useState('general')
 
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-900 mb-6">系统设置</h2>
 
-      <div className="flex space-x-4 mb-6">
-        <button
-          onClick={() => setActiveTab('general')}
-          className={`px-4 py-2 rounded ${
-            activeTab === 'general' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'
-          }`}
-        >
-          通用设置
-        </button>
-        <button
-          onClick={() => setActiveTab('domain')}
-          className={`px-4 py-2 rounded ${
-            activeTab === 'domain' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'
-          }`}
-        >
-          域名设置
-        </button>
-        <button
-          onClick={() => setActiveTab('listener')}
-          className={`px-4 py-2 rounded ${
-            activeTab === 'listener' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'
-          }`}
-        >
-          监听配置
-        </button>
-        <button
-          onClick={() => setActiveTab('notification')}
-          className={`px-4 py-2 rounded ${
-            activeTab === 'notification' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'
-          }`}
-        >
-          通知设置
-        </button>
-        <button
-          onClick={() => setActiveTab('tokens')}
-          className={`px-4 py-2 rounded ${
-            activeTab === 'tokens' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'
-          }`}
-        >
-          Token管理
-        </button>
-      </div>
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="general">通用设置</TabsTrigger>
+          <TabsTrigger value="domain">域名设置</TabsTrigger>
+          <TabsTrigger value="listener">监听配置</TabsTrigger>
+          <TabsTrigger value="notification">通知设置</TabsTrigger>
+          <TabsTrigger value="tokens">Token管理</TabsTrigger>
+        </TabsList>
 
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          {activeTab === 'general' && <GeneralSettings />}
-          {activeTab === 'domain' && <DomainSettings />}
-          {activeTab === 'listener' && <ListenerSettings />}
-          {activeTab === 'notification' && <NotificationSettings />}
-          {activeTab === 'tokens' && <TokenManagement />}
-        </div>
-      </div>
+        <TabsContent value="general" className="mt-4">
+          <GeneralSettings />
+        </TabsContent>
+
+        <TabsContent value="domain" className="mt-4">
+          <DomainSettings />
+        </TabsContent>
+
+        <TabsContent value="listener" className="mt-4">
+          <ListenerSettings />
+        </TabsContent>
+
+        <TabsContent value="notification" className="mt-4">
+          <NotificationSettings />
+        </TabsContent>
+
+        <TabsContent value="tokens" className="mt-4">
+          <TokenManagement />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
 
 function GeneralSettings() {
   return (
-    <div>
+    <div className="bg-white shadow rounded-lg p-6">
       <h3 className="text-lg font-medium text-gray-900 mb-4">通用设置</h3>
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            系统名称
-          </label>
-          <input
-            type="text"
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          <Label htmlFor="system-name">系统名称</Label>
+          <Input
+            id="system-name"
             defaultValue="GODNSLOG 2.0"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            语言
-          </label>
-          <select className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <option value="zh-CN">简体中文</option>
-            <option value="en-US">English</option>
-          </select>
+          <Label htmlFor="language">语言</Label>
+          <Select defaultValue="zh-CN">
+            <SelectTrigger id="language">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="zh-CN">简体中文</SelectItem>
+              <SelectItem value="en-US">English</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            时区
-          </label>
-          <select className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <option value="Asia/Shanghai">Asia/Shanghai</option>
-            <option value="UTC">UTC</option>
-          </select>
+          <Label htmlFor="timezone">时区</Label>
+          <Select defaultValue="Asia/Shanghai">
+            <SelectTrigger id="timezone">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Asia/Shanghai">Asia/Shanghai</SelectItem>
+              <SelectItem value="UTC">UTC</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <button className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
-          保存设置
-        </button>
+        <Button>保存设置</Button>
       </div>
     </div>
   )
@@ -117,42 +107,31 @@ function GeneralSettings() {
 
 function DomainSettings() {
   return (
-    <div>
+    <div className="bg-white shadow rounded-lg p-6">
       <h3 className="text-lg font-medium text-gray-900 mb-4">域名设置</h3>
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            主域名
-          </label>
-          <input
-            type="text"
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          <Label htmlFor="main-domain">主域名</Label>
+          <Input
+            id="main-domain"
             placeholder="example.com"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            DNS域名
-          </label>
-          <input
-            type="text"
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          <Label htmlFor="dns-domain">DNS域名</Label>
+          <Input
+            id="dns-domain"
             placeholder="dns.example.com"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            HTTP域名
-          </label>
-          <input
-            type="text"
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          <Label htmlFor="http-domain">HTTP域名</Label>
+          <Input
+            id="http-domain"
             placeholder="http.example.com"
           />
         </div>
-        <button className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
-          保存设置
-        </button>
+        <Button>保存设置</Button>
       </div>
     </div>
   )
@@ -160,42 +139,31 @@ function DomainSettings() {
 
 function ListenerSettings() {
   return (
-    <div>
+    <div className="bg-white shadow rounded-lg p-6">
       <h3 className="text-lg font-medium text-gray-900 mb-4">监听配置</h3>
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            DNS监听地址
-          </label>
-          <input
-            type="text"
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          <Label htmlFor="dns-listen">DNS监听地址</Label>
+          <Input
+            id="dns-listen"
             defaultValue=":53"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            HTTP监听地址
-          </label>
-          <input
-            type="text"
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          <Label htmlFor="http-listen">HTTP监听地址</Label>
+          <Input
+            id="http-listen"
             defaultValue=":8080"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            HTTPS监听地址
-          </label>
-          <input
-            type="text"
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          <Label htmlFor="https-listen">HTTPS监听地址</Label>
+          <Input
+            id="https-listen"
             defaultValue=":8443"
           />
         </div>
-        <button className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
-          保存设置
-        </button>
+        <Button>保存设置</Button>
       </div>
     </div>
   )
@@ -216,43 +184,39 @@ function NotificationSettings() {
   }
 
   return (
-    <div>
+    <div className="bg-white shadow rounded-lg p-6">
       <h3 className="text-lg font-medium text-gray-900 mb-4">通知设置</h3>
       <div className="space-y-6">
         {notifications.map((notification) => (
           <div key={notification.id} className="border border-gray-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center">
-                <input
-                  type="checkbox"
+                <Checkbox
+                  id={`notify-${notification.id}`}
                   checked={notification.enabled}
-                  onChange={(e) => updateNotification(notification.id, 'enabled', e.target.checked)}
+                  onCheckedChange={(checked) => updateNotification(notification.id, 'enabled', checked)}
                   className="mr-3"
                 />
-                <span className="font-medium text-gray-900">{notification.name}</span>
+                <Label htmlFor={`notify-${notification.id}`} className="font-medium text-gray-900">{notification.name}</Label>
               </div>
             </div>
 
             {notification.enabled && (
               <div className="space-y-4 ml-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Webhook URL
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  <Label htmlFor={`webhook-url-${notification.id}`}>Webhook URL</Label>
+                  <Input
+                    id={`webhook-url-${notification.id}`}
                     placeholder="https://your-webhook-url"
                     value={notification.webhook_url}
                     onChange={(e) => updateNotification(notification.id, 'webhook_url', e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Webhook Body (JSON模板)
-                  </label>
-                  <textarea
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+                  <Label htmlFor={`webhook-body-${notification.id}`}>Webhook Body (JSON模板)</Label>
+                  <Textarea
+                    id={`webhook-body-${notification.id}`}
+                    className="font-mono text-sm"
                     rows={4}
                     value={notification.webhook_body}
                     onChange={(e) => updateNotification(notification.id, 'webhook_body', e.target.value)}
@@ -267,9 +231,7 @@ function NotificationSettings() {
           </div>
         ))}
 
-        <button className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
-          保存设置
-        </button>
+        <Button>保存设置</Button>
       </div>
     </div>
   )
@@ -282,12 +244,10 @@ function TokenManagement() {
   ])
 
   return (
-    <div>
+    <div className="bg-white shadow rounded-lg p-6">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-medium text-gray-900">Token管理</h3>
-        <button className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm">
-          创建新Token
-        </button>
+        <Button>创建新Token</Button>
       </div>
       <div className="space-y-4">
         {apiKeys.map((key) => (
@@ -298,9 +258,9 @@ function TokenManagement() {
                 <p className="text-sm text-gray-500">Key: {key.key_prefix}****</p>
                 <p className="text-xs text-gray-400">创建于: {key.created_at}</p>
               </div>
-              <button className="text-red-600 hover:text-red-800 text-sm">
+              <Button variant="destructive" size="sm">
                 撤销
-              </button>
+              </Button>
             </div>
           </div>
         ))}

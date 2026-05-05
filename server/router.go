@@ -103,6 +103,16 @@ func (r *Router) RegisterRoutes() {
 			users.GET("", r.server.v2ListUsers)
 		}
 
+		// Settings
+		settings := v2.Group("/settings", r.server.authHandler)
+		{
+			settings.GET("", r.server.v2ListSettings)
+			settings.POST("", r.server.v2CreateSetting)
+			settings.GET("/:key", r.server.v2GetSetting)
+			settings.PUT("/:key", r.server.v2UpdateSetting)
+			settings.DELETE("/:key", r.server.v2DeleteSetting)
+		}
+
 		// Marketplace
 		marketplace := v2.Group("/marketplace", r.server.authHandler)
 		{
