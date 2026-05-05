@@ -23,6 +23,12 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全测试、扫
 
 ## 核心能力
 
+### 0. 1.0的核心功能需要保留
+- 保留用户管理功能
+- 保留API交互功能
+- 保留日志功能
+- 保留在平台可以直接看到使用文档，API部分可以改进为swagger，使用文档保留markdown渲染，并增加2.0的文档
+
 ### 1. OAST 交互中枢
 
 - 统一接入 DNS、HTTP、HTTPS，后续扩展 SMTP、LDAP、SMB、FTP、TCP Raw Listener。
@@ -91,7 +97,7 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全测试、扫
 
 ## 版本路线
 
-### 2.0 MVP：核心闭环 ✅ 已完成
+### 2.0 MVP：核心闭环 
 
 - Next.js + TypeScript + shadcn/ui 新前端。
 - APIKey、OpenAPI、Case/Payload/Interaction 核心 API。
@@ -101,14 +107,14 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全测试、扫
 - Webhook、企业微信、飞书通知。
 - Nuclei/CLI 最小集成。
 
-### 2.1：扫描器协同版 ✅ 已完成
+### 2.1：扫描器协同版 
 
 - Burp/ZAP 插件。
 - CI/CD 示例和门禁能力。
 - 更完整的 Payload 模板库。
 - 命中聚类、噪声压缩和报告增强。
 
-### 2.2：Agent 赋能版 ✅ 已完成
+### 2.2：Agent 赋能版 
 
 - MCP Server。
 - Agent 专用最小权限 APIKey。
@@ -116,14 +122,14 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全测试、扫
 - Agent 操作审计。
 - AI 摘要、证据解释和报告初稿，默认作为可选插件。
 
-### 2.3：平台化版本 ✅ 已完成
+### 2.3：平台化版本
 
-- ✅ Canary 长期监测。
-- ✅ Rebinding Lab 完整版。
-- ✅ SMTP/LDAP/SMB/FTP Listener。
-- ✅ 多工作空间、多域名、多 Listener 节点。
-- ✅ 企业级数据保留、归档和高可用部署。
-- ✅ 插件市场或模板市场。
+- Canary 长期监测。
+- Rebinding Lab 完整版。
+- SMTP/LDAP/SMB/FTP Listener。
+- 多工作空间、多域名、多 Listener 节点。
+- 企业级数据保留、归档和高可用部署。
+- 插件市场或模板市场。
 
 ## 参考方向
 
