@@ -65,3 +65,29 @@ export const apiKeyApi = {
   create: (data: APIKeyCreateRequest) => api.post<{ data: APIKey }>('/apikeys', data),
   delete: (id: string) => api.delete(`/apikeys/${id}`),
 }
+
+// Users API
+export const usersApi = {
+  list: (params?: { page?: number; page_size?: number }) =>
+    api.get<any>('/users', params),
+}
+
+// Marketplace API
+export const marketplaceApi = {
+  listPlugins: (params?: { page?: number; page_size?: number }) =>
+    api.get<any>('/marketplace/plugins', params),
+  getPlugin: (id: string) => api.get<any>(`/marketplace/plugins/${id}`),
+  listTemplates: (params?: { page?: number; page_size?: number }) =>
+    api.get<any>('/marketplace/templates', params),
+  getTemplate: (id: string) => api.get<any>(`/marketplace/templates/${id}`),
+}
+
+// Rules/Workflow API
+export const rulesApi = {
+  list: (params?: { page?: number; page_size?: number }) =>
+    api.get<any>('/rules', params),
+  get: (id: string) => api.get<any>(`/rules/${id}`),
+  create: (data: any) => api.post<any>('/rules', data),
+  update: (id: string, data: any) => api.put<any>(`/rules/${id}`, data),
+  delete: (id: string) => api.delete(`/rules/${id}`),
+}

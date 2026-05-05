@@ -202,45 +202,71 @@ function ListenerSettings() {
 }
 
 function NotificationSettings() {
+  const [notifications, setNotifications] = useState([
+    { id: 'dns', name: 'DNS命中', enabled: true, webhook_url: '', webhook_body: '{"protocol":"dns","domain":"{{domain}}","ip":"{{ip}}","timestamp":"{{timestamp}}"}' },
+    { id: 'http', name: 'HTTP命中', enabled: true, webhook_url: '', webhook_body: '{"protocol":"http","method":"{{method}}","path":"{{path}}","ip":"{{ip}}","timestamp":"{{timestamp}}"}' },
+    { id: 'smtp', name: 'SMTP命中', enabled: false, webhook_url: '', webhook_body: '{"protocol":"smtp","from":"{{from}}","to":"{{to}}","ip":"{{ip}}","timestamp":"{{timestamp}}"}' },
+    { id: 'ldap', name: 'LDAP命中', enabled: false, webhook_url: '', webhook_body: '{"protocol":"ldap","operation":"{{operation}}","dn":"{{dn}}","ip":"{{ip}}","timestamp":"{{timestamp}}"}' },
+    { id: 'ftp', name: 'FTP命中', enabled: false, webhook_url: '', webhook_body: '{"protocol":"ftp","command":"{{command}}","ip":"{{ip}}","timestamp":"{{timestamp}}"}' },
+    { id: 'payload_expire', name: 'Payload过期', enabled: false, webhook_url: '', webhook_body: '{"event":"payload_expire","token":"{{token}}","timestamp":"{{timestamp}}"}' },
+  ])
+
+  const updateNotification = (id: string, field: string, value: any) => {
+    setNotifications(notifications.map(n => n.id === id ? { ...n, [field]: value } : n))
+  }
+
   return (
     <div>
       <h3 className="text-lg font-medium text-gray-900 mb-4">通知设置</h3>
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Webhook URL
-          </label>
-          <input
-            type="text"
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="https://your-webhook-url"
-          />
-        </div>
-        <div>
-          <label className="flex items-center">
-            <input type="checkbox" className="mr-2" />
-            <span className="text-sm text-gray-700">启用Webhook通知</span>
-          </label>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            通知事件
-          </label>
-          <div className="space-y-2">
-            <label className="flex items-center">
-              <input type="checkbox" className="mr-2" defaultChecked />
-              <span className="text-sm text-gray-700">DNS命中</span>
-            </label>
-            <label className="flex items-center">
-              <input type="checkbox" className="mr-2" defaultChecked />
-              <span className="text-sm text-gray-700">HTTP命中</span>
-            </label>
-            <label className="flex items-center">
-              <input type="checkbox" className="mr-2" />
-              <span className="text-sm text-gray-700">Payload过期</span>
-            </label>
+      <div className="space-y-6">
+        {notifications.map((notification) => (
+          <div key={notification.id} className="border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={notification.enabled}
+                  onChange={(e) => updateNotification(notification.id, 'enabled', e.target.checked)}
+                  className="mr-3"
+                />
+                <span className="font-medium text-gray-900">{notification.name}</span>
+              </div>
+            </div>
+
+            {notification.enabled && (
+              <div className="space-y-4 ml-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Webhook URL
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="https://your-webhook-url"
+                    value={notification.webhook_url}
+                    onChange={(e) => updateNotification(notification.id, 'webhook_url', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Webhook Body (JSON模板)
+                  </label>
+                  <textarea
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+                    rows={4}
+                    value={notification.webhook_body}
+                    onChange={(e) => updateNotification(notification.id, 'webhook_body', e.target.value)}
+                    placeholder='{"key": "value"}'
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    可用变量: {`{{domain}}, {{ip}}, {{timestamp}}, {{method}}, {{path}}, {{from}}, {{to}}, {{operation}}, {{dn}}, {{command}}, {{token}}`}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
+        ))}
+
         <button className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
           保存设置
         </button>

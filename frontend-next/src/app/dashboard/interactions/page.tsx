@@ -62,6 +62,8 @@ export default function InteractionsPage() {
             <option value="http">HTTP</option>
             <option value="smtp">SMTP</option>
             <option value="ldap">LDAP</option>
+            <option value="smb">SMB</option>
+            <option value="ftp">FTP</option>
           </select>
           <input
             type="text"
@@ -89,6 +91,8 @@ export default function InteractionsPage() {
                           interaction.type === 'http' ? 'bg-blue-100 text-blue-800' :
                           interaction.type === 'smtp' ? 'bg-green-100 text-green-800' :
                           interaction.type === 'ldap' ? 'bg-yellow-100 text-yellow-800' :
+                          interaction.type === 'smb' ? 'bg-orange-100 text-orange-800' :
+                          interaction.type === 'ftp' ? 'bg-red-100 text-red-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
                           {interaction.type.toUpperCase()}

@@ -56,6 +56,31 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			apikeys.POST("", self.v2CreateAPIKey)
 			apikeys.DELETE("/:id", self.v2DeleteAPIKey)
 		}
+
+		// Users (admin only)
+		users := v2.Group("/users", self.authHandler)
+		{
+			users.GET("", self.v2ListUsers)
+		}
+
+		// Marketplace
+		marketplace := v2.Group("/marketplace", self.authHandler)
+		{
+			marketplace.GET("/plugins", self.v2ListPlugins)
+			marketplace.GET("/plugins/:id", self.v2GetPlugin)
+			marketplace.GET("/templates", self.v2ListTemplates)
+			marketplace.GET("/templates/:id", self.v2GetTemplate)
+		}
+
+		// Rules/Workflow
+		rules := v2.Group("/rules", self.authHandler)
+		{
+			rules.GET("", self.v2ListRules)
+			rules.POST("", self.v2CreateRule)
+			rules.GET("/:id", self.v2GetRule)
+			rules.PUT("/:id", self.v2UpdateRule)
+			rules.DELETE("/:id", self.v2DeleteRule)
+		}
 	}
 }
 
@@ -1065,4 +1090,153 @@ func generateRandomString(length int) string {
 		b[i] = charset[i%len(charset)]
 	}
 	return string(b)
+}
+
+// v2ListUsers lists users (admin only)
+func (self *WebServer) v2ListUsers(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	var users []models.TblUser
+	query := session.Table(new(models.TblUser))
+
+	total, err := query.Count()
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2ListUsers] count error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	err = query.OrderBy("created_at DESC").Limit(pageSize, (page-1)*pageSize).Find(&users)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2ListUsers] find error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "server internal error",
+		})
+		return
+	}
+
+	items := make([]map[string]interface{}, len(users))
+	for i, user := range users {
+		items[i] = map[string]interface{}{
+			"id":         strconv.FormatInt(user.Id, 10),
+			"username":   user.Name,
+			"email":      user.Email,
+			"role":       user.Role,
+			"created_at": user.Atime.Format(time.RFC3339),
+		}
+	}
+
+	totalPages := int(total) / pageSize
+	if int(total)%pageSize > 0 {
+		totalPages++
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"items":       items,
+			"total":       int(total),
+			"page":        page,
+			"page_size":   pageSize,
+			"total_pages": totalPages,
+		},
+	})
+}
+
+// v2ListPlugins lists marketplace plugins
+func (self *WebServer) v2ListPlugins(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"items": []map[string]interface{}{},
+			"total": 0,
+		},
+	})
+}
+
+// v2GetPlugin gets a specific plugin
+func (self *WebServer) v2GetPlugin(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    nil,
+	})
+}
+
+// v2ListTemplates lists marketplace templates
+func (self *WebServer) v2ListTemplates(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"items": []map[string]interface{}{},
+			"total": 0,
+		},
+	})
+}
+
+// v2GetTemplate gets a specific template
+func (self *WebServer) v2GetTemplate(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    nil,
+	})
+}
+
+// v2ListRules lists workflow rules
+func (self *WebServer) v2ListRules(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"items": []map[string]interface{}{},
+			"total": 0,
+		},
+	})
+}
+
+// v2CreateRule creates a new workflow rule
+func (self *WebServer) v2CreateRule(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    nil,
+	})
+}
+
+// v2GetRule gets a specific rule
+func (self *WebServer) v2GetRule(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    nil,
+	})
+}
+
+// v2UpdateRule updates a rule
+func (self *WebServer) v2UpdateRule(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    nil,
+	})
+}
+
+// v2DeleteRule deletes a rule
+func (self *WebServer) v2DeleteRule(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+	})
 }

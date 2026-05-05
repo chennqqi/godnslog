@@ -2,6 +2,30 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { rulesApi } from '@/lib/api-client'
+
+interface Rule {
+  id: string
+  name: string
+  description: string
+  enabled: boolean
+  priority: number
+  conditions: Condition[]
+  actions: Action[]
+}
+
+interface Condition {
+  id: string
+  field: string
+  operator: string
+  value: string
+}
+
+interface Action {
+  id: string
+  type: string
+  config: Record<string, any>
+}
 
 export default function WorkflowBuilderPage() {
   const router = useRouter()
@@ -12,8 +36,10 @@ export default function WorkflowBuilderPage() {
       router.push('/login')
     }
   }, [router])
-  const [rules, setRules] = useState<any[]>([])
-  const [selectedRule, setSelectedRule] = useState<any | null>(null)
+
+  const [rules, setRules] = useState<Rule[]>([])
+  const [selectedRule, setSelectedRule] = useState<Rule | null>(null)
+  const [loading, setLoading] = useState(true)
 
   const conditions = [
     { id: 'protocol', label: '协议', type: 'select', options: ['DNS', 'HTTP', 'SMTP', 'LDAP', 'SMB', 'FTP'] },
@@ -38,20 +64,80 @@ export default function WorkflowBuilderPage() {
     { id: 'call_api', label: '调用外部API' },
   ]
 
-  const addRule = () => {
-    const newRule = {
-      id: Date.now(),
-      name: `规则 ${rules.length + 1}`,
-      conditions: [],
-      actions: [],
-      enabled: true,
+  useEffect(() => {
+    loadRules()
+  }, [])
+
+  const loadRules = async () => {
+    try {
+      const response = await rulesApi.list()
+      if (response.data && response.data.items) {
+        setRules(response.data.items)
+      }
+    } catch (error) {
+      console.error('Failed to load rules:', error)
+    } finally {
+      setLoading(false)
     }
-    setRules([...rules, newRule])
-    setSelectedRule(newRule)
   }
 
-  const updateRule = (ruleId: number, field: string, value: any) => {
-    setRules(rules.map(r => r.id === ruleId ? { ...r, [field]: value } : r))
+  const addRule = async () => {
+    const newRule: Partial<Rule> = {
+      name: `规则 ${rules.length + 1}`,
+      description: '',
+      enabled: true,
+      priority: rules.length + 1,
+      conditions: [],
+      actions: [],
+    }
+    try {
+      const response = await rulesApi.create(newRule)
+      if (response.data) {
+        setRules([...rules, response.data])
+        setSelectedRule(response.data)
+      }
+    } catch (error) {
+      console.error('Failed to create rule:', error)
+    }
+  }
+
+  const updateRule = async (ruleId: string, field: string, value: any) => {
+    const ruleIndex = rules.findIndex(r => r.id === ruleId)
+    if (ruleIndex === -1) return
+
+    const updatedRules = [...rules]
+    updatedRules[ruleIndex] = { ...updatedRules[ruleIndex], [field]: value }
+    setRules(updatedRules)
+
+    if (selectedRule?.id === ruleId) {
+      setSelectedRule({ ...selectedRule, [field]: value })
+    }
+
+    try {
+      await rulesApi.update(ruleId, { [field]: value })
+    } catch (error) {
+      console.error('Failed to update rule:', error)
+    }
+  }
+
+  const deleteRule = async (ruleId: string) => {
+    try {
+      await rulesApi.delete(ruleId)
+      setRules(rules.filter(r => r.id !== ruleId))
+      if (selectedRule?.id === ruleId) {
+        setSelectedRule(null)
+      }
+    } catch (error) {
+      console.error('Failed to delete rule:', error)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-gray-500">加载中...</p>
+      </div>
+    )
   }
 
   return (
@@ -125,6 +211,18 @@ export default function WorkflowBuilderPage() {
                 </div>
 
                 <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    描述
+                  </label>
+                  <textarea
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    rows={2}
+                    value={selectedRule.description}
+                    onChange={(e) => updateRule(selectedRule.id, 'description', e.target.value)}
+                  />
+                </div>
+
+                <div className="mb-6">
                   <div className="flex justify-between items-center mb-3">
                     <h3 className="text-lg font-medium text-gray-900">条件</h3>
                     <button className="text-indigo-600 hover:text-indigo-800 text-sm">
@@ -135,9 +233,9 @@ export default function WorkflowBuilderPage() {
                     <p className="text-gray-500 text-sm mb-4">暂无条件</p>
                   ) : (
                     <div className="space-y-2 mb-4">
-                      {selectedRule.conditions.map((condition: any, idx: number) => (
+                      {selectedRule.conditions.map((condition, idx) => (
                         <div key={idx} className="border border-gray-200 rounded p-3">
-                          <span className="text-sm">{condition}</span>
+                          <span className="text-sm">{condition.field} {condition.operator} {condition.value}</span>
                         </div>
                       ))}
                     </div>
@@ -155,9 +253,9 @@ export default function WorkflowBuilderPage() {
                     <p className="text-gray-500 text-sm mb-4">暂无动作</p>
                   ) : (
                     <div className="space-y-2 mb-4">
-                      {selectedRule.actions.map((action: any, idx: number) => (
+                      {selectedRule.actions.map((action, idx) => (
                         <div key={idx} className="border border-gray-200 rounded p-3">
-                          <span className="text-sm">{action}</span>
+                          <span className="text-sm">{action.type}</span>
                         </div>
                       ))}
                     </div>
@@ -165,11 +263,17 @@ export default function WorkflowBuilderPage() {
                 </div>
 
                 <div className="flex space-x-4">
-                  <button className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
-                    保存规则
+                  <button 
+                    onClick={() => updateRule(selectedRule.id, 'enabled', !selectedRule.enabled)}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                  >
+                    {selectedRule.enabled ? '禁用规则' : '启用规则'}
                   </button>
-                  <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
-                    测试规则
+                  <button 
+                    onClick={() => deleteRule(selectedRule.id)}
+                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                  >
+                    删除规则
                   </button>
                 </div>
               </div>
