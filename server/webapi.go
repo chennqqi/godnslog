@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	v2models "github.com/chennqqi/godnslog/internal/models"
 	"github.com/chennqqi/godnslog/models"
 
 	"github.com/chennqqi/goutils/ginutils"
@@ -244,7 +245,7 @@ func (self *WebServer) record(c *gin.Context) {
 		uid = user.Id
 	}
 
-	_, err := session.InsertOne(&models.TblHttp{
+	httpRecord := &models.TblHttp{
 		Uid:    uid,
 		Ip:     c.ClientIP(),
 		Path:   path,
@@ -254,7 +255,8 @@ func (self *WebServer) record(c *gin.Context) {
 		Method: c.Request.Method,
 		Ctime:  time.Now(),
 		Data:   data.String(),
-	})
+	}
+	_, err := session.InsertOne(httpRecord)
 	if err != nil {
 		logrus.Errorf("[webapi.go::Record] orm.InsertOne: %v", err)
 		self.resp(c, 502, &CR{
@@ -262,6 +264,11 @@ func (self *WebServer) record(c *gin.Context) {
 			Code:    CodeServerInternal,
 		})
 		return
+	}
+	// Dual-write to unified interactions table
+	interaction := v2models.FromTblHttp(httpRecord)
+	if _, err2 := session.InsertOne(interaction); err2 != nil {
+		logrus.Errorf("[webapi.go::Record] dual-write interactions: %v", err2)
 	}
 	self.resp(c, 200, &CR{
 		Message: "OK",

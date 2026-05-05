@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/chennqqi/godnslog/cache"
+	v2models "github.com/chennqqi/godnslog/internal/models"
 	"github.com/chennqqi/godnslog/models"
 
 	"github.com/chennqqi/goutils/ginutils"
@@ -49,7 +50,8 @@ func (self *WebServer) initDatabase() error {
 		&models.TblCase{},
 		&models.TblPayload{},
 		&models.TblInteraction{},
-		&models.TblAPIKey{})
+		&models.TblAPIKey{},
+		&v2models.Interaction{})
 	if err != nil {
 		logrus.Errorf("[webui.go::initDatabase] orm.Sync: %v", err)
 		return err

@@ -1,19 +1,46 @@
 package models
 
 import (
+	"database/sql/driver"
+	"encoding/json"
 	"time"
 )
 
-// Case represents a test task, vulnerability verification, or project
-// Unified from internal/case/case.go and models/v2.go TblCase
+// Tags represents a list of tags stored as JSON in database.
+// It serializes to a JSON array in API responses.
+type Tags []string
+
+// Scan implements sql.Scanner interface for Tags.
+func (t *Tags) Scan(value interface{}) error {
+	if value == nil {
+		*t = nil
+		return nil
+	}
+	bytes, ok := value.([]byte)
+	if !ok {
+		return nil
+	}
+	return json.Unmarshal(bytes, t)
+}
+
+// Value implements driver.Valuer interface for Tags.
+func (t Tags) Value() (driver.Value, error) {
+	if t == nil {
+		return nil, nil
+	}
+	return json.Marshal(t)
+}
+
+// Case represents a test task, vulnerability verification, or project.
+// This struct serves as both the database entity and the API response model.
 type Case struct {
 	ID          string    `json:"id" xorm:"pk varchar(36) notnull"`
 	Title       string    `json:"title" xorm:"varchar(255) notnull"`
 	Description string    `json:"description" xorm:"text"`
 	Target      string    `json:"target" xorm:"varchar(255)"`
 	Status      string    `json:"status" xorm:"varchar(32) notnull default('active') index"` // active, archived, completed
-	Tags        string    `json:"tags" xorm:"varchar(500)"` // JSON array
-	CreatedBy   string    `json:"created_by" xorm:"varchar(36) notnull index"` // User ID
+	Tags        Tags      `json:"tags" xorm:"json"`                                          // Stored as JSON array
+	CreatedBy   string    `json:"created_by" xorm:"varchar(36) notnull index"`               // User ID
 	CreatedAt   time.Time `json:"created_at" xorm:"datetime created"`
 	UpdatedAt   time.Time `json:"updated_at" xorm:"datetime updated"`
 }

@@ -139,3 +139,75 @@ Phase 16：插件市场/模板市场
 ### 实现Evidence API端点
 - v2GetEvidence - 获取Evidence报告（添加说明：Evidence报告按需生成，不持久化存储）
 
+## 2026-05-05 (晚间)
+用户确认Q1-Q7决策项，输出统一数据模型设计和前端UI/UX规范。
+
+### Q1: Payload模板变量设计 — 结论
+- base32_context暂时不明确，预留，程序设计时考虑清楚再明确
+- 需要用户定义任意变量名
+- Payload模板是纯文本替换（字符串替换）
+
+### Q2: 通知渠道优先级 — 结论
+- 支持企微/飞书/钉钉和通用webhook
+- 不需要支持SMTP通知（SMTP用于邮件嗅探，不是通知）
+- 通知触发通过workflow触发
+- 默认关闭逐条通知
+
+### Q3: 1.0数据模型兼容策略 — 结论
+- 1.0前端直接废弃，但需要提供数据迁移工具
+- Roadmap明确要求1.0中的用户管理、文档、API等核心功能需要在2.0前端中具备
+
+### Q4: MCP Server技术选型 — 结论
+- MCP采用Streamable HTTP协议
+
+### Q5: 开源协议与商业模式 — 结论
+- 继续开源，保持原有协议，以后考虑OpenCore模式
+
+### Q6: Rebinding Lab安全边界 — 结论
+- Rebinding作为全局配置，仅Super/Admin可修改
+- 所有Rebinding Interaction标记类型
+- 为此功能增加遥测功能，默认打开，启动时通过环境变量关闭（防止产品被恶意滥用）
+
+### Q7: 前端技术栈确认 — 结论
+- Next.js App Router + TanStack Query + Zustand + React Hook Form
+- shadcn/ui深度使用
+- 目录结构采用features/按业务模块组织
+- TypeScript严格模式 + ESLint + Prettier
+- 数据获取策略：Server Components + TanStack Query混合
+
+### 输出文档
+- `doc/2.0-Requirement.md` — 重新梳理的需求规格说明书（含P0/P1/P2需求清单、7个待决策问题）
+- `doc/2.0-data-model-design.md` — 统一数据模型设计（数据库Schema、迁移策略、Go模型规范）
+- `doc/2.0-frontend-uiux-spec.md` — 前端UI/UX规范（目录结构、组件规范、页面设计、技术栈）
+
+### 补充原则（API模型共享）
+后端接口的请求/响应结构体必须使用 Go `struct` 声明，放置于**独立可导出的包**（如 `pkg/apimodels/` 或 `internal/models/`）。这些结构体是服务端 Gin handler 的绑定目标，也是客户端（Next.js/CLI）TypeScript 类型的唯一来源，确保前后端契约一致，禁止前端独立编造类型。
+
+---
+
+## 2026-05-05 Phase 1 开发完成
+
+### 1. 数据库迁移 + 双写逻辑
+- `server/webui.go`: `initDatabase` 新增 `v2models.Interaction` 表同步（创建 `interactions` 统一表）
+- `server/webserver.go`: DNS 记录双写（`models.TblDns` + `v2models.Interaction`）
+- `server/webapi.go`: HTTP 记录双写（`models.TblHttp` + `v2models.Interaction`）
+
+### 2. 模型统一清理
+- `internal/models/case.go`: 新增 `Tags` 自定义类型（`sql.Scanner`/`driver.Valuer`），支持 JSON 数组在 API 中序列化为数组、数据库中存储为 JSON 字符串
+- `models/v2.go`: 添加废弃注释，明确 API 类型与 `internal/models` 冗余；保留 `Tbl*` 数据库模型确保现有表兼容
+
+### 3. 前端 features/ 目录重构
+- 创建 `features/auth/store.ts`（Zustand auth store）、`features/auth/hooks/use-auth.ts`
+- 创建 `features/cases/hooks/use-cases.ts`（TanStack Query: list/get/create/update/delete）
+- 创建 `features/payloads/hooks/use-payloads.ts`（list/get/create/revoke）
+- 创建 `features/interactions/hooks/use-interactions.ts`（list/get/delete/export）
+- 初始化 shadcn/ui 组件（新增17个）：badge, dialog, select, tooltip, toast, tabs, separator, scroll-area, dropdown-menu, label, textarea, checkbox, switch, skeleton, pagination, popover, accordion
+- 安装依赖：`zustand`, `react-hook-form`, `@hookform/resolvers`，所有 `@radix-ui/*` 依赖
+
+### 4. middleware.ts + lib/api.ts
+- `src/middleware.ts`: Next.js 中间件认证守卫，检查 cookie/token，未认证重定向到 `/login`
+- `src/lib/api.ts`: SSR-safe Axios 拦截器，`typeof window` 检查避免 SSR 崩溃，`ApiError` 统一错误类型，401 自动清除认证并跳转
+
+### 编译状态
+- `go build ./...` ✅ 通过
+- `cd frontend-next && npx next lint` ✅ 通过（仅 useEffect 依赖警告，不影响功能）

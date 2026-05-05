@@ -10,6 +10,7 @@ import (
 	"github.com/chennqqi/godnslog/internal/canary"
 	"github.com/chennqqi/godnslog/internal/interaction"
 	"github.com/chennqqi/godnslog/internal/listener"
+
 	v2models "github.com/chennqqi/godnslog/internal/models"
 	"github.com/chennqqi/godnslog/internal/rebinding"
 	"github.com/chennqqi/godnslog/internal/workflow"

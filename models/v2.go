@@ -4,6 +4,13 @@ import (
 	"time"
 )
 
+// WARNING: This file contains v2 database models AND API response/request types.
+// The non-Tbl-prefixed API types (Case, Payload, Interaction, APIKey, etc.)
+// are REDUNDANT with types defined in internal/models/.
+// TODO: Migrate v2_api.go to use internal/models types and remove API types from this file.
+// The Tbl-prefixed database models (TblCase, TblPayload, TblInteraction, TblAPIKey)
+// are kept here for backward compatibility with existing database tables.
+
 // v2 database models
 
 // TblCase represents a case/vulnerability project
@@ -13,7 +20,7 @@ type TblCase struct {
 	Description string    `xorm:"text"`
 	Target      string    `xorm:"varchar(255)"`
 	Status      string    `xorm:"varchar(32) default('active') notnull"` // active, archived, completed
-	Tags        string    `xorm:"text"` // JSON array
+	Tags        string    `xorm:"text"`                                  // JSON array
 	CreatedBy   int64     `xorm:"notnull"`
 	CreatedAt   time.Time `xorm:"datetime created"`
 	UpdatedAt   time.Time `xorm:"datetime updated"`
@@ -26,9 +33,9 @@ type TblPayload struct {
 	Token            string    `xorm:"varchar(128) notnull unique"`
 	Template         string    `xorm:"varchar(64) notnull"`
 	RenderedPayload  string    `xorm:"text"`
-	Variables        string    `xorm:"json"` // JSON object
+	Variables        string    `xorm:"json"`                                 // JSON object
 	Status           string    `xorm:"varchar(32) default('draft') notnull"` // draft, deployed, hit, archived, expired
-	ExpectedProtocol string    `xorm:"varchar(32)"` // dns, http, smtp, ldap
+	ExpectedProtocol string    `xorm:"varchar(32)"`                          // dns, http, smtp, ldap
 	ExpiresAt        time.Time `xorm:"datetime"`
 	CreatedBy        int64     `xorm:"notnull"`
 	CreatedAt        time.Time `xorm:"datetime created"`
@@ -37,23 +44,23 @@ type TblPayload struct {
 
 // TblInteraction represents an interaction (DNS/HTTP callback)
 type TblInteraction struct {
-	Id         int64     `xorm:"pk autoincr"`
-	Type       string    `xorm:"varchar(32) notnull"` // dns, http, smtp, ldap, smb, ftp
-	CaseId     int64     `xorm:"index"`
-	PayloadId  int64     `xorm:"index"`
-	Token      string    `xorm:"varchar(128) index"`
-	Timestamp  time.Time `xorm:"datetime notnull"`
-	SourceIp   string    `xorm:"varchar(64) notnull"`
-	Domain     string    `xorm:"varchar(255)"`
-	DnsType    string    `xorm:"varchar(16)"` // A, AAAA, CNAME, etc.
-	Method     string    `xorm:"varchar(16)"` // GET, POST, etc.
-	Path       string    `xorm:"text"`
-	Headers    string    `xorm:"json"` // JSON object
-	Body       string    `xorm:"mediumtext"`
-	UserAgent  string    `xorm:"text"`
-	ContentType string   `xorm:"varchar(64)"`
-	RawData    string    `xorm:"mediumtext"`
-	CreatedAt  time.Time `xorm:"datetime created"`
+	Id          int64     `xorm:"pk autoincr"`
+	Type        string    `xorm:"varchar(32) notnull"` // dns, http, smtp, ldap, smb, ftp
+	CaseId      int64     `xorm:"index"`
+	PayloadId   int64     `xorm:"index"`
+	Token       string    `xorm:"varchar(128) index"`
+	Timestamp   time.Time `xorm:"datetime notnull"`
+	SourceIp    string    `xorm:"varchar(64) notnull"`
+	Domain      string    `xorm:"varchar(255)"`
+	DnsType     string    `xorm:"varchar(16)"` // A, AAAA, CNAME, etc.
+	Method      string    `xorm:"varchar(16)"` // GET, POST, etc.
+	Path        string    `xorm:"text"`
+	Headers     string    `xorm:"json"` // JSON object
+	Body        string    `xorm:"mediumtext"`
+	UserAgent   string    `xorm:"text"`
+	ContentType string    `xorm:"varchar(64)"`
+	RawData     string    `xorm:"mediumtext"`
+	CreatedAt   time.Time `xorm:"datetime created"`
 }
 
 // TblAPIKey represents an API key
@@ -74,15 +81,15 @@ type TblAPIKey struct {
 // v2 API request/response models
 
 type Case struct {
-	Id          string    `json:"id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Target      string    `json:"target"`
-	Status      string    `json:"status"`
-	Tags        []string  `json:"tags"`
-	CreatedBy   string    `json:"created_by"`
-	CreatedAt   string    `json:"created_at"`
-	UpdatedAt   string    `json:"updated_at"`
+	Id          string   `json:"id"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Target      string   `json:"target"`
+	Status      string   `json:"status"`
+	Tags        []string `json:"tags"`
+	CreatedBy   string   `json:"created_by"`
+	CreatedAt   string   `json:"created_at"`
+	UpdatedAt   string   `json:"updated_at"`
 }
 
 type CaseCreateRequest struct {
@@ -101,11 +108,11 @@ type CaseUpdateRequest struct {
 }
 
 type CaseListResponse struct {
-	Items       []Case `json:"items"`
-	Total       int    `json:"total"`
-	Page        int    `json:"page"`
-	PageSize    int    `json:"page_size"`
-	TotalPages  int    `json:"total_pages"`
+	Items      []Case `json:"items"`
+	Total      int    `json:"total"`
+	Page       int    `json:"page"`
+	PageSize   int    `json:"page_size"`
+	TotalPages int    `json:"total_pages"`
 }
 
 type Payload struct {
@@ -140,23 +147,23 @@ type PayloadListResponse struct {
 }
 
 type Interaction struct {
-	Id           string            `json:"id"`
-	Type         string            `json:"type"`
-	CaseId       string            `json:"case_id,omitempty"`
-	PayloadId    string            `json:"payload_id,omitempty"`
-	Token        string            `json:"token,omitempty"`
-	Timestamp    string            `json:"timestamp"`
-	SourceIp     string            `json:"source_ip"`
-	Domain       string            `json:"domain,omitempty"`
-	DnsType      string            `json:"dns_type,omitempty"`
-	Method       string            `json:"method,omitempty"`
-	Path         string            `json:"path,omitempty"`
-	Headers      map[string]string `json:"headers,omitempty"`
-	Body         string            `json:"body,omitempty"`
-	UserAgent    string            `json:"user_agent,omitempty"`
-	ContentType  string            `json:"content_type,omitempty"`
-	RawData      string            `json:"raw_data"`
-	CreatedAt    string            `json:"created_at"`
+	Id          string            `json:"id"`
+	Type        string            `json:"type"`
+	CaseId      string            `json:"case_id,omitempty"`
+	PayloadId   string            `json:"payload_id,omitempty"`
+	Token       string            `json:"token,omitempty"`
+	Timestamp   string            `json:"timestamp"`
+	SourceIp    string            `json:"source_ip"`
+	Domain      string            `json:"domain,omitempty"`
+	DnsType     string            `json:"dns_type,omitempty"`
+	Method      string            `json:"method,omitempty"`
+	Path        string            `json:"path,omitempty"`
+	Headers     map[string]string `json:"headers,omitempty"`
+	Body        string            `json:"body,omitempty"`
+	UserAgent   string            `json:"user_agent,omitempty"`
+	ContentType string            `json:"content_type,omitempty"`
+	RawData     string            `json:"raw_data"`
+	CreatedAt   string            `json:"created_at"`
 }
 
 type InteractionListResponse struct {

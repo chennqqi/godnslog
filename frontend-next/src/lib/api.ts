@@ -1,6 +1,33 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
 import type { ApiResponse } from '@/types'
 
+export interface ApiError {
+  code: number
+  message: string
+  originalError?: AxiosError<ApiResponse>
+}
+
+/**
+ * Get token from localStorage safely (works in browser only).
+ */
+function getToken(): string | null {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('token')
+  }
+  return null
+}
+
+/**
+ * Clear auth state and redirect to login.
+ */
+function clearAuthAndRedirect() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    window.location.href = '/login'
+  }
+}
+
 class ApiClient {
   private client: AxiosInstance
 
@@ -10,10 +37,10 @@ class ApiClient {
       timeout: 30000,
     })
 
-    // Request interceptor
+    // Request interceptor: attach Bearer token
     this.client.interceptors.request.use(
       (config) => {
-        const token = localStorage.getItem('token')
+        const token = getToken()
         if (token) {
           config.headers.Authorization = `Bearer ${token}`
         }
@@ -22,30 +49,20 @@ class ApiClient {
       (error) => Promise.reject(error)
     )
 
-    // Response interceptor
+    // Response interceptor: handle 401 and API-level errors
     this.client.interceptors.response.use(
       (response) => response,
       (error: AxiosError<ApiResponse>) => {
         if (error.response?.status === 401) {
-          // Handle unauthorized
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
-          window.location.href = '/login'
+          clearAuthAndRedirect()
         }
-        // Handle API-level errors from response body
         if (error.response?.data?.code !== undefined) {
-          const errorCode = error.response.data.code
-          const errorMessage = error.response.data.message || 'Unknown error'
-          
-          // Log error for debugging
-          console.error(`API Error [${errorCode}]: ${errorMessage}`)
-          
-          // Return a formatted error
-          return Promise.reject({
-            code: errorCode,
-            message: errorMessage,
-            originalError: error
-          })
+          const apiError: ApiError = {
+            code: error.response.data.code,
+            message: error.response.data.message || 'Unknown error',
+            originalError: error,
+          }
+          return Promise.reject(apiError)
         }
         return Promise.reject(error)
       }
