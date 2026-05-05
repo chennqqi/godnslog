@@ -3,6 +3,7 @@ package listener
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
@@ -151,11 +152,13 @@ func (l *SMTPListener) handleConnection(ctx context.Context, conn net.Conn) {
 
 	// Save message if we have data
 	if from != "" && len(to) > 0 {
+		// Convert to slice to JSON string
+		toJSON, _ := json.Marshal(to)
 		message := &SMTPMessage{
 			ID:         generateMessageID(),
 			ListenerID: l.listener.ID,
 			From:       from,
-			To:         to,
+			To:         string(toJSON),
 			Body:       body.String(),
 			Headers:    strings.Join(headers, "\n"),
 			SourceIP:   sourceIP,

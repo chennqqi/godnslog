@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 export default function CanaryPage() {
   const router = useRouter()
@@ -50,21 +53,19 @@ export default function CanaryPage() {
     <div>
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Canary长期监测</h2>
 
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <div className="flex justify-between items-center mb-6">
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
             <div>
-              <h3 className="text-lg font-medium text-gray-900">Canary Token列表</h3>
-              <p className="text-sm text-gray-500">管理长期部署的诱饵Token</p>
+              <CardTitle>Canary Token列表</CardTitle>
+              <CardDescription>管理长期部署的诱饵Token</CardDescription>
             </div>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-            >
+            <Button onClick={() => setShowCreateModal(true)}>
               创建Canary
-            </button>
+            </Button>
           </div>
-
+        </CardHeader>
+        <CardContent>
           {canaries.length === 0 ? (
             <p className="text-gray-500 text-center py-8">暂无Canary Token</p>
           ) : (
@@ -102,23 +103,25 @@ export default function CanaryPage() {
                       </p>
                     </div>
                     <div className="flex space-x-2">
-                      <button className="text-indigo-600 hover:text-indigo-800 text-sm">
+                      <Button variant="ghost" size="sm">
                         编辑
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => handleRevoke(canary.id)}
-                        className="text-red-600 hover:text-red-800 text-sm"
+                        className="text-red-600 hover:text-red-800"
                       >
                         撤销
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {showCreateModal && (
         <CreateCanaryModal
@@ -146,91 +149,89 @@ function CreateCanaryModal({ onClose, onSubmit, types }: any) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">创建Canary Token</h3>
-        </div>
-        <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Token类型
-            </label>
-            <select
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-            >
-              {types.map((t: any) => (
-                <option key={t.value} value={t.value}>
-                  {t.label} - {t.description}
-                </option>
-              ))}
-            </select>
-          </div>
+      <Card className="max-w-md w-full mx-4">
+        <CardHeader>
+          <CardTitle>创建Canary Token</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Token类型
+              </label>
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+              >
+                {types.map((t: any) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label} - {t.description}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              上下文编码
-            </label>
-            <textarea
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              rows={3}
-              value={formData.context}
-              onChange={(e) => setFormData({ ...formData, context: e.target.value })}
-              placeholder="项目、资产、投放位置、负责人等..."
-            />
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                上下文编码
+              </label>
+              <textarea
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                rows={3}
+                value={formData.context}
+                onChange={(e) => setFormData({ ...formData, context: e.target.value })}
+                placeholder="项目、资产、投放位置、负责人等..."
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              过期时间（秒）
-            </label>
-            <input
-              type="number"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={formData.expires_in}
-              onChange={(e) => setFormData({ ...formData, expires_in: parseInt(e.target.value) })}
-              min={86400}
-              max={31536000}
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              默认30天，最大1年
-            </p>
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                过期时间（秒）
+              </label>
+              <Input
+                type="number"
+                value={formData.expires_in}
+                onChange={(e) => setFormData({ ...formData, expires_in: parseInt(e.target.value) })}
+                min={86400}
+                max={31536000}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                默认30天，最大1年
+              </p>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              静默窗口（可选）
-            </label>
-            <input
-              type="text"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={formData.silent_window}
-              onChange={(e) => setFormData({ ...formData, silent_window: e.target.value })}
-              placeholder="例如: 0-6,18-24 (静默时间)"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              设置静默时间段，格式: start-end, start-end
-            </p>
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                静默窗口（可选）
+              </label>
+              <Input
+                type="text"
+                value={formData.silent_window}
+                onChange={(e) => setFormData({ ...formData, silent_window: e.target.value })}
+                placeholder="例如: 0-6,18-24 (静默时间)"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                设置静默时间段，格式: start-end, start-end
+              </p>
+            </div>
 
-          <div className="flex space-x-4 pt-4">
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-            >
-              创建
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-            >
-              取消
-            </button>
-          </div>
-        </form>
-      </div>
+            <div className="flex space-x-4 pt-4">
+              <Button type="submit" className="flex-1">
+                创建
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="flex-1"
+              >
+                取消
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/chennqqi/godnslog/internal/interaction"
+	"github.com/chennqqi/godnslog/internal/models"
 )
 
 // Detector detects canary token hits from interactions
@@ -39,7 +39,7 @@ func DefaultCanaryConfig() *CanaryConfig {
 }
 
 // Detect checks if an interaction matches a canary token
-func (d *Detector) Detect(ctx context.Context, inter interaction.Interaction) (*CanaryHit, error) {
+func (d *Detector) Detect(ctx context.Context, inter models.Interaction) (*CanaryHit, error) {
 	// Get active canaries
 	canaries, err := d.store.GetActiveCanaries(ctx)
 	if err != nil {
@@ -90,7 +90,7 @@ func (d *Detector) Detect(ctx context.Context, inter interaction.Interaction) (*
 }
 
 // matchesCanary checks if interaction matches canary token
-func (d *Detector) matchesCanary(inter interaction.Interaction, canary Canary) bool {
+func (d *Detector) matchesCanary(inter models.Interaction, canary Canary) bool {
 	switch canary.Type {
 	case string(CanaryTypeDNS):
 		if inter.Type == "dns" && inter.Domain != nil {

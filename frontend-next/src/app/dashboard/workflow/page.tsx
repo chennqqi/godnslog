@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { rulesApi } from '@/lib/api-client'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 interface Rule {
   id: string
@@ -147,18 +150,16 @@ export default function WorkflowBuilderPage() {
       <div className="grid grid-cols-3 gap-6">
         {/* 规则列表 */}
         <div className="col-span-1">
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900">规则列表</h3>
-                <button
-                  onClick={addRule}
-                  className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
-                >
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>规则列表</CardTitle>
+                <Button onClick={addRule} size="sm">
                   + 新建
-                </button>
+                </Button>
               </div>
-
+            </CardHeader>
+            <CardContent>
               <div className="space-y-2">
                 {rules.length === 0 ? (
                   <p className="text-gray-500 text-sm">暂无规则</p>
@@ -189,22 +190,21 @@ export default function WorkflowBuilderPage() {
                   ))
                 )}
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* 规则编辑器 */}
         <div className="col-span-2">
           {selectedRule ? (
-            <div className="bg-white shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
+            <Card>
+              <CardContent className="pt-6">
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     规则名称
                   </label>
-                  <input
+                  <Input
                     type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     value={selectedRule.name}
                     onChange={(e) => updateRule(selectedRule.id, 'name', e.target.value)}
                   />
@@ -263,27 +263,26 @@ export default function WorkflowBuilderPage() {
                 </div>
 
                 <div className="flex space-x-4">
-                  <button 
+                  <Button 
                     onClick={() => updateRule(selectedRule.id, 'enabled', !selectedRule.enabled)}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
                   >
                     {selectedRule.enabled ? '禁用规则' : '启用规则'}
-                  </button>
-                  <button 
+                  </Button>
+                  <Button 
                     onClick={() => deleteRule(selectedRule.id)}
-                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                    variant="destructive"
                   >
                     删除规则
-                  </button>
+                  </Button>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           ) : (
-            <div className="bg-white shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
+            <Card>
+              <CardContent className="pt-6">
                 <p className="text-gray-500 text-center">选择一个规则进行编辑</p>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>

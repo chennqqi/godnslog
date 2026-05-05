@@ -3,6 +3,8 @@ package interaction
 import (
 	"errors"
 	"time"
+
+	"github.com/chennqqi/godnslog/internal/models"
 )
 
 var (
@@ -26,7 +28,7 @@ func NewEvidenceService(interactionService *Service) *EvidenceService {
 // GenerateEvidence generates an evidence chain for a case or payload
 func (s *EvidenceService) GenerateEvidence(caseID, payloadID string, format string) (*EvidenceResponse, error) {
 	// Get interactions
-	var interactions []Interaction
+	var interactions []models.Interaction
 
 	if payloadID != "" {
 		resp, err := s.interactionService.ListInteractions("", payloadID, "", nil, nil, 1, 1000)
@@ -50,7 +52,7 @@ func (s *EvidenceService) GenerateEvidence(caseID, payloadID string, format stri
 
 	// Build evidence
 	evidence := &Evidence{
-		ID:           generateID(),
+		ID:           models.GenerateID(),
 		CaseID:       caseID,
 		PayloadID:    payloadID,
 		Interactions: interactions,
@@ -83,7 +85,7 @@ func (s *EvidenceService) GenerateEvidence(caseID, payloadID string, format stri
 }
 
 // buildTimeline builds a timeline from interactions
-func (s *EvidenceService) buildTimeline(interactions []Interaction) []TimelineItem {
+func (s *EvidenceService) buildTimeline(interactions []models.Interaction) []TimelineItem {
 	timeline := make([]TimelineItem, 0, len(interactions))
 
 	for _, i := range interactions {

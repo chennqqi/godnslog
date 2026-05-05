@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { caseApi, interactionApi } from '@/lib/api-client'
 import type { Case, Interaction } from '@/types'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({
@@ -57,30 +58,32 @@ export default function DashboardPage() {
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 mb-8">
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-gray-500 truncate">活跃 Cases</dt>
-            <dd className="mt-1 text-3xl font-semibold text-gray-900">{stats.activeCases}</dd>
-          </div>
-        </div>
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-gray-500 truncate">最近命中</dt>
-            <dd className="mt-1 text-3xl font-semibold text-gray-900">{stats.recentInteractions}</dd>
-          </div>
-        </div>
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-gray-500 truncate">系统状态</dt>
-            <dd className="mt-1 text-3xl font-semibold text-green-600">正常</dd>
-          </div>
-        </div>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>活跃 Cases</CardDescription>
+            <CardTitle className="text-3xl">{stats.activeCases}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>最近命中</CardDescription>
+            <CardTitle className="text-3xl">{stats.recentInteractions}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>系统状态</CardDescription>
+            <CardTitle className="text-3xl text-green-600">正常</CardTitle>
+          </CardHeader>
+        </Card>
       </div>
 
       {/* Recent cases */}
-      <div className="bg-white shadow rounded-lg mb-8">
-        <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">最近 Cases</h3>
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>最近 Cases</CardTitle>
+        </CardHeader>
+        <CardContent>
           {recentCases.length === 0 ? (
             <p className="text-gray-500">暂无 Cases</p>
           ) : (
@@ -95,13 +98,15 @@ export default function DashboardPage() {
               ))}
             </ul>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Recent interactions */}
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">最近命中</h3>
+      <Card>
+        <CardHeader>
+          <CardTitle>最近命中</CardTitle>
+        </CardHeader>
+        <CardContent>
           {recentInteractions.length === 0 ? (
             <p className="text-gray-500">暂无命中记录</p>
           ) : (
@@ -118,8 +123,8 @@ export default function DashboardPage() {
               ))}
             </ul>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

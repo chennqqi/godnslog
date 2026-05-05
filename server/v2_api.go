@@ -7,6 +7,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/chennqqi/godnslog/internal/canary"
+	"github.com/chennqqi/godnslog/internal/interaction"
+	"github.com/chennqqi/godnslog/internal/listener"
+	v2models "github.com/chennqqi/godnslog/internal/models"
+	"github.com/chennqqi/godnslog/internal/rebinding"
+	"github.com/chennqqi/godnslog/internal/workflow"
 	"github.com/chennqqi/godnslog/models"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -80,6 +86,46 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			rules.GET("/:id", self.v2GetRule)
 			rules.PUT("/:id", self.v2UpdateRule)
 			rules.DELETE("/:id", self.v2DeleteRule)
+		}
+
+		// Evidence
+		evidence := v2.Group("/evidence", self.authHandler)
+		{
+			evidence.POST("/generate", self.v2GenerateEvidence)
+			evidence.GET("/:id", self.v2GetEvidence)
+		}
+
+		// Canary
+		canary := v2.Group("/canary", self.authHandler)
+		{
+			canary.GET("", self.v2ListCanaries)
+			canary.POST("", self.v2CreateCanary)
+			canary.GET("/:id", self.v2GetCanary)
+			canary.PUT("/:id", self.v2UpdateCanary)
+			canary.DELETE("/:id", self.v2DeleteCanary)
+			canary.GET("/:id/hits", self.v2ListCanaryHits)
+		}
+
+		// Rebinding
+		rebinding := v2.Group("/rebinding", self.authHandler)
+		{
+			rebinding.GET("/rules", self.v2ListRebindingRules)
+			rebinding.POST("/rules", self.v2CreateRebindingRule)
+			rebinding.GET("/rules/:id", self.v2GetRebindingRule)
+			rebinding.PUT("/rules/:id", self.v2UpdateRebindingRule)
+			rebinding.DELETE("/rules/:id", self.v2DeleteRebindingRule)
+			rebinding.GET("/rules/:id/sessions", self.v2ListRebindingSessions)
+		}
+
+		// Listeners
+		listeners := v2.Group("/listeners", self.authHandler)
+		{
+			listeners.GET("", self.v2ListListeners)
+			listeners.POST("", self.v2CreateListener)
+			listeners.GET("/:id", self.v2GetListener)
+			listeners.PUT("/:id", self.v2UpdateListener)
+			listeners.DELETE("/:id", self.v2DeleteListener)
+			listeners.GET("/:id/interactions", self.v2ListListenerInteractions)
 		}
 	}
 }
@@ -1196,47 +1242,617 @@ func (self *WebServer) v2GetTemplate(c *gin.Context) {
 
 // v2ListRules lists workflow rules
 func (self *WebServer) v2ListRules(c *gin.Context) {
+	page := 1
+	pageSize := 20
+	if p := c.Query("page"); p != "" {
+		fmt.Sscanf(p, "%d", &page)
+	}
+	if s := c.Query("page_size"); s != "" {
+		fmt.Sscanf(s, "%d", &pageSize)
+	}
+
+	workflowService := workflow.NewService(self.orm)
+	resp, err := workflowService.ListWorkflows("", nil, page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to list workflows",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
 		"data": gin.H{
-			"items": []map[string]interface{}{},
-			"total": 0,
+			"items":       resp.Items,
+			"total":       resp.Total,
+			"page":        resp.Page,
+			"page_size":   resp.PageSize,
+			"total_pages": resp.TotalPages,
 		},
 	})
 }
 
 // v2CreateRule creates a new workflow rule
 func (self *WebServer) v2CreateRule(c *gin.Context) {
+	var req v2models.Workflow
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    1,
+			"message": "Invalid request body",
+		})
+		return
+	}
+
+	workflowService := workflow.NewService(self.orm)
+	if err := workflowService.CreateWorkflow(&req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to create workflow",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
-		"data":    nil,
+		"data":    req,
 	})
 }
 
 // v2GetRule gets a specific rule
 func (self *WebServer) v2GetRule(c *gin.Context) {
+	id := c.Param("id")
+
+	workflowService := workflow.NewService(self.orm)
+	workflow, err := workflowService.GetWorkflowByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    4,
+			"message": "Workflow not found",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
-		"data":    nil,
+		"data":    workflow,
 	})
 }
 
 // v2UpdateRule updates a rule
 func (self *WebServer) v2UpdateRule(c *gin.Context) {
+	id := c.Param("id")
+
+	var req v2models.Workflow
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    1,
+			"message": "Invalid request body",
+		})
+		return
+	}
+
+	req.ID = id
+	workflowService := workflow.NewService(self.orm)
+	if err := workflowService.UpdateWorkflow(&req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to update workflow",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
-		"data":    nil,
+		"data":    req,
 	})
 }
 
 // v2DeleteRule deletes a rule
 func (self *WebServer) v2DeleteRule(c *gin.Context) {
+	id := c.Param("id")
+
+	workflowService := workflow.NewService(self.orm)
+	if err := workflowService.DeleteWorkflow(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to delete workflow",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
+	})
+}
+
+// v2GenerateEvidence generates evidence report
+func (self *WebServer) v2GenerateEvidence(c *gin.Context) {
+	var req struct {
+		CaseID    string `json:"case_id"`
+		PayloadID string `json:"payload_id"`
+		Format    string `json:"format" binding:"required,oneof=json markdown csv"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    1,
+			"message": "Invalid request body",
+		})
+		return
+	}
+
+	interactionService := interaction.NewService(self.orm)
+	evidenceService := interaction.NewEvidenceService(interactionService)
+
+	resp, err := evidenceService.GenerateEvidence(req.CaseID, req.PayloadID, req.Format)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to generate evidence",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    resp,
+	})
+}
+
+// v2GetEvidence gets evidence report by ID
+func (self *WebServer) v2GetEvidence(c *gin.Context) {
+	// Evidence reports are generated on-demand and not persisted
+	// Use v2GenerateEvidence endpoint to generate evidence reports
+	c.JSON(http.StatusNotFound, gin.H{
+		"code":    4,
+		"message": "Evidence reports are generated on-demand. Use /evidence/generate endpoint to create evidence reports.",
+	})
+}
+
+// v2ListCanaries lists canary tokens
+func (self *WebServer) v2ListCanaries(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+
+	canaryService := canary.NewService(self.orm)
+	canaries, total, err := canaryService.ListCanaries(page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to list canaries",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"items": canaries,
+			"total": total,
+		},
+	})
+}
+
+// v2CreateCanary creates a new canary token
+func (self *WebServer) v2CreateCanary(c *gin.Context) {
+	var req v2models.Canary
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    1,
+			"message": "Invalid request body",
+		})
+		return
+	}
+
+	canaryService := canary.NewService(self.orm)
+	if err := canaryService.CreateCanary(&req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to create canary",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    req,
+	})
+}
+
+// v2GetCanary gets a specific canary token
+func (self *WebServer) v2GetCanary(c *gin.Context) {
+	id := c.Param("id")
+
+	canaryService := canary.NewService(self.orm)
+	canary, err := canaryService.GetCanary(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    4,
+			"message": "Canary not found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    canary,
+	})
+}
+
+// v2UpdateCanary updates a canary token
+func (self *WebServer) v2UpdateCanary(c *gin.Context) {
+	id := c.Param("id")
+
+	var req v2models.Canary
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    1,
+			"message": "Invalid request body",
+		})
+		return
+	}
+
+	req.ID = id
+	canaryService := canary.NewService(self.orm)
+	if err := canaryService.UpdateCanary(&req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to update canary",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    req,
+	})
+}
+
+// v2DeleteCanary deletes a canary token
+func (self *WebServer) v2DeleteCanary(c *gin.Context) {
+	id := c.Param("id")
+
+	canaryService := canary.NewService(self.orm)
+	if err := canaryService.DeleteCanary(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to delete canary",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+	})
+}
+
+// v2ListCanaryHits lists hits for a canary token
+func (self *WebServer) v2ListCanaryHits(c *gin.Context) {
+	id := c.Param("id")
+
+	canaryService := canary.NewService(self.orm)
+	hits, err := canaryService.ListCanaryHits(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to list canary hits",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"canary_id": id,
+			"hits":      hits,
+			"total":     len(hits),
+		},
+	})
+}
+
+// v2ListRebindingRules lists rebinding rules
+func (self *WebServer) v2ListRebindingRules(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+
+	rebindingService := rebinding.NewService(self.orm)
+	rules, total, err := rebindingService.ListRebindingRules(page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to list rebinding rules",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"items": rules,
+			"total": total,
+		},
+	})
+}
+
+// v2CreateRebindingRule creates a new rebinding rule
+func (self *WebServer) v2CreateRebindingRule(c *gin.Context) {
+	var req v2models.RebindingRule
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    1,
+			"message": "Invalid request body",
+		})
+		return
+	}
+
+	rebindingService := rebinding.NewService(self.orm)
+	if err := rebindingService.CreateRebindingRule(&req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to create rebinding rule",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    req,
+	})
+}
+
+// v2GetRebindingRule gets a specific rebinding rule
+func (self *WebServer) v2GetRebindingRule(c *gin.Context) {
+	id := c.Param("id")
+
+	rebindingService := rebinding.NewService(self.orm)
+	rule, err := rebindingService.GetRebindingRule(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    4,
+			"message": "Rebinding rule not found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    rule,
+	})
+}
+
+// v2UpdateRebindingRule updates a rebinding rule
+func (self *WebServer) v2UpdateRebindingRule(c *gin.Context) {
+	id := c.Param("id")
+
+	var req v2models.RebindingRule
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    1,
+			"message": "Invalid request body",
+		})
+		return
+	}
+
+	req.ID = id
+	rebindingService := rebinding.NewService(self.orm)
+	if err := rebindingService.UpdateRebindingRule(&req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to update rebinding rule",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    req,
+	})
+}
+
+// v2DeleteRebindingRule deletes a rebinding rule
+func (self *WebServer) v2DeleteRebindingRule(c *gin.Context) {
+	id := c.Param("id")
+
+	rebindingService := rebinding.NewService(self.orm)
+	if err := rebindingService.DeleteRebindingRule(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to delete rebinding rule",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+	})
+}
+
+// v2ListRebindingSessions lists sessions for a rebinding rule
+func (self *WebServer) v2ListRebindingSessions(c *gin.Context) {
+	id := c.Param("id")
+
+	rebindingService := rebinding.NewService(self.orm)
+	sessions, err := rebindingService.ListRebindingSessions(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to list rebinding sessions",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"rule_id":  id,
+			"sessions": sessions,
+			"total":    len(sessions),
+		},
+	})
+}
+
+// v2ListListeners lists protocol listeners
+func (self *WebServer) v2ListListeners(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+
+	listenerService := listener.NewService(self.orm)
+	listeners, total, err := listenerService.ListListeners(page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to list listeners",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"items": listeners,
+			"total": total,
+		},
+	})
+}
+
+// v2CreateListener creates a new protocol listener
+func (self *WebServer) v2CreateListener(c *gin.Context) {
+	var req v2models.Listener
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    1,
+			"message": "Invalid request body",
+		})
+		return
+	}
+
+	listenerService := listener.NewService(self.orm)
+	if err := listenerService.CreateListener(&req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to create listener",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    req,
+	})
+}
+
+// v2GetListener gets a specific listener
+func (self *WebServer) v2GetListener(c *gin.Context) {
+	id := c.Param("id")
+
+	listenerService := listener.NewService(self.orm)
+	listener, err := listenerService.GetListener(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    4,
+			"message": "Listener not found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    listener,
+	})
+}
+
+// v2UpdateListener updates a listener
+func (self *WebServer) v2UpdateListener(c *gin.Context) {
+	id := c.Param("id")
+
+	var req v2models.Listener
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    1,
+			"message": "Invalid request body",
+		})
+		return
+	}
+
+	req.ID = id
+	listenerService := listener.NewService(self.orm)
+	if err := listenerService.UpdateListener(&req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to update listener",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    req,
+	})
+}
+
+// v2DeleteListener deletes a listener
+func (self *WebServer) v2DeleteListener(c *gin.Context) {
+	id := c.Param("id")
+
+	listenerService := listener.NewService(self.orm)
+	if err := listenerService.DeleteListener(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to delete listener",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+	})
+}
+
+// v2ListListenerInteractions lists interactions for a listener
+func (self *WebServer) v2ListListenerInteractions(c *gin.Context) {
+	id := c.Param("id")
+
+	listenerService := listener.NewService(self.orm)
+	interactions, err := listenerService.ListListenerInteractions(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    5,
+			"message": "Failed to list listener interactions",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"listener_id":  id,
+			"interactions": interactions,
+			"total":        len(interactions),
+		},
 	})
 }

@@ -3,18 +3,19 @@ package interaction
 import (
 	"time"
 
+	"github.com/chennqqi/godnslog/internal/models"
 	"github.com/chennqqi/godnslog/internal/payload"
 )
 
 // Evidence represents an evidence chain composed of payload and interactions
 type Evidence struct {
-	ID           string           `json:"id"`
-	CaseID       string           `json:"case_id"`
-	PayloadID    string           `json:"payload_id"`
-	Payload      *payload.Payload `json:"payload"`
-	Interactions []Interaction    `json:"interactions"`
-	Timeline     []TimelineItem   `json:"timeline"`
-	CreatedAt    time.Time        `json:"created_at"`
+	ID           string               `json:"id"`
+	CaseID       string               `json:"case_id"`
+	PayloadID    string               `json:"payload_id"`
+	Payload      *payload.Payload     `json:"payload"`
+	Interactions []models.Interaction `json:"interactions"`
+	Timeline     []TimelineItem       `json:"timeline"`
+	CreatedAt    time.Time            `json:"created_at"`
 }
 
 // TimelineItem represents a timeline item in the evidence chain

@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { interactionApi } from '@/lib/api-client'
 import type { Interaction } from '@/types'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 export default function InteractionsPage() {
   const router = useRouter()
@@ -65,69 +68,70 @@ export default function InteractionsPage() {
             <option value="smb">SMB</option>
             <option value="ftp">FTP</option>
           </select>
-          <input
+          <Input
             type="text"
             placeholder="搜索 IP、域名或token..."
-            className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-64"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
         </div>
       </div>
 
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>交互记录</CardTitle>
+        </CardHeader>
+        <CardContent>
           {filteredInteractions.length === 0 ? (
             <p className="text-gray-500">暂无命中记录</p>
           ) : (
-            <ul className="divide-y divide-gray-200">
-              {filteredInteractions.map((interaction) => (
-                <li key={interaction.id} className="py-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <span className={`px-2 py-1 text-xs rounded font-medium ${
-                          interaction.type === 'dns' ? 'bg-purple-100 text-purple-800' :
-                          interaction.type === 'http' ? 'bg-blue-100 text-blue-800' :
-                          interaction.type === 'smtp' ? 'bg-green-100 text-green-800' :
-                          interaction.type === 'ldap' ? 'bg-yellow-100 text-yellow-800' :
-                          interaction.type === 'smb' ? 'bg-orange-100 text-orange-800' :
-                          interaction.type === 'ftp' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {interaction.type.toUpperCase()}
-                        </span>
-                        <p className="text-sm font-medium text-gray-900">{interaction.source_ip}</p>
-                      </div>
-                      {interaction.domain && (
-                        <p className="text-sm text-gray-600 mt-1">域名: {interaction.domain}</p>
-                      )}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>类型</TableHead>
+                  <TableHead>来源IP</TableHead>
+                  <TableHead>详情</TableHead>
+                  <TableHead>时间</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredInteractions.map((interaction) => (
+                  <TableRow key={interaction.id}>
+                    <TableCell>
+                      <span className={`px-2 py-1 text-xs rounded font-medium ${
+                        interaction.type === 'dns' ? 'bg-purple-100 text-purple-800' :
+                        interaction.type === 'http' ? 'bg-blue-100 text-blue-800' :
+                        interaction.type === 'smtp' ? 'bg-green-100 text-green-800' :
+                        interaction.type === 'ldap' ? 'bg-yellow-100 text-yellow-800' :
+                        interaction.type === 'smb' ? 'bg-orange-100 text-orange-800' :
+                        interaction.type === 'ftp' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {interaction.type.toUpperCase()}
+                      </span>
+                    </TableCell>
+                    <TableCell>{interaction.source_ip}</TableCell>
+                    <TableCell>
+                      {interaction.domain && <div>域名: {interaction.domain}</div>}
                       {interaction.method && interaction.path && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          {interaction.method} {interaction.path}
-                        </p>
+                        <div>{interaction.method} {interaction.path}</div>
                       )}
-                      {interaction.token && (
-                        <p className="text-xs text-gray-500 mt-1">Token: {interaction.token}</p>
-                      )}
+                      {interaction.token && <div>Token: {interaction.token}</div>}
                       {interaction.user_agent && (
-                        <p className="text-xs text-gray-400 mt-1 truncate max-w-md">
+                        <div className="text-xs text-gray-400 truncate max-w-md">
                           UA: {interaction.user_agent}
-                        </p>
+                        </div>
                       )}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-500">
-                        {new Date(interaction.timestamp).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                    </TableCell>
+                    <TableCell>{new Date(interaction.timestamp).toLocaleString()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

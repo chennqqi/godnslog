@@ -84,3 +84,58 @@ Phase 16：插件市场/模板市场
 - 添加插件/模板测试
 - 创建文档
 - 所有测试通过
+
+## 2026-05-05
+用户反馈2.0版本虽然标记完成，但存在严重问题：
+1. 很多1.0的核心功能在2.0都丢失了：
+   - 日志记录
+   - API自动化操作
+   - 多用户支持
+   - 一些payload可见性
+   - 一些文档
+2. 2.0的功能实现都很草率，根本没有深入理解意思，去认真实现
+3. 前端实现很粗糙，跟demo html没有区别，完全看不出来是一个生产可用的项目
+
+根据ROADMAP_2.0.md开始完整的开发流程，分步骤以保证质量：
+- 需求梳理 ✅ 已完成（doc/requirements-analysis-2026-05-05.md）
+- 程序设计 ✅ 已完成（doc/design-plan-2026-05-05.md）
+- 程序开发
+- 测试验收
+- 程序修复
+- 完成验收
+
+## 2026-05-05 (下午)
+实现v2_api.go中的TODO标记API端点业务逻辑：
+
+### 创建Service层
+- internal/canary/service.go - Canary服务层，提供Canary的CRUD操作
+- internal/rebinding/service.go - Rebinding服务层，提供Rebinding Rule的CRUD操作
+- internal/listener/service.go - Listener服务层，提供Listener的CRUD操作
+
+### 实现Canary API端点
+- v2ListCanaries - 列出所有Canary Token
+- v2CreateCanary - 创建新的Canary Token
+- v2GetCanary - 获取指定Canary Token
+- v2UpdateCanary - 更新Canary Token
+- v2DeleteCanary - 删除Canary Token
+- v2ListCanaryHits - 列出Canary Token的命中记录
+
+### 实现Rebinding API端点
+- v2ListRebindingRules - 列出所有Rebinding规则
+- v2CreateRebindingRule - 创建新的Rebinding规则
+- v2GetRebindingRule - 获取指定Rebinding规则
+- v2UpdateRebindingRule - 更新Rebinding规则
+- v2DeleteRebindingRule - 删除Rebinding规则
+- v2ListRebindingSessions - 列出Rebinding会话
+
+### 实现Listener API端点
+- v2ListListeners - 列出所有Listener
+- v2CreateListener - 创建新的Listener
+- v2GetListener - 获取指定Listener
+- v2UpdateListener - 更新Listener
+- v2DeleteListener - 删除Listener
+- v2ListListenerInteractions - 列出Listener的交互记录
+
+### 实现Evidence API端点
+- v2GetEvidence - 获取Evidence报告（添加说明：Evidence报告按需生成，不持久化存储）
+

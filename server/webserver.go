@@ -329,7 +329,10 @@ func (self *WebServer) Run() error {
 }
 
 func (self *WebServer) Shutdown(ctx context.Context) error {
-	err := self.s.Shutdown(ctx)
+	var err error
+	if self.s != nil {
+		err = self.s.Shutdown(ctx)
+	}
 	//important: stop input then call shutdown
 
 	<-self.storeQuit
