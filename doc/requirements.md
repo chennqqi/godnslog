@@ -180,6 +180,14 @@ Phase 16：插件市场/模板市场
 - `doc/2.0-data-model-design.md` — 统一数据模型设计（数据库Schema、迁移策略、Go模型规范）
 - `doc/2.0-frontend-uiux-spec.md` — 前端UI/UX规范（目录结构、组件规范、页面设计、技术栈）
 
+## 2026-05-06
+
+- 使用 Pencil 根据 `doc/2.0-UI-Design.md` 持续绘制并完善 `doc/ui-design-v2.pen`。
+- 本轮继续补齐剩余页面与系统管理相关画板。
+- 用户继续要求：continue（持续完善 UI 设计稿，补充统一壳层与深色主题页面）。
+- 用户继续要求：continue（继续补齐深色主题下系统管理页面）。
+- 用户继续要求：continue（进行设计稿收尾，包括导航高亮一致化与设计规范画板）。
+
 ### 补充原则（API模型共享）
 后端接口的请求/响应结构体必须使用 Go `struct` 声明，放置于**独立可导出的包**（如 `pkg/apimodels/` 或 `internal/models/`）。这些结构体是服务端 Gin handler 的绑定目标，也是客户端（Next.js/CLI）TypeScript 类型的唯一来源，确保前后端契约一致，禁止前端独立编造类型。
 
@@ -296,6 +304,14 @@ GODNSLOG 2.0 所有计划阶段已全部完成，共计 35 个主要功能模块
 ### P0严重问题
 
 1. **修复登录功能** ✅ 已完成
-   - 问题：v2Login/v2Logout/v2UserInfo使用旧的CR格式（大写字段Code/Message），前端期望ApiResponse格式（小写字段code/message）
-   - 修复：重写v2Login、v2Logout、v2UserInfo函数，直接返回前端期望的格式
-   - 修改文件：server/v2_api.go
+   - 问题1：后端v2Login/v2Logout/v2UserInfo使用旧的CR格式（大写字段Code/Message），前端期望ApiResponse格式（小写字段code/message）
+     - 修复：重写v2Login、v2Logout、v2UserInfo函数，直接返回前端期望的格式
+     - 修改文件：server/v2_api.go
+   - 问题2：前端登录成功后token存储在localStorage中，但中间件检查的是cookie中的token，导致登录后跳转失败
+     - 修复：修改中间件，从Authorization header读取token，移除cookie检查；修改API客户端，只从localStorage读取token；在dashboard页面添加客户端认证检查
+     - 修改文件：frontend-next/src/middleware.ts, frontend-next/src/lib/api.ts, frontend-next/src/app/dashboard/page.tsx
+   - 问题3：后端v2Login使用username和email两个字段查询用户，但前端只发送username，导致查询失败返回401
+     - 修复：修改v2Login函数，只使用username查询用户，移除email字段依赖；添加详细日志便于调试
+     - 修改文件：server/v2_api.go
+   - 单元测试增强：为登录API添加完整的单元测试，覆盖有效凭证、无效凭证、用户不存在等场景，验证ApiResponse格式
+     - 修改文件：server/v2_api_test.go
