@@ -342,3 +342,30 @@ GODNSLOG 2.0 所有计划阶段已全部完成，共计 35 个主要功能模块
 - Payload Studio：补充列表与三步创建向导（模板、变量、预览确认）。
 - 状态页：补充空状态、错误、网络、权限、404 和加载骨架屏。
 - 响应式：补充移动端 Dashboard、抽屉导航、移动端 Case 卡片列表。
+
+## 2026-05-09（产品经理复审）
+
+作为产品经理再次审阅 `doc/ui-design-v2.pen` 是否满足 UI/视觉设计要求。
+
+复审关注：
+- 是否满足企业级 OAST 平台的信息架构与核心页面要求。
+- 是否覆盖新版视觉稿中的桌面端、移动端、空状态、边界状态和设计规范。
+- 是否仍存在阻碍前端实现或评审验收的设计缺口。
+
+## 2026-05-09（企业级设计稿完善）
+
+继续完善 `doc/ui-design-v2.pen`，按照“完整企业级 OAST 平台设计稿”标准补齐设计缺口。
+
+完善范围：
+- 补齐 Canary Tokens、Rebinding Lab、Workflow 等次级业务页面。
+- 补齐 Visual v2 精度的 Case Detail 和 Interaction Timeline。
+- 补齐移动端 Payload、Interaction、Settings 等关键页面示例。
+- 改善设计稿作为企业级 UI 交付物的完整性和可开发性。
+
+## 2026-05-09（企业级收尾校验）
+
+继续对新增企业级补齐画板执行收尾校验（布局快照 + 截图复核），确认可见性与布局稳定性。
+
+本次校验范围：
+- Canary Tokens、Rebinding Lab、Workflow。
+- Case Detail v2、Interaction Timeline v2、Mobile Extended。
