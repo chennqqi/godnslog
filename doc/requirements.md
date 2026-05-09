@@ -188,6 +188,9 @@ Phase 16：插件市场/模板市场
 - 用户继续要求：continue（继续补齐深色主题下系统管理页面）。
 - 用户继续要求：continue（进行设计稿收尾，包括导航高亮一致化与设计规范画板）。
 - 用户继续要求：continue（进行可读性修复轮，改善整页预览效果）。
+- 用户继续要求：continue（补齐 Preview Pack 的系统页预览并统一网格）。
+- 用户继续要求：continue（最终收尾：Light 预览裁切修复 + 评审入口画板）。
+- 用户继续要求：continue（Pencil 服务恢复后落实最终收尾）。
 
 ### 补充原则（API模型共享）
 后端接口的请求/响应结构体必须使用 Go `struct` 声明，放置于**独立可导出的包**（如 `pkg/apimodels/` 或 `internal/models/`）。这些结构体是服务端 Gin handler 的绑定目标，也是客户端（Next.js/CLI）TypeScript 类型的唯一来源，确保前后端契约一致，禁止前端独立编造类型。

@@ -10,6 +10,7 @@ import (
 	"github.com/chennqqi/godnslog/cache"
 	"github.com/chennqqi/godnslog/models"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestV2Login(t *testing.T) {
@@ -32,22 +33,45 @@ func TestV2Login(t *testing.T) {
 		t.Fatalf("Failed to create server: %v", err)
 	}
 
+	// Initialize database and create test user
+	if err := server.initDatabase(); err != nil {
+		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Create test user
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	user := &models.TblUser{
+		Name:  "testuser",
+		Email: "testuser@test.com",
+		Pass:  string(hashedPassword),
+		Role:  0, // super admin
+		Lang:  "en-US",
+	}
+	if _, err := server.orm.Insert(user); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
 	// Initialize router
 	r := gin.New()
 	server.registerV2API(r)
 
 	// Test login with valid credentials
-	reqBody := `{"username": "admin", "password": "password"}`
+	reqBody := `{"username": "testuser", "password": "password"}`
 	req := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	// Check response
+	// Check response status
 	if w.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", w.Code)
+		t.Errorf("Expected status 200, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
+	// Check response format (ApiResponse format with lowercase fields)
 	var response struct {
 		Code    int    `json:"code"`
 		Message string `json:"message"`
@@ -57,20 +81,143 @@ func TestV2Login(t *testing.T) {
 				Id       int64  `json:"id"`
 				Username string `json:"username"`
 				Email    string `json:"email"`
+				Role     int    `json:"role"`
+				Lang     string `json:"lang"`
 			} `json:"user"`
 		} `json:"data"`
 	}
 
 	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to parse response: %v. Body: %s", err, w.Body.String())
+	}
+
+	// Verify code is 0 (success)
+	if response.Code != 0 {
+		t.Errorf("Expected code 0, got %d. Message: %s", response.Code, response.Message)
+	}
+
+	// Verify token is present
+	if response.Data.Token == "" {
+		t.Error("Expected token in response data")
+	}
+
+	// Verify user data is present
+	if response.Data.User.Username != "testuser" {
+		t.Errorf("Expected username 'testuser', got '%s'", response.Data.User.Username)
+	}
+}
+
+func TestV2LoginInvalidCredentials(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	// Create test server config
+	cfg := &WebServerConfig{
+		Domain:     "test.example.com",
+		Driver:     "sqlite",
+		Dsn:        ":memory:",
+		AuthExpire: 3600,
+	}
+
+	// Create cache
+	store := cache.NewCache(300, 60)
+
+	// Create test server
+	server, err := NewWebServer(cfg, store)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	// Initialize database and create test user
+	if err := server.initDatabase(); err != nil {
+		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Create test user
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	user := &models.TblUser{
+		Name:  "testuser2",
+		Email: "testuser2@test.com",
+		Pass:  string(hashedPassword),
+		Role:  0,
+		Lang:  "en-US",
+	}
+	if _, err := server.orm.Insert(user); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Initialize router
+	r := gin.New()
+	server.registerV2API(r)
+
+	// Test login with invalid password
+	reqBody := `{"username": "testuser2", "password": "wrongpassword"}`
+	req := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	// Should return 401
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("Expected status 401, got %d", w.Code)
+	}
+
+	// Check response format
+	var response struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
 
-	if response.Code != models.CodeOK {
-		t.Errorf("Expected code %d, got %d", models.CodeOK, response.Code)
+	if response.Code != 401 {
+		t.Errorf("Expected code 401, got %d", response.Code)
+	}
+}
+
+func TestV2LoginUserNotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	// Create test server config
+	cfg := &WebServerConfig{
+		Domain:     "test.example.com",
+		Driver:     "sqlite",
+		Dsn:        ":memory:",
+		AuthExpire: 3600,
 	}
 
-	if response.Data.Token == "" {
-		t.Error("Expected token in response data")
+	// Create cache
+	store := cache.NewCache(300, 60)
+
+	// Create test server
+	server, err := NewWebServer(cfg, store)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	// Initialize database (no users created)
+	if err := server.initDatabase(); err != nil {
+		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Initialize router
+	r := gin.New()
+	server.registerV2API(r)
+
+	// Test login with non-existent user
+	reqBody := `{"username": "nonexistent", "password": "password"}`
+	req := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	// Should return 401
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("Expected status 401, got %d", w.Code)
 	}
 }
 

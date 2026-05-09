@@ -172,36 +172,43 @@ func (self *WebServer) v2Login(c *gin.Context) {
 	var req LoginRequest
 	err := c.BindJSON(&req)
 	if err != nil {
+		logrus.Errorf("[v2_api.go::v2Login] BindJSON error: %v", err)
 		c.JSON(400, gin.H{
 			"code":    400,
 			"message": T("bad input"),
 		})
 		return
 	}
+
+	logrus.Infof("[v2_api.go::v2Login] login request: username=%s", req.Username)
+
 	session := self.orm.NewSession()
 	defer session.Close()
 	var user = new(models.TblUser)
-	exist, err := session.Where(`name=?`, req.Username).
-		Or(`email=?`, req.Email).Get(user)
+	// Only use username for query (email is optional in frontend)
+	exist, err := session.Where(`name=?`, req.Username).Get(user)
 
 	if err != nil {
-		logrus.Errorf("[v2_api.go::v2Login] orm.Get: %v", err)
+		logrus.Errorf("[v2_api.go::v2Login] orm.Get error: %v", err)
 		c.JSON(502, gin.H{
 			"code":    502,
 			"message": T("bad service"),
 		})
 		return
 	} else if !exist {
-		logrus.Infof("[v2_api.go::v2Login] not found: %v", req)
+		logrus.Infof("[v2_api.go::v2Login] user not found: username=%s", req.Username)
 		c.JSON(401, gin.H{
 			"code":    401,
 			"message": T("bad request"),
 		})
 		return
 	}
+
+	logrus.Infof("[v2_api.go::v2Login] user found: id=%d, name=%s", user.Id, user.Name)
+
 	err = comparePassword(req.Password, user.Pass)
 	if err != nil {
-		logrus.Infof("[v2_api.go::v2Login] password not match")
+		logrus.Infof("[v2_api.go::v2Login] password not match for user: %s", req.Username)
 		c.JSON(401, gin.H{
 			"code":    401,
 			"message": T("bad request"),
@@ -225,7 +232,7 @@ func (self *WebServer) v2Login(c *gin.Context) {
 
 	tokenString, err := token.SignedString([]byte(self.verifyKey))
 	if err != nil {
-		logrus.Errorf("[v2_api.go::v2Login] token.SignedString: %v", err)
+		logrus.Errorf("[v2_api.go::v2Login] token.SignedString error: %v", err)
 		c.JSON(502, gin.H{
 			"code":    502,
 			"message": T("bad service"),
@@ -236,6 +243,8 @@ func (self *WebServer) v2Login(c *gin.Context) {
 
 	store.Set(fmt.Sprintf("%v.seed", user.Id), seed, self.AuthExpire)
 	store.Set(fmt.Sprintf("%v.user", user.Id), user, cache.NoExpiration)
+
+	logrus.Infof("[v2_api.go::v2Login] login success: username=%s", req.Username)
 
 	// Return data in format expected by frontend: { code: 0, message: "OK", data: { token, user } }
 	c.JSON(200, gin.H{

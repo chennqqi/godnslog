@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { caseApi, interactionApi, payloadApi } from '@/lib/api-client'
 import type { Case, Interaction } from '@/types'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function DashboardPage() {
+  const router = useRouter()
   const [stats, setStats] = useState({
     totalCases: 0,
     activeCases: 0,
@@ -21,8 +23,15 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Check authentication on client side
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/login')
+      return
+    }
+
     loadDashboardData()
-  }, [])
+  }, [router])
 
   const loadDashboardData = async () => {
     try {

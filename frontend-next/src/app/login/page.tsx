@@ -34,14 +34,17 @@ export default function LoginPage() {
 
     try {
       const response = await authApi.login(formData)
+      console.log('Login response:', response)
       if (response.code === 0 && response.data) {
         localStorage.setItem('token', response.data.token)
         localStorage.setItem('user', JSON.stringify(response.data.user))
+        console.log('Token stored:', response.data.token)
         router.push('/dashboard')
       } else {
         setError(response.message || t('login.error', lang))
       }
     } catch (err: any) {
+      console.error('Login error:', err)
       setError(err.response?.data?.message || t('login.error', lang))
     } finally {
       setLoading(false)
