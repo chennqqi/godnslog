@@ -75,17 +75,15 @@ export default function InteractionsPage() {
 
   const loadStats = async () => {
     try {
-      // Call stats API if available
-      const response = await fetch('/api/v2/interactions/stats', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        if (data.code === 0) {
-          setStats(data.data)
-        }
+      const response = await interactionApi.stats()
+      if (response.code === 0 && response.data) {
+        setStats({
+          total: response.data.total ?? 0,
+          dns_count: response.data.dns_count ?? 0,
+          http_count: response.data.http_count ?? 0,
+          smtp_count: response.data.smtp_count ?? 0,
+          ldap_count: response.data.ldap_count ?? 0,
+        })
       }
     } catch (error) {
       console.error('Failed to load stats:', error)

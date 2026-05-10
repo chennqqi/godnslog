@@ -12,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
 import { api } from '@/lib/api'
 
 /** Audit log entry shape */
@@ -84,13 +83,17 @@ export default function AuditPage() {
   const loadAudit = useCallback(async () => {
     setLoading(true)
     try {
-      const resp = await api.get<{ items: AuditEntry[]; total: number }>('/audit', {
+      const resp = await api.get<{ items: AuditEntry[]; total: number }>('/audit/logs', {
         page: 1,
         page_size: 100,
       })
       setEntries(resp.data?.items ?? [])
     } catch (err) {
-      console.error('Failed to load audit log:', err)
+      const statusCode = (err as { originalError?: { response?: { status?: number } } })?.originalError?.response?.status
+      // Backend may not expose audit APIs yet; keep UI usable without noisy errors.
+      if (statusCode !== 404) {
+        console.error('Failed to load audit log:', err)
+      }
       // Fall back to empty list so the page remains usable
       setEntries([])
     } finally {

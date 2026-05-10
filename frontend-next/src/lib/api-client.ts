@@ -11,6 +11,7 @@ import type {
   PayloadListResponse,
   Interaction,
   InteractionListResponse,
+  InteractionStats,
   APIKey,
   APIKeyCreateRequest,
   APIKeyUpdateRequest,
@@ -54,6 +55,8 @@ export const interactionApi = {
     page?: number
     page_size?: number
   }) => api.get<InteractionListResponse>('/interactions', params),
+  stats: (params?: { case_id?: string; payload_id?: string }) =>
+    api.get<InteractionStats>('/interactions/stats', params),
   get: (id: string) => api.get<{ data: Interaction }>(`/interactions/${id}`),
   delete: (ids: string[]) => api.post('/interactions/delete', { ids }),
   export: (data: any) => api.post('/interactions/export', data),

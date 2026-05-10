@@ -1761,14 +1761,18 @@ func generateRandomString(length int) string {
 func (self *WebServer) v2ListUsers(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
 
-	session := self.orm.NewSession()
-	defer session.Close()
-
-	var users []models.TblUser
-	query := session.Table(new(models.TblUser))
-
-	total, err := query.Count()
+	// TblUser uses Atime/Utime (DB columns atime/utime), not created_at — avoid invalid ORDER BY.
+	total, err := self.orm.Count(&models.TblUser{})
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListUsers] count error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -1778,7 +1782,8 @@ func (self *WebServer) v2ListUsers(c *gin.Context) {
 		return
 	}
 
-	err = query.OrderBy("created_at DESC").Limit(pageSize, (page-1)*pageSize).Find(&users)
+	var users []models.TblUser
+	err = self.orm.Desc("id").Limit(pageSize, (page-1)*pageSize).Find(&users)
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListUsers] find error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -1790,12 +1795,16 @@ func (self *WebServer) v2ListUsers(c *gin.Context) {
 
 	items := make([]map[string]interface{}, len(users))
 	for i, user := range users {
+		created := user.Atime
+		if created.IsZero() {
+			created = user.Utime
+		}
 		items[i] = map[string]interface{}{
 			"id":         strconv.FormatInt(user.Id, 10),
 			"username":   user.Name,
 			"email":      user.Email,
 			"role":       user.Role,
-			"created_at": user.Atime.Format(time.RFC3339),
+			"created_at": created.Format(time.RFC3339),
 		}
 	}
 
@@ -2009,6 +2018,7 @@ func (self *WebServer) v2ListRules(c *gin.Context) {
 	workflowService := workflow.NewService(self.orm)
 	resp, err := workflowService.ListWorkflows("", nil, page, pageSize)
 	if err != nil {
+		logrus.Errorf("[v2_api.go::v2ListRules] ListWorkflows: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    5,
 			"message": "Failed to list workflows",
@@ -2040,8 +2050,17 @@ func (self *WebServer) v2CreateRule(c *gin.Context) {
 		return
 	}
 
+	if req.CreatedBy == "" {
+		if uid, ok := c.Get("id"); ok {
+			req.CreatedBy = fmt.Sprintf("%v", uid)
+		} else {
+			req.CreatedBy = "0"
+		}
+	}
+
 	workflowService := workflow.NewService(self.orm)
 	if err := workflowService.CreateWorkflow(&req); err != nil {
+		logrus.Errorf("[v2_api.go::v2CreateRule] CreateWorkflow: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    5,
 			"message": "Failed to create workflow",

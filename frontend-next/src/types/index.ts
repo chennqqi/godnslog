@@ -144,6 +144,16 @@ export interface InteractionListResponse {
   total_pages: number
 }
 
+/** Aggregated interaction counts returned by GET /interactions/stats */
+export interface InteractionStats {
+  total: number
+  by_type?: Record<string, number>
+  dns_count?: number
+  http_count?: number
+  smtp_count?: number
+  ldap_count?: number
+}
+
 // APIKey types
 export interface APIKey {
   id: string

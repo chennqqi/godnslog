@@ -28,13 +28,16 @@ func (s *Service) CreateWorkflow(workflow *models.Workflow) error {
 	if workflow.ID == "" {
 		workflow.ID = models.GenerateID()
 	}
+	if workflow.Actions == nil {
+		workflow.Actions = models.Actions{}
+	}
 	if workflow.CreatedAt.IsZero() {
 		workflow.CreatedAt = time.Now()
 	}
 	if workflow.UpdatedAt.IsZero() {
 		workflow.UpdatedAt = time.Now()
 	}
-	
+
 	_, err := s.engine.Insert(workflow)
 	return err
 }
@@ -57,29 +60,29 @@ func (s *Service) ListWorkflows(caseID string, enabled *bool, page, pageSize int
 	var workflows []models.Workflow
 	session := s.engine.NewSession()
 	defer session.Close()
-	
+
 	if caseID != "" {
 		session = session.Where("case_id = ?", caseID)
 	}
 	if enabled != nil {
 		session = session.Where("enabled = ?", *enabled)
 	}
-	
+
 	total, err := session.Count(&models.Workflow{})
 	if err != nil {
 		return nil, err
 	}
-	
+
 	offset := (page - 1) * pageSize
 	if err := session.Desc("created_at").Limit(pageSize, offset).Find(&workflows); err != nil {
 		return nil, err
 	}
-	
+
 	totalPages := int(total) / pageSize
 	if int(total)%pageSize > 0 {
 		totalPages++
 	}
-	
+
 	return &models.WorkflowListResponse{
 		Items:      workflows,
 		Total:      total,
@@ -92,7 +95,7 @@ func (s *Service) ListWorkflows(caseID string, enabled *bool, page, pageSize int
 // UpdateWorkflow updates an existing workflow
 func (s *Service) UpdateWorkflow(workflow *models.Workflow) error {
 	workflow.UpdatedAt = time.Now()
-	
+
 	_, err := s.engine.ID(workflow.ID).Update(workflow)
 	return err
 }
@@ -109,23 +112,23 @@ func (s *Service) ExecuteWorkflow(workflowID string, interaction *models.Interac
 	if err != nil {
 		return err
 	}
-	
+
 	if !workflow.Enabled {
 		return nil // Skip disabled workflows
 	}
-	
+
 	// Execute each action in the workflow
 	for _, action := range workflow.Actions {
 		if !action.Enabled {
 			continue
 		}
-		
+
 		if err := s.executeAction(action, interaction); err != nil {
 			// Log error but continue with other actions
 			continue
 		}
 	}
-	
+
 	return nil
 }
 

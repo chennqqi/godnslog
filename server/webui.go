@@ -51,7 +51,8 @@ func (self *WebServer) initDatabase() error {
 		&models.TblPayload{},
 		&models.TblInteraction{},
 		&models.TblAPIKey{},
-		&v2models.Interaction{})
+		&v2models.Interaction{},
+		&v2models.Workflow{})
 	if err != nil {
 		logrus.Errorf("[webui.go::initDatabase] orm.Sync: %v", err)
 		return err

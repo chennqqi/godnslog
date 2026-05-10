@@ -404,3 +404,15 @@ GODNSLOG 2.0 所有计划阶段已全部完成，共计 35 个主要功能模块
 ## 2026-05-10（Next.js 升级）
 
 处理 “Next.js (14.2.35) is outdated” 提示：将 `frontend-next` 升级到 `next@16.2.6`，同步 `eslint-config-next` 与依赖安装流程（使用 pnpm）。
+
+## 2026-05-10（Audit 404 兼容）
+
+修复 Audit 页接口 404 噪音：请求路径调整为 `/audit/logs`，并对后端未启用审计接口时的 404 进行静默降级为空列表。
+
+## 2026-05-10（Workflow / Interactions 统计）
+
+修复终端日志：Workflow 列表与创建失败（`workflows` 表未 Sync）；Interactions 统计 404（前端 `fetch` 打到 Next 而非后端 API）。已在 `initDatabase` 同步 `Workflow`、创建时补全 `created_by` 与空 `actions`；统计改为 `interactionApi.stats()`。
+
+## 2026-05-10（用户列表 API）
+
+修复 `/api/v2/users` code 5：`v2ListUsers` 使用不存在的 `created_at` 排序（`TblUser` 为 `atime`/`utime`），改为按 `id` 倒序并规范分页参数。

@@ -204,3 +204,34 @@
 - npm 在该环境安装异常，改用 `pnpm install` 成功。
 - 构建初次失败后复跑通过，确认升级后的 App Router 页面可正常产物化。
 - Next 16 对 lint 工具链有变化，当前仓库存在历史 ESLint 配置兼容问题，不影响 build，但 `pnpm run lint` 仍需后续统一迁移整理。
+
+## 2026-05-10（Audit 日志 404）
+
+用户提供终端日志，报错为 Audit 页面请求失败 404。
+
+分析：
+- 前端原请求为 `/api/v2/audit`，与文档中约定的 `/api/v2/audit/logs` 不一致。
+- 当前后端未注册可用 audit 路由时，前端会持续输出 error 级日志，影响调试体验。
+
+处理：
+- Audit 页接口路径改为 `/audit/logs`。
+- 对 404 做静默降级（仅保留空数据展示，不打印 error），其他错误继续输出日志。
+
+## 2026-05-10（Workflow code 5、interactions/stats 404）
+
+用户提供 dev 日志：`/rules` 返回 code 5；`GET /api/v2/interactions/stats` 404；创建 rule 失败。
+
+分析：
+- `v2ListRules`/`v2CreateRule` 依赖 `workflows` 表，但 `initDatabase` 的 `Sync` 未包含 `Workflow`，导致 SQL 失败。
+- `Workflow` 模型要求 `created_by`、`actions`（JSON notnull）；前端创建体可能缺字段。
+- Interactions 页用相对路径 `fetch('/api/v2/...')` 指向 Next.js，后端路由在 `NEXT_PUBLIC_API_URL`，故 404。
+
+处理：Sync 增加 `Workflow`；`CreateWorkflow` 默认空 `actions`；`v2CreateRule` 从 JWT 上下文填充 `created_by`；统计走 `interactionApi.stats()`。
+
+## 2026-05-10（用户管理报错、功能完备度）
+
+用户反馈用户页加载失败，并认为许多功能未实现。
+
+分析：`v2ListUsers` 中 `OrderBy("created_at DESC")` 与 `models.TblUser`  schema 不一致（仅有 `Atime`/`Utime`），数据库无 `created_at` 列导致查询失败返回 code 5。2.0 部分页面为骨架或占位 API，需按 ROADMAP 逐项补齐。
+
+处理：用户列表改为 `Count` + `Desc("id")` 分页；`created_at` 输出优先 `Atime`、否则 `Utime`。

@@ -31,6 +31,22 @@ interface User {
   created_at: string
 }
 
+/** Maps backend role ints (models/api.go) to a short label */
+function roleLabel(role: number): string {
+  switch (role) {
+    case 0:
+      return 'Super admin'
+    case 1:
+      return 'Admin'
+    case 2:
+      return 'User'
+    case 3:
+      return 'Guest'
+    default:
+      return `Role ${role}`
+  }
+}
+
 export default function UsersPage() {
   const router = useRouter()
 
@@ -117,8 +133,8 @@ export default function UsersPage() {
                     <TableCell>{user.username}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>
-                      <Badge variant={user.role === 1 ? 'default' : 'outline'}>
-                        {user.role === 0 ? '普通用户' : '管理员'}
+                      <Badge variant={user.role === 0 || user.role === 1 ? 'default' : 'outline'}>
+                        {roleLabel(user.role)}
                       </Badge>
                     </TableCell>
                     <TableCell>{new Date(user.created_at).toLocaleString()}</TableCell>
