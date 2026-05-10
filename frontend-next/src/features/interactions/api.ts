@@ -1,18 +1,19 @@
 import { interactionApi } from '@/lib/api-client'
-import type { Interaction, InteractionListResponse, ExportRequest, DeleteRequest } from '@/types'
+import type { Interaction, InteractionListResponse } from '@/types'
 
+/** Feature-layer interaction API wrapper */
 export const interactionsApi = {
-  list: async (params: { page?: number; page_size?: number }): Promise<InteractionListResponse> => {
+  list: async (params: { page?: number; page_size?: number }): Promise<InteractionListResponse | undefined> => {
     const response = await interactionApi.list(params)
     return response.data
   },
 
-  get: async (id: string): Promise<Interaction> => {
+  get: async (id: string): Promise<Interaction | undefined> => {
     const response = await interactionApi.get(id)
-    return response.data
+    return response.data as unknown as Interaction | undefined
   },
 
-  export: async (data: ExportRequest): Promise<Blob> => {
+  export: async (data: Record<string, unknown>): Promise<Blob> => {
     const response = await fetch('/api/v2/interactions/export', {
       method: 'POST',
       headers: {
@@ -24,7 +25,7 @@ export const interactionsApi = {
     return response.blob()
   },
 
-  delete: async (data: DeleteRequest): Promise<void> => {
-    await interactionApi.delete(data)
+  delete: async (ids: string[]): Promise<void> => {
+    await interactionApi.delete(ids)
   },
 }

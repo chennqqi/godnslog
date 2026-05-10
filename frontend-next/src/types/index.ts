@@ -181,3 +181,39 @@ export interface APIKeyListResponse {
   page_size: number
   total_pages: number
 }
+
+// Settings types
+export interface Settings {
+  dns_domain: string
+  dns_port: number
+  dns_ttl: number
+  http_port: number
+  https_tls_cert: string
+  https_tls_key: string
+  enable_auth: boolean
+  session_timeout: number
+  enable_notification: boolean
+  notification_url: string
+  log_level: string
+  log_retention_days: number
+}
+
+export interface SettingsCreateRequest extends Partial<Settings> {}
+
+export interface SettingsUpdateRequest extends Partial<Settings> {}
+
+// User management types
+export interface UserCreateRequest {
+  username: string
+  password: string
+  email?: string
+  role?: string
+}
+
+export interface UserListResponse {
+  items: User[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}

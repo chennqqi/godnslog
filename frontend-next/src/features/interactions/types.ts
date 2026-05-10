@@ -1,6 +1,6 @@
-import type { Interaction, ExportRequest, DeleteRequest } from '@/types'
+import type { Interaction } from '@/types'
 
-export type { Interaction, ExportRequest, DeleteRequest }
+export type { Interaction }
 
 export interface InteractionFilters {
   type?: string

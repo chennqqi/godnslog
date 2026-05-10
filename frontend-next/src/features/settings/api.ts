@@ -1,58 +1,44 @@
-import type { Settings, SettingsCreateRequest, SettingsUpdateRequest, SettingsListResponse } from '@/types'
+/** Settings configuration key-value type */
+export interface Settings {
+  key: string
+  value: string
+  description?: string
+}
 
+export interface SettingsListResponse {
+  items: Settings[]
+  total: number
+}
+
+/** Feature-layer settings API wrapper */
 export const settingsApi = {
   list: async (params: { page?: number; page_size?: number }): Promise<SettingsListResponse> => {
-    const response = await fetch(`/api/v2/settings?page=${params.page || 1}&page_size=${params.page_size || 20}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    })
+    const response = await fetch(
+      `/api/v2/settings?page=${params.page || 1}&page_size=${params.page_size || 20}`,
+      { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+    )
     const data = await response.json()
-    return data.data
+    return data.data ?? { items: [], total: 0 }
   },
 
-  get: async (key: string): Promise<Settings> => {
+  get: async (key: string): Promise<Settings | undefined> => {
     const response = await fetch(`/api/v2/settings/${key}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     })
     const data = await response.json()
     return data.data
   },
 
-  create: async (data: SettingsCreateRequest): Promise<Settings> => {
-    const response = await fetch('/api/v2/settings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-      body: JSON.stringify(data),
-    })
-    const result = await response.json()
-    return result.data
-  },
-
-  update: async (key: string, data: SettingsUpdateRequest): Promise<Settings> => {
+  update: async (key: string, value: string): Promise<Settings | undefined> => {
     const response = await fetch(`/api/v2/settings/${key}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ value }),
     })
     const result = await response.json()
     return result.data
-  },
-
-  delete: async (key: string): Promise<void> => {
-    await fetch(`/api/v2/settings/${key}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    })
   },
 }

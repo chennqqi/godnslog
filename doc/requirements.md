@@ -387,3 +387,12 @@ GODNSLOG 2.0 所有计划阶段已全部完成，共计 35 个主要功能模块
 - 将设计稿中的企业级 AppShell、侧边栏导航、顶部栏和核心页面落到 `frontend-next`。
 - 优先实现 Dashboard、Cases、Payloads、Interaction Timeline、Canary、Rebinding、Workflow、System 页面骨架。
 - 保持 Light/Dark、响应式、空状态和边界状态与设计稿一致。
+
+## 2026-05-10（前端实现续）
+
+从实际仓库状态继续 frontend-next 实现：
+- 新增缺失的 Audit Log 页面（/dashboard/audit）。
+- Sidebar 添加 Audit Log 导航项（AuditIcon + SYSTEM 分组）。
+- AppShell PAGE_TITLES 补充 /dashboard/audit 映射。
+- Cases 页面中英文混用文本全部改为英文。
+- Canary Tokens 页面重写为企业级英文 UI，添加 Dialog 确认、摘要统计卡片。

@@ -1,6 +1,6 @@
-import type { Payload, PayloadCreateRequest, PayloadUpdateRequest } from '@/types'
+import type { Payload, PayloadCreateRequest } from '@/types'
 
-export type { Payload, PayloadCreateRequest, PayloadUpdateRequest }
+export type { Payload, PayloadCreateRequest }
 
 export interface PayloadFormData {
   case_id: string

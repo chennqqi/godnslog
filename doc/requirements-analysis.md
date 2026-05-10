@@ -178,3 +178,11 @@
 - 应优先落地共享布局与导航，再实现核心页面骨架，避免每页重复布局。
 - 需要遵循现有 `frontend-next` 技术栈与目录结构，优先复用 shadcn/ui、Tailwind 和已有 feature hooks。
 - 本阶段先完成静态 UI 与页面结构对齐，再逐步接入真实 API 数据和交互逻辑。
+
+## 2026-05-10（前端实现续）
+
+分析：
+- 发现 Audit 页面完全缺失，其他核心页面（Dashboard、Cases、Payloads、Interactions、Canary 等）已存在。
+- Cases 页面 UI 文字中英混用，Canary 页面全中文且无 Dialog 组件。
+- 修复点：补 Audit 页（带过滤器/表格/骨架屏）；Sidebar 增 Audit 导航项；Cases/Canary 页文案统一为英文，Canary 改用 Dialog 二次确认 Revoke，添加摘要统计卡。
+- 未改动路由结构，仅新增 /dashboard/audit 路由和对应文件。
