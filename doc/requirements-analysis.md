@@ -168,3 +168,13 @@
 - 已按规则重新加载 Pencil 工具 schema 与当前编辑器状态，并显式打开 `doc/ui-design-v2.pen`。
 - 对 `qtkcN`、`Hr37W`、`Fyjgz`、`XzHLP`、`KnBzl`、`c8dGcm` 执行 `snapshot_layout(problemsOnly=true)`，均返回无布局问题。
 - 对同一批画板执行截图复核，未见明显空白、裁切、按钮文字不可见或错位，故无需额外 `batch_design` 修复。
+
+## 2026-05-09（前端实现）
+
+用户要求开始根据 `doc/ui-design-v2.pen` 开发前端代码。
+
+分析：
+- 当前设计稿已具备企业级 AppShell、核心页面、Monitor/Automation 页面、状态页和移动端示例，可以进入前端实现阶段。
+- 应优先落地共享布局与导航，再实现核心页面骨架，避免每页重复布局。
+- 需要遵循现有 `frontend-next` 技术栈与目录结构，优先复用 shadcn/ui、Tailwind 和已有 feature hooks。
+- 本阶段先完成静态 UI 与页面结构对齐，再逐步接入真实 API 数据和交互逻辑。

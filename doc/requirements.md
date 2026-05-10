@@ -369,3 +369,21 @@ GODNSLOG 2.0 所有计划阶段已全部完成，共计 35 个主要功能模块
 本次校验范围：
 - Canary Tokens、Rebinding Lab、Workflow。
 - Case Detail v2、Interaction Timeline v2、Mobile Extended。
+
+## 2026-05-09（前端实现）
+
+开始根据 `doc/ui-design-v2.pen` 开发前端代码。
+
+实现目标：
+- 将设计稿中的企业级 AppShell、侧边栏导航、顶部栏和核心页面落到 `frontend-next`。
+- 优先实现 Dashboard、Cases、Payloads、Interaction Timeline、Canary、Rebinding、Workflow、System 页面骨架。
+- 保持 Light/Dark、响应式、空状态和边界状态与设计稿一致。
+
+## 2026-05-09（前端实现）
+
+开始根据 `doc/ui-design-v2.pen` 开发前端代码。
+
+实现目标：
+- 将设计稿中的企业级 AppShell、侧边栏导航、顶部栏和核心页面落到 `frontend-next`。
+- 优先实现 Dashboard、Cases、Payloads、Interaction Timeline、Canary、Rebinding、Workflow、System 页面骨架。
+- 保持 Light/Dark、响应式、空状态和边界状态与设计稿一致。
