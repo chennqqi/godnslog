@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { payloadApi, caseApi } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -353,13 +353,15 @@ function StepPreview({
 /** Multi-step Payload creation wizard */
 export default function NewPayloadPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const presetCaseId = searchParams.get('case_id') || ''
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [cases, setCases] = useState<Array<{ id: string; title: string }>>([])
   const [formData, setFormData] = useState({
     template: 'ssrf_http',
     scenario: '',
-    case_id: '',
+    case_id: presetCaseId,
     expires_in: 86400,
   })
   const [vars, setVars] = useState<Record<string, string>>({ token: 'gdl_xxxxxxxx' })

@@ -10,6 +10,7 @@ export default function CaseDetailPage() {
   const router = useRouter()
   const [case_, setCase] = useState<Case | null>(null)
   const [payloads, setPayloads] = useState<Payload[]>([])
+  const [stats, setStats] = useState({ payload_count: 0, interaction_count: 0, hit_payload_count: 0 })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -20,9 +21,10 @@ export default function CaseDetailPage() {
 
   const loadData = async () => {
     try {
-      const [caseResp, payloadsResp] = await Promise.all([
+      const [caseResp, payloadsResp, statsResp] = await Promise.all([
         caseApi.get(params.id as string),
         payloadApi.list({ case_id: params.id as string, page: 1, page_size: 100 }),
+        caseApi.stats(params.id as string),
       ])
 
       // Handle nested response structure
@@ -34,6 +36,13 @@ export default function CaseDetailPage() {
       if (payloadsResp.data) {
         setPayloads(payloadsResp.data.items)
       }
+      if (statsResp.data) {
+        setStats({
+          payload_count: statsResp.data.payload_count || 0,
+          interaction_count: statsResp.data.interaction_count || 0,
+          hit_payload_count: statsResp.data.hit_payload_count || 0,
+        })
+      }
     } catch (error) {
       console.error('Failed to load case data:', error)
     } finally {
@@ -42,11 +51,11 @@ export default function CaseDetailPage() {
   }
 
   if (loading) {
-    return <div className="text-center py-12">加载中...</div>
+    return <div className="text-center py-12">Loading...</div>
   }
 
   if (!case_) {
-    return <div className="text-center py-12">Case 不存在</div>
+    return <div className="text-center py-12">Case not found</div>
   }
 
   return (
@@ -55,7 +64,7 @@ export default function CaseDetailPage() {
         onClick={() => router.back()}
         className="mb-4 text-indigo-600 hover:text-indigo-800"
       >
-        ← 返回
+        ← Back
       </button>
 
       <div className="bg-white shadow rounded-lg mb-6">
@@ -65,7 +74,7 @@ export default function CaseDetailPage() {
               <h2 className="text-2xl font-bold text-gray-900">{case_.title}</h2>
               <p className="text-gray-600 mt-2">{case_.description}</p>
               {case_.target && (
-                <p className="text-sm text-gray-500 mt-2">目标: {case_.target}</p>
+                <p className="text-sm text-gray-500 mt-2">Target: {case_.target}</p>
               )}
             </div>
             <span className={`px-3 py-1 text-sm rounded ${
@@ -77,8 +86,23 @@ export default function CaseDetailPage() {
             </span>
           </div>
           <div className="mt-4 text-sm text-gray-500">
-            创建于: {new Date(case_.created_at).toLocaleString()}
+            Created at: {new Date(case_.created_at).toLocaleString()}
           </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white shadow rounded-lg p-4">
+          <p className="text-xs text-gray-500 uppercase">Payloads</p>
+          <p className="text-2xl font-bold text-gray-900">{stats.payload_count}</p>
+        </div>
+        <div className="bg-white shadow rounded-lg p-4">
+          <p className="text-xs text-gray-500 uppercase">Interactions</p>
+          <p className="text-2xl font-bold text-gray-900">{stats.interaction_count}</p>
+        </div>
+        <div className="bg-white shadow rounded-lg p-4">
+          <p className="text-xs text-gray-500 uppercase">Hit Payloads</p>
+          <p className="text-2xl font-bold text-gray-900">{stats.hit_payload_count}</p>
         </div>
       </div>
 
@@ -87,14 +111,14 @@ export default function CaseDetailPage() {
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-gray-900">Payloads</h3>
             <button
-              onClick={() => router.push(`/dashboard/cases/${case_.id}/payloads/new`)}
+              onClick={() => router.push(`/dashboard/payloads/new?case_id=${case_.id}`)}
               className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
             >
-              创建 Payload
+              Create Payload
             </button>
           </div>
           {payloads.length === 0 ? (
-            <p className="text-gray-500">暂无 Payloads</p>
+            <p className="text-gray-500">No payloads yet</p>
           ) : (
             <ul className="divide-y divide-gray-200">
               {payloads.map((payload) => (
@@ -107,7 +131,7 @@ export default function CaseDetailPage() {
                     <p className="text-sm font-medium text-indigo-600">{payload.template}</p>
                     <p className="text-sm text-gray-500">Token: {payload.token}</p>
                     <p className="text-xs text-gray-400 mt-1">
-                      状态: {payload.status}
+                      Status: {payload.status}
                     </p>
                   </div>
                   <span className="text-xs text-gray-400">

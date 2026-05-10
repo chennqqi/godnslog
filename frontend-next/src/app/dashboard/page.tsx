@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { caseApi, interactionApi, payloadApi } from '@/lib/api-client'
-import type { Case, Interaction } from '@/types'
+import type { Interaction } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -138,24 +138,26 @@ export default function DashboardPage() {
 
   const loadData = async () => {
     try {
-      const [casesResp, interactionsResp, payloadsResp] = await Promise.all([
+      const [casesResp, interactionsResp, interactionsStatsResp, payloadsResp] = await Promise.all([
         caseApi.list({ page: 1, page_size: 5 }),
         interactionApi.list({ page: 1, page_size: 10 }),
-        payloadApi.list({ page: 1, page_size: 1 }),
+        interactionApi.stats({ period: 'today' }),
+        payloadApi.list({ status: 'deployed', page: 1, page_size: 1 }),
       ])
 
       const interactions = interactionsResp.data?.items || []
       const cases = casesResp.data?.items || []
+      const statsData = interactionsStatsResp.data
 
       setStats({
         activeCases: cases.filter((c) => c.status === 'active').length,
-        totalHitsToday: interactionsResp.data?.total || 0,
+        totalHitsToday: statsData?.total || 0,
         activePayloads: payloadsResp.data?.total || 0,
         systemOk: true,
-        dnsCount: interactions.filter((i) => i.type === 'dns').length,
-        httpCount: interactions.filter((i) => i.type === 'http').length,
-        smtpCount: interactions.filter((i) => i.type === 'smtp').length,
-        totalInteractions: interactionsResp.data?.total || 0,
+        dnsCount: statsData?.dns_count || 0,
+        httpCount: statsData?.http_count || 0,
+        smtpCount: statsData?.smtp_count || 0,
+        totalInteractions: statsData?.total || 0,
       })
       setRecentInteractions(interactions)
     } catch (err) {

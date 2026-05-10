@@ -49,22 +49,24 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		{
 			payloads.GET("", self.v2ListPayloads)
 			payloads.POST("", self.v2CreatePayload)
+			// Static path segments must be registered before /:id so Gin does not treat e.g. "batch" as an id.
+			payloads.POST("/batch", self.v2BatchCreatePayloads)
 			payloads.GET("/:id", self.v2GetPayload)
 			payloads.PUT("/:id", self.v2UpdatePayload)
 			payloads.POST("/:id/revoke", self.v2RevokePayload)
 			payloads.POST("/:id/preview", self.v2PreviewPayload)
-			payloads.POST("/batch", self.v2BatchCreatePayloads)
 		}
 
 		// Interactions
 		interactions := v2.Group("/interactions", self.authHandler)
 		{
 			interactions.GET("", self.v2ListInteractions)
-			interactions.GET("/:id", self.v2GetInteraction)
+			// Register /stats and /timeline before /:id so paths like /interactions/stats are not captured as ids.
 			interactions.GET("/stats", self.v2InteractionStats)
 			interactions.GET("/timeline", self.v2InteractionTimeline)
 			interactions.POST("/delete", self.v2DeleteInteractions)
 			interactions.POST("/export", self.v2ExportInteractions)
+			interactions.GET("/:id", self.v2GetInteraction)
 		}
 
 		// APIKeys
@@ -125,10 +127,11 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		{
 			canary.GET("", self.v2ListCanaries)
 			canary.POST("", self.v2CreateCanary)
+			// Register /:id/hits before /:id for consistent matching across Gin versions.
+			canary.GET("/:id/hits", self.v2ListCanaryHits)
 			canary.GET("/:id", self.v2GetCanary)
 			canary.PUT("/:id", self.v2UpdateCanary)
 			canary.DELETE("/:id", self.v2DeleteCanary)
-			canary.GET("/:id/hits", self.v2ListCanaryHits)
 		}
 
 		// Rebinding
@@ -147,10 +150,10 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		{
 			listeners.GET("", self.v2ListListeners)
 			listeners.POST("", self.v2CreateListener)
+			listeners.GET("/:id/interactions", self.v2ListListenerInteractions)
 			listeners.GET("/:id", self.v2GetListener)
 			listeners.PUT("/:id", self.v2UpdateListener)
 			listeners.DELETE("/:id", self.v2DeleteListener)
-			listeners.GET("/:id/interactions", self.v2ListListenerInteractions)
 		}
 
 		// Settings
@@ -1830,6 +1833,7 @@ func (self *WebServer) v2ListUsers(c *gin.Context) {
 func (self *WebServer) v2InteractionStats(c *gin.Context) {
 	caseId := c.Query("case_id")
 	payloadId := c.Query("payload_id")
+	period := c.Query("period")
 
 	session := self.orm.NewSession()
 	defer session.Close()
@@ -1841,6 +1845,11 @@ func (self *WebServer) v2InteractionStats(c *gin.Context) {
 	}
 	if payloadId != "" {
 		query = query.Where("payload_id = ?", payloadId)
+	}
+	if period == "today" {
+		t := time.Now().UTC()
+		start := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+		query = query.Where("timestamp >= ?", start)
 	}
 
 	// Count total interactions

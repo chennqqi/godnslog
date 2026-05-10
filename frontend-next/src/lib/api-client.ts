@@ -25,11 +25,20 @@ export const authApi = {
   info: () => api.get('/auth/info'),
 }
 
+/** Summary counts for a case from GET /cases/:id/stats */
+export interface CaseStats {
+  payload_count: number
+  interaction_count: number
+  hit_payload_count: number
+}
+
 // Case API
 export const caseApi = {
   list: (params?: { status?: string; search?: string; page?: number; page_size?: number }) =>
     api.get<CaseListResponse>('/cases', params),
   get: (id: string) => api.get<{ data: Case }>(`/cases/${id}`),
+  /** Returns aggregate payload and interaction counts for the case. */
+  stats: (id: string) => api.get<CaseStats>(`/cases/${id}/stats`),
   create: (data: CaseCreateRequest) => api.post<{ data: Case }>('/cases', data),
   update: (id: string, data: CaseUpdateRequest) => api.put<{ data: Case }>(`/cases/${id}`, data),
   delete: (id: string) => api.delete(`/cases/${id}`),
@@ -55,7 +64,7 @@ export const interactionApi = {
     page?: number
     page_size?: number
   }) => api.get<InteractionListResponse>('/interactions', params),
-  stats: (params?: { case_id?: string; payload_id?: string }) =>
+  stats: (params?: { case_id?: string; payload_id?: string; period?: string }) =>
     api.get<InteractionStats>('/interactions/stats', params),
   get: (id: string) => api.get<{ data: Interaction }>(`/interactions/${id}`),
   delete: (ids: string[]) => api.post('/interactions/delete', { ids }),
