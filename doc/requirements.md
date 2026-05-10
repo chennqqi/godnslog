@@ -396,3 +396,7 @@ GODNSLOG 2.0 所有计划阶段已全部完成，共计 35 个主要功能模块
 - AppShell PAGE_TITLES 补充 /dashboard/audit 映射。
 - Cases 页面中英文混用文本全部改为英文。
 - Canary Tokens 页面重写为企业级英文 UI，添加 Dialog 确认、摘要统计卡片。
+
+## 2026-05-10（Radix Select 修复）
+
+修复 Cases 等页控制台报错：`SelectItem` 不能使用 `value=""`；将「全部」类选项改为占位值 `all` 并在筛选/API 中映射为「不传过滤条件」。

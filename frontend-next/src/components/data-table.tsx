@@ -41,7 +41,8 @@ export function DataTable<T extends Record<string, any>>({
   emptyMessage = '暂无数据',
 }: DataTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterValue, setFilterValue] = useState('')
+  /** Radix SelectItem cannot use value="" */
+  const [filterValue, setFilterValue] = useState('all')
 
   const filteredData = data.filter((row) => {
     const matchesSearch = !searchTerm || columns.some((col) => {
@@ -49,7 +50,8 @@ export function DataTable<T extends Record<string, any>>({
       return String(value).toLowerCase().includes(searchTerm.toLowerCase())
     })
     
-    const matchesFilter = !filterValue || !filterKey || row[filterKey] === filterValue
+    const matchesFilter =
+      filterValue === 'all' || !filterKey || row[filterKey] === filterValue
     
     return matchesSearch && matchesFilter
   })
@@ -72,7 +74,7 @@ export function DataTable<T extends Record<string, any>>({
                 <SelectValue placeholder="全部" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部</SelectItem>
+                <SelectItem value="all">全部</SelectItem>
                 {filterOptions.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>
                     {opt.label}

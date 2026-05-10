@@ -186,3 +186,11 @@
 - Cases 页面 UI 文字中英混用，Canary 页面全中文且无 Dialog 组件。
 - 修复点：补 Audit 页（带过滤器/表格/骨架屏）；Sidebar 增 Audit 导航项；Cases/Canary 页文案统一为英文，Canary 改用 Dialog 二次确认 Revoke，添加摘要统计卡。
 - 未改动路由结构，仅新增 /dashboard/audit 路由和对应文件。
+
+## 2026-05-10（Radix Select）
+
+用户粘贴浏览器控制台错误：`Select.Item` 不得使用空字符串 `value`。
+
+分析：Radix UI 用空字符串表示清除选中/占位，故禁止 `SelectItem value=""`。Cases 页「All statuses」触发崩溃及连带 HotReload 警告。
+
+处理：`frontend-next` 中 Cases、Audit、Interactions、`data-table` 将「全部」改为非空哨兵（如 `all`），并同步初始 state、客户端筛选与 `caseApi.list` 的 `status` 参数（全部时不传 `status`）。

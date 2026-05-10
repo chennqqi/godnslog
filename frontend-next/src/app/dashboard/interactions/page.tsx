@@ -23,12 +23,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
+/** Radix SelectItem cannot use value="" for "all types" */
+const TYPE_FILTER_ALL = 'all'
+
 export default function InteractionsPage() {
   const router = useRouter()
   const [interactions, setInteractions] = useState<Interaction[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
-  const [typeFilter, setTypeFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState(TYPE_FILTER_ALL)
   const [viewMode, setViewMode] = useState<'table' | 'timeline'>('table')
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null)
   const [stats, setStats] = useState({ total: 0, dns_count: 0, http_count: 0, smtp_count: 0, ldap_count: 0 })
@@ -94,7 +97,7 @@ export default function InteractionsPage() {
       i.source_ip.includes(filter) ||
       (i.domain && i.domain.includes(filter)) ||
       (i.token && i.token.includes(filter))
-    const matchesType = !typeFilter || i.type === typeFilter
+    const matchesType = typeFilter === TYPE_FILTER_ALL || i.type === typeFilter
     return matchesSearch && matchesType
   })
 
@@ -141,7 +144,7 @@ export default function InteractionsPage() {
               <SelectValue placeholder="所有类型" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">所有类型</SelectItem>
+              <SelectItem value={TYPE_FILTER_ALL}>所有类型</SelectItem>
               <SelectItem value="dns">DNS</SelectItem>
               <SelectItem value="http">HTTP</SelectItem>
               <SelectItem value="smtp">SMTP</SelectItem>

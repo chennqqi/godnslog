@@ -35,6 +35,9 @@ const RESULT_STYLES: Record<string, string> = {
   denied:  'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
 }
 
+/** Sentinel for unfiltered Radix Select rows (SelectItem must not use value="") */
+const FILTER_ALL = 'all'
+
 /** Colour mapping for action category badges */
 const ACTION_STYLES: Record<string, string> = {
   auth:     'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
@@ -75,8 +78,8 @@ export default function AuditPage() {
   const [entries, setEntries] = useState<AuditEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [searchActor, setSearchActor] = useState('')
-  const [resultFilter, setResultFilter] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('')
+  const [resultFilter, setResultFilter] = useState(FILTER_ALL)
+  const [categoryFilter, setCategoryFilter] = useState(FILTER_ALL)
 
   const loadAudit = useCallback(async () => {
     setLoading(true)
@@ -106,8 +109,8 @@ export default function AuditPage() {
 
   const filtered = entries.filter((e) => {
     if (searchActor && !e.actor.toLowerCase().includes(searchActor.toLowerCase())) return false
-    if (resultFilter && e.result !== resultFilter) return false
-    if (categoryFilter && actionCategory(e.action) !== categoryFilter) return false
+    if (resultFilter !== FILTER_ALL && e.result !== resultFilter) return false
+    if (categoryFilter !== FILTER_ALL && actionCategory(e.action) !== categoryFilter) return false
     return true
   })
 
@@ -145,7 +148,7 @@ export default function AuditPage() {
                 <SelectValue placeholder="All results" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All results</SelectItem>
+                <SelectItem value={FILTER_ALL}>All results</SelectItem>
                 <SelectItem value="success">Success</SelectItem>
                 <SelectItem value="failure">Failure</SelectItem>
                 <SelectItem value="denied">Denied</SelectItem>
@@ -156,7 +159,7 @@ export default function AuditPage() {
                 <SelectValue placeholder="All categories" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All categories</SelectItem>
+                <SelectItem value={FILTER_ALL}>All categories</SelectItem>
                 <SelectItem value="auth">Auth</SelectItem>
                 <SelectItem value="case">Case</SelectItem>
                 <SelectItem value="payload">Payload</SelectItem>
@@ -165,11 +168,15 @@ export default function AuditPage() {
                 <SelectItem value="settings">Settings</SelectItem>
               </SelectContent>
             </Select>
-            {(searchActor || resultFilter || categoryFilter) && (
+            {(searchActor || resultFilter !== FILTER_ALL || categoryFilter !== FILTER_ALL) && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setSearchActor(''); setResultFilter(''); setCategoryFilter('') }}
+                onClick={() => {
+                  setSearchActor('')
+                  setResultFilter(FILTER_ALL)
+                  setCategoryFilter(FILTER_ALL)
+                }}
               >
                 Clear filters
               </Button>

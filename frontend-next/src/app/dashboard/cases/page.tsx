@@ -26,6 +26,9 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 
+/** Sentinel for Radix Select: empty string is reserved for clearing selection */
+const STATUS_FILTER_ALL = 'all'
+
 export default function CasesPage() {
   const router = useRouter()
   const [cases, setCases] = useState<Case[]>([])
@@ -36,7 +39,7 @@ export default function CasesPage() {
   const [selectedCase, setSelectedCase] = useState<Case | null>(null)
   const [selectedCases, setSelectedCases] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState(STATUS_FILTER_ALL)
   const [newCase, setNewCase] = useState<CaseCreateRequest>({
     title: '',
     description: '',
@@ -63,7 +66,12 @@ export default function CasesPage() {
   const loadCases = async () => {
     try {
       console.log('Loading cases...')
-      const response = await caseApi.list({ page: 1, page_size: 50, search: searchTerm, status: statusFilter })
+      const response = await caseApi.list({
+        page: 1,
+        page_size: 50,
+        search: searchTerm,
+        ...(statusFilter !== STATUS_FILTER_ALL ? { status: statusFilter } : {}),
+      })
       console.log('Cases response:', response)
       if (response.data) {
         setCases(response.data.items || [])
@@ -197,7 +205,7 @@ export default function CasesPage() {
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All statuses</SelectItem>
+              <SelectItem value={STATUS_FILTER_ALL}>All statuses</SelectItem>
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="archived">Archived</SelectItem>
