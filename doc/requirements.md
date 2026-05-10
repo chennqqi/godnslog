@@ -400,3 +400,7 @@ GODNSLOG 2.0 所有计划阶段已全部完成，共计 35 个主要功能模块
 ## 2026-05-10（Radix Select 修复）
 
 修复 Cases 等页控制台报错：`SelectItem` 不能使用 `value=""`；将「全部」类选项改为占位值 `all` 并在筛选/API 中映射为「不传过滤条件」。
+
+## 2026-05-10（Next.js 升级）
+
+处理 “Next.js (14.2.35) is outdated” 提示：将 `frontend-next` 升级到 `next@16.2.6`，同步 `eslint-config-next` 与依赖安装流程（使用 pnpm）。

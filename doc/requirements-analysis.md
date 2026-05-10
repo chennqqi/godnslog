@@ -194,3 +194,13 @@
 分析：Radix UI 用空字符串表示清除选中/占位，故禁止 `SelectItem value=""`。Cases 页「All statuses」触发崩溃及连带 HotReload 警告。
 
 处理：`frontend-next` 中 Cases、Audit、Interactions、`data-table` 将「全部」改为非空哨兵（如 `all`），并同步初始 state、客户端筛选与 `caseApi.list` 的 `status` 参数（全部时不传 `status`）。
+
+## 2026-05-10（Next.js 版本告警）
+
+用户反馈 Next.js 14.2.35 过旧，需要继续升级。
+
+分析：
+- 选择直接升级到 npm 当前稳定 `next@16.2.6`，并同步 `eslint-config-next`。
+- npm 在该环境安装异常，改用 `pnpm install` 成功。
+- 构建初次失败后复跑通过，确认升级后的 App Router 页面可正常产物化。
+- Next 16 对 lint 工具链有变化，当前仓库存在历史 ESLint 配置兼容问题，不影响 build，但 `pnpm run lint` 仍需后续统一迁移整理。
