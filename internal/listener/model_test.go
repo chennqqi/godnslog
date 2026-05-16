@@ -108,7 +108,7 @@ func TestSMTPMessageModel(t *testing.T) {
 		ID:         "test-message-1",
 		ListenerID: "test-listener-1",
 		From:       "sender@example.com",
-		To:         []string{"recipient@example.com"},
+		To:         `["recipient@example.com"]`,
 		Subject:    "Test subject",
 		Body:       "Test body",
 		SourceIP:   "192.168.1.1",

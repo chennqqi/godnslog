@@ -43,6 +43,7 @@ package-lock.json
 *.bak
 *.lock
 *.sum
+!go.sum
 dist
 godnslog.db
 /.gitee

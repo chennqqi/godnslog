@@ -13,6 +13,33 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+func TestV2RoutesExposeRequiredMVPPaths(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	r := gin.New()
+	server := &WebServer{}
+	server.registerV2API(r)
+
+	routes := make(map[string]struct{}, len(r.Routes()))
+	for _, route := range r.Routes() {
+		routes[route.Method+" "+route.Path] = struct{}{}
+	}
+
+	requiredRoutes := []string{
+		"GET /api/v2/cases/:id/payloads",
+		"GET /api/v2/cases/:id/interactions",
+		"PUT /api/v2/payloads/:id",
+		"GET /api/v2/interactions/stats",
+		"POST /api/v2/evidence/generate",
+	}
+
+	for _, route := range requiredRoutes {
+		if _, ok := routes[route]; !ok {
+			t.Fatalf("expected route %q to be registered, but it was missing", route)
+		}
+	}
+}
+
 func TestV2Login(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

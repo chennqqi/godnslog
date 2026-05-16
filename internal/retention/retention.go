@@ -1,22 +1,6 @@
 package retention
 
-import (
-	"time"
-)
-
-// RetentionPolicy defines data retention policies
-type RetentionPolicy struct {
-	ID                string        `json:"id"`
-	Name              string        `json:"name"`
-	Description       string        `json:"description"`
-	CaseRetentionDays int           `json:"case_retention_days"`
-	PayloadRetentionDays int        `json:"payload_retention_days"`
-	InteractionRetentionDays int   `json:"interaction_retention_days"`
-	CanaryRetentionDays int         `json:"canary_retention_days"`
-	ArchiveAfterDays  int           `json:"archive_after_days"`
-	IsDefault         bool          `json:"is_default"`
-	CreatedAt         time.Time     `json:"created_at"`
-}
+import "time"
 
 // ArchiveRecord represents an archived data record
 type ArchiveRecord struct {
@@ -44,15 +28,24 @@ func NewRetentionService() *RetentionService {
 // GetDefaultPolicy returns the default retention policy
 func (s *RetentionService) GetDefaultPolicy() *RetentionPolicy {
 	return &RetentionPolicy{
-		ID:                "default",
-		Name:              "Default Policy",
-		Description:       "Default data retention policy",
-		CaseRetentionDays:        90,
-		PayloadRetentionDays:     90,
-		InteractionRetentionDays: 30,
-		CanaryRetentionDays:      365,
-		ArchiveAfterDays:         60,
-		IsDefault:                true,
+		ID:                  "default",
+		Name:                "Default Policy",
+		Description:         "Default data retention policy",
+		ApplyToCases:        true,
+		ApplyToPayloads:     true,
+		ApplyToInteractions: true,
+		ApplyToEvidence:     true,
+		ApplyToLogs:         true,
+		RetentionDays:       90,
+		ArchiveAfterDays:    60,
+		MaxRecords:          0,
+		ArchiveToStorage:    "local",
+		DeleteAfterArchive:  false,
+		RunHourly:           false,
+		RunDaily:            true,
+		RunWeekly:           false,
+		RunMonthly:          false,
+		IsEnabled:           true,
 	}
 }
 
@@ -98,7 +91,7 @@ func (s *RetentionService) GetRetentionStats(workspaceID string) (map[string]int
 		"total_payloads":     0,
 		"total_interactions": 0,
 		"archive_ready":      0,
-		"delete_ready":        0,
+		"delete_ready":       0,
 	}, nil
 }
 

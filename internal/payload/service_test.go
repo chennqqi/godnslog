@@ -3,18 +3,18 @@ package payload
 import (
 	"testing"
 
-	"github.com/chennqqi/godnslog/models"
+	_ "modernc.org/sqlite"
 	"xorm.io/xorm"
 )
 
 func TestCreatePayload(t *testing.T) {
-	engine, err := xorm.NewEngine("sqlite3", ":memory:")
+	engine, err := xorm.NewEngine("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to create engine: %v", err)
 	}
 	defer engine.Close()
 
-	err = engine.Sync2(new(models.TblPayload))
+	err = engine.Sync2(new(Payload))
 	if err != nil {
 		t.Fatalf("Failed to sync tables: %v", err)
 	}
@@ -29,21 +29,21 @@ func TestCreatePayload(t *testing.T) {
 
 	payload, err := service.CreatePayload(req, "1", "example.com")
 	if err != nil {
-		t.Errorf("Failed to create payload: %v", err)
+		t.Fatalf("Failed to create payload: %v", err)
 	}
 	if payload == nil {
-		t.Error("Expected payload, got nil")
+		t.Fatal("Expected payload, got nil")
 	}
 }
 
 func TestGetPayloadByID(t *testing.T) {
-	engine, err := xorm.NewEngine("sqlite3", ":memory:")
+	engine, err := xorm.NewEngine("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to create engine: %v", err)
 	}
 	defer engine.Close()
 
-	err = engine.Sync2(new(models.TblPayload))
+	err = engine.Sync2(new(Payload))
 	if err != nil {
 		t.Fatalf("Failed to sync tables: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestGetPayloadByID(t *testing.T) {
 
 	retrieved, err := service.GetPayloadByID(payload.ID)
 	if err != nil {
-		t.Errorf("Failed to get payload: %v", err)
+		t.Fatalf("Failed to get payload: %v", err)
 	}
 	if retrieved.Token != payload.Token {
 		t.Errorf("Expected token %s, got %s", payload.Token, retrieved.Token)
@@ -71,13 +71,13 @@ func TestGetPayloadByID(t *testing.T) {
 }
 
 func TestUpdatePayload(t *testing.T) {
-	engine, err := xorm.NewEngine("sqlite3", ":memory:")
+	engine, err := xorm.NewEngine("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to create engine: %v", err)
 	}
 	defer engine.Close()
 
-	err = engine.Sync2(new(models.TblPayload))
+	err = engine.Sync2(new(Payload))
 	if err != nil {
 		t.Fatalf("Failed to sync tables: %v", err)
 	}
@@ -96,31 +96,31 @@ func TestUpdatePayload(t *testing.T) {
 	}
 
 	updateReq := &PayloadUpdateRequest{
-		Status: "hit",
+		Status: "deployed",
 	}
 
 	err = service.UpdatePayload(payload.ID, updateReq)
 	if err != nil {
-		t.Errorf("Failed to update payload: %v", err)
+		t.Fatalf("Failed to update payload: %v", err)
 	}
 
 	retrieved, err := service.GetPayloadByID(payload.ID)
 	if err != nil {
-		t.Errorf("Failed to get updated payload: %v", err)
+		t.Fatalf("Failed to get updated payload: %v", err)
 	}
-	if retrieved.Template != "xxe" {
-		t.Errorf("Expected updated template, got %s", retrieved.Template)
+	if retrieved.Status != "deployed" {
+		t.Errorf("Expected updated status deployed, got %s", retrieved.Status)
 	}
 }
 
 func TestListPayloads(t *testing.T) {
-	engine, err := xorm.NewEngine("sqlite3", ":memory:")
+	engine, err := xorm.NewEngine("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to create engine: %v", err)
 	}
 	defer engine.Close()
 
-	err = engine.Sync2(new(models.TblPayload))
+	err = engine.Sync2(new(Payload))
 	if err != nil {
 		t.Fatalf("Failed to sync tables: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestListPayloads(t *testing.T) {
 
 	payloads, err := service.ListPayloads("", "", 1, 10)
 	if err != nil {
-		t.Errorf("Failed to list payloads: %v", err)
+		t.Fatalf("Failed to list payloads: %v", err)
 	}
 	if len(payloads.Items) != 5 {
 		t.Errorf("Expected 5 payloads in list, got %d", len(payloads.Items))
