@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -160,100 +161,33 @@ func (self *WebServer) initDatabase() error {
 }
 
 func (self *WebServer) authHandler(c *gin.Context) {
-	T := getTranslateFunc(c)
-	tokenString := c.GetHeader("Access-Token")
-	if tokenString == "" {
-		// Try Authorization header with Bearer token
-		authHeader := c.GetHeader("Authorization")
-		if authHeader != "" && len(authHeader) > 7 && authHeader[:7] == "Bearer " {
-			tokenString = authHeader[7:]
-		}
-	}
-	if tokenString == "" {
-		c.JSON(401, CR{
-			Message: T("Token Required"),
-			Code:    CodeNoAuth,
-		})
-		c.Abort()
-		return
-	}
-	var claim MyClaims
-	token, err := jwt.ParseWithClaims(tokenString, &claim, func(token *jwt.Token) (interface{}, error) {
-		// since we only use the one private key to sign the tokens,
-		// we also only use its public counter part to verify
-		return []byte(self.verifyKey), nil
-	})
-	if token.Valid {
-		store := self.store
-		key := fmt.Sprintf("%v.seed", claim.Id)
-		realSeed, exist := store.Get(key)
-		if !exist {
-			logrus.Infof("That's not even a token")
-			c.JSON(401, CR{
-				Message: T("not login"),
-				Code:    CodeNoAuth,
-			})
-			c.Abort()
-			return
-		} else if realSeed.(string) != claim.Seed {
-			logrus.Infof("That's not even a token")
-			c.JSON(401, CR{
-				Message: T("Token Expire"),
-				Code:    CodeNoAuth,
-			})
-			c.Abort()
-			return
-		}
-		u, exist := store.Get(fmt.Sprintf("%v.user", claim.Id))
-		if !exist {
-			logrus.Infof("[webui.go::authHandler] cache.Get(user), not exist")
-			c.JSON(401, CR{
-				Message: T("not login"),
-				Code:    CodeNoAuth,
-			})
-			c.Abort()
-			return
-		}
+	// Try JWT authentication first
+	if user, err := self.authenticateJWT(c); err == nil && user != nil {
+		c.Set("user", user)
 
-		var uid int64
-		fmt.Sscanf(claim.Id, "%d", &uid)
+		// Set legacy context values for backward compatibility
+		var uid int64 = int64(user.Id)
 		c.Set("id", uid)
-		c.Set("username", claim.Audience)
-		c.Set("email", claim.Subject)
-		c.Set("seed", claim.Seed)
-		c.Set("role", u.(*models.TblUser).Role)
-		c.Set("user", u.(*models.TblUser)) // Set full user object for v2 APIs
+		c.Set("username", user.Name)
+		c.Set("email", user.Email)
+		c.Set("role", user.Role)
 
-		//TODO: permission
+		c.Next()
 		return
-	} else if ve, ok := err.(*jwt.ValidationError); ok {
-		if ve.Errors&jwt.ValidationErrorMalformed != 0 {
-			logrus.Infof("That's not even a token")
-			c.JSON(401, CR{
-				Message: T("Token invalid"),
-				Code:    CodeNoAuth,
-			})
-			c.Abort()
-			return
-		} else if ve.Errors&(jwt.ValidationErrorExpired|jwt.ValidationErrorNotValidYet) != 0 {
-			// Token is either expired or not active yet
-			logrus.Infof("Timing is everything")
-			c.JSON(401, CR{
-				Message: T("Token Expired or not active yet"),
-				Code:    CodeNoAuth,
-			})
-			c.Abort()
-			return
-		} else {
-			logrus.Warnf("Couldn't handle this token: %v", err)
-			c.JSON(401, CR{
-				Message: T("Can't handle this token"),
-				Code:    0,
-			})
-			c.Abort()
-			return
-		}
 	}
+
+	// Try API key authentication
+	if key, err := self.authenticateAPIKey(c); err == nil && key != nil {
+		c.Set("api_key", key)
+		c.Next()
+		return
+	}
+
+	// No valid credentials found
+	c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+		"code":    401,
+		"message": "unauthorized",
+	})
 }
 
 func (self *WebServer) verifyAdminPermission(c *gin.Context) {

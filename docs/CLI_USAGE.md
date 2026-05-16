@@ -90,6 +90,41 @@ CLI 支持多种输出格式：
 - `yaml`：YAML 格式
 - `markdown`：Markdown 格式（仅报告）
 
+## Scanner Hub 集成
+
+GODNSLOG 提供统一的 Scanner Hub 集成接口，支持多种安全扫描器工具。详细的集成合同请参考 [Scanner Hub Integration Contract](./scanner-hub.md)。
+
+### 支持的工具
+
+- Nuclei: CLI wrapper 和模板变量
+- Burp Suite: 扩展调用 REST API
+- Yakit/Yak: Yak script 调用 REST API 并轮询 token
+- ZAP: 脚本或插件调用 REST API 并轮询 token
+- xray/rad: CLI 或 webhook 桥接映射扫描器事件到 Case 和 Payload
+- Postman/Apifox: 环境变量和预请求脚本
+
+### 集成示例
+
+创建 Probe 并等待结果的完整流程：
+
+```bash
+# 1. 创建 Payload (Probe)
+curl -X POST http://localhost:8080/api/v2/payloads \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{
+    "template": "ssrf-url",
+    "case_id": "case-123",
+    "variables": {"path": "/callback"},
+    "expected_protocols": ["dns", "http"],
+    "tool": "burp-suite"
+  }'
+
+# 2. 等待 Interaction 结果
+curl -X GET "http://localhost:8080/api/v2/interactions?token=<token>&page_size=10" \
+  -H "Authorization: Bearer <token>"
+```
+
 ## Nuclei 集成
 
 ### JSONL 输出

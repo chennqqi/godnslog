@@ -24,8 +24,13 @@ test.describe('Dashboard', () => {
     await expect(page.locator('text=暂无命中记录').first()).toBeVisible();
   });
 
-  test('should display stats with zero values', async ({ page }) => {
+  test('should display stats from API', async ({ page }) => {
+    await page.route('**/api/v2/interactions/stats', async route => {
+      await route.fulfill({
+        json: { code: 0, data: { today: 3, total: 10, high_risk: 1 } }
+      })
+    })
     await page.waitForTimeout(5000);
-    await expect(page.locator('text=0').first()).toBeVisible();
+    await expect(page.getByText('3')).toBeVisible();
   });
 });

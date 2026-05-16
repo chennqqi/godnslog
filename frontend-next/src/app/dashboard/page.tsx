@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { caseApi, interactionApi, payloadApi } from '@/lib/api-client'
+import { caseApi, payloadApi } from '@/lib/api-client'
+import { interactionsApi } from '@/features/interactions/api'
 import type { Interaction } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -138,25 +139,24 @@ export default function DashboardPage() {
 
   const loadData = async () => {
     try {
-      const [casesResp, interactionsResp, interactionsStatsResp, payloadsResp] = await Promise.all([
+      const [casesResp, interactionsResp, statsData, payloadsResp] = await Promise.all([
         caseApi.list({ page: 1, page_size: 5 }),
-        interactionApi.list({ page: 1, page_size: 10 }),
-        interactionApi.stats({ period: 'today' }),
+        interactionsApi.list({ page: 1, page_size: 10 }),
+        interactionsApi.getStats(),
         payloadApi.list({ status: 'deployed', page: 1, page_size: 1 }),
       ])
 
-      const interactions = interactionsResp.data?.items || []
+      const interactions = interactionsResp?.items || []
       const cases = casesResp.data?.items || []
-      const statsData = interactionsStatsResp.data
 
       setStats({
-        activeCases: cases.filter((c) => c.status === 'active').length,
-        totalHitsToday: statsData?.total || 0,
+        activeCases: cases.filter((c: any) => c.status === 'active').length,
+        totalHitsToday: statsData?.today || 0,
         activePayloads: payloadsResp.data?.total || 0,
         systemOk: true,
-        dnsCount: statsData?.dns_count || 0,
-        httpCount: statsData?.http_count || 0,
-        smtpCount: statsData?.smtp_count || 0,
+        dnsCount: 0,
+        httpCount: 0,
+        smtpCount: 0,
         totalInteractions: statsData?.total || 0,
       })
       setRecentInteractions(interactions)

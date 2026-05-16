@@ -1,24 +1,61 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/chennqqi/godnslog/models"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
-// validateJWTToken validates a JWT token and returns the user
-func (s *WebServer) validateJWTToken(token string) (*models.TblUser, error) {
-	// TODO: Implement JWT token validation
-	// For now, return nil to force API key authentication
-	return nil, nil
+// authenticateJWT validates a JWT token from the request context and returns the user
+func (s *WebServer) authenticateJWT(c *gin.Context) (*models.TblUser, error) {
+	tokenString := c.GetHeader("Access-Token")
+	if tokenString == "" {
+		// Try Authorization header with Bearer token
+		authHeader := c.GetHeader("Authorization")
+		if authHeader != "" && len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+			tokenString = authHeader[7:]
+		}
+	}
+	if tokenString == "" {
+		return nil, nil
+	}
+
+	var claim MyClaims
+	token, err := jwt.ParseWithClaims(tokenString, &claim, func(token *jwt.Token) (interface{}, error) {
+		return []byte(s.verifyKey), nil
+	})
+	if err != nil || !token.Valid {
+		return nil, err
+	}
+
+	store := s.store
+	key := fmt.Sprintf("%v.seed", claim.Id)
+	realSeed, exist := store.Get(key)
+	if !exist || realSeed.(string) != claim.Seed {
+		return nil, fmt.Errorf("invalid seed")
+	}
+
+	u, exist := store.Get(fmt.Sprintf("%v.user", claim.Id))
+	if !exist {
+		return nil, fmt.Errorf("user not found")
+	}
+
+	return u.(*models.TblUser), nil
 }
 
-// validateAPIKey validates an API key and returns the key details
-func (s *WebServer) validateAPIKey(key string) (*models.TblAPIKey, error) {
-	// TODO: Implement API key validation
-	// For now, return nil
+// authenticateAPIKey validates an API key from the request context and returns the key details
+func (s *WebServer) authenticateAPIKey(c *gin.Context) (*models.TblAPIKey, error) {
+	apiKey := c.GetHeader("X-API-Key")
+	if apiKey == "" {
+		return nil, nil
+	}
+
+	// TODO: Implement API key validation from database
+	// For now, return nil as API key authentication is not yet implemented
 	return nil, nil
 }
 

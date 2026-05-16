@@ -13,6 +13,19 @@ export const interactionsApi = {
     return response.data as unknown as Interaction | undefined
   },
 
+  getStats: async (): Promise<{ today: number; total: number; high_risk: number } | undefined> => {
+    const response = await fetch('/api/v2/interactions/stats', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      },
+    })
+    if (!response.ok) {
+      return undefined
+    }
+    const result = await response.json()
+    return result.data
+  },
+
   export: async (data: Record<string, unknown>): Promise<Blob> => {
     const response = await fetch('/api/v2/interactions/export', {
       method: 'POST',
