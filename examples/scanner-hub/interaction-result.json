@@ -1,0 +1,9 @@
+{
+  "token": "tok123",
+  "evidence_strength": "high",
+  "confidence": 85,
+  "interactions": [
+    {"type": "dns", "source_ip": "10.0.0.1"},
+    {"type": "http", "source_ip": "10.0.0.1", "path": "/callback"}
+  ]
+}

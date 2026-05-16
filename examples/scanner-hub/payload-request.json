@@ -1,0 +1,9 @@
+{
+  "template": "ssrf-url",
+  "case_id": "case-123",
+  "variables": {
+    "path": "/callback"
+  },
+  "expected_protocols": ["dns", "http"],
+  "tool": "burp-suite"
+}

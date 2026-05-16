@@ -1,0 +1,13 @@
+// GODNSLOG OAST helper for Yakit/Yak.
+// Configure GODNSLOG_API_URL and GODNSLOG_API_KEY in the Yak runtime environment.
+apiURL = getenv("GODNSLOG_API_URL")
+apiKey = getenv("GODNSLOG_API_KEY")
+
+createPayload = func(caseID, templateName) {
+    body = sprintf(`{"case_id":"%s","template":"%s","tool":"yakit"}`, caseID, templateName)
+    return http.Post(apiURL + "/payloads", "application/json", body, {"Authorization": "Bearer " + apiKey})
+}
+
+waitInteraction = func(token) {
+    return http.Get(apiURL + "/interactions?token=" + token + "&page_size=10", {"Authorization": "Bearer " + apiKey})
+}
