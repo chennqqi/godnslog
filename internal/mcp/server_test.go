@@ -333,6 +333,7 @@ func TestCreateOASTProbeToolCreatesCaseThenPayload(t *testing.T) {
 		"template":           "ssrf-url",
 		"expected_protocols": []interface{}{"dns", "http"},
 		"variables":          map[string]interface{}{"path": "/callback"},
+		"agent_id":           "agent-1",
 	})
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
@@ -345,13 +346,17 @@ func TestCreateOASTProbeToolCreatesCaseThenPayload(t *testing.T) {
 	if !toolResult.Success {
 		t.Fatalf("Expected success, got error: %s", toolResult.Error)
 	}
-	if createdPayloadCaseID != "case-1" {
-		t.Fatalf("expected payload to be created for case-1, got %q", createdPayloadCaseID)
-	}
 
 	data, ok := toolResult.Data.(map[string]interface{})
 	if !ok {
 		t.Fatal("Data should be a map")
+	}
+
+	if agentRunID, exists := data["agent_run_id"]; !exists || agentRunID == "" {
+		t.Fatal("agent_run_id should be populated when agent_id is provided")
+	}
+	if createdPayloadCaseID != "case-1" {
+		t.Fatalf("expected payload to be created for case-1, got %q", createdPayloadCaseID)
 	}
 	if data["probe_id"] == "" {
 		t.Fatal("probe_id should be populated")

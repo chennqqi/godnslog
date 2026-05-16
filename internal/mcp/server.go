@@ -84,6 +84,7 @@ func (s *Server) createOASTProbe(ctx context.Context, args map[string]interface{
 
 	description, _ := args["description"].(string)
 	target, _ := args["target"].(string)
+	agentID, _ := args["agent_id"].(string)
 	expiresIn, _ := args["expires_in"].(string)
 	variables := normalizeStringMap(args["variables"])
 	expectedProtocols := normalizeStringSlice(args["expected_protocols"])
@@ -123,7 +124,13 @@ func (s *Server) createOASTProbe(ctx context.Context, args map[string]interface{
 	}
 	token := extractString(payloadResult, "token")
 
-	return ToolResult{Success: true, Data: map[string]interface{}{
+	// Generate agent_run_id if agent_id is provided
+	agentRunID := ""
+	if agentID != "" {
+		agentRunID = agentID + ":" + caseID + ":" + payloadID
+	}
+
+	responseData := map[string]interface{}{
 		"probe_id":           caseID + ":" + payloadID,
 		"case_id":            caseID,
 		"payload_id":         payloadID,
@@ -132,7 +139,13 @@ func (s *Server) createOASTProbe(ctx context.Context, args map[string]interface{
 		"payload":            payloadResult,
 		"expected_protocols": expectedProtocols,
 		"agent_next_action":  "Deliver the payload to the target, then call wait_for_interaction with the returned token.",
-	}}, nil
+	}
+
+	if agentRunID != "" {
+		responseData["agent_run_id"] = agentRunID
+	}
+
+	return ToolResult{Success: true, Data: responseData}, nil
 }
 
 // create_case creates a new case

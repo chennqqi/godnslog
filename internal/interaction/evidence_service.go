@@ -57,6 +57,7 @@ func (s *EvidenceService) GenerateEvidence(caseID, payloadID string, format stri
 		PayloadID:    payloadID,
 		Interactions: interactions,
 		Timeline:     s.buildTimeline(interactions),
+		Score:        s.calculateScore(interactions),
 		CreatedAt:    time.Now(),
 	}
 
@@ -82,6 +83,41 @@ func (s *EvidenceService) GenerateEvidence(caseID, payloadID string, format stri
 			"payload_id":        payloadID,
 		},
 	}, nil
+}
+
+// calculateScore calculates an evidence score based on interactions
+func (s *EvidenceService) calculateScore(interactions []models.Interaction) float64 {
+	if len(interactions) == 0 {
+		return 0.0
+	}
+
+	score := 0.0
+	for _, interaction := range interactions {
+		// Base score for any interaction
+		score += 10.0
+
+		// Bonus for HTTP interactions (more valuable than DNS)
+		if interaction.Type == "http" {
+			score += 20.0
+		}
+
+		// Bonus for interactions with body content
+		if interaction.Body != nil && len(*interaction.Body) > 0 {
+			score += 20.0
+		}
+	}
+
+	// Normalize score to 0-100 range
+	maxScore := float64(len(interactions)) * 30.0
+	if maxScore > 0 {
+		score = (score / maxScore) * 100.0
+	}
+
+	if score > 100.0 {
+		score = 100.0
+	}
+
+	return score
 }
 
 // buildTimeline builds a timeline from interactions

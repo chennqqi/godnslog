@@ -15,6 +15,7 @@ type Evidence struct {
 	Payload      *payload.Payload     `json:"payload"`
 	Interactions []models.Interaction `json:"interactions"`
 	Timeline     []TimelineItem       `json:"timeline"`
+	Score        float64              `json:"score"`
 	CreatedAt    time.Time            `json:"created_at"`
 }
 
