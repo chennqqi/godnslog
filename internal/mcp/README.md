@@ -11,6 +11,31 @@ MCP (Model Context Protocol) server for AI Agent integration with GODNSLOG.
 
 ## Available Tools
 
+### create_oast_probe
+
+Create an agent-native OAST probe. This high-level tool creates a case, creates a payload bound to that case, and returns the IDs, token, expected protocols, and next action for the Agent.
+
+**Parameters**:
+- `title` (string, required): Probe title
+- `template` (string, required): Payload template
+- `description` (string, optional): Case description
+- `target` (string, optional): Target URL or system
+- `variables` (object, optional): Template variables
+- `expected_protocols` (array, optional): Expected callback protocols
+- `expires_in` (string, optional): Expiration time (e.g., "1h")
+
+**Example**:
+```json
+{
+  "title": "SSRF probe",
+  "target": "https://api.example.com",
+  "template": "ssrf-url",
+  "variables": {"path": "/callback"},
+  "expected_protocols": ["dns", "http"],
+  "expires_in": "1h"
+}
+```
+
 ### create_case
 
 Create a new testing case.
@@ -220,12 +245,11 @@ Audit logs can be viewed via:
 
 ### Workflow 1: Automated SSRF Testing
 
-1. Agent calls `create_case` for SSRF test
-2. Agent calls `create_payload` with SSRF template
-3. Agent injects payload into target application
-4. Agent calls `wait_for_interaction` with timeout
-5. Agent calls `summarize_evidence` to get summary
-6. Agent calls `export_report` to generate report
+1. Agent calls `create_oast_probe` for SSRF test
+2. Agent injects the returned payload into target application
+3. Agent calls `wait_for_interaction` with the returned token and timeout
+4. Agent calls `summarize_evidence` to get summary
+5. Agent calls `export_report` to generate report
 
 ### Workflow 2: Continuous Monitoring
 

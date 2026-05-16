@@ -2,15 +2,16 @@
 
 ## 一句话定位
 
-GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全测试、扫描器协同和 AI Agent 的 **OAST 交互验证与证据平台**。它应负责生成可追踪 Payload、捕获多协议回连、自动归因、沉淀证据、触发工作流，并通过 API/MCP 为外部工具赋能。
+GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全团队、扫描器和 AI Agent 的 **自托管 OAST 证据中枢**。它应负责生成可追踪 Payload、捕获多协议回连、自动归因、沉淀可解释证据、触发工作流，并通过 API/MCP/插件为外部工具赋能。
 
 ## 设计原则
 
 - **自托管优先**：安全团队可私有部署，敏感交互数据不离开组织。
 - **API 先行**：前端、CLI、SDK、扫描器插件和 MCP Server 共用同一套 API。
 - **证据优先**：所有功能最终服务于确认漏洞、解释命中、导出证据。
-- **协同优先**：不替代 Nuclei、Burp、ZAP、YApi、CI/CD，而是增强它们。
+- **协同优先**：不替代 Nuclei、Burp、Yakit/Yak、ZAP、xray/rad、YApi、CI/CD，而是增强它们。
 - **权限优先**：用户、扫描器、APIKey、Agent 都必须有最小权限和审计。
+- **Agent 友好**：面向 AI Agent 提供异步等待、结构化证据、可恢复任务上下文和受控高层工具，而不是只暴露 CRUD API。
 
 ## 核心对象
 
@@ -48,19 +49,28 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全测试、扫
 - 自动把 Interaction 关联到 Payload、Case、目标、测试人和投放时间。
 - 生成证据时间线：Payload 创建、投放、DNS 查询、HTTP 请求、通知发送、人工备注。
 - 自动分类命中类型：可疑出网、SSRF、外部资源加载、异步任务执行、扫描器噪声。
+- 提供 Evidence Score：按 DNS-only、DNS+HTTP、敏感 Header、云元数据路径、内部来源、延迟命中等维度评估证据强度。
+- 生成 Explainable Evidence：解释命中意味着什么、置信度、误报线索和建议的下一步验证。
 - 支持 Markdown、JSON、CSV 报告导出，并提供脱敏策略。
 
-### 4. Scanner Hub
+### 4. Scanner Hub：多工具 OAST 协同
 
-- Nuclei：提供 `godnslog-cli`、JSONL 输出、模板示例和类似 `{{godnslog-url}}` 的集成思路。
-- Burp/ZAP：提供插件或扩展，支持右键生成 Payload、插入请求、拉取命中、回填备注。
+- Nuclei/ProjectDiscovery：提供 `godnslog-cli`、JSONL 输出、模板示例、私有 OAST 后端集成和 CI 门禁。
+- Burp Suite：提供扩展，支持右键生成 Payload、插入请求、拉取命中、回填备注和证据导出。
+- Yakit/Yak：提供 Yak 脚本/插件，支持在 MITM、Web Fuzzer、PoC 执行和批量扫描中生成 OAST Payload、等待命中并回填结果。
+- OWASP ZAP：提供脚本或 Add-on，支持主动扫描、请求重放和 OAST 命中轮询。
+- xray/rad：提供 webhook/CLI/代理模式示例，用于爬虫、被动扫描和 OAST 结果关联。
 - YApi/OpenAPI：导入接口定义，批量向参数、Header、Body、URL 注入 OAST Payload。
+- Postman/Apifox/Hoppscotch：提供环境变量和 pre-request 脚本示例，便于 API 测试人员直接投放 Payload。
 - CI/CD：提供 GitHub Actions、GitLab CI、Jenkins 示例；高危命中可作为流水线门禁。
+- 通用集成协议：所有工具优先复用 REST API、OpenAPI、CLI、JSONL/SARIF 输出和 Webhook，插件只做体验增强。
 
-### 5. Agent API 与 MCP
+### 5. Agent-Native API 与 MCP
 
 - 提供稳定 REST API 和 OpenAPI 文档，覆盖 Case、Payload、Interaction、Evidence、Workflow、Token。
-- 提供 `godnslog-mcp-server`，为 AI Agent 暴露受控工具：`create_case`、`create_payload`、`list_interactions`、`wait_for_interaction`、`summarize_evidence`、`export_report`、`revoke_token`。
+- 提供 `godnslog-mcp-server`，为 AI Agent 暴露受控工具：`create_oast_probe`、`create_case`、`create_payload`、`list_interactions`、`wait_for_interaction`、`summarize_evidence`、`export_report`、`revoke_token`。
+- 引入 AgentRun/TaskRun 概念，记录 Agent 的测试目标、步骤、Payload、Interaction、决策日志和最终证据。
+- 输出机器可读证据 Schema：漏洞类型、置信度、证据强度、命中详情、误报线索和下一步建议。
 - MCP Client 使用独立 APIKey，必须支持作用域、过期时间、审计日志和高风险动作限制。
 - GODNSLOG 在 Agent 工作流中定位为外部感知层和证据系统，而不是黑盒自动攻击器。
 
@@ -105,11 +115,14 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全测试、扫
 - Payload Studio 支持 SSRF、XXE、RCE、Blind SQLi。
 - 命中后自动归因、时间线和 Markdown/JSON 证据导出。
 - Webhook、企业微信、飞书通知。
-- Nuclei/CLI 最小集成。
+- Nuclei/CLI 最小集成，并定义 Burp Suite、Yakit/Yak、ZAP、xray/rad 的集成协议和样例优先级。
 
 ### 2.1：扫描器协同版 
 
-- Burp/ZAP 插件。
+- Burp Suite 插件。
+- Yakit/Yak 插件或 Yak 脚本包。
+- ZAP 脚本或 Add-on。
+- xray/rad、Postman/Apifox 集成示例。
 - CI/CD 示例和门禁能力。
 - 更完整的 Payload 模板库。
 - 命中聚类、噪声压缩和报告增强。
@@ -117,6 +130,8 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全测试、扫
 ### 2.2：Agent 赋能版 
 
 - MCP Server。
+- `create_oast_probe` 等高层 Agent 工具。
+- AgentRun/TaskRun 和机器可读证据 Schema。
 - Agent 专用最小权限 APIKey。
 - `wait_for_interaction` 等异步工具。
 - Agent 操作审计。
@@ -137,3 +152,4 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全测试、扫
 - ProjectDiscovery Interactsh / Nuclei：强调多协议 OOB、模板化和扫描器集成。
 - Webhook.site：强调请求触发后的工作流、变量、转发、重放和响应控制。
 - Canarytokens：强调长期诱饵、上下文编码和触发告警。
+- https://github.com/ZackSecurity/Zack-AI-Scanner

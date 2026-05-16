@@ -33,7 +33,32 @@ godnslog-mcp-server
 
 ## 可用工具
 
-### 1. create_case
+### 1. create_oast_probe
+
+为 Agent 创建一次完整的 OAST 探针。该工具会先创建 Case，再创建绑定该 Case 的 Payload，并返回 `probe_id`、`case_id`、`payload_id`、`token` 和下一步动作提示。Agent 优先使用这个高层工具，只有需要精细控制时才分别调用 `create_case` 和 `create_payload`。
+
+**参数**：
+- `title` (string, required)：探针标题
+- `template` (string, required)：Payload 模板
+- `description` (string, optional)：Case 描述
+- `target` (string, optional)：目标系统
+- `variables` (object, optional)：模板变量
+- `expected_protocols` (array of strings, optional)：期望回连协议，如 `dns`、`http`
+- `expires_in` (string, optional)：过期时间（如 "1h"）
+
+**示例**：
+```json
+{
+  "title": "SSRF 探针",
+  "target": "https://example.com",
+  "template": "ssrf-url",
+  "variables": {"path": "/callback"},
+  "expected_protocols": ["dns", "http"],
+  "expires_in": "1h"
+}
+```
+
+### 2. create_case
 
 创建一个新的测试 Case。
 
@@ -53,7 +78,7 @@ godnslog-mcp-server
 }
 ```
 
-### 2. create_payload
+### 3. create_payload
 
 生成一个可追踪的 Payload。
 
@@ -73,7 +98,7 @@ godnslog-mcp-server
 }
 ```
 
-### 3. list_interactions
+### 4. list_interactions
 
 列出 Interaction 记录。
 
@@ -89,7 +114,7 @@ godnslog-mcp-server
 }
 ```
 
-### 4. wait_for_interaction
+### 5. wait_for_interaction
 
 等待特定的 Interaction 发生。
 
@@ -105,7 +130,7 @@ godnslog-mcp-server
 }
 ```
 
-### 5. summarize_evidence
+### 6. summarize_evidence
 
 汇总 Case 的证据。
 
@@ -119,7 +144,7 @@ godnslog-mcp-server
 }
 ```
 
-### 6. export_report
+### 7. export_report
 
 导出 Case 报告。
 
@@ -135,7 +160,7 @@ godnslog-mcp-server
 }
 ```
 
-### 7. revoke_token
+### 8. revoke_token
 
 撤销 API Key。
 
@@ -202,38 +227,34 @@ MCP API Key 应该设置合理的过期时间（如 24 小时）。
 ```python
 # Agent 使用 MCP 工具的典型工作流
 
-# 1. 创建 Case
-case = await mcp.call_tool("create_case", {
+# 1. 创建 OAST 探针
+probe = await mcp.call_tool("create_oast_probe", {
     "title": "SSRF 漏洞验证",
-    "target": "example.com"
-})
-
-# 2. 生成 Payload
-payload = await mcp.call_tool("create_payload", {
-    "template": "http://{{.Token}}.example.com",
-    "case_id": case["id"],
+    "target": "example.com",
+    "template": "ssrf-url",
+    "expected_protocols": ["dns", "http"],
     "expires_in": "1h"
 })
 
-token = payload["token"]
+token = probe["token"]
 
-# 3. 在测试中使用 Payload
+# 2. 在测试中使用 Payload
 # ... 执行测试，将 Payload 注入到目标系统 ...
 
-# 4. 等待 Interaction
+# 3. 等待 Interaction
 interaction = await mcp.call_tool("wait_for_interaction", {
     "token": token,
     "timeout": 300
 })
 
-# 5. 汇总证据
+# 4. 汇总证据
 evidence = await mcp.call_tool("summarize_evidence", {
-    "case_id": case["id"]
+    "case_id": probe["case_id"]
 })
 
-# 6. 导出报告
+# 5. 导出报告
 report = await mcp.call_tool("export_report", {
-    "case_id": case["id"],
+    "case_id": probe["case_id"],
     "format": "markdown"
 })
 ```

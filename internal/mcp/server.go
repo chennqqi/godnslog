@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -31,6 +32,7 @@ func NewServer(apiURL, apiKey string) *Server {
 func (s *Server) Run(ctx context.Context) error {
 	// Register tools
 	tools := []Tool{
+		{Name: "create_oast_probe", Description: "Create an agent-native OAST probe with a case and payload", Execute: s.createOASTProbe},
 		{Name: "create_case", Description: "Create a new case", Execute: s.createCase},
 		{Name: "create_payload", Description: "Create a new payload", Execute: s.createPayload},
 		{Name: "list_interactions", Description: "List interactions", Execute: s.listInteractions},
@@ -66,6 +68,71 @@ type ToolResult struct {
 	Success bool        `json:"success"`
 	Data    interface{} `json:"data,omitempty"`
 	Error   string      `json:"error,omitempty"`
+}
+
+// createOASTProbe creates a case and payload in one agent-friendly operation.
+func (s *Server) createOASTProbe(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	title, ok := args["title"].(string)
+	if !ok || strings.TrimSpace(title) == "" {
+		return nil, fmt.Errorf("title is required")
+	}
+
+	template, ok := args["template"].(string)
+	if !ok || strings.TrimSpace(template) == "" {
+		return nil, fmt.Errorf("template is required")
+	}
+
+	description, _ := args["description"].(string)
+	target, _ := args["target"].(string)
+	expiresIn, _ := args["expires_in"].(string)
+	variables := normalizeStringMap(args["variables"])
+	expectedProtocols := normalizeStringSlice(args["expected_protocols"])
+
+	caseResult, err := s.apiCall("POST", "/cases", map[string]interface{}{
+		"title":       title,
+		"description": description,
+		"target":      target,
+		"tags":        []string{"agent", "oast-probe"},
+	})
+	if err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	caseID := extractString(caseResult, "id")
+	if caseID == "" {
+		caseID = extractString(caseResult, "case_id")
+	}
+	if caseID == "" {
+		return ToolResult{Success: false, Error: "case creation response did not include an id"}, nil
+	}
+
+	payloadResult, err := s.apiCall("POST", "/payloads", map[string]interface{}{
+		"template":           template,
+		"case_id":            caseID,
+		"variables":          variables,
+		"expires_in":         expiresIn,
+		"expected_protocols": expectedProtocols,
+	})
+	if err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	payloadID := extractString(payloadResult, "id")
+	if payloadID == "" {
+		payloadID = extractString(payloadResult, "payload_id")
+	}
+	token := extractString(payloadResult, "token")
+
+	return ToolResult{Success: true, Data: map[string]interface{}{
+		"probe_id":           caseID + ":" + payloadID,
+		"case_id":            caseID,
+		"payload_id":         payloadID,
+		"token":              token,
+		"case":               caseResult,
+		"payload":            payloadResult,
+		"expected_protocols": expectedProtocols,
+		"agent_next_action":  "Deliver the payload to the target, then call wait_for_interaction with the returned token.",
+	}}, nil
 }
 
 // create_case creates a new case
@@ -144,6 +211,10 @@ func (s *Server) listInteractions(ctx context.Context, args map[string]interface
 
 // wait_for_interaction waits for an interaction
 func (s *Server) waitForInteraction(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	token, ok := args["token"].(string)
 	if !ok {
 		return nil, fmt.Errorf("token is required")
@@ -274,8 +345,77 @@ func (s *Server) apiCall(method, path string, body interface{}) (interface{}, er
 	return result, nil
 }
 
+func normalizeStringMap(value interface{}) map[string]string {
+	result := make(map[string]string)
+
+	switch typed := value.(type) {
+	case map[string]string:
+		for k, v := range typed {
+			result[k] = v
+		}
+	case map[string]interface{}:
+		for k, v := range typed {
+			result[k] = fmt.Sprint(v)
+		}
+	}
+
+	return result
+}
+
+func normalizeStringSlice(value interface{}) []string {
+	result := []string{}
+
+	switch typed := value.(type) {
+	case []string:
+		result = append(result, typed...)
+	case []interface{}:
+		for _, item := range typed {
+			result = append(result, fmt.Sprint(item))
+		}
+	}
+
+	return result
+}
+
+func extractString(value interface{}, key string) string {
+	if found := extractStringFromMap(value, key); found != "" {
+		return found
+	}
+
+	if root, ok := value.(map[string]interface{}); ok {
+		if data, ok := root["data"]; ok {
+			return extractStringFromMap(data, key)
+		}
+	}
+
+	return ""
+}
+
+func extractStringFromMap(value interface{}, key string) string {
+	fields, ok := value.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+
+	if raw, ok := fields[key]; ok {
+		if text, ok := raw.(string); ok {
+			return text
+		}
+	}
+
+	return ""
+}
+
 // pollInteractions polls for interactions
 func (s *Server) pollInteractions(ctx context.Context, token string, timeout int) (interface{}, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	if result, found := s.findInteractions(token); found {
+		return result, nil
+	}
+
 	deadline := time.After(time.Duration(timeout) * time.Second)
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -290,27 +430,40 @@ func (s *Server) pollInteractions(ctx context.Context, token string, timeout int
 				"token":   token,
 			}, nil
 		case <-ticker.C:
-			// Check for interactions with this token
-			query := fmt.Sprintf("?token=%s&page_size=10", token)
-			result, err := s.apiCall("GET", "/interactions"+query, nil)
-			if err != nil {
-				continue // Retry on error
-			}
-
-			// Check if we have any interactions
-			if resp, ok := result.(map[string]interface{}); ok {
-				if data, ok := resp["data"].(map[string]interface{}); ok {
-					if items, ok := data["items"].([]interface{}); ok && len(items) > 0 {
-						return map[string]interface{}{
-							"message":      "Interaction detected",
-							"token":        token,
-							"interactions": items,
-						}, nil
-					}
-				}
+			if result, found := s.findInteractions(token); found {
+				return result, nil
 			}
 		}
 	}
+}
+
+func (s *Server) findInteractions(token string) (interface{}, bool) {
+	query := fmt.Sprintf("?token=%s&page_size=10", token)
+	result, err := s.apiCall("GET", "/interactions"+query, nil)
+	if err != nil {
+		return nil, false
+	}
+
+	resp, ok := result.(map[string]interface{})
+	if !ok {
+		return nil, false
+	}
+
+	data, ok := resp["data"].(map[string]interface{})
+	if !ok {
+		return nil, false
+	}
+
+	items, ok := data["items"].([]interface{})
+	if !ok || len(items) == 0 {
+		return nil, false
+	}
+
+	return map[string]interface{}{
+		"message":      "Interaction detected",
+		"token":        token,
+		"interactions": items,
+	}, true
 }
 
 // runHTTPServer runs a simple HTTP server for MCP (MVP)

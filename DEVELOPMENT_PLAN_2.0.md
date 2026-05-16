@@ -53,9 +53,9 @@ docs/                    # 2.0 API、部署、插件、MCP 文档
 
 ### 对外工具
 
-- `godnslog-cli`：服务 Nuclei、CI/CD 和脚本化使用。
+- `godnslog-cli`：服务 Nuclei、Yakit/Yak、xray/rad、CI/CD 和脚本化使用。
 - `godnslog-mcp-server`：服务 AI Agent。
-- Burp/ZAP 插件先做最小可用版本，再完善 UI。
+- Burp Suite、Yakit/Yak、ZAP 插件或脚本先做最小可用版本，再完善 UI。
 
 ## 阶段计划
 
@@ -109,7 +109,7 @@ docs/                    # 2.0 API、部署、插件、MCP 文档
 - 系统设置页面 - 通用、域名、监听、通知、Token管理
 - API客户端和类型定义
 
-### Phase 3：扫描器协同 🔄 进行中
+### Phase 3：扫描器协同基线 🔄 进行中
 
 - ✅ 实现 `godnslog-cli`：
   - ✅ 创建 Case。
@@ -117,6 +117,8 @@ docs/                    # 2.0 API、部署、插件、MCP 文档
   - ✅ 等待或轮询 Interaction。
   - ✅ 导出 JSON/Markdown 报告。
 - ✅ 提供 Nuclei 模板示例和 JSONL 输出。
+- 补充 Burp Suite、Yakit/Yak、ZAP、xray/rad 的集成协议和最小脚本示例。
+- 统一外部工具输出：JSONL/SARIF/Webhook 三种机器可读格式。
 
 **交付物**：
 - cmd/cli/main.go - CLI入口
@@ -145,6 +147,9 @@ docs/                    # 2.0 API、部署、插件、MCP 文档
 ### Phase 5：扫描器协同 ✅ 已完成
 
 - ✅ Burp Suite插件（Java实现）
+- ✅ Yakit/Yak 集成规划和脚本接口
+- ✅ ZAP 集成规划和脚本接口
+- ✅ xray/rad 集成规划和 CLI/webhook 接口
 - ✅ CI/CD集成示例（GitHub Actions、GitLab CI、Jenkins）
 - ✅ Payload模板库扩展
 - ✅ 高风险检测门禁
@@ -159,7 +164,8 @@ docs/                    # 2.0 API、部署、插件、MCP 文档
 ### Phase 6：MCP 与 Agent 赋能 ✅ 已完成
 
 - ✅ 实现 `godnslog-mcp-server`
-- ✅ 暴露工具：`create_case`、`create_payload`、`list_interactions`、`wait_for_interaction`、`summarize_evidence`、`export_report`、`revoke_token`
+- ✅ 暴露工具：`create_oast_probe`、`create_case`、`create_payload`、`list_interactions`、`wait_for_interaction`、`summarize_evidence`、`export_report`、`revoke_token`
+- ✅ `create_oast_probe` 支持 Agent 一次性创建 Case 和 Payload，并返回下一步等待命中动作
 - ✅ 审计日志集成
 - ✅ 高风险能力默认禁用
 
