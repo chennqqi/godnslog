@@ -1,20 +1,23 @@
 # build frontend
-FROM node:12.18.3-alpine3.12 as frontend-builder
+FROM node:24.13.0-alpine as frontend-builder
 WORKDIR /app
-COPY frontend /app
-RUN yarn config set registry https://registry.npmmirror.com && yarn install
-RUN yarn build
+COPY frontend-next /app
+RUN npm config set registry https://registry.npmmirror.com && npm install
+RUN npm run build
 
 # build backend
-FROM golang:1.16.4-alpine as backend-builder
+FROM golang:1.22-alpine as backend-builder
 
 RUN echo "https://mirror.tuna.tsinghua.edu.cn/alpine/v3.12/main" > /etc/apk/repositories
-#RUN apk add build-base git musl-dev
 
 COPY models /src/godnslog/models
 COPY server /src/godnslog/server
 COPY cache /src/godnslog/cache
-COPY *.go go.mod /src/godnslog/
+COPY internal /src/godnslog/internal
+COPY cmd /src/godnslog/cmd
+COPY cli /src/godnslog/cli
+COPY migration /src/godnslog/migration
+COPY *.go go.mod go.sum /src/godnslog/
 WORKDIR /src/godnslog
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o /go/bin/godnslog
 

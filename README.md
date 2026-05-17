@@ -1,158 +1,140 @@
-# GODNSLOG
+# GODNSLOG 2.0
 
 ![](https://z3.ax1x.com/2021/08/10/fGd4IJ.png)
 
-A dns&amp;http log server for verify SSRF/XXE/RFI/RCE vulnerability
+A DNS & HTTP log server for verifying SSRF/XXE/RFI/RCE vulnerabilities
 
 English Doc | [中文文档](https://github.com/chennqqi/godnslog/blob/master/README_CN.md)
 
-## Roadmap
+## Version 2.0
 
-### 易用性
+GODNSLOG 2.0 is a complete rewrite with enterprise-grade features:
 
-- [ ] 前端重构
-- [ ] 基于APIkey的验证，swagger UI
-- [ ] 更多SDK
-- [ ] 支持firebase之类的SaaS服务
+- **OAST Evidence Platform**: Full evidence chain with Case/Payload/Interaction tracking
+- **Agent-Native MCP Server**: AI/LLM integration with minimal permissions
+- **Scanner Hub**: Nuclei, Burp Suite, ZAP, Yakit/Yak, xray/rad integration
+- **Workflow Automation**: Rule-based notification triggers via Webhook/Enterprise WeChat/Feishu/DingTalk
+- **Canary Tokens**: Long-term monitoring with multiple token types
+- **Rebinding Lab**: Multi-stage DNS rebinding with session tracking
+- **Multi-Protocol Listeners**: DNS, HTTP, SMTP, LDAP, SMB, FTP
+- **Enterprise Features**: Multi-workspace, data retention, audit logging
 
-### 通知
+## Quick Start
 
-- [ ] 邮件通知
-- [ ] 微信通知
-- [ ] 企业微信通知
-- [ ] slack通知
-- [ ] discord通知
-- [ ] webhook通知
+### Docker
 
-### 检测能力
-- [ ] ssrf
-- [ ] xxe
-- [ ] rfi
-- [ ] rce
-- [ ] Blind SQL injection
-- [ ] deserialization
-- [ ] cors/jsonp
-- [ ] smtp injection
-
-### 工具
-
-- [ ] DNS ReverseProxy
-- [ ] DNS C2
-- [ ] EMAIL
-- [ ] SMS
-
-### 集成
-- [ ] nuclei
-- [ ] burp suite/​Burp Collaborator
-- [ ] yapi
-
-### MCP/A2A：连接大模型与其他Agent
-- [ ] 创建APIKey
-- [ ] 获取DNSLog日志记录
-- [ ] 创建绑定
-
-## features
-
-- Standard Domain Resolve Service
-- DNSLOG
-- HTTPLOG
-- Rebinding/CustomRebinding
-- Push (callback)
-- Multi-user
-- dockerlized
-- python/golang client sdk
-- as a standard name resolve service with support `A,CNAME,TXT,MX`
-- xip
-
-
-### DNSLOG
-
-super admin user: `admin`
-password will be showed in console logs when first run.
-you can change it by subcommand `resetpw`
-
-![](https://s1.ax1x.com/2020/08/31/dXPba4.png)
-
-
-### HTTPLOG
-![](https://s1.ax1x.com/2020/08/31/dXiiIH.png)
-
-
-## build frontend
-
-requirements: 
-
-`yarn`
-
+```bash
+docker build -t "user/godnslog" .
+docker run -p 8080:8080 -p 53:53/udp "user/godnslog" serve -domain example.com -4 127.0.0.1
 ```
-cd frontend
-yarn install
-yarn build
+
+For Chinese users:
+
+```bash
+docker build -t "user/godnslog" -f DockerfileCN .
+docker run -p 8080:8080 -p 53:53/udp "user/godnslog" serve -domain example.com -4 127.0.0.1
 ```
-	
-## build backend
 
-requirements: 
+### Build from Source
 
-`golang >= 1.13.0`
+**Frontend (Next.js):**
+
+```bash
+cd frontend-next
+npm install
+npm run build
+```
+
+**Backend (Go):**
 
 ```bash
 go build
 ```
 
-## docker build
+## Configuration
+
+### Domain Setup
+
+1. Register your domain (e.g., `example.com`)
+2. Set your DNS server to point to your host (e.g., `ns.example.com` → `100.100.100.100`)
+3. Some registrars require NS hosts to point to different IPs initially
+4. Access http://your-server-ip
+
+### Default Admin
+
+- Username: `admin`
+- Password: Shown in console logs on first run
+- Change password using: `go run . resetpw`
+
+## Features
+
+### Core OAST
+- DNS/HTTP interaction capture
+- Evidence timeline with scoring
+- Case-based workflow
+- Payload template system (30+ templates)
+- Interaction clustering and noise reduction
+
+### Scanner Integration
+- Nuclei templates with JSONL output
+- Burp Suite extension
+- ZAP script
+- Yakit/Yak script
+- xray/rad integration
+- CI/CD gate examples
+
+### Agent Integration
+- MCP Server (Streamable HTTP)
+- Agent-specific API keys with scopes
+- Audit logging for agent operations
+- AI evidence summarization
+
+### Monitoring
+- Canary tokens (DNS/HTTP/SMTP)
+- DNS Rebinding Lab
+- Multi-protocol listeners (SMTP/LDAP/SMB/FTP)
+- Webhook notifications
+- Enterprise IM (WeChat/Feishu/DingTalk)
+
+### Enterprise
+- Multi-workspace isolation
+- User and role management
+- Data retention policies
+- Audit logging
+- API key management
+
+## Documentation
+
+- [Introduction](https://www.godnslog.com/document/introduce)
+- [Payload Templates](https://www.godnslog.com/document/payload)
+- [API Reference](https://www.godnslog.com/document/api)
+- [Rebinding](https://www.godnslog.com/document/rebinding)
+- [DNS Resolution](https://www.godnslog.com/document/resolve)
+
+## Development
+
+### Run Tests
 
 ```bash
-docker build -t "user/godnslog" .
+# Backend tests
+go test ./...
+
+# Frontend E2E tests
+cd frontend-next
+npm install
+npm run test:e2e
 ```
 
-For Chinese user:
+### CLI Usage
 
 ```bash
-docker build -t "user/godnslog" -f DockerfileCN .
+# View help
+go run ./cmd/cli --help
+
+# Create OAST probe
+go run ./cmd/cli create-oast-probe --title "SSRF Test" --template "ssrf-basic"
 ```
 
-## RUN
+## License
 
-i. Register your domain, eg: `example.com`
-Set your DNS Server point to your host, eg: ns.example.com => 100.100.100.100
-Some registrar limit set to NS host, your can set two ns host point to only one address.
-Some registrar to ns host must be different ip address, you can set one to a fake addresss and then change to the same addresss
-
-
-ii. self build
-
-```bash
-docker run -p80:8080 -p53:53/udp "user/godnslog"  serve -domain yourdomain.com -4 100.100.100.100
-```
-
-or use dockerhub
-
-```bash
-docker pull "sort/godnslog"
-docker run -p80:8080 -p53:53/udp -p80:8080  "sort/godnslog" serve -domain yourdomain.com -4 100.100.100.100
-```
-
-iii. access http://100.100.100.100
-
-## Doc
-
-guest/guest123
-
-[introduce](https://www.godnslog.com/document/introduce)
-[payload](https://www.godnslog.com/document/payload)
-[api](https://www.godnslog.com/document/api)
-[rebiding](https://www.godnslog.com/document/rebinding)
-[resolve](https://www.godnslog.com/document/resolve)
-
-## TODO && Known Issues
-
-- [ ]~~enhance reverse proxy~~
-- [ ] admin user can read all recordds
-- [ ] allow Anonymous user access document page
-- [ ] enable custom rebinding stage two setting
-- [ ] fix login logical problem
-
-## Follow me
-
-![](https://open.weixin.qq.com/qr/code?username=gh_4a48daaf398b)
+Open source, continuing under the original license.
