@@ -132,11 +132,11 @@ type Payload struct {
 }
 
 type PayloadCreateRequest struct {
-	CaseId           string            `json:"case_id,omitempty"`
-	Template         string            `json:"template"`
-	Variables        map[string]string `json:"variables,omitempty"`
-	ExpiresAt        string            `json:"expires_at,omitempty"`
-	ExpectedProtocol string            `json:"expected_protocol,omitempty"`
+	CaseID           string            `json:"case_id" binding:"required"`
+	TemplateID       string            `json:"template_id" binding:"required"`
+	Variables        map[string]string `json:"variables"`
+	ExpiresAt        string            `json:"expires_at"`
+	ExpectedProtocol string            `json:"expected_protocol" binding:"omitempty,oneof=dns http smtp ldap"`
 }
 
 type PayloadListResponse struct {

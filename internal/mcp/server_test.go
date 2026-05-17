@@ -91,7 +91,7 @@ func TestToolResultStruct(t *testing.T) {
 // TestCreateCaseTool tests createCase tool
 func TestCreateCaseTool(t *testing.T) {
 	server := newTestServer(func(r *http.Request) string {
-		if r.Method != http.MethodPost || r.URL.Path != "/cases" {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v2/cases" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
 		if got := r.Header.Get("Authorization"); got != "Bearer test-key" {
@@ -127,16 +127,16 @@ func TestCreateCaseTool(t *testing.T) {
 // TestCreatePayloadTool tests createPayload tool
 func TestCreatePayloadTool(t *testing.T) {
 	server := newTestServer(func(r *http.Request) string {
-		if r.Method != http.MethodPost || r.URL.Path != "/payloads" {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v2/payloads" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
 		return `{"data":{"id":"payload-1","token":"tok-1"}}`
 	})
 
 	args := map[string]interface{}{
-		"template":   "http://{{.Token}}.example.com",
-		"case_id":    "case-1",
-		"expires_in": "24h",
+		"template_id": "ssrf-basic",
+		"case_id":     "case-1",
+		"expires_in":  "24h",
 	}
 
 	result, err := server.createPayload(nil, args)
@@ -158,7 +158,7 @@ func TestCreatePayloadTool(t *testing.T) {
 // TestListInteractionsTool tests listInteractions tool
 func TestListInteractionsTool(t *testing.T) {
 	server := newTestServer(func(r *http.Request) string {
-		if r.Method != http.MethodGet || r.URL.Path != "/interactions" {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/v2/interactions" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
 		if got := r.URL.Query().Get("case_id"); got != "case-1" {
@@ -191,7 +191,7 @@ func TestListInteractionsTool(t *testing.T) {
 // TestWaitForInteractionTool tests waitForInteraction tool
 func TestWaitForInteractionTool(t *testing.T) {
 	server := newTestServer(func(r *http.Request) string {
-		if r.Method != http.MethodGet || r.URL.Path != "/interactions" {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/v2/interactions" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
 		return `{"data":{"items":[{"id":"interaction-1","token":"test-token"}]}}`
@@ -221,7 +221,7 @@ func TestWaitForInteractionTool(t *testing.T) {
 // TestSummarizeEvidenceTool tests summarizeEvidence tool
 func TestSummarizeEvidenceTool(t *testing.T) {
 	server := newTestServer(func(r *http.Request) string {
-		if r.Method != http.MethodGet || r.URL.Path != "/evidence/case-1/summary" {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/v2/evidence/case-1" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
 		return `{"data":{"confidence":"medium"}}`
@@ -250,7 +250,7 @@ func TestSummarizeEvidenceTool(t *testing.T) {
 // TestExportReportTool tests exportReport tool
 func TestExportReportTool(t *testing.T) {
 	server := newTestServer(func(r *http.Request) string {
-		if r.Method != http.MethodPost || r.URL.Path != "/evidence/export" {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v2/evidence/generate" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
 		return `{"data":{"format":"markdown"}}`
@@ -280,7 +280,7 @@ func TestExportReportTool(t *testing.T) {
 // TestRevokeTokenTool tests revokeToken tool
 func TestRevokeTokenTool(t *testing.T) {
 	server := newTestServer(func(r *http.Request) string {
-		if r.Method != http.MethodDelete || r.URL.Path != "/apikeys/key-1" {
+		if r.Method != http.MethodDelete || r.URL.Path != "/api/v2/apikeys/key-1" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
 		return `{"data":{"revoked":true}}`
@@ -312,9 +312,9 @@ func TestCreateOASTProbeToolCreatesCaseThenPayload(t *testing.T) {
 
 	server := newTestServer(func(r *http.Request) string {
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/cases":
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v2/cases":
 			return `{"data":{"id":"case-1","title":"SSRF probe"}}`
-		case r.Method == http.MethodPost && r.URL.Path == "/payloads":
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v2/payloads":
 			var body map[string]interface{}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Fatalf("failed to decode payload request: %v", err)
@@ -330,7 +330,7 @@ func TestCreateOASTProbeToolCreatesCaseThenPayload(t *testing.T) {
 	result, err := server.createOASTProbe(context.Background(), map[string]interface{}{
 		"title":              "SSRF probe",
 		"target":             "https://target.example",
-		"template":           "ssrf-url",
+		"template_id":        "ssrf-basic",
 		"expected_protocols": []interface{}{"dns", "http"},
 		"variables":          map[string]interface{}{"path": "/callback"},
 		"agent_id":           "agent-1",

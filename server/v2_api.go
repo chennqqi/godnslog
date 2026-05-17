@@ -12,6 +12,7 @@ import (
 	"github.com/chennqqi/godnslog/internal/interaction"
 	"github.com/chennqqi/godnslog/internal/listener"
 	"github.com/chennqqi/godnslog/internal/notification"
+	"github.com/chennqqi/godnslog/internal/payload"
 	"github.com/dgrijalva/jwt-go"
 
 	v2models "github.com/chennqqi/godnslog/internal/models"
@@ -667,7 +668,7 @@ func (self *WebServer) v2GetCaseStats(c *gin.Context) {
 	}
 	if !has {
 		c.JSON(http.StatusNotFound, gin.H{
-			"code":    4,
+			"code":    404,
 			"message": "case not found",
 		})
 		return
@@ -933,48 +934,39 @@ func (self *WebServer) v2CreatePayload(c *gin.Context) {
 		return
 	}
 
-	if req.Template == "" {
+	if req.TemplateID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
-			"message": "template is required",
+			"message": "template_id is required",
 		})
 		return
 	}
 
 	user := c.MustGet("user").(*models.TblUser)
+	userID := strconv.FormatInt(user.Id, 10)
 
-	payloadItem := models.TblPayload{
-		Template:         req.Template,
-		Status:           "draft",
-		ExpectedProtocol: req.ExpectedProtocol,
-		CreatedBy:        user.Id,
-	}
-
-	if req.CaseId != "" {
-		caseId, err := strconv.ParseInt(req.CaseId, 10, 64)
-		if err == nil {
-			payloadItem.CaseId = caseId
-		}
-	}
-
-	if req.Variables != nil {
-		variablesJson, _ := json.Marshal(req.Variables)
-		payloadItem.Variables = string(variablesJson)
-	}
-
+	// Convert ExpiresAt string to *time.Time if provided
+	var expiresAt *time.Time
 	if req.ExpiresAt != "" {
-		expiresAt, err := time.Parse(time.RFC3339, req.ExpiresAt)
+		parsedTime, err := time.Parse(time.RFC3339, req.ExpiresAt)
 		if err == nil {
-			payloadItem.ExpiresAt = expiresAt
+			expiresAt = &parsedTime
 		}
 	}
 
-	session := self.orm.NewSession()
-	defer session.Close()
+	// Create unified request for payload service
+	unifiedReq := v2models.PayloadCreateRequest{
+		CaseID:           req.CaseID,
+		TemplateID:       req.TemplateID,
+		Variables:        req.Variables,
+		ExpiresAt:        expiresAt,
+		ExpectedProtocol: req.ExpectedProtocol,
+	}
 
-	_, err = session.Insert(&payloadItem)
+	payloadService := payload.NewService(self.orm)
+	payloadItem, err := payloadService.CreatePayload(&unifiedReq, userID, self.Domain)
 	if err != nil {
-		logrus.Errorf("[v2_api.go::v2CreatePayload] insert error: %v", err)
+		logrus.Errorf("[v2_api.go::v2CreatePayload] create error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "server internal error",
@@ -982,27 +974,10 @@ func (self *WebServer) v2CreatePayload(c *gin.Context) {
 		return
 	}
 
-	var variables map[string]string
-	if payloadItem.Variables != "" {
-		json.Unmarshal([]byte(payloadItem.Variables), &variables)
-	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
-		"data": models.Payload{
-			Id:               strconv.FormatInt(payloadItem.Id, 10),
-			CaseId:           strconv.FormatInt(payloadItem.CaseId, 10),
-			Token:            payloadItem.Token,
-			Template:         payloadItem.Template,
-			RenderedPayload:  payloadItem.RenderedPayload,
-			Variables:        variables,
-			Status:           payloadItem.Status,
-			ExpectedProtocol: payloadItem.ExpectedProtocol,
-			CreatedBy:        strconv.FormatInt(payloadItem.CreatedBy, 10),
-			CreatedAt:        payloadItem.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:        payloadItem.UpdatedAt.Format(time.RFC3339),
-		},
+		"data":    payloadItem,
 	})
 }
 
@@ -1145,20 +1120,9 @@ func (self *WebServer) v2UpdatePayload(c *gin.Context) {
 // v2PreviewPayload previews payload rendering
 func (self *WebServer) v2PreviewPayload(c *gin.Context) {
 	id := c.Param("id")
-	payloadId, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "invalid payload id",
-		})
-		return
-	}
 
-	session := self.orm.NewSession()
-	defer session.Close()
-
-	var payload models.TblPayload
-	has, err := session.ID(payloadId).Get(&payload)
+	payloadService := payload.NewService(self.orm)
+	payloadItem, err := payloadService.GetPayloadByID(id)
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2PreviewPayload] get error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -1167,19 +1131,12 @@ func (self *WebServer) v2PreviewPayload(c *gin.Context) {
 		})
 		return
 	}
-	if !has {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code":    4,
-			"message": "payload not found",
-		})
-		return
-	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
 		"data": gin.H{
-			"rendered_payload": payload.RenderedPayload,
+			"rendered_payload": payloadItem.TemplateRendered,
 		},
 	})
 }
@@ -1675,7 +1632,7 @@ func (self *WebServer) v2GetAPIKey(c *gin.Context) {
 	}
 	if !has {
 		c.JSON(http.StatusNotFound, gin.H{
-			"code":    4,
+			"code":    404,
 			"message": "api key not found",
 		})
 		return
@@ -2092,7 +2049,7 @@ func (self *WebServer) v2GetRule(c *gin.Context) {
 	workflow, err := workflowService.GetWorkflowByID(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"code":    4,
+			"code":    404,
 			"message": "Workflow not found",
 		})
 		return
@@ -2194,7 +2151,7 @@ func (self *WebServer) v2GetEvidence(c *gin.Context) {
 	// Evidence reports are generated on-demand and not persisted
 	// Use v2GenerateEvidence endpoint to generate evidence reports
 	c.JSON(http.StatusNotFound, gin.H{
-		"code":    4,
+		"code":    404,
 		"message": "Evidence reports are generated on-demand. Use /evidence/generate endpoint to create evidence reports.",
 	})
 }
@@ -2259,7 +2216,7 @@ func (self *WebServer) v2GetCanary(c *gin.Context) {
 	canary, err := canaryService.GetCanary(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"code":    4,
+			"code":    404,
 			"message": "Canary not found",
 		})
 		return
@@ -2406,7 +2363,7 @@ func (self *WebServer) v2GetRebindingRule(c *gin.Context) {
 	rule, err := rebindingService.GetRebindingRule(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"code":    4,
+			"code":    404,
 			"message": "Rebinding rule not found",
 		})
 		return
@@ -2553,7 +2510,7 @@ func (self *WebServer) v2GetListener(c *gin.Context) {
 	listener, err := listenerService.GetListener(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"code":    4,
+			"code":    404,
 			"message": "Listener not found",
 		})
 		return
@@ -2716,7 +2673,7 @@ func (self *WebServer) v2GetNotificationChannel(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetNotificationChannel] error: %v", err)
 		c.JSON(http.StatusNotFound, gin.H{
-			"code":    4,
+			"code":    404,
 			"message": "channel not found",
 		})
 		return
@@ -2885,7 +2842,7 @@ func (self *WebServer) v2GetSetting(c *gin.Context) {
 
 	if setting.ID == "" {
 		c.JSON(http.StatusNotFound, gin.H{
-			"code":    4,
+			"code":    404,
 			"message": "setting not found",
 		})
 		return
@@ -2927,7 +2884,7 @@ func (self *WebServer) v2UpdateSetting(c *gin.Context) {
 
 	if setting.ID == "" {
 		c.JSON(http.StatusNotFound, gin.H{
-			"code":    4,
+			"code":    404,
 			"message": "setting not found",
 		})
 		return

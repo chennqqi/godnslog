@@ -22,7 +22,7 @@ func TestCreatePayload(t *testing.T) {
 	service := NewService(engine)
 
 	req := &PayloadCreateRequest{
-		Template:         "ssrf",
+		TemplateID:       "ssrf-basic",
 		Variables:        map[string]string{},
 		ExpectedProtocol: "dns",
 	}
@@ -51,7 +51,7 @@ func TestGetPayloadByID(t *testing.T) {
 	service := NewService(engine)
 
 	req := &PayloadCreateRequest{
-		Template:         "ssrf",
+		TemplateID:       "ssrf-basic",
 		Variables:        map[string]string{},
 		ExpectedProtocol: "dns",
 	}
@@ -85,7 +85,7 @@ func TestUpdatePayload(t *testing.T) {
 	service := NewService(engine)
 
 	req := &PayloadCreateRequest{
-		Template:         "ssrf",
+		TemplateID:       "ssrf-basic",
 		Variables:        map[string]string{},
 		ExpectedProtocol: "dns",
 	}
@@ -129,7 +129,7 @@ func TestListPayloads(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		req := &PayloadCreateRequest{
-			Template:         "ssrf",
+			TemplateID:       "ssrf-basic",
 			Variables:        map[string]string{},
 			ExpectedProtocol: "dns",
 		}

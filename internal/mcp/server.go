@@ -77,9 +77,9 @@ func (s *Server) createOASTProbe(ctx context.Context, args map[string]interface{
 		return nil, fmt.Errorf("title is required")
 	}
 
-	template, ok := args["template"].(string)
-	if !ok || strings.TrimSpace(template) == "" {
-		return nil, fmt.Errorf("template is required")
+	templateID, ok := args["template_id"].(string)
+	if !ok || strings.TrimSpace(templateID) == "" {
+		return nil, fmt.Errorf("template_id is required")
 	}
 
 	description, _ := args["description"].(string)
@@ -89,7 +89,7 @@ func (s *Server) createOASTProbe(ctx context.Context, args map[string]interface{
 	variables := normalizeStringMap(args["variables"])
 	expectedProtocols := normalizeStringSlice(args["expected_protocols"])
 
-	caseResult, err := s.apiCall("POST", "/cases", map[string]interface{}{
+	caseResult, err := s.apiCall("POST", "/api/v2/cases", map[string]interface{}{
 		"title":       title,
 		"description": description,
 		"target":      target,
@@ -107,8 +107,8 @@ func (s *Server) createOASTProbe(ctx context.Context, args map[string]interface{
 		return ToolResult{Success: false, Error: "case creation response did not include an id"}, nil
 	}
 
-	payloadResult, err := s.apiCall("POST", "/payloads", map[string]interface{}{
-		"template":           template,
+	payloadResult, err := s.apiCall("POST", "/api/v2/payloads", map[string]interface{}{
+		"template_id":        templateID,
 		"case_id":            caseID,
 		"variables":          variables,
 		"expires_in":         expiresIn,
@@ -160,7 +160,7 @@ func (s *Server) createCase(ctx context.Context, args map[string]interface{}) (i
 	tags, _ := args["tags"].([]string)
 
 	// Call API
-	result, err := s.apiCall("POST", "/cases", map[string]interface{}{
+	result, err := s.apiCall("POST", "/api/v2/cases", map[string]interface{}{
 		"title":       title,
 		"description": description,
 		"target":      target,
@@ -176,9 +176,9 @@ func (s *Server) createCase(ctx context.Context, args map[string]interface{}) (i
 
 // create_payload creates a new payload
 func (s *Server) createPayload(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-	template, ok := args["template"].(string)
+	templateID, ok := args["template_id"].(string)
 	if !ok {
-		return nil, fmt.Errorf("template is required")
+		return nil, fmt.Errorf("template_id is required")
 	}
 
 	caseID, _ := args["case_id"].(string)
@@ -186,11 +186,11 @@ func (s *Server) createPayload(ctx context.Context, args map[string]interface{})
 	expiresIn, _ := args["expires_in"].(string)
 
 	// Call API
-	result, err := s.apiCall("POST", "/payloads", map[string]interface{}{
-		"template":   template,
-		"case_id":    caseID,
-		"variables":  variables,
-		"expires_in": expiresIn,
+	result, err := s.apiCall("POST", "/api/v2/payloads", map[string]interface{}{
+		"template_id": templateID,
+		"case_id":     caseID,
+		"variables":   variables,
+		"expires_in":  expiresIn,
 	})
 
 	if err != nil {
@@ -214,7 +214,7 @@ func (s *Server) listInteractions(ctx context.Context, args map[string]interface
 		query += fmt.Sprintf("&case_id=%s", caseID)
 	}
 
-	result, err := s.apiCall("GET", "/interactions"+query, nil)
+	result, err := s.apiCall("GET", "/api/v2/interactions"+query, nil)
 	if err != nil {
 		return ToolResult{Success: false, Error: err.Error()}, nil
 	}
@@ -256,7 +256,7 @@ func (s *Server) summarizeEvidence(ctx context.Context, args map[string]interfac
 	}
 
 	// Call API
-	result, err := s.apiCall("GET", "/evidence/"+caseID+"/summary", nil)
+	result, err := s.apiCall("GET", "/api/v2/evidence/"+caseID, nil)
 	if err != nil {
 		return ToolResult{Success: false, Error: err.Error()}, nil
 	}
@@ -277,7 +277,7 @@ func (s *Server) exportReport(ctx context.Context, args map[string]interface{}) 
 	}
 
 	// Call API
-	result, err := s.apiCall("POST", "/evidence/export", map[string]interface{}{
+	result, err := s.apiCall("POST", "/api/v2/evidence/generate", map[string]interface{}{
 		"case_id": caseID,
 		"format":  format,
 	})
@@ -297,7 +297,7 @@ func (s *Server) revokeToken(ctx context.Context, args map[string]interface{}) (
 	}
 
 	// Call API
-	result, err := s.apiCall("DELETE", "/apikeys/"+keyID, nil)
+	result, err := s.apiCall("DELETE", "/api/v2/apikeys/"+keyID, nil)
 	if err != nil {
 		return ToolResult{Success: false, Error: err.Error()}, nil
 	}
@@ -452,7 +452,7 @@ func (s *Server) pollInteractions(ctx context.Context, token string, timeout int
 
 func (s *Server) findInteractions(token string) (interface{}, bool) {
 	query := fmt.Sprintf("?token=%s&page_size=10", token)
-	result, err := s.apiCall("GET", "/interactions"+query, nil)
+	result, err := s.apiCall("GET", "/api/v2/interactions"+query, nil)
 	if err != nil {
 		return nil, false
 	}

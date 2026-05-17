@@ -122,7 +122,7 @@ func RecoveryMiddleware() gin.HandlerFunc {
 			if err := recover(); err != nil {
 				logrus.Errorf("Panic recovered: %v", err)
 				c.JSON(http.StatusInternalServerError, gin.H{
-					"code":    5,
+					"code":    500,
 					"message": "Internal server error",
 				})
 				c.Abort()
@@ -138,7 +138,7 @@ func (s *WebServer) AdminOnlyMiddleware() gin.HandlerFunc {
 		role, exists := c.Get("role")
 		if !exists {
 			c.JSON(http.StatusForbidden, gin.H{
-				"code":    4,
+				"code":    403,
 				"message": "Forbidden",
 			})
 			c.Abort()
@@ -149,7 +149,7 @@ func (s *WebServer) AdminOnlyMiddleware() gin.HandlerFunc {
 		if roleInt, ok := role.(int); ok {
 			if roleInt > 1 {
 				c.JSON(http.StatusForbidden, gin.H{
-					"code":    4,
+					"code":    403,
 					"message": "Admin access required",
 				})
 				c.Abort()

@@ -1,14 +1,10 @@
 package payload
 
 import (
-	"crypto/rand"
-	"encoding/base32"
 	"errors"
-	"fmt"
-	"strings"
-	"text/template"
 	"time"
 
+	"github.com/chennqqi/godnslog/internal/models"
 	"xorm.io/xorm"
 )
 
@@ -27,91 +23,28 @@ func NewService(engine *xorm.Engine) *Service {
 	return &Service{engine: engine}
 }
 
-// PayloadTemplates defines available payload templates
-var PayloadTemplates = map[string]string{
-	"ssrf":            "http://{token}.example.com/",
-	"xxe":             "http://{token}.example.com/xxe",
-	"rfi":             "http://{token}.example.com/file.php",
-	"rce":             "http://{token}.example.com/cmd",
-	"blind_sqli":      "http://{token}.example.com/sql?id=1",
-	"ssti":            "http://{token}.example.com/template",
-	"deserialization": "http://{token}.example.com/obj",
-	"cors":            "http://{token}.example.com/cors",
-	"jsonp":           "http://{token}.example.com/jsonp",
-	"smtp_injection":  "{token}@example.com",
-	"webhook":         "http://{token}.example.com/webhook",
-	"ci_cd":           "http://{token}.example.com/build",
-	"metadata":        "http://{token}.example.com/latest/meta-data/",
-}
-
-// generateToken generates a unique token for payload tracking
-func generateToken() string {
-	bytes := make([]byte, 8)
-	rand.Read(bytes)
-	return strings.ToLower(base32.StdEncoding.EncodeToString(bytes))
-}
-
 // renderPayload renders a payload template with variables
+// Uses unified rendering from models package
 func renderPayload(tmpl string, variables map[string]string, token, domain string) (string, error) {
-	// Add default variables
-	if variables == nil {
-		variables = make(map[string]string)
-	}
-	variables["token"] = token
-	variables["domain"] = domain
-	variables["callback_url"] = fmt.Sprintf("http://%s/log/%s/", domain, token)
-
-	// Parse template
-	t, err := template.New("payload").Parse(tmpl)
-	if err != nil {
-		return "", err
-	}
-
-	// Execute template
-	var buf strings.Builder
-	if err := t.Execute(&buf, variables); err != nil {
-		return "", err
-	}
-
-	return buf.String(), nil
+	return models.RenderTemplate(tmpl, variables, token, domain)
 }
 
 // renderPayloadWithCase renders a payload template with case variable
+// Uses unified rendering from models package
 func renderPayloadWithCase(tmpl string, variables map[string]string, token, domain, caseID string) (string, error) {
-	// Add default variables
-	if variables == nil {
-		variables = make(map[string]string)
-	}
-	variables["token"] = token
-	variables["domain"] = domain
-	variables["case"] = caseID
-	variables["callback_url"] = fmt.Sprintf("http://%s/log/%s/", domain, token)
-
-	// Parse template
-	t, err := template.New("payload").Parse(tmpl)
-	if err != nil {
-		return "", err
-	}
-
-	// Execute template
-	var buf strings.Builder
-	if err := t.Execute(&buf, variables); err != nil {
-		return "", err
-	}
-
-	return buf.String(), nil
+	return models.RenderTemplateWithCase(tmpl, variables, token, domain, caseID)
 }
 
 // CreatePayload creates a new payload
 func (s *Service) CreatePayload(req *PayloadCreateRequest, userID, domain string) (*Payload, error) {
 	// Validate template
-	tmpl, ok := PayloadTemplates[req.Template]
+	tmpl, ok := models.PayloadTemplates[req.TemplateID]
 	if !ok {
 		return nil, ErrInvalidTemplate
 	}
 
 	// Generate token
-	token := generateToken()
+	token := models.GenerateToken()
 
 	// Render payload
 	rendered, err := renderPayload(tmpl, req.Variables, token, domain)
@@ -120,11 +53,11 @@ func (s *Service) CreatePayload(req *PayloadCreateRequest, userID, domain string
 	}
 
 	payload := &Payload{
-		ID:               generateID(),
+		ID:               models.GenerateID(),
 		CaseID:           req.CaseID,
 		Token:            token,
-		Template:         req.Template,
-		RenderedPayload:  rendered,
+		TemplateID:       req.TemplateID,
+		TemplateRendered: rendered,
 		Variables:        Variables(req.Variables),
 		Status:           "draft",
 		ExpectedProtocol: req.ExpectedProtocol,
@@ -268,11 +201,4 @@ func (s *Service) MarkPayloadHit(token string) error {
 	payload := &Payload{Status: "hit"}
 	_, err := s.engine.Where("token = ?", token).Cols("status").Update(payload)
 	return err
-}
-
-// generateID generates a unique ID
-func generateID() string {
-	bytes := make([]byte, 16)
-	rand.Read(bytes)
-	return base32.StdEncoding.EncodeToString(bytes)
 }

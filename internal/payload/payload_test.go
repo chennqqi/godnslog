@@ -39,8 +39,8 @@ func TestVariablesValue(t *testing.T) {
 // TestPayloadCreateRequest tests payload creation request
 func TestPayloadCreateRequest(t *testing.T) {
 	req := &PayloadCreateRequest{
-		CaseID:           "test-case-1",
-		Template:         "ssrf",
+		CaseID:           "case-123",
+		TemplateID:       "ssrf",
 		Variables:        map[string]string{"url": "http://example.com"},
 		ExpectedProtocol: "http",
 	}
@@ -49,8 +49,8 @@ func TestPayloadCreateRequest(t *testing.T) {
 		t.Fatal("CaseID should not be empty")
 	}
 
-	if req.Template == "" {
-		t.Fatal("Template should not be empty")
+	if req.TemplateID == "" {
+		t.Fatal("TemplateID should not be empty")
 	}
 
 	if len(req.Variables) != 1 {
@@ -96,7 +96,7 @@ func TestPayloadModel(t *testing.T) {
 		ID:               "test-id-1",
 		CaseID:           "test-case-1",
 		Token:            "test-token-abc123",
-		Template:         "ssrf",
+		TemplateID:       "ssrf",
 		Status:           "draft",
 		ExpectedProtocol: "http",
 		CreatedAt:        now,
