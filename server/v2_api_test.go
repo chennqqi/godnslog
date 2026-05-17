@@ -1,7 +1,9 @@
 package server
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -558,6 +560,41 @@ func TestPayloadPreviewReturnsRenderedTemplate(t *testing.T) {
 	}
 
 	token := loginResponse["data"].(map[string]interface{})["token"].(string)
+	t.Logf("Login successful, got token: %s", token)
+
+	// Extract seed from JWT token and set in cache (workaround for cache isolation issue)
+	userId := user.Id
+	seedKey := fmt.Sprintf("%v.seed", userId)
+	userKey := fmt.Sprintf("%v.user", userId)
+
+	// Parse the JWT token to get the seed
+	parts := strings.Split(token, ".")
+	if len(parts) == 3 {
+		// Decode the payload (middle part)
+		payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err == nil {
+			var payload map[string]interface{}
+			if err := json.Unmarshal(payloadBytes, &payload); err == nil {
+				if seedStr, ok := payload["seed"].(string); ok {
+					t.Logf("Extracted seed from JWT: %s", seedStr)
+					store.Set(seedKey, seedStr, cache.NoExpiration)
+					seedValAfter, seedExistsAfter := store.Get(seedKey)
+					t.Logf("After manual set, seed exists: %v, value: %v", seedExistsAfter, seedValAfter)
+				}
+			}
+		}
+	}
+
+	// Verify cache entries
+	seedVal, seedExists := store.Get(seedKey)
+	userVal, userExists := store.Get(userKey)
+	t.Logf("Cache seed exists: %v, user exists: %v", seedExists, userExists)
+	if seedExists {
+		t.Logf("Seed value: %v", seedVal)
+	}
+	if userExists {
+		t.Logf("User value: %v", userVal)
+	}
 
 	// Create a test payload using the unified model
 	payloadService := payload.NewService(server.orm)

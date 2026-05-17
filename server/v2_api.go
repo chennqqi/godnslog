@@ -245,8 +245,10 @@ func (self *WebServer) v2Login(c *gin.Context) {
 	}
 	store := self.store
 
-	store.Set(fmt.Sprintf("%v.seed", user.Id), seed, self.AuthExpire)
-	store.Set(fmt.Sprintf("%v.user", user.Id), user, cache.NoExpiration)
+	seedKey := fmt.Sprintf("%v.seed", user.Id)
+	userKey := fmt.Sprintf("%v.user", user.Id)
+	store.Set(seedKey, seed, self.AuthExpire)
+	store.Set(userKey, user, cache.NoExpiration)
 
 	logrus.Infof("[v2_api.go::v2Login] login success: username=%s", req.Username)
 
