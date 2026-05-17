@@ -3,7 +3,6 @@ package models
 import (
 	"database/sql/driver"
 	"encoding/json"
-	"strconv"
 	"time"
 
 	"github.com/chennqqi/godnslog/models"
@@ -165,16 +164,14 @@ func FromTblDnsWithAttribution(dns *models.TblDns, engine *xorm.Engine) *Interac
 	// Auto-attribution: associate interaction with payload and case based on token
 	if token != "" {
 		type PayloadInfo struct {
-			ID     int64 `xorm:"id"`
-			CaseId int64 `xorm:"case_id"`
+			ID     string `xorm:"id"`
+			CaseID string `xorm:"case_id"`
 		}
 		var payloadInfo PayloadInfo
-		has, err := engine.Table("payloads").Where("token = ?", token).Get(&payloadInfo)
+		has, err := engine.Table(new(Payload)).Where("token = ?", token).Get(&payloadInfo)
 		if err == nil && has {
-			payloadID := strconv.FormatInt(payloadInfo.ID, 10)
-			caseID := strconv.FormatInt(payloadInfo.CaseId, 10)
-			interaction.PayloadID = &payloadID
-			interaction.CaseID = &caseID
+			interaction.PayloadID = &payloadInfo.ID
+			interaction.CaseID = &payloadInfo.CaseID
 		}
 	}
 
@@ -231,16 +228,14 @@ func FromTblHttpWithAttribution(http *models.TblHttp, engine *xorm.Engine) *Inte
 	// Auto-attribution: associate interaction with payload and case based on token
 	if token != "" {
 		type PayloadInfo struct {
-			ID     int64 `xorm:"id"`
-			CaseId int64 `xorm:"case_id"`
+			ID     string `xorm:"id"`
+			CaseID string `xorm:"case_id"`
 		}
 		var payloadInfo PayloadInfo
-		has, err := engine.Table("payloads").Where("token = ?", token).Get(&payloadInfo)
+		has, err := engine.Table(new(Payload)).Where("token = ?", token).Get(&payloadInfo)
 		if err == nil && has {
-			payloadID := strconv.FormatInt(payloadInfo.ID, 10)
-			caseID := strconv.FormatInt(payloadInfo.CaseId, 10)
-			interaction.PayloadID = &payloadID
-			interaction.CaseID = &caseID
+			interaction.PayloadID = &payloadInfo.ID
+			interaction.CaseID = &payloadInfo.CaseID
 		}
 	}
 

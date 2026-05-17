@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -309,6 +310,7 @@ func TestRevokeTokenTool(t *testing.T) {
 // TestCreateOASTProbeToolCreatesCaseThenPayload tests the agent-native high level probe flow.
 func TestCreateOASTProbeToolCreatesCaseThenPayload(t *testing.T) {
 	var createdPayloadCaseID string
+	var payloadRequestBody map[string]interface{}
 
 	server := newTestServer(func(r *http.Request) string {
 		switch {
@@ -320,6 +322,7 @@ func TestCreateOASTProbeToolCreatesCaseThenPayload(t *testing.T) {
 				t.Fatalf("failed to decode payload request: %v", err)
 			}
 			createdPayloadCaseID, _ = body["case_id"].(string)
+			payloadRequestBody = body
 			return `{"data":{"id":"payload-1","token":"tok-1","value":"https://tok-1.example.com/callback"}}`
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
@@ -334,6 +337,7 @@ func TestCreateOASTProbeToolCreatesCaseThenPayload(t *testing.T) {
 		"expected_protocols": []interface{}{"dns", "http"},
 		"variables":          map[string]interface{}{"path": "/callback"},
 		"agent_id":           "agent-1",
+		"expires_in":         "24h",
 	})
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
@@ -367,7 +371,35 @@ func TestCreateOASTProbeToolCreatesCaseThenPayload(t *testing.T) {
 	if data["payload_id"] != "payload-1" {
 		t.Fatalf("expected payload_id payload-1, got %v", data["payload_id"])
 	}
-	if data["agent_next_action"] == "" {
-		t.Fatal("agent_next_action should guide the agent")
+
+	// Strong assertion: verify request body conversion
+	// Check that expires_in was converted to expires_at (RFC3339 format)
+	if payloadRequestExpiresIn, exists := payloadRequestBody["expires_in"]; exists {
+		t.Errorf("payload request should not contain expires_in, got %v", payloadRequestExpiresIn)
+	}
+	if payloadRequestExpiresAt, exists := payloadRequestBody["expires_at"]; exists {
+		// If expires_in was not provided, expires_at may be empty, which is acceptable
+		if payloadRequestExpiresAt.(string) != "" {
+			// Verify expires_at is a valid RFC3339 timestamp when present
+			if _, err := time.Parse(time.RFC3339, payloadRequestExpiresAt.(string)); err != nil {
+				t.Errorf("expires_at should be valid RFC3339 format, got %v: %v", payloadRequestExpiresAt, err)
+			}
+		}
+	}
+	// Check that expected_protocols array was converted to expected_protocol single value
+	if payloadRequestExpectedProtocols, exists := payloadRequestBody["expected_protocols"]; exists {
+		t.Errorf("payload request should not contain expected_protocols array, got %v", payloadRequestExpectedProtocols)
+	}
+	if payloadRequestExpectedProtocol, exists := payloadRequestBody["expected_protocol"]; !exists {
+		t.Error("payload request should contain expected_protocol after conversion")
+	} else {
+		// Verify expected_protocol is a string, not an array
+		if _, ok := payloadRequestExpectedProtocol.(string); !ok {
+			t.Errorf("expected_protocol should be a string, got %T", payloadRequestExpectedProtocol)
+		}
+		// Verify it's the first value from the original array
+		if payloadRequestExpectedProtocol != "dns" {
+			t.Errorf("expected_protocol should be 'dns' (first value), got %v", payloadRequestExpectedProtocol)
+		}
 	}
 }

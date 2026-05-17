@@ -1193,8 +1193,8 @@ func (self *WebServer) v2ListInteractions(c *gin.Context) {
 	session := self.orm.NewSession()
 	defer session.Close()
 
-	var interactions []models.TblInteraction
-	query := session.Table(new(models.TblInteraction))
+	var interactions []v2models.Interaction
+	query := session.Table(new(v2models.Interaction))
 
 	if caseId != "" {
 		query = query.Where("case_id = ?", caseId)
@@ -1228,26 +1228,65 @@ func (self *WebServer) v2ListInteractions(c *gin.Context) {
 
 	items := make([]models.Interaction, len(interactions))
 	for i, item := range interactions {
-		var headers map[string]string
-		if item.Headers != "" {
-			json.Unmarshal([]byte(item.Headers), &headers)
+		headers := item.Headers
+		token := ""
+		if item.Token != nil {
+			token = *item.Token
 		}
+		domain := ""
+		if item.Domain != nil {
+			domain = *item.Domain
+		}
+		dnsType := ""
+		if item.DNSType != nil {
+			dnsType = *item.DNSType
+		}
+		method := ""
+		if item.Method != nil {
+			method = *item.Method
+		}
+		path := ""
+		if item.Path != nil {
+			path = *item.Path
+		}
+		body := ""
+		if item.Body != nil {
+			body = *item.Body
+		}
+		userAgent := ""
+		if item.UserAgent != nil {
+			userAgent = *item.UserAgent
+		}
+		contentType := ""
+		if item.ContentType != nil {
+			contentType = *item.ContentType
+		}
+
+		caseId := ""
+		if item.CaseID != nil {
+			caseId = *item.CaseID
+		}
+		payloadId := ""
+		if item.PayloadID != nil {
+			payloadId = *item.PayloadID
+		}
+
 		items[i] = models.Interaction{
-			Id:          strconv.FormatInt(item.Id, 10),
+			Id:          item.ID,
 			Type:        item.Type,
-			CaseId:      strconv.FormatInt(item.CaseId, 10),
-			PayloadId:   strconv.FormatInt(item.PayloadId, 10),
-			Token:       item.Token,
+			CaseId:      caseId,
+			PayloadId:   payloadId,
+			Token:       token,
 			Timestamp:   item.Timestamp.Format(time.RFC3339),
-			SourceIp:    item.SourceIp,
-			Domain:      item.Domain,
-			DnsType:     item.DnsType,
-			Method:      item.Method,
-			Path:        item.Path,
+			SourceIp:    item.SourceIP,
+			Domain:      domain,
+			DnsType:     dnsType,
+			Method:      method,
+			Path:        path,
 			Headers:     headers,
-			Body:        item.Body,
-			UserAgent:   item.UserAgent,
-			ContentType: item.ContentType,
+			Body:        body,
+			UserAgent:   userAgent,
+			ContentType: contentType,
 			RawData:     item.RawData,
 			CreatedAt:   item.CreatedAt.Format(time.RFC3339),
 		}
@@ -1286,7 +1325,7 @@ func (self *WebServer) v2GetInteraction(c *gin.Context) {
 	session := self.orm.NewSession()
 	defer session.Close()
 
-	var interactionItem models.TblInteraction
+	var interactionItem v2models.Interaction
 	has, err := session.ID(interactionId).Get(&interactionItem)
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetInteraction] get error: %v", err)
@@ -1304,27 +1343,65 @@ func (self *WebServer) v2GetInteraction(c *gin.Context) {
 		return
 	}
 
-	var headers map[string]string
-	if interactionItem.Headers != "" {
-		json.Unmarshal([]byte(interactionItem.Headers), &headers)
+	headers := interactionItem.Headers
+	token := ""
+	if interactionItem.Token != nil {
+		token = *interactionItem.Token
+	}
+	domain := ""
+	if interactionItem.Domain != nil {
+		domain = *interactionItem.Domain
+	}
+	dnsType := ""
+	if interactionItem.DNSType != nil {
+		dnsType = *interactionItem.DNSType
+	}
+	method := ""
+	if interactionItem.Method != nil {
+		method = *interactionItem.Method
+	}
+	path := ""
+	if interactionItem.Path != nil {
+		path = *interactionItem.Path
+	}
+	body := ""
+	if interactionItem.Body != nil {
+		body = *interactionItem.Body
+	}
+	userAgent := ""
+	if interactionItem.UserAgent != nil {
+		userAgent = *interactionItem.UserAgent
+	}
+	contentType := ""
+	if interactionItem.ContentType != nil {
+		contentType = *interactionItem.ContentType
+	}
+
+	caseId := ""
+	if interactionItem.CaseID != nil {
+		caseId = *interactionItem.CaseID
+	}
+	payloadId := ""
+	if interactionItem.PayloadID != nil {
+		payloadId = *interactionItem.PayloadID
 	}
 
 	result := models.Interaction{
-		Id:          strconv.FormatInt(interactionItem.Id, 10),
+		Id:          interactionItem.ID,
 		Type:        interactionItem.Type,
-		CaseId:      strconv.FormatInt(interactionItem.CaseId, 10),
-		PayloadId:   strconv.FormatInt(interactionItem.PayloadId, 10),
-		Token:       interactionItem.Token,
+		CaseId:      caseId,
+		PayloadId:   payloadId,
+		Token:       token,
 		Timestamp:   interactionItem.Timestamp.Format(time.RFC3339),
-		SourceIp:    interactionItem.SourceIp,
-		Domain:      interactionItem.Domain,
-		DnsType:     interactionItem.DnsType,
-		Method:      interactionItem.Method,
-		Path:        interactionItem.Path,
+		SourceIp:    interactionItem.SourceIP,
+		Domain:      domain,
+		DnsType:     dnsType,
+		Method:      method,
+		Path:        path,
 		Headers:     headers,
-		Body:        interactionItem.Body,
-		UserAgent:   interactionItem.UserAgent,
-		ContentType: interactionItem.ContentType,
+		Body:        body,
+		UserAgent:   userAgent,
+		ContentType: contentType,
 		RawData:     interactionItem.RawData,
 		CreatedAt:   interactionItem.CreatedAt.Format(time.RFC3339),
 	}
@@ -1352,12 +1429,8 @@ func (self *WebServer) v2DeleteInteractions(c *gin.Context) {
 	session := self.orm.NewSession()
 	defer session.Close()
 
-	for _, idStr := range req.Ids {
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			continue
-		}
-		session.ID(id).Delete(new(models.TblInteraction))
+	for _, id := range req.Ids {
+		session.ID(id).Delete(new(v2models.Interaction))
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -1769,7 +1842,7 @@ func (self *WebServer) v2InteractionStats(c *gin.Context) {
 	session := self.orm.NewSession()
 	defer session.Close()
 
-	query := session.Table(new(models.TblInteraction))
+	query := session.Table(new(v2models.Interaction))
 
 	if caseId != "" {
 		query = query.Where("case_id = ?", caseId)
@@ -1839,7 +1912,7 @@ func (self *WebServer) v2InteractionTimeline(c *gin.Context) {
 	session := self.orm.NewSession()
 	defer session.Close()
 
-	query := session.Table(new(models.TblInteraction))
+	query := session.Table(new(v2models.Interaction))
 
 	if caseId != "" {
 		query = query.Where("case_id = ?", caseId)
@@ -1848,7 +1921,7 @@ func (self *WebServer) v2InteractionTimeline(c *gin.Context) {
 		query = query.Where("payload_id = ?", payloadId)
 	}
 
-	var interactions []models.TblInteraction
+	var interactions []v2models.Interaction
 	if err := query.OrderBy("timestamp ASC").Find(&interactions); err != nil {
 		logrus.Errorf("[v2_api.go::v2InteractionTimeline] find error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -1859,7 +1932,7 @@ func (self *WebServer) v2InteractionTimeline(c *gin.Context) {
 	}
 
 	// Group by time interval
-	groupedEvents := make(map[string][]models.TblInteraction)
+	groupedEvents := make(map[string][]v2models.Interaction)
 	for _, interaction := range interactions {
 		key := getIntervalKey(interaction.Timestamp, interval)
 		groupedEvents[key] = append(groupedEvents[key], interaction)
