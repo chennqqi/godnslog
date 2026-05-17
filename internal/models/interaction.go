@@ -33,7 +33,7 @@ func (h Headers) Value() (driver.Value, error) {
 	return json.Marshal(h)
 }
 
-// Interaction represents an external connection event (DNS, HTTP, SMTP, LDAP, etc.)
+// Interaction represents a captured out-of-band event (DNS, HTTP, SMTP, LDAP, SMB, FTP) triggered by a Probe.
 // Unified from internal/interaction/interaction.go and models/v2.go TblInteraction
 // Also serves as unified storage for 1.0 TblDns and TblHttp
 type Interaction struct {

@@ -32,17 +32,20 @@ func (s Scopes) Value() (driver.Value, error) {
 // APIKey represents an API key for programmatic access
 // Unified from internal/auth/apikey.go and models/v2.go TblAPIKey
 type APIKey struct {
-	ID         string     `json:"id" xorm:"pk varchar(36) notnull"`
-	Key        string     `json:"key" xorm:"varchar(128) notnull unique"` // Only shown on creation
-	KeyPrefix  string     `json:"key_prefix" xorm:"varchar(16) notnull index"`
-	Name       string     `json:"name" xorm:"varchar(128) notnull"`
-	Scopes     Scopes     `json:"scopes" xorm:"json"`
-	ExpiresAt  *time.Time `json:"expires_at" xorm:"datetime"`
-	LastUsedAt *time.Time `json:"last_used_at" xorm:"datetime"`
-	CreatedBy  string     `json:"created_by" xorm:"varchar(36) notnull"`
-	CreatedAt  time.Time  `json:"created_at" xorm:"datetime created"`
-	RevokedAt  *time.Time `json:"revoked_at" xorm:"datetime"`
-	IsRevoked  bool       `json:"is_revoked" xorm:"bool notnull default(false)"`
+	ID            string     `json:"id" xorm:"pk varchar(36) notnull"`
+	Key           string     `json:"key" xorm:"varchar(128) notnull unique"` // Only shown on creation
+	KeyPrefix     string     `json:"key_prefix" xorm:"varchar(16) notnull index"`
+	Name          string     `json:"name" xorm:"varchar(128) notnull"`
+	Scopes        Scopes     `json:"scopes" xorm:"json"`
+	WorkspaceID   *string    `json:"workspace_id" xorm:"varchar(36) index"`             // Workspace constraint
+	RiskTolerance string     `json:"risk_tolerance" xorm:"varchar(16)"`                 // low, medium, high
+	IsAgent       bool       `json:"is_agent" xorm:"bool notnull default(false) index"` // Agent API key flag
+	ExpiresAt     *time.Time `json:"expires_at" xorm:"datetime"`
+	LastUsedAt    *time.Time `json:"last_used_at" xorm:"datetime"`
+	CreatedBy     string     `json:"created_by" xorm:"varchar(36) notnull"`
+	CreatedAt     time.Time  `json:"created_at" xorm:"datetime created"`
+	RevokedAt     *time.Time `json:"revoked_at" xorm:"datetime"`
+	IsRevoked     bool       `json:"is_revoked" xorm:"bool notnull default(false)"`
 }
 
 // MarshalJSON implements json.Marshaler interface for APIKey

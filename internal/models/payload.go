@@ -29,21 +29,18 @@ func (v Variables) Value() (driver.Value, error) {
 	return json.Marshal(v)
 }
 
-// Payload represents a trackable payload with token and lifecycle
+// Payload represents a generated OAST probe template with rendered values, ready for delivery to targets.
 // Unified from internal/payload/payload.go and models/v2.go TblPayload
 type Payload struct {
 	ID               string     `json:"id" xorm:"pk varchar(36) notnull"`
 	CaseID           string     `json:"case_id" xorm:"varchar(36) notnull index"`
 	Token            string     `json:"token" xorm:"varchar(64) notnull unique index"`
-	Template         string     `json:"template" xorm:"varchar(64) notnull"` // SSRF, XXE, RCE, Blind SQLi, etc.
-	RenderedPayload  string     `json:"rendered_payload" xorm:"text"`
+	TemplateID       string     `json:"template_id" xorm:"varchar(64) notnull"` // SSRF, XXE, RCE, Blind SQLi, etc.
+	TemplateRendered string     `json:"template_rendered" xorm:"text"`
 	Variables        Variables  `json:"variables" xorm:"json"`
-	Status           string     `json:"status" xorm:"varchar(32) notnull default('draft') index"` // draft, deployed, hit, archived, expired
-	ExpectedProtocol string     `json:"expected_protocol" xorm:"varchar(16)"`                     // dns, http, smtp, ldap
+	Status           string     `json:"status" xorm:"varchar(32) notnull default('active') index"` // active, expired, revoked
 	ExpiresAt        *time.Time `json:"expires_at" xorm:"datetime"`
-	CreatedBy        string     `json:"created_by" xorm:"varchar(36) notnull"`
 	CreatedAt        time.Time  `json:"created_at" xorm:"datetime created"`
-	UpdatedAt        time.Time  `json:"updated_at" xorm:"datetime updated"`
 }
 
 // MarshalJSON implements json.Marshaler interface for Payload
@@ -56,12 +53,10 @@ func (p *Payload) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		*Alias
 		CreatedAt string `json:"created_at"`
-		UpdatedAt string `json:"updated_at"`
 		ExpiresAt string `json:"expires_at,omitempty"`
 	}{
 		Alias:     (*Alias)(p),
 		CreatedAt: p.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: p.UpdatedAt.Format(time.RFC3339),
 		ExpiresAt: expiresAt,
 	})
 }
@@ -73,11 +68,9 @@ func (Payload) TableName() string {
 
 // Status constants
 const (
-	PayloadStatusDraft    = "draft"
-	PayloadStatusDeployed = "deployed"
-	PayloadStatusHit      = "hit"
-	PayloadStatusArchived = "archived"
-	PayloadStatusExpired  = "expired"
+	PayloadStatusActive  = "active"
+	PayloadStatusExpired = "expired"
+	PayloadStatusRevoked = "revoked"
 )
 
 // PayloadCreateRequest represents the request to create a payload

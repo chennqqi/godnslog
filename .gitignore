@@ -64,7 +64,8 @@ godnslog.db
 /frontend-next/.next
 /frontend-next/dist
 /frontend-next/out
-
+/frontend-next/playwright-report/index.html
+/frontend-next/test-results/.last-run.json
 # Office temporary files
 ~$*.xlsx
 ~$*.docx

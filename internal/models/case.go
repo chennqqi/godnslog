@@ -31,14 +31,13 @@ func (t Tags) Value() (driver.Value, error) {
 	return json.Marshal(t)
 }
 
-// Case represents a test task, vulnerability verification, or project.
+// Case represents a security engagement or testing session that groups related OAST activities.
 // This struct serves as both the database entity and the API response model.
 type Case struct {
 	ID          string    `json:"id" xorm:"pk varchar(36) notnull"`
 	Title       string    `json:"title" xorm:"varchar(255) notnull"`
 	Description string    `json:"description" xorm:"text"`
-	Target      string    `json:"target" xorm:"varchar(255)"`
-	Status      string    `json:"status" xorm:"varchar(32) notnull default('active') index"` // active, archived, completed
+	Status      string    `json:"status" xorm:"varchar(32) notnull default('active') index"` // active, completed, archived
 	Tags        Tags      `json:"tags" xorm:"json"`                                          // Stored as JSON array
 	CreatedBy   string    `json:"created_by" xorm:"varchar(36) notnull index"`               // User ID
 	CreatedAt   time.Time `json:"created_at" xorm:"datetime created"`

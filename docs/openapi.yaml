@@ -14,8 +14,10 @@ info:
     
     ## Authentication
     Most endpoints require authentication via:
-    - JWT Token (user login)
-    - APIKey (programmatic access)
+    - JWT Token (user login) - Use `Authorization: Bearer <token>` or `Access-Token: <token>` header
+    - APIKey (programmatic access) - Use `X-API-Key: <key>` header
+
+    API Keys include an `is_agent` flag that identifies Agent API keys with scoped permissions.
     
     ## Version
     Current version: 2.0.0
@@ -941,30 +943,33 @@ components:
       properties:
         code:
           type: integer
-          description: Error code
+          description: Error code (400, 401, 403, 404, 500, 502)
+          enum: [400, 401, 403, 404, 500, 502]
         message:
           type: string
           description: Error message
-        timestamp:
-          type: integer
-          format: int64
-          description: Unix timestamp
+        data:
+          type: object
+          description: Optional error details
 
     SuccessResponse:
       type: object
       required:
-        - message
         - code
+        - message
       properties:
         code:
           type: integer
+          description: Success code (0 for success)
           example: 0
+          enum: [0]
         message:
           type: string
+          description: Success message
           example: OK
-        timestamp:
-          type: integer
-          format: int64
+        data:
+          type: object
+          description: Response data (optional)
 
     LoginRequest:
       type: object
@@ -1135,14 +1140,14 @@ components:
       type: object
       required:
         - case_id
-        - template
+        - template_id
       properties:
         case_id:
           type: string
           description: Associated case ID
-        template:
+        template_id:
           type: string
-          description: Payload template (SSRF, XXE, RCE, etc.)
+          description: Payload template ID (SSRF, XXE, RCE, etc.)
         variables:
           type: object
           additionalProperties:
@@ -1152,10 +1157,6 @@ components:
           type: string
           format: date-time
           description: Payload expiration time
-        expected_protocol:
-          type: string
-          enum: [dns, http, smtp, ldap]
-          description: Expected interaction protocol
 
     Payload:
       type: object
@@ -1163,8 +1164,9 @@ components:
         - id
         - case_id
         - token
-        - template
-        - created_by
+        - template_id
+        - template_rendered
+        - status
         - created_at
       properties:
         id:
@@ -1175,34 +1177,30 @@ components:
           description: Associated case ID
         token:
           type: string
-          description: Unique tracking token
-        template:
+          description: Unique token for interaction correlation
+        template_id:
           type: string
-          description: Payload template type
-        rendered_payload:
+          description: Template ID used for generation
+        template_rendered:
           type: string
-          description: Rendered payload with variables
+          description: Rendered payload with variables substituted
         variables:
           type: object
           additionalProperties:
             type: string
+          description: Variable values used in rendering
         status:
           type: string
-          enum: [draft, deployed, hit, archived, expired]
-        expected_protocol:
-          type: string
-          enum: [dns, http, smtp, ldap]
+          enum: [active, expired, revoked]
+          description: Payload status
         expires_at:
           type: string
           format: date-time
-        created_by:
-          type: string
+          description: Expiration timestamp
         created_at:
           type: string
           format: date-time
-        updated_at:
-          type: string
-          format: date-time
+          description: Creation timestamp
 
     PayloadResponse:
       type: object
@@ -1420,6 +1418,17 @@ components:
           items:
             type: string
           description: API key scopes
+        is_agent:
+          type: boolean
+          description: Mark as agent-specific key
+          default: false
+        workspace_id:
+          type: string
+          description: Workspace constraint (optional)
+        risk_tolerance:
+          type: string
+          enum: [low, medium, high]
+          description: Risk level tolerance
         expires_at:
           type: string
           format: date-time
@@ -1429,7 +1438,7 @@ components:
       type: object
       required:
         - id
-        - key
+        - key_prefix
         - name
         - scopes
         - created_by
@@ -1437,6 +1446,7 @@ components:
       properties:
         id:
           type: string
+          description: API key ID
         key:
           type: string
           description: API key value (only shown on creation)
@@ -1445,10 +1455,22 @@ components:
           description: API key prefix for identification
         name:
           type: string
+          description: API key name
         scopes:
           type: array
           items:
             type: string
+          description: API key scopes
+        workspace_id:
+          type: string
+          description: Workspace constraint (optional)
+        risk_tolerance:
+          type: string
+          enum: [low, medium, high]
+          description: Risk level tolerance
+        is_agent:
+          type: boolean
+          description: Agent API key flag
         expires_at:
           type: string
           format: date-time
@@ -1460,6 +1482,11 @@ components:
         created_at:
           type: string
           format: date-time
+        revoked_at:
+          type: string
+          format: date-time
+        is_revoked:
+          type: boolean
 
     ApiKeyResponse:
       type: object
