@@ -1315,20 +1315,12 @@ func (self *WebServer) v2ListInteractions(c *gin.Context) {
 // v2GetInteraction gets an interaction
 func (self *WebServer) v2GetInteraction(c *gin.Context) {
 	id := c.Param("id")
-	interactionId, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "invalid interaction id",
-		})
-		return
-	}
 
 	session := self.orm.NewSession()
 	defer session.Close()
 
 	var interactionItem v2models.Interaction
-	has, err := session.ID(interactionId).Get(&interactionItem)
+	has, err := session.Where("id = ?", id).Get(&interactionItem)
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetInteraction] get error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -1339,7 +1331,7 @@ func (self *WebServer) v2GetInteraction(c *gin.Context) {
 	}
 	if !has {
 		c.JSON(http.StatusNotFound, gin.H{
-			"code":    6,
+			"code":    404,
 			"message": "interaction not found",
 		})
 		return
