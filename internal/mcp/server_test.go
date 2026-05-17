@@ -165,7 +165,8 @@ func TestListInteractionsTool(t *testing.T) {
 		if got := r.URL.Query().Get("case_id"); got != "case-1" {
 			t.Fatalf("expected case_id case-1, got %q", got)
 		}
-		return `{"data":{"items":[]}}`
+		// Return realistic response with semantic fields
+		return `{"code":0,"message":"success","data":{"items":[{"id":"interaction-1","type":"dns","token":"test-token","case_id":"case-1","payload_id":"payload-1","timestamp":"2026-05-17T00:00:00Z","source_ip":"127.0.0.1"}],"total":1,"page":1,"page_size":50,"total_pages":1}}`
 	})
 
 	args := map[string]interface{}{
@@ -187,36 +188,143 @@ func TestListInteractionsTool(t *testing.T) {
 	if !toolResult.Success {
 		t.Fatalf("Expected success, got error: %s", toolResult.Error)
 	}
+
+	// Verify the data contains the raw API response
+	if toolResult.Data == nil {
+		t.Fatal("Expected data to be present")
+	}
+
+	// The data should be the raw API response structure
+	data, ok := toolResult.Data.(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map")
+	}
+
+	// Verify the response has the expected structure from v2 API
+	if data["code"] == nil {
+		t.Error("Expected code field")
+	}
+	if data["data"] == nil {
+		t.Error("Expected data field")
+	}
+
+	// Verify the nested data structure
+	responseData, ok := data["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data.data to be a map")
+	}
+
+	items, ok := responseData["items"].([]interface{})
+	if !ok {
+		t.Fatal("Expected items to be a list")
+	}
+
+	if len(items) == 0 {
+		t.Fatal("Expected at least one item")
+	}
+
+	item, ok := items[0].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected item to be a map")
+	}
+
+	// Verify required semantic fields
+	if item["id"] == nil {
+		t.Error("Expected id field")
+	}
+	if item["type"] == nil {
+		t.Error("Expected type field")
+	}
+	if item["token"] == nil {
+		t.Error("Expected token field")
+	}
+	if item["case_id"] == nil {
+		t.Error("Expected case_id field")
+	}
+	if item["payload_id"] == nil {
+		t.Error("Expected payload_id field")
+	}
 }
 
 // TestWaitForInteractionTool tests waitForInteraction tool
 func TestWaitForInteractionTool(t *testing.T) {
-	server := newTestServer(func(r *http.Request) string {
-		if r.Method != http.MethodGet || r.URL.Path != "/api/v2/interactions" {
-			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+	t.Run("success", func(t *testing.T) {
+		server := newTestServer(func(r *http.Request) string {
+			if r.Method != http.MethodGet || r.URL.Path != "/api/v2/interactions" {
+				t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+			}
+			return `{"code":0,"message":"success","data":{"items":[{"id":"interaction-1","type":"dns","token":"test-token","case_id":"case-1","payload_id":"payload-1"}],"total":1}}`
+		})
+
+		args := map[string]interface{}{
+			"token":   "test-token",
+			"timeout": float64(1),
 		}
-		return `{"data":{"items":[{"id":"interaction-1","token":"test-token"}]}}`
+
+		result, err := server.waitForInteraction(nil, args)
+
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+
+		toolResult, ok := result.(ToolResult)
+		if !ok {
+			t.Fatal("Result should be ToolResult type")
+		}
+
+		if !toolResult.Success {
+			t.Fatalf("Expected success, got error: %s", toolResult.Error)
+		}
+
+		// Verify data is present (semantic assertion that interaction data is returned)
+		if toolResult.Data == nil {
+			t.Fatal("Expected data to be present")
+		}
 	})
 
-	args := map[string]interface{}{
-		"token":   "test-token",
-		"timeout": float64(1),
-	}
+	t.Run("timeout", func(t *testing.T) {
+		server := newTestServer(func(r *http.Request) string {
+			if r.Method != http.MethodGet || r.URL.Path != "/api/v2/interactions" {
+				t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+			}
+			return `{"code":0,"message":"success","data":{"items":[],"total":0}}`
+		})
 
-	result, err := server.waitForInteraction(nil, args)
+		args := map[string]interface{}{
+			"token":   "test-token",
+			"timeout": float64(0.1),
+		}
 
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
+		result, err := server.waitForInteraction(nil, args)
 
-	toolResult, ok := result.(ToolResult)
-	if !ok {
-		t.Fatal("Result should be ToolResult type")
-	}
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
 
-	if !toolResult.Success {
-		t.Fatalf("Expected success, got error: %s", toolResult.Error)
-	}
+		toolResult, ok := result.(ToolResult)
+		if !ok {
+			t.Fatal("Result should be ToolResult type")
+		}
+
+		// Timeout should return success with timeout message (timeout path assertion)
+		if !toolResult.Success {
+			t.Fatalf("Expected success even on timeout, got error: %s", toolResult.Error)
+		}
+
+		if toolResult.Data == nil {
+			t.Fatal("Expected data to be present")
+		}
+
+		data, ok := toolResult.Data.(map[string]interface{})
+		if !ok {
+			t.Fatal("Expected data to be a map")
+		}
+
+		// Verify timeout message is present
+		if data["message"] == nil {
+			t.Error("Expected message field on timeout")
+		}
+	})
 }
 
 // TestSummarizeEvidenceTool tests summarizeEvidence tool
