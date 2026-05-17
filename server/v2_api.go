@@ -176,7 +176,7 @@ func (self *WebServer) v2Login(c *gin.Context) {
 	err := c.BindJSON(&req)
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2Login] BindJSON error: %v", err)
-		c.JSON(400, gin.H{
+		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
 			"message": T("bad input"),
 		})
@@ -193,14 +193,14 @@ func (self *WebServer) v2Login(c *gin.Context) {
 
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2Login] orm.Get error: %v", err)
-		c.JSON(502, gin.H{
+		c.JSON(http.StatusBadGateway, gin.H{
 			"code":    502,
 			"message": T("bad service"),
 		})
 		return
 	} else if !exist {
 		logrus.Infof("[v2_api.go::v2Login] user not found: username=%s", req.Username)
-		c.JSON(401, gin.H{
+		c.JSON(http.StatusUnauthorized, gin.H{
 			"code":    401,
 			"message": T("bad request"),
 		})
@@ -212,7 +212,7 @@ func (self *WebServer) v2Login(c *gin.Context) {
 	err = comparePassword(req.Password, user.Pass)
 	if err != nil {
 		logrus.Infof("[v2_api.go::v2Login] password not match for user: %s", req.Username)
-		c.JSON(401, gin.H{
+		c.JSON(http.StatusUnauthorized, gin.H{
 			"code":    401,
 			"message": T("bad request"),
 		})
@@ -236,7 +236,7 @@ func (self *WebServer) v2Login(c *gin.Context) {
 	tokenString, err := token.SignedString([]byte(self.verifyKey))
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2Login] token.SignedString error: %v", err)
-		c.JSON(502, gin.H{
+		c.JSON(http.StatusBadGateway, gin.H{
 			"code":    502,
 			"message": T("bad service"),
 		})
@@ -250,7 +250,7 @@ func (self *WebServer) v2Login(c *gin.Context) {
 	logrus.Infof("[v2_api.go::v2Login] login success: username=%s", req.Username)
 
 	// Return data in format expected by frontend: { code: 0, message: "OK", data: { token, user } }
-	c.JSON(200, gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": T("OK"),
 		"data": gin.H{
@@ -341,7 +341,7 @@ func (self *WebServer) v2ListCases(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListCases] count error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -351,7 +351,7 @@ func (self *WebServer) v2ListCases(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListCases] find error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -399,7 +399,7 @@ func (self *WebServer) v2CreateCase(c *gin.Context) {
 	var req models.CaseCreateRequest
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": fmt.Sprintf("invalid request: %v", err),
 		})
 		return
@@ -407,7 +407,7 @@ func (self *WebServer) v2CreateCase(c *gin.Context) {
 
 	if req.Title == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "title is required",
 		})
 		return
@@ -435,7 +435,7 @@ func (self *WebServer) v2CreateCase(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2CreateCase] insert error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -469,7 +469,7 @@ func (self *WebServer) v2GetCase(c *gin.Context) {
 	caseId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid case id",
 		})
 		return
@@ -483,7 +483,7 @@ func (self *WebServer) v2GetCase(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetCase] get error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -524,7 +524,7 @@ func (self *WebServer) v2UpdateCase(c *gin.Context) {
 	caseId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid case id",
 		})
 		return
@@ -533,7 +533,7 @@ func (self *WebServer) v2UpdateCase(c *gin.Context) {
 	var req models.CaseUpdateRequest
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": fmt.Sprintf("invalid request: %v", err),
 		})
 		return
@@ -547,7 +547,7 @@ func (self *WebServer) v2UpdateCase(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2UpdateCase] get error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -581,7 +581,7 @@ func (self *WebServer) v2UpdateCase(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2UpdateCase] update error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -615,7 +615,7 @@ func (self *WebServer) v2DeleteCase(c *gin.Context) {
 	caseId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid case id",
 		})
 		return
@@ -628,7 +628,7 @@ func (self *WebServer) v2DeleteCase(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2DeleteCase] delete error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -646,7 +646,7 @@ func (self *WebServer) v2GetCaseStats(c *gin.Context) {
 	caseId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid case id",
 		})
 		return
@@ -660,7 +660,7 @@ func (self *WebServer) v2GetCaseStats(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetCaseStats] get error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -678,7 +678,7 @@ func (self *WebServer) v2GetCaseStats(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetCaseStats] count payloads error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -689,7 +689,7 @@ func (self *WebServer) v2GetCaseStats(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetCaseStats] count interactions error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -700,7 +700,7 @@ func (self *WebServer) v2GetCaseStats(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetCaseStats] count hit payloads error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -723,7 +723,7 @@ func (self *WebServer) v2GetCasePayloads(c *gin.Context) {
 	caseId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid case id",
 		})
 		return
@@ -747,7 +747,7 @@ func (self *WebServer) v2GetCasePayloads(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetCasePayloads] count error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -758,7 +758,7 @@ func (self *WebServer) v2GetCasePayloads(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetCasePayloads] find error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -804,7 +804,7 @@ func (self *WebServer) v2GetCaseInteractions(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetCaseInteractions] count error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -815,7 +815,7 @@ func (self *WebServer) v2GetCaseInteractions(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetCaseInteractions] find error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -863,7 +863,7 @@ func (self *WebServer) v2ListPayloads(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListPayloads] count error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -873,7 +873,7 @@ func (self *WebServer) v2ListPayloads(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListPayloads] find error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -927,7 +927,7 @@ func (self *WebServer) v2CreatePayload(c *gin.Context) {
 	var err error
 	if err = c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": fmt.Sprintf("invalid request: %v", err),
 		})
 		return
@@ -935,7 +935,7 @@ func (self *WebServer) v2CreatePayload(c *gin.Context) {
 
 	if req.Template == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "template is required",
 		})
 		return
@@ -976,7 +976,7 @@ func (self *WebServer) v2CreatePayload(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2CreatePayload] insert error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1012,7 +1012,7 @@ func (self *WebServer) v2GetPayload(c *gin.Context) {
 	payloadId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid payload id",
 		})
 		return
@@ -1026,7 +1026,7 @@ func (self *WebServer) v2GetPayload(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetPayload] get error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1074,7 +1074,7 @@ func (self *WebServer) v2RevokePayload(c *gin.Context) {
 	payloadId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid payload id",
 		})
 		return
@@ -1087,7 +1087,7 @@ func (self *WebServer) v2RevokePayload(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2RevokePayload] update error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1105,7 +1105,7 @@ func (self *WebServer) v2UpdatePayload(c *gin.Context) {
 	payloadId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid payload id",
 		})
 		return
@@ -1114,7 +1114,7 @@ func (self *WebServer) v2UpdatePayload(c *gin.Context) {
 	var req models.PayloadUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid request body",
 		})
 		return
@@ -1130,7 +1130,7 @@ func (self *WebServer) v2UpdatePayload(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2UpdatePayload] update error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1148,7 +1148,7 @@ func (self *WebServer) v2PreviewPayload(c *gin.Context) {
 	payloadId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid payload id",
 		})
 		return
@@ -1162,7 +1162,7 @@ func (self *WebServer) v2PreviewPayload(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2PreviewPayload] get error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1195,7 +1195,7 @@ func (self *WebServer) v2BatchCreatePayloads(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid request body",
 		})
 		return
@@ -1204,7 +1204,7 @@ func (self *WebServer) v2BatchCreatePayloads(c *gin.Context) {
 	caseId, err := strconv.ParseInt(req.CaseID, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid case id",
 		})
 		return
@@ -1235,7 +1235,7 @@ func (self *WebServer) v2BatchCreatePayloads(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2BatchCreatePayloads] insert error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1279,7 +1279,7 @@ func (self *WebServer) v2ListInteractions(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListInteractions] count error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1289,7 +1289,7 @@ func (self *WebServer) v2ListInteractions(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListInteractions] find error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1346,7 +1346,7 @@ func (self *WebServer) v2GetInteraction(c *gin.Context) {
 	interactionId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid interaction id",
 		})
 		return
@@ -1360,7 +1360,7 @@ func (self *WebServer) v2GetInteraction(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetInteraction] get error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1412,7 +1412,7 @@ func (self *WebServer) v2DeleteInteractions(c *gin.Context) {
 	}
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": fmt.Sprintf("invalid request: %v", err),
 		})
 		return
@@ -1443,7 +1443,7 @@ func (self *WebServer) v2ExportInteractions(c *gin.Context) {
 	}
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": fmt.Sprintf("invalid request: %v", err),
 		})
 		return
@@ -1473,7 +1473,7 @@ func (self *WebServer) v2ListAPIKeys(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListAPIKeys] count error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1483,7 +1483,7 @@ func (self *WebServer) v2ListAPIKeys(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListAPIKeys] find error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1538,7 +1538,7 @@ func (self *WebServer) v2CreateAPIKey(c *gin.Context) {
 	var req models.APIKeyCreateRequest
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": fmt.Sprintf("invalid request: %v", err),
 		})
 		return
@@ -1546,7 +1546,7 @@ func (self *WebServer) v2CreateAPIKey(c *gin.Context) {
 
 	if req.Name == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "name is required",
 		})
 		return
@@ -1585,7 +1585,7 @@ func (self *WebServer) v2CreateAPIKey(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2CreateAPIKey] insert error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1623,7 +1623,7 @@ func (self *WebServer) v2DeleteAPIKey(c *gin.Context) {
 	apiKeyId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid api key id",
 		})
 		return
@@ -1636,7 +1636,7 @@ func (self *WebServer) v2DeleteAPIKey(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2DeleteAPIKey] update error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1654,7 +1654,7 @@ func (self *WebServer) v2GetAPIKey(c *gin.Context) {
 	apiKeyId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid api key id",
 		})
 		return
@@ -1668,7 +1668,7 @@ func (self *WebServer) v2GetAPIKey(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetAPIKey] get error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1697,7 +1697,7 @@ func (self *WebServer) v2UpdateAPIKey(c *gin.Context) {
 	apiKeyId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid api key id",
 		})
 		return
@@ -1706,7 +1706,7 @@ func (self *WebServer) v2UpdateAPIKey(c *gin.Context) {
 	var req models.APIKeyUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid request body",
 		})
 		return
@@ -1735,7 +1735,7 @@ func (self *WebServer) v2UpdateAPIKey(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2UpdateAPIKey] update error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1779,7 +1779,7 @@ func (self *WebServer) v2ListUsers(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListUsers] count error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1790,7 +1790,7 @@ func (self *WebServer) v2ListUsers(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListUsers] find error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1857,7 +1857,7 @@ func (self *WebServer) v2InteractionStats(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2InteractionStats] count error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1873,7 +1873,7 @@ func (self *WebServer) v2InteractionStats(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2InteractionStats] group by type error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -1921,7 +1921,7 @@ func (self *WebServer) v2InteractionTimeline(c *gin.Context) {
 	if err := query.OrderBy("timestamp ASC").Find(&interactions); err != nil {
 		logrus.Errorf("[v2_api.go::v2InteractionTimeline] find error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -2029,7 +2029,7 @@ func (self *WebServer) v2ListRules(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListRules] ListWorkflows: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to list workflows",
 		})
 		return
@@ -2071,7 +2071,7 @@ func (self *WebServer) v2CreateRule(c *gin.Context) {
 	if err := workflowService.CreateWorkflow(&req); err != nil {
 		logrus.Errorf("[v2_api.go::v2CreateRule] CreateWorkflow: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to create workflow",
 		})
 		return
@@ -2122,7 +2122,7 @@ func (self *WebServer) v2UpdateRule(c *gin.Context) {
 	workflowService := workflow.NewService(self.orm)
 	if err := workflowService.UpdateWorkflow(&req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to update workflow",
 		})
 		return
@@ -2142,7 +2142,7 @@ func (self *WebServer) v2DeleteRule(c *gin.Context) {
 	workflowService := workflow.NewService(self.orm)
 	if err := workflowService.DeleteWorkflow(id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to delete workflow",
 		})
 		return
@@ -2176,7 +2176,7 @@ func (self *WebServer) v2GenerateEvidence(c *gin.Context) {
 	resp, err := evidenceService.GenerateEvidence(req.CaseID, req.PayloadID, req.Format)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to generate evidence",
 		})
 		return
@@ -2208,7 +2208,7 @@ func (self *WebServer) v2ListCanaries(c *gin.Context) {
 	canaries, total, err := canaryService.ListCanaries(page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to list canaries",
 		})
 		return
@@ -2238,7 +2238,7 @@ func (self *WebServer) v2CreateCanary(c *gin.Context) {
 	canaryService := canary.NewService(self.orm)
 	if err := canaryService.CreateCanary(&req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to create canary",
 		})
 		return
@@ -2289,7 +2289,7 @@ func (self *WebServer) v2UpdateCanary(c *gin.Context) {
 	canaryService := canary.NewService(self.orm)
 	if err := canaryService.UpdateCanary(&req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to update canary",
 		})
 		return
@@ -2309,7 +2309,7 @@ func (self *WebServer) v2DeleteCanary(c *gin.Context) {
 	canaryService := canary.NewService(self.orm)
 	if err := canaryService.DeleteCanary(id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to delete canary",
 		})
 		return
@@ -2329,7 +2329,7 @@ func (self *WebServer) v2ListCanaryHits(c *gin.Context) {
 	hits, err := canaryService.ListCanaryHits(id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to list canary hits",
 		})
 		return
@@ -2355,7 +2355,7 @@ func (self *WebServer) v2ListRebindingRules(c *gin.Context) {
 	rules, total, err := rebindingService.ListRebindingRules(page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to list rebinding rules",
 		})
 		return
@@ -2385,7 +2385,7 @@ func (self *WebServer) v2CreateRebindingRule(c *gin.Context) {
 	rebindingService := rebinding.NewService(self.orm)
 	if err := rebindingService.CreateRebindingRule(&req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to create rebinding rule",
 		})
 		return
@@ -2436,7 +2436,7 @@ func (self *WebServer) v2UpdateRebindingRule(c *gin.Context) {
 	rebindingService := rebinding.NewService(self.orm)
 	if err := rebindingService.UpdateRebindingRule(&req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to update rebinding rule",
 		})
 		return
@@ -2456,7 +2456,7 @@ func (self *WebServer) v2DeleteRebindingRule(c *gin.Context) {
 	rebindingService := rebinding.NewService(self.orm)
 	if err := rebindingService.DeleteRebindingRule(id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to delete rebinding rule",
 		})
 		return
@@ -2476,7 +2476,7 @@ func (self *WebServer) v2ListRebindingSessions(c *gin.Context) {
 	sessions, err := rebindingService.ListRebindingSessions(id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to list rebinding sessions",
 		})
 		return
@@ -2502,7 +2502,7 @@ func (self *WebServer) v2ListListeners(c *gin.Context) {
 	listeners, total, err := listenerService.ListListeners(page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to list listeners",
 		})
 		return
@@ -2532,7 +2532,7 @@ func (self *WebServer) v2CreateListener(c *gin.Context) {
 	listenerService := listener.NewService(self.orm)
 	if err := listenerService.CreateListener(&req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to create listener",
 		})
 		return
@@ -2583,7 +2583,7 @@ func (self *WebServer) v2UpdateListener(c *gin.Context) {
 	listenerService := listener.NewService(self.orm)
 	if err := listenerService.UpdateListener(&req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to update listener",
 		})
 		return
@@ -2603,7 +2603,7 @@ func (self *WebServer) v2DeleteListener(c *gin.Context) {
 	listenerService := listener.NewService(self.orm)
 	if err := listenerService.DeleteListener(id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to delete listener",
 		})
 		return
@@ -2623,7 +2623,7 @@ func (self *WebServer) v2ListListenerInteractions(c *gin.Context) {
 	interactions, err := listenerService.ListListenerInteractions(id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "Failed to list listener interactions",
 		})
 		return
@@ -2650,7 +2650,7 @@ func (self *WebServer) v2ListNotificationChannels(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListNotificationChannels] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -2674,7 +2674,7 @@ func (self *WebServer) v2CreateNotificationChannel(c *gin.Context) {
 	var req models.NotificationChannelCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid request body",
 		})
 		return
@@ -2686,7 +2686,7 @@ func (self *WebServer) v2CreateNotificationChannel(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2CreateNotificationChannel] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -2705,7 +2705,7 @@ func (self *WebServer) v2GetNotificationChannel(c *gin.Context) {
 	channelId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid channel id",
 		})
 		return
@@ -2735,7 +2735,7 @@ func (self *WebServer) v2UpdateNotificationChannel(c *gin.Context) {
 	channelId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid channel id",
 		})
 		return
@@ -2744,7 +2744,7 @@ func (self *WebServer) v2UpdateNotificationChannel(c *gin.Context) {
 	var req models.NotificationChannelUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid request body",
 		})
 		return
@@ -2755,7 +2755,7 @@ func (self *WebServer) v2UpdateNotificationChannel(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2UpdateNotificationChannel] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -2773,7 +2773,7 @@ func (self *WebServer) v2DeleteNotificationChannel(c *gin.Context) {
 	channelId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid channel id",
 		})
 		return
@@ -2784,7 +2784,7 @@ func (self *WebServer) v2DeleteNotificationChannel(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2DeleteNotificationChannel] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -2815,7 +2815,7 @@ func (self *WebServer) v2ListNotificationLogs(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListNotificationLogs] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -2844,7 +2844,7 @@ func (self *WebServer) v2ListSettings(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListSettings] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -2877,7 +2877,7 @@ func (self *WebServer) v2GetSetting(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetSetting] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -2905,7 +2905,7 @@ func (self *WebServer) v2UpdateSetting(c *gin.Context) {
 	var req v2models.SettingsUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid request body",
 		})
 		return
@@ -2919,7 +2919,7 @@ func (self *WebServer) v2UpdateSetting(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2UpdateSetting] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -2938,7 +2938,7 @@ func (self *WebServer) v2UpdateSetting(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2UpdateSetting] update error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -2956,7 +2956,7 @@ func (self *WebServer) v2CreateSetting(c *gin.Context) {
 	var req v2models.SettingsCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    2,
+			"code":    400,
 			"message": "invalid request body",
 		})
 		return
@@ -2975,7 +2975,7 @@ func (self *WebServer) v2CreateSetting(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2CreateSetting] insert error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return
@@ -2999,7 +2999,7 @@ func (self *WebServer) v2DeleteSetting(c *gin.Context) {
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2DeleteSetting] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    5,
+			"code":    500,
 			"message": "server internal error",
 		})
 		return

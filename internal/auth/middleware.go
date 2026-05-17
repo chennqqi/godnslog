@@ -123,25 +123,19 @@ func (m *AuthMiddleware) authenticateAPIKey(c *gin.Context) (*AuthIdentity, erro
 		return nil, nil // No API key either
 	}
 
-	// Extract prefix (first 8 characters)
-	if len(apiKey) < 8 {
-		return nil, errors.New("invalid api key format")
-	}
-	prefix := apiKey[:8]
-
 	// Check if service is available
 	if m.apiKeyConfig.Service == nil {
 		return nil, errors.New("auth service not configured")
 	}
 
-	// Validate API key from database
-	key, err := m.apiKeyConfig.Service.ValidateAPIKey(prefix)
+	// Validate full API key from database
+	key, err := m.apiKeyConfig.Service.ValidateAPIKey(apiKey)
 	if err != nil {
 		return nil, err
 	}
 
 	// Update last used timestamp
-	_ = m.apiKeyConfig.Service.UpdateLastUsed(prefix)
+	_ = m.apiKeyConfig.Service.UpdateLastUsed(apiKey)
 
 	return &AuthIdentity{
 		UserID:      key.CreatedBy,

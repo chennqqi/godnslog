@@ -150,6 +150,43 @@ func TestAuthMiddlewareAPIKey(t *testing.T) {
 		assert.False(t, identity.IsAgent)
 	})
 
+	t.Run("Invalid full API Key rejection", func(t *testing.T) {
+		// Create in-memory database
+		engine, err := xorm.NewEngine("sqlite", ":memory:")
+		assert.NoError(t, err)
+		defer engine.Close()
+
+		// Sync schema
+		assert.NoError(t, engine.Sync2(new(models.APIKey)))
+
+		// Create auth service
+		authService := NewService(engine)
+
+		// Create a test API key
+		req := &models.APIKeyCreateRequest{
+			Name:    "Test Key",
+			Scopes:  []string{"case:read"},
+			IsAgent: false,
+		}
+		apiKey, err := authService.CreateAPIKey(req, "user-1")
+		assert.NoError(t, err)
+		assert.NotNil(t, apiKey)
+
+		// Create middleware with service
+		middleware := NewAuthMiddleware("test-secret", authService)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("GET", "/", nil)
+		// Use correct prefix but wrong full key
+		c.Request.Header.Set("X-API-Key", apiKey.KeyPrefix+"00000000000000000000000000000000")
+
+		identity, err := middleware.authenticateAPIKey(c)
+
+		assert.Error(t, err)
+		assert.Nil(t, identity)
+	})
+
 	t.Run("Invalid API Key rejection", func(t *testing.T) {
 		// Create in-memory database
 		engine, err := xorm.NewEngine("sqlite", ":memory:")

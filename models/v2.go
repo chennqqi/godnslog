@@ -69,7 +69,8 @@ type TblAPIKey struct {
 	Key        string    `xorm:"varchar(128) notnull unique"`
 	KeyPrefix  string    `xorm:"varchar(32) notnull"`
 	Name       string    `xorm:"varchar(255) notnull"`
-	Scopes     string    `xorm:"json"` // JSON array
+	Scopes     string    `xorm:"json"`                       // JSON array
+	IsAgent    bool      `xorm:"bool notnull default false"` // Agent API key flag
 	ExpiresAt  time.Time `xorm:"datetime"`
 	LastUsedAt time.Time `xorm:"datetime"`
 	CreatedBy  int64     `xorm:"notnull"`

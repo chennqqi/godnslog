@@ -988,21 +988,29 @@ components:
     LoginResponse:
       type: object
       required:
-        - token
-        - refresh_token
-        - expires_in
+        - code
+        - message
+        - data
       properties:
-        token:
-          type: string
-          description: JWT access token
-        refresh_token:
-          type: string
-          description: JWT refresh token
-        expires_in:
+        code:
           type: integer
-          description: Token expiration time in seconds
-        user:
-          $ref: '#/components/schemas/User'
+          description: Response code (0 for success)
+          example: 0
+        message:
+          type: string
+          description: Response message
+          example: OK
+        data:
+          type: object
+          required:
+            - token
+            - user
+          properties:
+            token:
+              type: string
+              description: JWT access token
+            user:
+              $ref: '#/components/schemas/User'
 
     RefreshTokenRequest:
       type: object

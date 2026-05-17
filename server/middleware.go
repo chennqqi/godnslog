@@ -54,9 +54,33 @@ func (s *WebServer) authenticateAPIKey(c *gin.Context) (*models.TblAPIKey, error
 		return nil, nil
 	}
 
-	// TODO: Implement API key validation from database
-	// For now, return nil as API key authentication is not yet implemented
-	return nil, nil
+	// Validate full API key using auth service
+	key, err := s.authService.ValidateAPIKey(apiKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update last used timestamp
+	_ = s.authService.UpdateLastUsed(apiKey)
+
+	// Convert to TblAPIKey for backward compatibility
+	tblKey := &models.TblAPIKey{
+		Key:       key.Key,
+		KeyPrefix: key.KeyPrefix,
+		Name:      key.Name,
+		IsAgent:   key.IsAgent, // Propagate IsAgent to legacy model
+	}
+
+	// Convert ExpiresAt pointer to value
+	if key.ExpiresAt != nil {
+		tblKey.ExpiresAt = *key.ExpiresAt
+	}
+
+	// Convert Scopes array to JSON string
+	// For now, leave as empty string since TblAPIKey expects JSON string
+	// The actual scope checking will be done in the auth middleware
+
+	return tblKey, nil
 }
 
 // CORSMiddleware handles CORS headers

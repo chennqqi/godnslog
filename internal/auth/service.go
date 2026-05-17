@@ -165,20 +165,38 @@ func (s *Service) RevokeAPIKey(id string) error {
 	return err
 }
 
-// UpdateLastUsed updates the last used timestamp for an API key
-func (s *Service) UpdateLastUsed(prefix string) error {
+// UpdateLastUsed updates the last used timestamp for an API key by full key
+func (s *Service) UpdateLastUsed(fullKey string) error {
+	// Extract prefix from full key
+	if len(fullKey) < 8 {
+		return errors.New("invalid api key format")
+	}
+	prefix := fullKey[:8]
+
 	now := time.Now()
-	_, err := s.engine.Where("key_prefix = ?", prefix).
+	_, err := s.engine.Where("key_prefix = ? AND key = ?", prefix, fullKey).
 		Cols("last_used_at").
 		Update(&models.APIKey{LastUsedAt: &now})
 	return err
 }
 
-// ValidateAPIKey validates an API key and returns it if valid
-func (s *Service) ValidateAPIKey(prefix string) (*models.APIKey, error) {
+// ValidateAPIKey validates an API key by full key and returns it if valid
+func (s *Service) ValidateAPIKey(fullKey string) (*models.APIKey, error) {
+	// Extract prefix from full key
+	if len(fullKey) < 8 {
+		return nil, errors.New("invalid api key format")
+	}
+	prefix := fullKey[:8]
+
+	// First find by prefix
 	apiKey, err := s.GetAPIKeyByPrefix(prefix)
 	if err != nil {
 		return nil, err
+	}
+
+	// Then verify the full key matches
+	if apiKey.Key != fullKey {
+		return nil, ErrAPIKeyNotFound
 	}
 
 	if !apiKey.IsValid() {
