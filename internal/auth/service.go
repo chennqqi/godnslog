@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/chennqqi/godnslog/internal/models"
 	"xorm.io/xorm"
 )
 
@@ -57,11 +58,18 @@ func generateAPIKey() (string, string, error) {
 }
 
 // CreateAPIKey creates a new API key
-func (s *Service) CreateAPIKey(req *APIKeyCreateRequest, userID string) (*APIKey, error) {
+func (s *Service) CreateAPIKey(req *models.APIKeyCreateRequest, userID string) (*models.APIKey, error) {
 	// Validate scopes
 	for _, scope := range req.Scopes {
 		if !ValidScopes[scope] {
 			return nil, ErrInvalidScope
+		}
+	}
+
+	// Validate agent scopes if this is an agent key
+	if req.IsAgent {
+		if !models.ValidateAgentScopes(req.Scopes) {
+			return nil, errors.New("invalid agent scope")
 		}
 	}
 
@@ -70,14 +78,17 @@ func (s *Service) CreateAPIKey(req *APIKeyCreateRequest, userID string) (*APIKey
 		return nil, err
 	}
 
-	apiKey := &APIKey{
-		ID:        generateID(),
-		Key:       key,
-		KeyPrefix: prefix,
-		Name:      req.Name,
-		Scopes:    Scopes(req.Scopes),
-		ExpiresAt: req.ExpiresAt,
-		CreatedBy: userID,
+	apiKey := &models.APIKey{
+		ID:            generateID(),
+		Key:           key,
+		KeyPrefix:     prefix,
+		Name:          req.Name,
+		Scopes:        models.Scopes(req.Scopes),
+		WorkspaceID:   req.WorkspaceID,
+		RiskTolerance: req.RiskTolerance,
+		IsAgent:       req.IsAgent,
+		ExpiresAt:     req.ExpiresAt,
+		CreatedBy:     userID,
 	}
 
 	if _, err := s.engine.Insert(apiKey); err != nil {
@@ -88,8 +99,8 @@ func (s *Service) CreateAPIKey(req *APIKeyCreateRequest, userID string) (*APIKey
 }
 
 // GetAPIKeyByPrefix retrieves an API key by its prefix
-func (s *Service) GetAPIKeyByPrefix(prefix string) (*APIKey, error) {
-	var apiKey APIKey
+func (s *Service) GetAPIKeyByPrefix(prefix string) (*models.APIKey, error) {
+	var apiKey models.APIKey
 	has, err := s.engine.Where("key_prefix = ? AND is_revoked = ?", prefix, false).Get(&apiKey)
 	if err != nil {
 		return nil, err
@@ -101,8 +112,8 @@ func (s *Service) GetAPIKeyByPrefix(prefix string) (*APIKey, error) {
 }
 
 // GetAPIKeyByID retrieves an API key by its ID
-func (s *Service) GetAPIKeyByID(id string) (*APIKey, error) {
-	var apiKey APIKey
+func (s *Service) GetAPIKeyByID(id string) (*models.APIKey, error) {
+	var apiKey models.APIKey
 	has, err := s.engine.ID(id).Get(&apiKey)
 	if err != nil {
 		return nil, err
@@ -114,11 +125,11 @@ func (s *Service) GetAPIKeyByID(id string) (*APIKey, error) {
 }
 
 // ListAPIKeys retrieves API keys for a user
-func (s *Service) ListAPIKeys(userID string, page, pageSize int) (*APIKeyListResponse, error) {
-	var apiKeys []APIKey
+func (s *Service) ListAPIKeys(userID string, page, pageSize int) (*models.APIKeyListResponse, error) {
+	var apiKeys []models.APIKey
 	offset := (page - 1) * pageSize
 
-	total, err := s.engine.Where("created_by = ?", userID).Count(&APIKey{})
+	total, err := s.engine.Where("created_by = ?", userID).Count(&models.APIKey{})
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +146,7 @@ func (s *Service) ListAPIKeys(userID string, page, pageSize int) (*APIKeyListRes
 		totalPages++
 	}
 
-	return &APIKeyListResponse{
+	return &models.APIKeyListResponse{
 		Items:      apiKeys,
 		Total:      total,
 		Page:       page,
@@ -147,7 +158,7 @@ func (s *Service) ListAPIKeys(userID string, page, pageSize int) (*APIKeyListRes
 // RevokeAPIKey revokes an API key
 func (s *Service) RevokeAPIKey(id string) error {
 	now := time.Now()
-	_, err := s.engine.ID(id).Cols("is_revoked", "revoked_at").Update(&APIKey{
+	_, err := s.engine.ID(id).Cols("is_revoked", "revoked_at").Update(&models.APIKey{
 		IsRevoked: true,
 		RevokedAt: &now,
 	})
@@ -159,12 +170,12 @@ func (s *Service) UpdateLastUsed(prefix string) error {
 	now := time.Now()
 	_, err := s.engine.Where("key_prefix = ?", prefix).
 		Cols("last_used_at").
-		Update(&APIKey{LastUsedAt: &now})
+		Update(&models.APIKey{LastUsedAt: &now})
 	return err
 }
 
 // ValidateAPIKey validates an API key and returns it if valid
-func (s *Service) ValidateAPIKey(prefix string) (*APIKey, error) {
+func (s *Service) ValidateAPIKey(prefix string) (*models.APIKey, error) {
 	apiKey, err := s.GetAPIKeyByPrefix(prefix)
 	if err != nil {
 		return nil, err
@@ -181,7 +192,7 @@ func (s *Service) ValidateAPIKey(prefix string) (*APIKey, error) {
 }
 
 // CreateAuditLog creates an audit log entry
-func (s *Service) CreateAuditLog(log *AuditLog) error {
+func (s *Service) CreateAuditLog(log *models.AuditLog) error {
 	if _, err := s.engine.Insert(log); err != nil {
 		return err
 	}
@@ -189,8 +200,8 @@ func (s *Service) CreateAuditLog(log *AuditLog) error {
 }
 
 // ListAuditLogs retrieves audit logs with filtering
-func (s *Service) ListAuditLogs(userID, action, resourceType string, startTime, endTime *time.Time, page, pageSize int) (*AuditLogListResponse, error) {
-	var logs []AuditLog
+func (s *Service) ListAuditLogs(userID, action, resourceType string, startTime, endTime *time.Time, page, pageSize int) (*models.AuditLogListResponse, error) {
+	var logs []models.AuditLog
 	session := s.engine.NewSession()
 	defer session.Close()
 
@@ -210,7 +221,7 @@ func (s *Service) ListAuditLogs(userID, action, resourceType string, startTime, 
 		session = session.Where("timestamp <= ?", endTime)
 	}
 
-	total, err := session.Count(&AuditLog{})
+	total, err := session.Count(&models.AuditLog{})
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +236,7 @@ func (s *Service) ListAuditLogs(userID, action, resourceType string, startTime, 
 		totalPages++
 	}
 
-	return &AuditLogListResponse{
+	return &models.AuditLogListResponse{
 		Items:      logs,
 		Total:      total,
 		Page:       page,

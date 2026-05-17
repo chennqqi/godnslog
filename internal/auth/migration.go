@@ -1,13 +1,14 @@
 package auth
 
 import (
+	"github.com/chennqqi/godnslog/internal/models"
 	"xorm.io/xorm"
 )
 
-// MigrateAuth runs database migration for auth related tables
-func MigrateAuth(engine *xorm.Engine) error {
-	return engine.Sync(
-		new(APIKey),
-		new(AuditLog),
+// SyncSchema synchronizes the database schema with the current models
+func SyncSchema(engine *xorm.Engine) error {
+	return engine.Sync2(
+		new(models.APIKey),
+		new(models.AuditLog),
 	)
 }

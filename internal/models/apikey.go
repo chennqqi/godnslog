@@ -85,9 +85,37 @@ func (APIKey) TableName() string {
 
 // APIKeyCreateRequest represents the request to create an API key
 type APIKeyCreateRequest struct {
-	Name      string     `json:"name" binding:"required"`
-	Scopes    []string   `json:"scopes" binding:"required"`
-	ExpiresAt *time.Time `json:"expires_at"`
+	Name          string     `json:"name" binding:"required"`
+	Scopes        []string   `json:"scopes" binding:"required"`
+	IsAgent       bool       `json:"is_agent"`       // Mark as agent-specific key
+	WorkspaceID   *string    `json:"workspace_id"`   // Workspace constraint
+	RiskTolerance string     `json:"risk_tolerance"` // low, medium, high
+	ExpiresAt     *time.Time `json:"expires_at"`
+}
+
+// AgentScopes defines the allowed scopes for agent API keys (minimum privilege)
+var AgentScopes = []string{
+	"case:read",
+	"payload:read",
+	"interaction:read",
+	"evidence:read",
+}
+
+// ValidateAgentScopes validates that an agent key only has allowed scopes
+func ValidateAgentScopes(scopes []string) bool {
+	for _, scope := range scopes {
+		allowed := false
+		for _, allowedScope := range AgentScopes {
+			if scope == allowedScope {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return false
+		}
+	}
+	return true
 }
 
 // APIKeyListResponse represents the response for listing API keys

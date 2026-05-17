@@ -4,9 +4,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/chennqqi/godnslog/internal/models"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	_ "modernc.org/sqlite"
+	"xorm.io/xorm"
 )
 
 func init() {
@@ -101,6 +105,186 @@ func TestAuthMiddlewareAPIKey(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Request = httptest.NewRequest("GET", "/", nil)
 		c.Request.Header.Set("X-API-Key", "short")
+
+		identity, err := middleware.authenticateAPIKey(c)
+
+		assert.Error(t, err)
+		assert.Nil(t, identity)
+	})
+
+	t.Run("API Key success authentication with valid service", func(t *testing.T) {
+		// Create in-memory database
+		engine, err := xorm.NewEngine("sqlite", ":memory:")
+		assert.NoError(t, err)
+		defer engine.Close()
+
+		// Sync schema
+		assert.NoError(t, engine.Sync2(new(models.APIKey)))
+
+		// Create auth service
+		authService := NewService(engine)
+
+		// Create a test API key with valid scopes
+		req := &models.APIKeyCreateRequest{
+			Name:    "Test Key",
+			Scopes:  []string{"case:read", "payload:read"},
+			IsAgent: false,
+		}
+		apiKey, err := authService.CreateAPIKey(req, "user-1")
+		assert.NoError(t, err)
+		assert.NotNil(t, apiKey)
+
+		// Create middleware with service
+		middleware := NewAuthMiddleware("test-secret", authService)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("GET", "/", nil)
+		c.Request.Header.Set("X-API-Key", apiKey.Key)
+
+		identity, err := middleware.authenticateAPIKey(c)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, identity)
+		assert.Equal(t, apiKey.ID, identity.APIKeyID)
+		assert.False(t, identity.IsAgent)
+	})
+
+	t.Run("Invalid API Key rejection", func(t *testing.T) {
+		// Create in-memory database
+		engine, err := xorm.NewEngine("sqlite", ":memory:")
+		assert.NoError(t, err)
+		defer engine.Close()
+
+		// Sync schema
+		assert.NoError(t, engine.Sync2(new(models.APIKey)))
+
+		// Create auth service
+		authService := NewService(engine)
+
+		// Create middleware with service
+		middleware := NewAuthMiddleware("test-secret", authService)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("GET", "/", nil)
+		c.Request.Header.Set("X-API-Key", "invalid-key-12345678")
+
+		identity, err := middleware.authenticateAPIKey(c)
+
+		assert.Error(t, err)
+		assert.Nil(t, identity)
+	})
+
+	t.Run("Agent API Key identification", func(t *testing.T) {
+		// Create in-memory database
+		engine, err := xorm.NewEngine("sqlite", ":memory:")
+		assert.NoError(t, err)
+		defer engine.Close()
+
+		// Sync schema
+		assert.NoError(t, engine.Sync2(new(models.APIKey)))
+
+		// Create auth service
+		authService := NewService(engine)
+
+		// Create an agent API key with valid agent scopes (singular forms)
+		req := &models.APIKeyCreateRequest{
+			Name:    "Agent Key",
+			Scopes:  []string{"case:read", "payload:read", "interaction:read", "evidence:read"},
+			IsAgent: true,
+		}
+		apiKey, err := authService.CreateAPIKey(req, "user-1")
+		assert.NoError(t, err)
+		assert.NotNil(t, apiKey)
+		assert.True(t, apiKey.IsAgent)
+
+		// Create middleware with service
+		middleware := NewAuthMiddleware("test-secret", authService)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("GET", "/", nil)
+		c.Request.Header.Set("X-API-Key", apiKey.Key)
+
+		identity, err := middleware.authenticateAPIKey(c)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, identity)
+		assert.Equal(t, apiKey.ID, identity.APIKeyID)
+		assert.True(t, identity.IsAgent)
+	})
+
+	t.Run("Revoked API Key rejection", func(t *testing.T) {
+		// Create in-memory database
+		engine, err := xorm.NewEngine("sqlite", ":memory:")
+		assert.NoError(t, err)
+		defer engine.Close()
+
+		// Sync schema
+		assert.NoError(t, engine.Sync2(new(models.APIKey)))
+
+		// Create auth service
+		authService := NewService(engine)
+
+		// Create and then revoke an API key with valid scopes
+		req := &models.APIKeyCreateRequest{
+			Name:    "Test Key",
+			Scopes:  []string{"case:read"},
+			IsAgent: false,
+		}
+		apiKey, err := authService.CreateAPIKey(req, "user-1")
+		assert.NoError(t, err)
+		assert.NotNil(t, apiKey)
+
+		err = authService.RevokeAPIKey(apiKey.ID)
+		assert.NoError(t, err)
+
+		// Create middleware with service
+		middleware := NewAuthMiddleware("test-secret", authService)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("GET", "/", nil)
+		c.Request.Header.Set("X-API-Key", apiKey.Key)
+
+		identity, err := middleware.authenticateAPIKey(c)
+
+		assert.Error(t, err)
+		assert.Nil(t, identity)
+	})
+
+	t.Run("Expired API Key rejection", func(t *testing.T) {
+		// Create in-memory database
+		engine, err := xorm.NewEngine("sqlite", ":memory:")
+		assert.NoError(t, err)
+		defer engine.Close()
+
+		// Sync schema
+		assert.NoError(t, engine.Sync2(new(models.APIKey)))
+
+		// Create auth service
+		authService := NewService(engine)
+
+		// Create an expired API key with valid scopes
+		pastTime := time.Now().Add(-1 * time.Hour)
+		req := &models.APIKeyCreateRequest{
+			Name:      "Test Key",
+			Scopes:    []string{"case:read"},
+			IsAgent:   false,
+			ExpiresAt: &pastTime,
+		}
+		apiKey, err := authService.CreateAPIKey(req, "user-1")
+		assert.NoError(t, err)
+		assert.NotNil(t, apiKey)
+
+		// Create middleware with service
+		middleware := NewAuthMiddleware("test-secret", authService)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("GET", "/", nil)
+		c.Request.Header.Set("X-API-Key", apiKey.Key)
 
 		identity, err := middleware.authenticateAPIKey(c)
 
