@@ -91,8 +91,10 @@ func TestCreatePayloadWithCaseVariable(t *testing.T) {
 
 	service := NewService(engine)
 
+	// Create a custom template that uses {case} variable to verify it's rendered
+	testCaseID := "case-456"
 	req := &PayloadCreateRequest{
-		CaseID:           "case-456",
+		CaseID:           testCaseID,
 		TemplateID:       "ssrf-basic",
 		Variables:        map[string]string{},
 		ExpectedProtocol: "dns",
@@ -104,11 +106,33 @@ func TestCreatePayloadWithCaseVariable(t *testing.T) {
 	}
 
 	// Verify case variable is substituted in template_rendered
-	// Since we use RenderTemplateWithCase, the case ID should be available in the template
+	// Since we use RenderTemplateWithCase, the case ID should be available as {case}
 	// For ssrf-basic template: "http://{token}.{domain}/"
-	// If template includes {case}, it should be substituted
+	// The template doesn't include {case} by default, so we need to check that
+	// the rendering logic works by verifying the template is rendered correctly
 	if payload.TemplateRendered == "" {
 		t.Fatal("Expected TemplateRendered to be set")
+	}
+
+	// Verify the rendering worked by checking token and domain are present
+	if !strings.Contains(payload.TemplateRendered, payload.Token) {
+		t.Errorf("Expected TemplateRendered to contain token %s", payload.Token)
+	}
+	if !strings.Contains(payload.TemplateRendered, "example.com") {
+		t.Error("Expected TemplateRendered to contain domain")
+	}
+
+	// Test with a template that explicitly uses {case} to prove case variable rendering works
+	// We'll add a custom template for this test
+	customTemplate := "http://{token}.{domain}/case/{case}"
+	rendered, err := renderPayloadWithCase(customTemplate, map[string]string{}, payload.Token, "example.com", testCaseID)
+	if err != nil {
+		t.Fatalf("Failed to render with case variable: %v", err)
+	}
+
+	// Strong assertion: verify case ID is actually in the rendered output
+	if !strings.Contains(rendered, testCaseID) {
+		t.Errorf("Expected rendered template to contain case ID %s, got %s", testCaseID, rendered)
 	}
 }
 

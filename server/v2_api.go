@@ -952,12 +952,6 @@ func (self *WebServer) v2CreatePayload(c *gin.Context) {
 		if err == nil {
 			expiresAt = &parsedTime
 		}
-	} else if req.ExpiresIn != "" {
-		// Parse ExpiresIn duration string (e.g., "24h", "1h30m")
-		duration, err := time.ParseDuration(req.ExpiresIn)
-		if err == nil {
-			expiresAt = &[]time.Time{time.Now().Add(duration)}[0]
-		}
 	}
 
 	// Create unified request for payload service

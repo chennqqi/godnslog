@@ -9,6 +9,7 @@ import (
 
 	"github.com/chennqqi/godnslog/cache"
 	v2models "github.com/chennqqi/godnslog/internal/models"
+	"github.com/chennqqi/godnslog/internal/payload"
 	"github.com/chennqqi/godnslog/models"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -345,33 +346,53 @@ func TestPayloadPreviewReturnsRenderedTemplate(t *testing.T) {
 		t.Fatalf("Failed to initialize database: %v", err)
 	}
 
-	// Create a test payload with rendered template
-	session := server.orm.NewSession()
-	defer session.Close()
-
-	payload := &models.TblPayload{
-		CaseId:          1,
-		Token:           "testtoken",
-		Template:        "ssrf",
-		RenderedPayload: "http://testtoken.example.com/payload",
-	}
-	if _, err := session.InsertOne(payload); err != nil {
-		t.Fatalf("Failed to insert payload: %v", err)
+	// Sync the payloads table for the unified model
+	if err := server.orm.Sync2(new(v2models.Payload)); err != nil {
+		t.Fatalf("Failed to sync payloads table: %v", err)
 	}
 
-	// Initialize router with v2 API
-	r := gin.New()
-	server.registerV2API(r)
+	// Create a test payload using the unified model
+	payloadService := payload.NewService(server.orm)
+	req := &v2models.PayloadCreateRequest{
+		CaseID:           "case-123",
+		TemplateID:       "ssrf-basic",
+		Variables:        map[string]string{},
+		ExpectedProtocol: "http",
+	}
+	payload, err := payloadService.CreatePayload(req, "1", "test.example.com")
+	if err != nil {
+		t.Fatalf("Failed to create payload: %v", err)
+	}
 
-	// Test preview endpoint
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/payloads/1/preview", nil)
-	req.Header.Set("Access-Token", "test-token") // Will fail auth, but that's OK for this test
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	// Test that creation and preview use the same rendering logic
+	// The payload service uses RenderTemplateWithCase for creation
+	// The preview endpoint should return the same template_rendered
+	if payload.TemplateRendered == "" {
+		t.Fatal("Expected TemplateRendered to be set after creation")
+	}
 
-	// Should return 401 without valid auth, but we're testing the endpoint exists
-	if w.Code != http.StatusUnauthorized {
-		t.Logf("Preview endpoint exists, returned status %d", w.Code)
+	// Verify rendered payload contains token and domain (proves rendering logic works)
+	if !strings.Contains(payload.TemplateRendered, payload.Token) {
+		t.Errorf("Expected TemplateRendered to contain token %s", payload.Token)
+	}
+	if !strings.Contains(payload.TemplateRendered, "test.example.com") {
+		t.Error("Expected TemplateRendered to contain domain")
+	}
+
+	// Test that GetPayloadByID returns the same template_rendered (simulates preview)
+	retrieved, err := payloadService.GetPayloadByID(payload.ID)
+	if err != nil {
+		t.Fatalf("Failed to get payload: %v", err)
+	}
+
+	if retrieved.TemplateRendered != payload.TemplateRendered {
+		t.Error("Preview should return the same template_rendered as creation")
+	}
+
+	// Test that non-existent payload returns 404 (simulates preview 404)
+	_, err = payloadService.GetPayloadByID("nonexistent-id")
+	if err == nil {
+		t.Error("Expected error for non-existent payload")
 	}
 }
 

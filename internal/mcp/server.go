@@ -89,6 +89,21 @@ func (s *Server) createOASTProbe(ctx context.Context, args map[string]interface{
 	variables := normalizeStringMap(args["variables"])
 	expectedProtocols := normalizeStringSlice(args["expected_protocols"])
 
+	// Convert expires_in duration to expires_at timestamp (RFC3339 format)
+	var expiresAt string
+	if expiresIn != "" {
+		duration, err := time.ParseDuration(expiresIn)
+		if err == nil {
+			expiresAt = time.Now().Add(duration).Format(time.RFC3339)
+		}
+	}
+
+	// Convert expected_protocols array to single string (take first if exists)
+	var expectedProtocol string
+	if len(expectedProtocols) > 0 {
+		expectedProtocol = expectedProtocols[0]
+	}
+
 	caseResult, err := s.apiCall("POST", "/api/v2/cases", map[string]interface{}{
 		"title":       title,
 		"description": description,
@@ -111,8 +126,8 @@ func (s *Server) createOASTProbe(ctx context.Context, args map[string]interface{
 		"template_id":       templateID,
 		"case_id":           caseID,
 		"variables":         variables,
-		"expires_in":        expiresIn,
-		"expected_protocol": expectedProtocols,
+		"expires_at":        expiresAt,
+		"expected_protocol": expectedProtocol,
 	})
 	if err != nil {
 		return ToolResult{Success: false, Error: err.Error()}, nil
@@ -185,12 +200,21 @@ func (s *Server) createPayload(ctx context.Context, args map[string]interface{})
 	variables, _ := args["variables"].(map[string]string)
 	expiresIn, _ := args["expires_in"].(string)
 
+	// Convert expires_in duration to expires_at timestamp (RFC3339 format)
+	var expiresAt string
+	if expiresIn != "" {
+		duration, err := time.ParseDuration(expiresIn)
+		if err == nil {
+			expiresAt = time.Now().Add(duration).Format(time.RFC3339)
+		}
+	}
+
 	// Call API
 	result, err := s.apiCall("POST", "/api/v2/payloads", map[string]interface{}{
 		"template_id": templateID,
 		"case_id":     caseID,
 		"variables":   variables,
-		"expires_in":  expiresIn,
+		"expires_at":  expiresAt,
 	})
 
 	if err != nil {
