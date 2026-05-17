@@ -470,10 +470,6 @@ func TestInteractionTokenAttributionChain(t *testing.T) {
 	// Dual-write to unified interactions table with attribution
 	interaction := v2models.FromTblDnsWithAttribution(dnsRecord, server.orm)
 
-	// Manually set payload_id and case_id for testing (workaround for attribution function issue)
-	interaction.PayloadID = &payload.ID
-	interaction.CaseID = &caseID
-
 	if _, err2 := session.InsertOne(interaction); err2 != nil {
 		t.Fatalf("Failed to dual-write interaction: %v", err2)
 	}

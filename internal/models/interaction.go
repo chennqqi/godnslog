@@ -163,15 +163,11 @@ func FromTblDnsWithAttribution(dns *models.TblDns, engine *xorm.Engine) *Interac
 
 	// Auto-attribution: associate interaction with payload and case based on token
 	if token != "" {
-		type PayloadInfo struct {
-			ID     string `xorm:"id"`
-			CaseID string `xorm:"case_id"`
-		}
-		var payloadInfo PayloadInfo
-		has, err := engine.Table(new(Payload)).Where("token = ?", token).Get(&payloadInfo)
+		var payload Payload
+		has, err := engine.Where("token = ?", token).Get(&payload)
 		if err == nil && has {
-			interaction.PayloadID = &payloadInfo.ID
-			interaction.CaseID = &payloadInfo.CaseID
+			interaction.PayloadID = &payload.ID
+			interaction.CaseID = &payload.CaseID
 		}
 	}
 
@@ -227,15 +223,11 @@ func FromTblHttpWithAttribution(http *models.TblHttp, engine *xorm.Engine) *Inte
 
 	// Auto-attribution: associate interaction with payload and case based on token
 	if token != "" {
-		type PayloadInfo struct {
-			ID     string `xorm:"id"`
-			CaseID string `xorm:"case_id"`
-		}
-		var payloadInfo PayloadInfo
-		has, err := engine.Table(new(Payload)).Where("token = ?", token).Get(&payloadInfo)
+		var payload Payload
+		has, err := engine.Where("token = ?", token).Get(&payload)
 		if err == nil && has {
-			interaction.PayloadID = &payloadInfo.ID
-			interaction.CaseID = &payloadInfo.CaseID
+			interaction.PayloadID = &payload.ID
+			interaction.CaseID = &payload.CaseID
 		}
 	}
 
