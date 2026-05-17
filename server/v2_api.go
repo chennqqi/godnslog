@@ -952,6 +952,12 @@ func (self *WebServer) v2CreatePayload(c *gin.Context) {
 		if err == nil {
 			expiresAt = &parsedTime
 		}
+	} else if req.ExpiresIn != "" {
+		// Parse ExpiresIn duration string (e.g., "24h", "1h30m")
+		duration, err := time.ParseDuration(req.ExpiresIn)
+		if err == nil {
+			expiresAt = &[]time.Time{time.Now().Add(duration)}[0]
+		}
 	}
 
 	// Create unified request for payload service
@@ -984,21 +990,17 @@ func (self *WebServer) v2CreatePayload(c *gin.Context) {
 // v2GetPayload gets a payload
 func (self *WebServer) v2GetPayload(c *gin.Context) {
 	id := c.Param("id")
-	payloadId, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "invalid payload id",
-		})
-		return
-	}
 
-	session := self.orm.NewSession()
-	defer session.Close()
-
-	var payloadItem models.TblPayload
-	has, err := session.ID(payloadId).Get(&payloadItem)
+	payloadService := payload.NewService(self.orm)
+	payloadItem, err := payloadService.GetPayloadByID(id)
 	if err != nil {
+		if err == payload.ErrPayloadNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"code":    404,
+				"message": "payload not found",
+			})
+			return
+		}
 		logrus.Errorf("[v2_api.go::v2GetPayload] get error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
@@ -1006,40 +1008,11 @@ func (self *WebServer) v2GetPayload(c *gin.Context) {
 		})
 		return
 	}
-	if !has {
-		c.JSON(http.StatusNotFound, gin.H{
-			"code":    6,
-			"message": "payload not found",
-		})
-		return
-	}
-
-	var variables map[string]string
-	if payloadItem.Variables != "" {
-		json.Unmarshal([]byte(payloadItem.Variables), &variables)
-	}
-
-	result := models.Payload{
-		Id:               strconv.FormatInt(payloadItem.Id, 10),
-		CaseId:           strconv.FormatInt(payloadItem.CaseId, 10),
-		Token:            payloadItem.Token,
-		Template:         payloadItem.Template,
-		RenderedPayload:  payloadItem.RenderedPayload,
-		Variables:        variables,
-		Status:           payloadItem.Status,
-		ExpectedProtocol: payloadItem.ExpectedProtocol,
-		CreatedBy:        strconv.FormatInt(payloadItem.CreatedBy, 10),
-		CreatedAt:        payloadItem.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:        payloadItem.UpdatedAt.Format(time.RFC3339),
-	}
-	if !payloadItem.ExpiresAt.IsZero() {
-		result.ExpiresAt = payloadItem.ExpiresAt.Format(time.RFC3339)
-	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
-		"data":    result,
+		"data":    payloadItem,
 	})
 }
 
@@ -1124,6 +1097,13 @@ func (self *WebServer) v2PreviewPayload(c *gin.Context) {
 	payloadService := payload.NewService(self.orm)
 	payloadItem, err := payloadService.GetPayloadByID(id)
 	if err != nil {
+		if err == payload.ErrPayloadNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"code":    404,
+				"message": "payload not found",
+			})
+			return
+		}
 		logrus.Errorf("[v2_api.go::v2PreviewPayload] get error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,

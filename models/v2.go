@@ -136,6 +136,7 @@ type PayloadCreateRequest struct {
 	TemplateID       string            `json:"template_id" binding:"required"`
 	Variables        map[string]string `json:"variables"`
 	ExpiresAt        string            `json:"expires_at"`
+	ExpiresIn        string            `json:"expires_in"` // Duration string like "24h" for MCP compatibility
 	ExpectedProtocol string            `json:"expected_protocol" binding:"omitempty,oneof=dns http smtp ldap"`
 }
 

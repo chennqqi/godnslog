@@ -46,8 +46,8 @@ func (s *Service) CreatePayload(req *PayloadCreateRequest, userID, domain string
 	// Generate token
 	token := models.GenerateToken()
 
-	// Render payload
-	rendered, err := renderPayload(tmpl, req.Variables, token, domain)
+	// Render payload with case variable support
+	rendered, err := renderPayloadWithCase(tmpl, req.Variables, token, domain, req.CaseID)
 	if err != nil {
 		return nil, err
 	}

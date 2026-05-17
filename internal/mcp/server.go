@@ -108,11 +108,11 @@ func (s *Server) createOASTProbe(ctx context.Context, args map[string]interface{
 	}
 
 	payloadResult, err := s.apiCall("POST", "/api/v2/payloads", map[string]interface{}{
-		"template_id":        templateID,
-		"case_id":            caseID,
-		"variables":          variables,
-		"expires_in":         expiresIn,
-		"expected_protocols": expectedProtocols,
+		"template_id":       templateID,
+		"case_id":           caseID,
+		"variables":         variables,
+		"expires_in":        expiresIn,
+		"expected_protocol": expectedProtocols,
 	})
 	if err != nil {
 		return ToolResult{Success: false, Error: err.Error()}, nil
