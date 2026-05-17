@@ -330,10 +330,10 @@ func TestWaitForInteractionTool(t *testing.T) {
 // TestSummarizeEvidenceTool tests summarizeEvidence tool
 func TestSummarizeEvidenceTool(t *testing.T) {
 	server := newTestServer(func(r *http.Request) string {
-		if r.Method != http.MethodGet || r.URL.Path != "/api/v2/evidence/case-1" {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v2/evidence/generate" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
-		return `{"data":{"confidence":"medium"}}`
+		return `{"code":0,"message":"success","data":{"format":"json","content":"{\"id\":\"evidence-1\",\"case_id\":\"case-1\",\"evidence_strength\":\"medium\",\"confidence\":75,\"interaction_count\":4,\"unique_sources\":2,\"explainability\":\"Captured 4 interactions from 2 unique sources. Evidence strength: medium. Confidence: 75%.\"}","metadata":{"interaction_count":4}}}`
 	})
 
 	args := map[string]interface{}{
@@ -354,6 +354,22 @@ func TestSummarizeEvidenceTool(t *testing.T) {
 	if !toolResult.Success {
 		t.Fatalf("Expected success, got error: %s", toolResult.Error)
 	}
+
+	// Verify that the tool returns the data field from API response
+	if toolResult.Data == nil {
+		t.Fatal("Expected data to be present")
+	}
+
+	// The data should be the content field which contains JSON string
+	content, ok := toolResult.Data.(string)
+	if !ok {
+		t.Fatal("Expected data to be a string (content)")
+	}
+
+	// Verify content is not empty
+	if content == "" {
+		t.Error("Expected non-empty content")
+	}
 }
 
 // TestExportReportTool tests exportReport tool
@@ -362,7 +378,7 @@ func TestExportReportTool(t *testing.T) {
 		if r.Method != http.MethodPost || r.URL.Path != "/api/v2/evidence/generate" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
-		return `{"data":{"format":"markdown"}}`
+		return `{"code":0,"message":"success","data":{"format":"markdown","content":"# Evidence Report\n\n**Case ID**: case-1\n**Evidence Strength**: medium\n**Confidence**: 75%\n\n## Interactions\n\n- DNS interaction from 192.168.1.1\n- HTTP interaction from 192.168.1.2\n","metadata":{"interaction_count":2}}}`
 	})
 
 	args := map[string]interface{}{
@@ -383,6 +399,21 @@ func TestExportReportTool(t *testing.T) {
 
 	if !toolResult.Success {
 		t.Fatalf("Expected success, got error: %s", toolResult.Error)
+	}
+
+	// Verify that the tool returns the content field from API response
+	if toolResult.Data == nil {
+		t.Fatal("Expected data to be present")
+	}
+
+	content, ok := toolResult.Data.(string)
+	if !ok {
+		t.Fatal("Expected data to be a string (content)")
+	}
+
+	// Verify markdown content is present
+	if content == "" {
+		t.Error("Expected non-empty markdown content")
 	}
 }
 

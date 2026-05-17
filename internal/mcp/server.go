@@ -273,26 +273,49 @@ func (s *Server) waitForInteraction(ctx context.Context, args map[string]interfa
 }
 
 // summarize_evidence summarizes evidence for a case
+// summarizeEvidence summarizes evidence for a case (returns structured evidence data)
 func (s *Server) summarizeEvidence(ctx context.Context, args map[string]interface{}) (interface{}, error) {
 	caseID, ok := args["case_id"].(string)
 	if !ok {
 		return nil, fmt.Errorf("case_id is required")
 	}
 
-	// Call API
-	result, err := s.apiCall("GET", "/api/v2/evidence/"+caseID, nil)
+	payloadID := ""
+	if pid, ok := args["payload_id"].(string); ok {
+		payloadID = pid
+	}
+
+	// Call API to generate evidence in JSON format
+	result, err := s.apiCall("POST", "/api/v2/evidence/generate", map[string]interface{}{
+		"case_id":    caseID,
+		"payload_id": payloadID,
+		"format":     "json",
+	})
+
 	if err != nil {
 		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	// Extract the data field from API response
+	if resp, ok := result.(map[string]interface{}); ok {
+		if data, ok := resp["data"]; ok {
+			return ToolResult{Success: true, Data: data}, nil
+		}
 	}
 
 	return ToolResult{Success: true, Data: result}, nil
 }
 
-// export_report exports a report
+// export_report exports a report in specified format
 func (s *Server) exportReport(ctx context.Context, args map[string]interface{}) (interface{}, error) {
 	caseID, ok := args["case_id"].(string)
 	if !ok {
 		return nil, fmt.Errorf("case_id is required")
+	}
+
+	payloadID := ""
+	if pid, ok := args["payload_id"].(string); ok {
+		payloadID = pid
 	}
 
 	format := "markdown"
@@ -300,14 +323,24 @@ func (s *Server) exportReport(ctx context.Context, args map[string]interface{}) 
 		format = f
 	}
 
-	// Call API
+	// Call API to generate evidence
 	result, err := s.apiCall("POST", "/api/v2/evidence/generate", map[string]interface{}{
-		"case_id": caseID,
-		"format":  format,
+		"case_id":    caseID,
+		"payload_id": payloadID,
+		"format":     format,
 	})
 
 	if err != nil {
 		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	// Extract the content field from API response
+	if resp, ok := result.(map[string]interface{}); ok {
+		if data, ok := resp["data"].(map[string]interface{}); ok {
+			if content, ok := data["content"]; ok {
+				return ToolResult{Success: true, Data: content}, nil
+			}
+		}
 	}
 
 	return ToolResult{Success: true, Data: result}, nil

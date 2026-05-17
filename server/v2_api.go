@@ -2155,9 +2155,9 @@ func (self *WebServer) v2DeleteRule(c *gin.Context) {
 // v2GenerateEvidence generates evidence report
 func (self *WebServer) v2GenerateEvidence(c *gin.Context) {
 	var req struct {
-		CaseID    string `json:"case_id"`
+		CaseID    string `json:"case_id" binding:"required"`
 		PayloadID string `json:"payload_id"`
-		Format    string `json:"format" binding:"required,oneof=json markdown csv"`
+		Format    string `json:"format" binding:"required,oneof=json markdown"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -2173,6 +2173,13 @@ func (self *WebServer) v2GenerateEvidence(c *gin.Context) {
 
 	resp, err := evidenceService.GenerateEvidence(req.CaseID, req.PayloadID, req.Format)
 	if err != nil {
+		if err == interaction.ErrEvidenceNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"code":    404,
+				"message": "No evidence found for the specified case or payload",
+			})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "Failed to generate evidence",
