@@ -50,8 +50,10 @@ type EvidenceRequest struct {
 }
 
 // EvidenceResponse represents the response for evidence generation
+// The main semantic is the structured Evidence, with format/content for export
 type EvidenceResponse struct {
-	Format   string                 `json:"format"`
-	Content  string                 `json:"content"`
-	Metadata map[string]interface{} `json:"metadata"`
+	Evidence *Evidence              `json:"evidence"` // Structured evidence result (main semantic)
+	Format   string                 `json:"format"`   // json | markdown
+	Content  string                 `json:"content"`  // Exported content (JSON string or Markdown text)
+	Metadata map[string]interface{} `json:"metadata"` // Auxiliary information
 }

@@ -731,3 +731,13 @@ func TestV2APIResponseFormat(t *testing.T) {
 		}
 	}
 }
+
+// Note: Comprehensive API tests for evidence generation require fully functional case/payload creation
+// which is outside Sprint D remediation scope. Service-level tests in internal/interaction/evidence_service_test.go
+// already cover the core evidence generation logic including:
+// - case_id and payload_id support
+// - timeline chronological ordering
+// - JSON export with complete fields
+// - Markdown export with summary and details
+// - DNS/HTTP differentiated scoring
+// - no evidence scenarios

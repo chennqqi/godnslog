@@ -272,17 +272,21 @@ func (s *Server) waitForInteraction(ctx context.Context, args map[string]interfa
 	return ToolResult{Success: true, Data: result}, nil
 }
 
-// summarize_evidence summarizes evidence for a case
-// summarizeEvidence summarizes evidence for a case (returns structured evidence data)
+// summarizeEvidence summarizes evidence for a case or payload (returns structured evidence data)
 func (s *Server) summarizeEvidence(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-	caseID, ok := args["case_id"].(string)
-	if !ok {
-		return nil, fmt.Errorf("case_id is required")
-	}
-
+	caseID := ""
 	payloadID := ""
+
+	if cid, ok := args["case_id"].(string); ok {
+		caseID = cid
+	}
 	if pid, ok := args["payload_id"].(string); ok {
 		payloadID = pid
+	}
+
+	// Validate that at least one of case_id or payload_id is provided
+	if len(caseID) == 0 && len(payloadID) == 0 {
+		return nil, fmt.Errorf("either case_id or payload_id is required")
 	}
 
 	// Call API to generate evidence in JSON format
@@ -296,10 +300,12 @@ func (s *Server) summarizeEvidence(ctx context.Context, args map[string]interfac
 		return ToolResult{Success: false, Error: err.Error()}, nil
 	}
 
-	// Extract the data field from API response
+	// Extract the evidence field from API response (structured Evidence)
 	if resp, ok := result.(map[string]interface{}); ok {
-		if data, ok := resp["data"]; ok {
-			return ToolResult{Success: true, Data: data}, nil
+		if data, ok := resp["data"].(map[string]interface{}); ok {
+			if evidence, ok := data["evidence"]; ok {
+				return ToolResult{Success: true, Data: evidence}, nil
+			}
 		}
 	}
 

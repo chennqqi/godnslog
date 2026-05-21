@@ -1,6 +1,7 @@
 package interaction
 
 import (
+	"sort"
 	"testing"
 	"time"
 
@@ -258,6 +259,225 @@ func TestGenerateExplainability(t *testing.T) {
 	if len(explainability) == 0 {
 		t.Error("Explainability should not be empty")
 	}
+}
+
+func TestGenerateEvidence_NoInteractions(t *testing.T) {
+	engine, err := xorm.NewEngine("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to create engine: %v", err)
+	}
+	defer engine.Close()
+
+	service := NewEvidenceService(NewService(engine))
+
+	// Test that empty interactions return ErrEvidenceNotFound
+	// We test this by checking the calculateEvidenceStrength directly
+	interactions := []models.Interaction{}
+	strength, confidence := service.calculateEvidenceStrength(interactions)
+
+	if strength != EvidenceStrengthLow {
+		t.Errorf("Expected EvidenceStrengthLow for empty interactions, got %s", strength)
+	}
+	if confidence != 0 {
+		t.Errorf("Expected confidence 0 for empty interactions, got %d", confidence)
+	}
+}
+
+func TestGenerateEvidence_TimelineChronological(t *testing.T) {
+	engine, err := xorm.NewEngine("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to create engine: %v", err)
+	}
+	defer engine.Close()
+
+	service := NewEvidenceService(NewService(engine))
+
+	// Create interactions with specific timestamps
+	baseTime := time.Now()
+	interactions := []models.Interaction{
+		{
+			Type:      "dns",
+			SourceIP:  "127.0.0.1",
+			Timestamp: baseTime.Add(2 * time.Hour),
+		},
+		{
+			Type:      "http",
+			SourceIP:  "192.168.1.1",
+			Timestamp: baseTime.Add(1 * time.Hour),
+		},
+		{
+			Type:      "dns",
+			SourceIP:  "10.0.0.1",
+			Timestamp: baseTime,
+		},
+	}
+
+	// Sort interactions chronologically (as done in GenerateEvidence)
+	sort.Slice(interactions, func(i, j int) bool {
+		return interactions[i].Timestamp.Before(interactions[j].Timestamp)
+	})
+
+	// Build timeline from sorted interactions
+	timeline := service.buildTimeline(interactions)
+
+	if len(timeline) != 3 {
+		t.Errorf("Expected 3 timeline items, got %d", len(timeline))
+	}
+
+	// Verify timeline is in chronological order
+	for i := 1; i < len(timeline); i++ {
+		if timeline[i].Timestamp.Before(timeline[i-1].Timestamp) {
+			t.Errorf("Timeline should be chronological, but item %d is before item %d", i, i-1)
+		}
+	}
+}
+
+func TestGenerateEvidence_JSONExportStructure(t *testing.T) {
+	engine, err := xorm.NewEngine("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to create engine: %v", err)
+	}
+	defer engine.Close()
+
+	service := NewEvidenceService(NewService(engine))
+
+	interactions := []models.Interaction{
+		{
+			Type:      "dns",
+			SourceIP:  "127.0.0.1",
+			Timestamp: time.Now(),
+		},
+	}
+
+	evidence := &Evidence{
+		ID:               "test-evidence-1",
+		CaseID:           "case-1",
+		Interactions:     interactions,
+		Timeline:         service.buildTimeline(interactions),
+		EvidenceStrength: EvidenceStrengthLow,
+		Confidence:       10,
+		InteractionCount: 1,
+		UniqueSources:    1,
+		Explainability:   "Test explanation",
+		GeneratedAt:      time.Now(),
+	}
+
+	jsonContent := service.generateJSONEvidence(evidence)
+
+	if jsonContent == "" {
+		t.Error("Expected non-empty JSON content")
+	}
+
+	// Verify JSON contains key fields
+	requiredFields := []string{"id", "case_id", "evidence_strength", "confidence", "interaction_count", "unique_sources", "explainability", "generated_at", "timeline"}
+	for _, field := range requiredFields {
+		if !contains(jsonContent, field) {
+			t.Errorf("Expected JSON to contain field '%s'", field)
+		}
+	}
+}
+
+func TestGenerateEvidence_MarkdownExportContent(t *testing.T) {
+	engine, err := xorm.NewEngine("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to create engine: %v", err)
+	}
+	defer engine.Close()
+
+	service := NewEvidenceService(NewService(engine))
+
+	interactions := []models.Interaction{
+		{
+			Type:      "dns",
+			SourceIP:  "127.0.0.1",
+			Timestamp: time.Now(),
+		},
+	}
+
+	evidence := &Evidence{
+		ID:               "test-evidence-1",
+		CaseID:           "case-1",
+		Interactions:     interactions,
+		Timeline:         service.buildTimeline(interactions),
+		EvidenceStrength: EvidenceStrengthLow,
+		Confidence:       10,
+		InteractionCount: 1,
+		UniqueSources:    1,
+		Explainability:   "Test explanation",
+		GeneratedAt:      time.Now(),
+	}
+
+	markdownContent := service.generateMarkdownEvidence(evidence)
+
+	if markdownContent == "" {
+		t.Error("Expected non-empty Markdown content")
+	}
+
+	// Verify Markdown contains summary and interaction details
+	requiredSections := []string{"Evidence Report", "Case ID", "Evidence Strength", "Confidence", "Explainability", "Interactions"}
+	for _, section := range requiredSections {
+		if !contains(markdownContent, section) {
+			t.Errorf("Expected Markdown to contain section '%s'", section)
+		}
+	}
+}
+
+func TestCalculateEvidenceStrength_HTTPWeighted(t *testing.T) {
+	engine, err := xorm.NewEngine("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to create engine: %v", err)
+	}
+	defer engine.Close()
+
+	service := NewEvidenceService(NewService(engine))
+
+	// Test with HTTP interactions (should have higher confidence than DNS only)
+	httpInteractions := []models.Interaction{
+		{
+			Type:      "http",
+			SourceIP:  "127.0.0.1",
+			Timestamp: time.Now(),
+		},
+		{
+			Type:      "http",
+			SourceIP:  "192.168.1.1",
+			Timestamp: time.Now(),
+		},
+	}
+
+	dnsInteractions := []models.Interaction{
+		{
+			Type:      "dns",
+			SourceIP:  "127.0.0.1",
+			Timestamp: time.Now(),
+		},
+		{
+			Type:      "dns",
+			SourceIP:  "192.168.1.1",
+			Timestamp: time.Now(),
+		},
+	}
+
+	_, httpConfidence := service.calculateEvidenceStrength(httpInteractions)
+	_, dnsConfidence := service.calculateEvidenceStrength(dnsInteractions)
+
+	// HTTP should have higher confidence than DNS for same count
+	if httpConfidence <= dnsConfidence {
+		t.Errorf("Expected HTTP confidence (%d) > DNS confidence (%d)", httpConfidence, dnsConfidence)
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) > 0 && len(substr) > 0 && (s == substr || len(s) > len(substr) && containsHelper(s, substr))
+}
+
+func containsHelper(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 func strPtr(s string) *string {

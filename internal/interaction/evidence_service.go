@@ -1,8 +1,10 @@
 package interaction
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/chennqqi/godnslog/internal/models"
@@ -51,6 +53,11 @@ func (s *EvidenceService) GenerateEvidence(caseID, payloadID string, format stri
 		return nil, ErrEvidenceNotFound
 	}
 
+	// Sort interactions chronologically for timeline
+	sort.Slice(interactions, func(i, j int) bool {
+		return interactions[i].Timestamp.Before(interactions[j].Timestamp)
+	})
+
 	// Build evidence with MVP scoring logic
 	strength, confidence := s.calculateEvidenceStrength(interactions)
 	evidence := &Evidence{
@@ -81,8 +88,9 @@ func (s *EvidenceService) GenerateEvidence(caseID, payloadID string, format stri
 	}
 
 	return &EvidenceResponse{
-		Format:  format,
-		Content: content,
+		Evidence: evidence,
+		Format:   format,
+		Content:  content,
 		Metadata: map[string]interface{}{
 			"interaction_count": len(interactions),
 			"case_id":           caseID,
@@ -96,7 +104,7 @@ func (s *EvidenceService) GenerateEvidence(caseID, payloadID string, format stri
 // - Low: 0-2 interactions
 // - Medium: 3-5 interactions from ≥2 unique sources
 // - High: 6+ interactions from ≥3 unique sources
-// - Confidence: Based on interaction count and source diversity (0-100)
+// - Confidence: Based on interaction count, source diversity, and protocol type (0-100)
 func (s *EvidenceService) calculateEvidenceStrength(interactions []models.Interaction) (EvidenceStrength, int) {
 	if len(interactions) == 0 {
 		return EvidenceStrengthLow, 0
@@ -104,6 +112,14 @@ func (s *EvidenceService) calculateEvidenceStrength(interactions []models.Intera
 
 	uniqueSources := s.countUniqueSources(interactions)
 	count := len(interactions)
+
+	// Count HTTP interactions for differentiated weighting
+	httpCount := 0
+	for _, i := range interactions {
+		if i.Type == "http" {
+			httpCount++
+		}
+	}
 
 	var strength EvidenceStrength
 	var confidence int
@@ -120,20 +136,26 @@ func (s *EvidenceService) calculateEvidenceStrength(interactions []models.Intera
 		strength = EvidenceStrengthLow
 	}
 
-	// Calculate confidence (0-100) based on interaction count and source diversity
-	// Base confidence from interaction count (max 60 points)
+	// Calculate confidence (0-100) based on interaction count, source diversity, and protocol type
+	// Base confidence from interaction count (max 50 points)
 	countScore := float64(count) * 10.0
-	if countScore > 60.0 {
-		countScore = 60.0
+	if countScore > 50.0 {
+		countScore = 50.0
 	}
 
-	// Source diversity bonus (max 40 points)
-	sourceScore := float64(uniqueSources-1) * 20.0
-	if sourceScore > 40.0 {
-		sourceScore = 40.0
+	// Source diversity bonus (max 30 points)
+	sourceScore := float64(uniqueSources-1) * 15.0
+	if sourceScore > 30.0 {
+		sourceScore = 30.0
 	}
 
-	confidence = int(countScore + sourceScore)
+	// Protocol type bonus: HTTP interactions are weighted higher (max 20 points)
+	httpScore := float64(httpCount) * 5.0
+	if httpScore > 20.0 {
+		httpScore = 20.0
+	}
+
+	confidence = int(countScore + sourceScore + httpScore)
 	if confidence > 100 {
 		confidence = 100
 	}
@@ -244,20 +266,15 @@ func (s *EvidenceService) buildTimeline(interactions []models.Interaction) []Tim
 	return timeline
 }
 
-// generateJSONEvidence generates JSON format evidence
+// generateJSONEvidence generates JSON format evidence using json.Marshal
 func (s *EvidenceService) generateJSONEvidence(evidence *Evidence) string {
-	// Simplified JSON generation
-	return `{
-  "id": "` + evidence.ID + `",
-  "case_id": "` + evidence.CaseID + `",
-  "payload_id": "` + evidence.PayloadID + `",
-  "evidence_strength": "` + string(evidence.EvidenceStrength) + `",
-  "confidence": ` + fmt.Sprintf("%d", evidence.Confidence) + `,
-  "interaction_count": ` + fmt.Sprintf("%d", evidence.InteractionCount) + `,
-  "unique_sources": ` + fmt.Sprintf("%d", evidence.UniqueSources) + `,
-  "explainability": "` + evidence.Explainability + `",
-  "generated_at": "` + evidence.GeneratedAt.Format(time.RFC3339) + `"
-}`
+	// Use json.Marshal to ensure complete Evidence semantics are exported
+	jsonBytes, err := json.MarshalIndent(evidence, "", "  ")
+	if err != nil {
+		// Fallback to basic JSON if marshaling fails
+		return fmt.Sprintf(`{"error": "failed to marshal evidence: %v"}`, err)
+	}
+	return string(jsonBytes)
 }
 
 // generateMarkdownEvidence generates Markdown format evidence

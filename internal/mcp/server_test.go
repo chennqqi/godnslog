@@ -333,7 +333,7 @@ func TestSummarizeEvidenceTool(t *testing.T) {
 		if r.Method != http.MethodPost || r.URL.Path != "/api/v2/evidence/generate" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
-		return `{"code":0,"message":"success","data":{"format":"json","content":"{\"id\":\"evidence-1\",\"case_id\":\"case-1\",\"evidence_strength\":\"medium\",\"confidence\":75,\"interaction_count\":4,\"unique_sources\":2,\"explainability\":\"Captured 4 interactions from 2 unique sources. Evidence strength: medium. Confidence: 75%.\"}","metadata":{"interaction_count":4}}}`
+		return `{"code":0,"message":"success","data":{"evidence":{"id":"evidence-1","case_id":"case-1","evidence_strength":"medium","confidence":75,"interaction_count":4,"unique_sources":2,"explainability":"Captured 4 interactions from 2 unique sources. Evidence strength: medium. Confidence: 75%.","timeline":[{"type":"interaction","description":"DNS interaction","timestamp":"2026-05-18T00:00:00Z"}]},"format":"json","content":"{\"id\":\"evidence-1\"}","metadata":{"interaction_count":4}}}`
 	})
 
 	args := map[string]interface{}{
@@ -355,20 +355,32 @@ func TestSummarizeEvidenceTool(t *testing.T) {
 		t.Fatalf("Expected success, got error: %s", toolResult.Error)
 	}
 
-	// Verify that the tool returns the data field from API response
+	// Verify that the tool returns structured evidence data
 	if toolResult.Data == nil {
 		t.Fatal("Expected data to be present")
 	}
 
-	// The data should be the content field which contains JSON string
-	content, ok := toolResult.Data.(string)
+	// The data should be the evidence field (structured data)
+	evidence, ok := toolResult.Data.(map[string]interface{})
 	if !ok {
-		t.Fatal("Expected data to be a string (content)")
+		t.Fatal("Expected data to be a map (structured evidence)")
 	}
 
-	// Verify content is not empty
-	if content == "" {
-		t.Error("Expected non-empty content")
+	// Verify evidence fields are present
+	if evidence["evidence_strength"] == nil {
+		t.Error("Expected evidence_strength field")
+	}
+	if evidence["confidence"] == nil {
+		t.Error("Expected confidence field")
+	}
+	if evidence["interaction_count"] == nil {
+		t.Error("Expected interaction_count field")
+	}
+	if evidence["explainability"] == nil {
+		t.Error("Expected explainability field")
+	}
+	if evidence["timeline"] == nil {
+		t.Error("Expected timeline field")
 	}
 }
 

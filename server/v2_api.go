@@ -2155,7 +2155,7 @@ func (self *WebServer) v2DeleteRule(c *gin.Context) {
 // v2GenerateEvidence generates evidence report
 func (self *WebServer) v2GenerateEvidence(c *gin.Context) {
 	var req struct {
-		CaseID    string `json:"case_id" binding:"required"`
+		CaseID    string `json:"case_id"`
 		PayloadID string `json:"payload_id"`
 		Format    string `json:"format" binding:"required,oneof=json markdown"`
 	}
@@ -2163,7 +2163,16 @@ func (self *WebServer) v2GenerateEvidence(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    1,
-			"message": "Invalid request body",
+			"message": "Invalid request body: either case_id or payload_id is required",
+		})
+		return
+	}
+
+	// Validate that at least one of case_id or payload_id is provided
+	if len(req.CaseID) == 0 && len(req.PayloadID) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    1,
+			"message": "Either case_id or payload_id is required",
 		})
 		return
 	}
