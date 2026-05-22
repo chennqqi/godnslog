@@ -18,6 +18,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// Helper function to create string pointer
+func strPtr(s string) *string {
+	return &s
+}
+
 func TestV2RoutesExposeRequiredMVPPaths(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -36,12 +41,191 @@ func TestV2RoutesExposeRequiredMVPPaths(t *testing.T) {
 		"PUT /api/v2/payloads/:id",
 		"GET /api/v2/interactions/stats",
 		"POST /api/v2/evidence/generate",
+		"GET /api/v2/audit/logs",
 	}
 
 	for _, route := range requiredRoutes {
 		if _, ok := routes[route]; !ok {
 			t.Fatalf("expected route %q to be registered, but it was missing", route)
 		}
+	}
+}
+
+func TestV2ListAuditLogs(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &WebServerConfig{
+		Domain:     "test.example.com",
+		Driver:     "sqlite",
+		Dsn:        ":memory:",
+		AuthExpire: 3600,
+	}
+
+	store := cache.NewCache(300, 60)
+	server, err := NewWebServer(cfg, store)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	if err := server.initDatabase(); err != nil {
+		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Sync audit logs table
+	if err := server.orm.Sync2(new(v2models.AuditLog)); err != nil {
+		t.Fatalf("Failed to sync audit logs table: %v", err)
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	user := &models.TblUser{
+		Name:  "testuser",
+		Email: "testuser@test.com",
+		Pass:  string(hashedPassword),
+		Role:  0,
+		Lang:  "en-US",
+	}
+	if _, err := server.orm.Insert(user); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Create a test audit log
+	userIDStr := fmt.Sprintf("%d", user.Id)
+	resourceID := "case-123"
+	auditLog := &v2models.AuditLog{
+		ID:           v2models.GenerateID(),
+		UserID:       &userIDStr,
+		Action:       "create_case",
+		ResourceType: "case",
+		ResourceID:   &resourceID,
+		Parameters:   `{"title":"test case"}`,
+		Result:       "success",
+		IPAddress:    "127.0.0.1",
+		UserAgent:    "test-agent",
+		Timestamp:    time.Now(),
+	}
+	if _, err := server.orm.Insert(auditLog); err != nil {
+		t.Fatalf("Failed to create test audit log: %v", err)
+	}
+
+	r := gin.New()
+	server.registerV2API(r)
+
+	loginReq := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(`{"username":"testuser","password":"password"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginW := httptest.NewRecorder()
+	r.ServeHTTP(loginW, loginReq)
+
+	type LoginResponse struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	var loginResp LoginResponse
+	if err := json.Unmarshal(loginW.Body.Bytes(), &loginResp); err != nil {
+		t.Fatalf("Failed to unmarshal login response: %v", err)
+	}
+	token := loginResp.Data.Token
+
+	// Extract seed from JWT and set user in cache
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		t.Fatal("Invalid JWT token format")
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("Failed to decode JWT payload: %v", err)
+	}
+	var claims map[string]interface{}
+	if err := json.Unmarshal(decoded, &claims); err != nil {
+		t.Fatalf("Failed to unmarshal JWT claims: %v", err)
+	}
+	seedValue := claims["seed"]
+	var seedStr string
+	switch v := seedValue.(type) {
+	case float64:
+		seedStr = fmt.Sprintf("%.0f", v)
+	case string:
+		seedStr = v
+	default:
+		t.Fatalf("Unexpected seed type: %T, value: %v", seedValue, seedValue)
+	}
+	seedKey := fmt.Sprintf("%v.seed", user.Id)
+	userKey := fmt.Sprintf("%v.user", user.Id)
+	store.Set(seedKey, seedStr, cache.NoExpiration)
+	store.Set(userKey, user, cache.NoExpiration)
+
+	// Test successful audit logs list
+	auditReq := httptest.NewRequest("GET", "/api/v2/audit/logs?page=1&page_size=10", nil)
+	auditReq.Header.Set("Access-Token", token)
+	auditW := httptest.NewRecorder()
+	r.ServeHTTP(auditW, auditReq)
+
+	if auditW.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d: %s", auditW.Code, auditW.Body.String())
+	}
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(auditW.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+	if response["code"].(float64) != 0 {
+		t.Errorf("Expected code 0, got %v", response["code"])
+	}
+
+	// Verify data structure
+	data, ok := response["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map")
+	}
+	if data["items"] == nil {
+		t.Error("Expected items field in data")
+	}
+	if data["total"] == nil {
+		t.Error("Expected total field in data")
+	}
+	if data["page"] == nil {
+		t.Error("Expected page field in data")
+	}
+	if data["page_size"] == nil {
+		t.Error("Expected page_size field in data")
+	}
+	if data["total_pages"] == nil {
+		t.Error("Expected total_pages field in data")
+	}
+
+	// Test filtering by action
+	auditReq2 := httptest.NewRequest("GET", "/api/v2/audit/logs?action=create_case", nil)
+	auditReq2.Header.Set("Access-Token", token)
+	auditW2 := httptest.NewRecorder()
+	r.ServeHTTP(auditW2, auditReq2)
+
+	if auditW2.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 for filtered request, got %d: %s", auditW2.Code, auditW2.Body.String())
+	}
+
+	// Test filtering by resource_type
+	auditReq3 := httptest.NewRequest("GET", "/api/v2/audit/logs?resource_type=case", nil)
+	auditReq3.Header.Set("Access-Token", token)
+	auditW3 := httptest.NewRecorder()
+	r.ServeHTTP(auditW3, auditReq3)
+
+	if auditW3.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 for resource_type filter, got %d: %s", auditW3.Code, auditW3.Body.String())
+	}
+
+	// Test unauthenticated access
+	auditReq4 := httptest.NewRequest("GET", "/api/v2/audit/logs", nil)
+	auditW4 := httptest.NewRecorder()
+	r.ServeHTTP(auditW4, auditReq4)
+
+	if auditW4.Code != http.StatusUnauthorized {
+		t.Errorf("Expected status 401 for unauthenticated request, got %d", auditW4.Code)
 	}
 }
 
@@ -68,6 +252,11 @@ func TestV2Login(t *testing.T) {
 	// Initialize database and create test user
 	if err := server.initDatabase(); err != nil {
 		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Sync interactions table for evidence generation tests
+	if err := server.orm.Sync2(new(v2models.Interaction)); err != nil {
+		t.Fatalf("Failed to sync interactions table: %v", err)
 	}
 
 	// Create test user
@@ -164,6 +353,11 @@ func TestV2LoginInvalidCredentials(t *testing.T) {
 		t.Fatalf("Failed to initialize database: %v", err)
 	}
 
+	// Sync interactions table for evidence generation tests
+	if err := server.orm.Sync2(new(v2models.Interaction)); err != nil {
+		t.Fatalf("Failed to sync interactions table: %v", err)
+	}
+
 	// Create test user
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
 	if err != nil {
@@ -236,6 +430,11 @@ func TestV2LoginUserNotFound(t *testing.T) {
 		t.Fatalf("Failed to initialize database: %v", err)
 	}
 
+	// Sync interactions table for evidence generation tests
+	if err := server.orm.Sync2(new(v2models.Interaction)); err != nil {
+		t.Fatalf("Failed to sync interactions table: %v", err)
+	}
+
 	// Initialize router
 	r := gin.New()
 	server.registerV2API(r)
@@ -289,6 +488,11 @@ func TestCapturedHTTPLogAppearsInV2Interactions(t *testing.T) {
 
 	if err := server.initDatabase(); err != nil {
 		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Sync interactions table for evidence generation tests
+	if err := server.orm.Sync2(new(v2models.Interaction)); err != nil {
+		t.Fatalf("Failed to sync interactions table: %v", err)
 	}
 
 	// Simulate HTTP capture through the actual capture path
@@ -349,6 +553,11 @@ func TestCapturedDNSLogAppearsInV2Interactions(t *testing.T) {
 		t.Fatalf("Failed to initialize database: %v", err)
 	}
 
+	// Sync interactions table for evidence generation tests
+	if err := server.orm.Sync2(new(v2models.Interaction)); err != nil {
+		t.Fatalf("Failed to sync interactions table: %v", err)
+	}
+
 	// Simulate DNS capture through the actual capture path
 	session := server.orm.NewSession()
 	defer session.Close()
@@ -406,6 +615,11 @@ func TestInteractionTokenAttributionChain(t *testing.T) {
 
 	if err := server.initDatabase(); err != nil {
 		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Sync interactions table for evidence generation tests
+	if err := server.orm.Sync2(new(v2models.Interaction)); err != nil {
+		t.Fatalf("Failed to sync interactions table: %v", err)
 	}
 
 	// Sync tables for unified model
@@ -530,6 +744,11 @@ func TestPayloadPreviewReturnsRenderedTemplate(t *testing.T) {
 
 	if err := server.initDatabase(); err != nil {
 		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Sync interactions table for evidence generation tests
+	if err := server.orm.Sync2(new(v2models.Interaction)); err != nil {
+		t.Fatalf("Failed to sync interactions table: %v", err)
 	}
 
 	// Sync the payloads table for the unified model
@@ -732,12 +951,719 @@ func TestV2APIResponseFormat(t *testing.T) {
 	}
 }
 
-// Note: Comprehensive API tests for evidence generation require fully functional case/payload creation
-// which is outside Sprint D remediation scope. Service-level tests in internal/interaction/evidence_service_test.go
-// already cover the core evidence generation logic including:
-// - case_id and payload_id support
-// - timeline chronological ordering
-// - JSON export with complete fields
-// - Markdown export with summary and details
-// - DNS/HTTP differentiated scoring
-// - no evidence scenarios
+// Evidence API validation tests
+// These tests verify the endpoint validation and error handling for /api/v2/evidence/generate
+// Note: 404 (no evidence) scenario is covered in service layer tests (internal/interaction/evidence_service_test.go)
+
+func TestV2GenerateEvidence_EmptyParams(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &WebServerConfig{
+		Domain:     "test.example.com",
+		Driver:     "sqlite",
+		Dsn:        ":memory:",
+		AuthExpire: 3600,
+	}
+
+	store := cache.NewCache(300, 60)
+	server, err := NewWebServer(cfg, store)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	if err := server.initDatabase(); err != nil {
+		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Sync interactions table for evidence generation tests
+	if err := server.orm.Sync2(new(v2models.Interaction)); err != nil {
+		t.Fatalf("Failed to sync interactions table: %v", err)
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	user := &models.TblUser{
+		Name:  "testuser",
+		Email: "testuser@test.com",
+		Pass:  string(hashedPassword),
+		Role:  0,
+		Lang:  "en-US",
+	}
+	if _, err := server.orm.Insert(user); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	r := gin.New()
+	server.registerV2API(r)
+
+	loginReq := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(`{"username":"testuser","password":"password"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginW := httptest.NewRecorder()
+	r.ServeHTTP(loginW, loginReq)
+
+	type LoginResponse struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	var loginResp LoginResponse
+	if err := json.Unmarshal(loginW.Body.Bytes(), &loginResp); err != nil {
+		t.Fatalf("Failed to unmarshal login response: %v", err)
+	}
+	token := loginResp.Data.Token
+
+	// Extract seed from JWT token and set in cache (workaround for cache isolation issue)
+	userId := user.Id
+	seedKey := fmt.Sprintf("%v.seed", userId)
+	userKey := fmt.Sprintf("%v.user", userId)
+
+	// Parse the JWT token to get the seed
+	parts := strings.Split(token, ".")
+	if len(parts) == 3 {
+		// Decode the payload (middle part)
+		payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err == nil {
+			var payload map[string]interface{}
+			if err := json.Unmarshal(payloadBytes, &payload); err == nil {
+				if seedStr, ok := payload["seed"].(string); ok {
+					store.Set(seedKey, seedStr, cache.NoExpiration)
+				}
+			}
+		}
+	}
+
+	// Set user in cache
+	store.Set(userKey, user, cache.NoExpiration)
+
+	// Test empty params (neither case_id nor payload_id)
+	evidenceReq := httptest.NewRequest("POST", "/api/v2/evidence/generate", strings.NewReader(`{"format":"json"}`))
+	evidenceReq.Header.Set("Content-Type", "application/json")
+	evidenceReq.Header.Set("Access-Token", token)
+	evidenceW := httptest.NewRecorder()
+	r.ServeHTTP(evidenceW, evidenceReq)
+
+	if evidenceW.Code != http.StatusBadRequest {
+		t.Fatalf("Expected status 400, got %d: %s", evidenceW.Code, evidenceW.Body.String())
+	}
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(evidenceW.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+	if response["code"].(float64) != 1 {
+		t.Errorf("Expected code 1, got %v", response["code"])
+	}
+	if response["message"] != "Either case_id or payload_id is required" {
+		t.Errorf("Expected 'Either case_id or payload_id is required', got %v", response["message"])
+	}
+}
+
+func TestV2GenerateEvidence_InvalidFormat(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &WebServerConfig{
+		Domain:     "test.example.com",
+		Driver:     "sqlite",
+		Dsn:        ":memory:",
+		AuthExpire: 3600,
+	}
+
+	store := cache.NewCache(300, 60)
+	server, err := NewWebServer(cfg, store)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	if err := server.initDatabase(); err != nil {
+		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Sync interactions table for evidence generation tests
+	if err := server.orm.Sync2(new(v2models.Interaction)); err != nil {
+		t.Fatalf("Failed to sync interactions table: %v", err)
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	user := &models.TblUser{
+		Name:  "testuser",
+		Email: "testuser@test.com",
+		Pass:  string(hashedPassword),
+		Role:  0,
+		Lang:  "en-US",
+	}
+	if _, err := server.orm.Insert(user); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	r := gin.New()
+	server.registerV2API(r)
+
+	loginReq := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(`{"username":"testuser","password":"password"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginW := httptest.NewRecorder()
+	r.ServeHTTP(loginW, loginReq)
+
+	type LoginResponse struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	var loginResp LoginResponse
+	if err := json.Unmarshal(loginW.Body.Bytes(), &loginResp); err != nil {
+		t.Fatalf("Failed to unmarshal login response: %v", err)
+	}
+	token := loginResp.Data.Token
+
+	// Extract seed from JWT token and set in cache (workaround for cache isolation issue)
+	userId := user.Id
+	seedKey := fmt.Sprintf("%v.seed", userId)
+	userKey := fmt.Sprintf("%v.user", userId)
+
+	// Parse the JWT token to get the seed
+	parts := strings.Split(token, ".")
+	if len(parts) == 3 {
+		// Decode the payload (middle part)
+		payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err == nil {
+			var payload map[string]interface{}
+			if err := json.Unmarshal(payloadBytes, &payload); err == nil {
+				if seedStr, ok := payload["seed"].(string); ok {
+					store.Set(seedKey, seedStr, cache.NoExpiration)
+				}
+			}
+		}
+	}
+
+	// Set user in cache
+	store.Set(userKey, user, cache.NoExpiration)
+
+	// Test invalid format
+	evidenceReq := httptest.NewRequest("POST", "/api/v2/evidence/generate", strings.NewReader(`{"case_id":"test","format":"invalid"}`))
+	evidenceReq.Header.Set("Content-Type", "application/json")
+	evidenceReq.Header.Set("Access-Token", token)
+	evidenceW := httptest.NewRecorder()
+	r.ServeHTTP(evidenceW, evidenceReq)
+
+	if evidenceW.Code != http.StatusBadRequest {
+		t.Fatalf("Expected status 400, got %d: %s", evidenceW.Code, evidenceW.Body.String())
+	}
+}
+
+func TestV2GenerateEvidence_SuccessWithCaseID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &WebServerConfig{
+		Domain:     "test.example.com",
+		Driver:     "sqlite",
+		Dsn:        ":memory:",
+		AuthExpire: 3600,
+	}
+
+	store := cache.NewCache(300, 60)
+	server, err := NewWebServer(cfg, store)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	if err := server.initDatabase(); err != nil {
+		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Sync interactions table for evidence generation tests
+	if err := server.orm.Sync2(new(v2models.Interaction)); err != nil {
+		t.Fatalf("Failed to sync interactions table: %v", err)
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	user := &models.TblUser{
+		Name:  "testuser",
+		Email: "testuser@test.com",
+		Pass:  string(hashedPassword),
+		Role:  0,
+		Lang:  "en-US",
+	}
+	if _, err := server.orm.Insert(user); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Create a test interaction with case_id
+	caseID := "test-case-123"
+	domain := "test.example.com"
+	interaction := &v2models.Interaction{
+		ID:        v2models.GenerateID(),
+		Type:      "dns",
+		CaseID:    &caseID,
+		SourceIP:  "127.0.0.1",
+		Timestamp: time.Now(),
+		Domain:    &domain,
+	}
+	if _, err := server.orm.Insert(interaction); err != nil {
+		t.Fatalf("Failed to create test interaction: %v", err)
+	}
+
+	// Verify interaction was inserted
+	count, err := server.orm.Where("case_id = ?", caseID).Count(&v2models.Interaction{})
+	if err != nil {
+		t.Fatalf("Failed to count interactions: %v", err)
+	}
+	if count == 0 {
+		t.Fatal("Interaction was not inserted")
+	}
+
+	r := gin.New()
+	server.registerV2API(r)
+
+	loginReq := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(`{"username":"testuser","password":"password"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginW := httptest.NewRecorder()
+	r.ServeHTTP(loginW, loginReq)
+
+	type LoginResponse struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	var loginResp LoginResponse
+	if err := json.Unmarshal(loginW.Body.Bytes(), &loginResp); err != nil {
+		t.Fatalf("Failed to unmarshal login response: %v", err)
+	}
+	token := loginResp.Data.Token
+
+	// Extract seed from JWT token and set in cache
+	userId := user.Id
+	seedKey := fmt.Sprintf("%v.seed", userId)
+	userKey := fmt.Sprintf("%v.user", userId)
+	parts := strings.Split(token, ".")
+	if len(parts) == 3 {
+		payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err == nil {
+			var payload map[string]interface{}
+			if err := json.Unmarshal(payloadBytes, &payload); err == nil {
+				if seedStr, ok := payload["seed"].(string); ok {
+					store.Set(seedKey, seedStr, cache.NoExpiration)
+				}
+			}
+		}
+	}
+	store.Set(userKey, user, cache.NoExpiration)
+
+	// Test successful evidence generation with case_id
+	evidenceReq := httptest.NewRequest("POST", "/api/v2/evidence/generate", strings.NewReader(`{"case_id":"test-case-123","format":"json"}`))
+	evidenceReq.Header.Set("Content-Type", "application/json")
+	evidenceReq.Header.Set("Access-Token", token)
+	evidenceW := httptest.NewRecorder()
+	r.ServeHTTP(evidenceW, evidenceReq)
+
+	if evidenceW.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d: %s", evidenceW.Code, evidenceW.Body.String())
+	}
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(evidenceW.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+	if response["code"].(float64) != 0 {
+		t.Errorf("Expected code 0, got %v", response["code"])
+	}
+
+	// Verify data.evidence is present
+	data, ok := response["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map")
+	}
+	if data["evidence"] == nil {
+		t.Error("Expected evidence field in data")
+	}
+}
+
+func TestV2GenerateEvidence_SuccessWithPayloadID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &WebServerConfig{
+		Domain:     "test.example.com",
+		Driver:     "sqlite",
+		Dsn:        ":memory:",
+		AuthExpire: 3600,
+	}
+
+	store := cache.NewCache(300, 60)
+	server, err := NewWebServer(cfg, store)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	if err := server.initDatabase(); err != nil {
+		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Sync interactions table for evidence generation tests
+	if err := server.orm.Sync2(new(v2models.Interaction)); err != nil {
+		t.Fatalf("Failed to sync interactions table: %v", err)
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	user := &models.TblUser{
+		Name:  "testuser",
+		Email: "testuser@test.com",
+		Pass:  string(hashedPassword),
+		Role:  0,
+		Lang:  "en-US",
+	}
+	if _, err := server.orm.Insert(user); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Create a test interaction with payload_id
+	payloadID := "test-payload-456"
+	method := "GET"
+	path := "/test"
+	interaction := &v2models.Interaction{
+		ID:        v2models.GenerateID(),
+		Type:      "http",
+		PayloadID: &payloadID,
+		SourceIP:  "127.0.0.1",
+		Timestamp: time.Now(),
+		Method:    &method,
+		Path:      &path,
+	}
+	if _, err := server.orm.Insert(interaction); err != nil {
+		t.Fatalf("Failed to create test interaction: %v", err)
+	}
+
+	// Verify interaction was inserted
+	count, err := server.orm.Where("payload_id = ?", payloadID).Count(&v2models.Interaction{})
+	if err != nil {
+		t.Fatalf("Failed to count interactions: %v", err)
+	}
+	if count == 0 {
+		t.Fatal("Interaction was not inserted")
+	}
+
+	r := gin.New()
+	server.registerV2API(r)
+
+	loginReq := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(`{"username":"testuser","password":"password"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginW := httptest.NewRecorder()
+	r.ServeHTTP(loginW, loginReq)
+
+	type LoginResponse struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	var loginResp LoginResponse
+	if err := json.Unmarshal(loginW.Body.Bytes(), &loginResp); err != nil {
+		t.Fatalf("Failed to unmarshal login response: %v", err)
+	}
+	token := loginResp.Data.Token
+
+	// Extract seed from JWT token and set in cache
+	userId := user.Id
+	seedKey := fmt.Sprintf("%v.seed", userId)
+	userKey := fmt.Sprintf("%v.user", userId)
+	parts := strings.Split(token, ".")
+	if len(parts) == 3 {
+		payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err == nil {
+			var payload map[string]interface{}
+			if err := json.Unmarshal(payloadBytes, &payload); err == nil {
+				if seedStr, ok := payload["seed"].(string); ok {
+					store.Set(seedKey, seedStr, cache.NoExpiration)
+				}
+			}
+		}
+	}
+	store.Set(userKey, user, cache.NoExpiration)
+
+	// Test successful evidence generation with payload_id
+	evidenceReq := httptest.NewRequest("POST", "/api/v2/evidence/generate", strings.NewReader(`{"payload_id":"test-payload-456","format":"json"}`))
+	evidenceReq.Header.Set("Content-Type", "application/json")
+	evidenceReq.Header.Set("Access-Token", token)
+	evidenceW := httptest.NewRecorder()
+	r.ServeHTTP(evidenceW, evidenceReq)
+
+	if evidenceW.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d: %s", evidenceW.Code, evidenceW.Body.String())
+	}
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(evidenceW.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+	if response["code"].(float64) != 0 {
+		t.Errorf("Expected code 0, got %v", response["code"])
+	}
+
+	// Verify data.evidence is present
+	data, ok := response["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map")
+	}
+	if data["evidence"] == nil {
+		t.Error("Expected evidence field in data")
+	}
+}
+
+func TestV2GenerateEvidence_MarkdownFormat(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &WebServerConfig{
+		Domain:     "test.example.com",
+		Driver:     "sqlite",
+		Dsn:        ":memory:",
+		AuthExpire: 3600,
+	}
+
+	store := cache.NewCache(300, 60)
+	server, err := NewWebServer(cfg, store)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	if err := server.initDatabase(); err != nil {
+		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Sync interactions table for evidence generation tests
+	if err := server.orm.Sync2(new(v2models.Interaction)); err != nil {
+		t.Fatalf("Failed to sync interactions table: %v", err)
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	user := &models.TblUser{
+		Name:  "testuser",
+		Email: "testuser@test.com",
+		Pass:  string(hashedPassword),
+		Role:  0,
+		Lang:  "en-US",
+	}
+	if _, err := server.orm.Insert(user); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Create a test interaction
+	caseID := "test-case-789"
+	domain := "test.example.com"
+	interaction := &v2models.Interaction{
+		ID:        v2models.GenerateID(),
+		Type:      "dns",
+		CaseID:    &caseID,
+		SourceIP:  "127.0.0.1",
+		Timestamp: time.Now(),
+		Domain:    &domain,
+	}
+	if _, err := server.orm.Insert(interaction); err != nil {
+		t.Fatalf("Failed to create test interaction: %v", err)
+	}
+
+	// Verify interaction was inserted
+	count, err := server.orm.Where("case_id = ?", caseID).Count(&v2models.Interaction{})
+	if err != nil {
+		t.Fatalf("Failed to count interactions: %v", err)
+	}
+	if count == 0 {
+		t.Fatal("Interaction was not inserted")
+	}
+
+	r := gin.New()
+	server.registerV2API(r)
+
+	loginReq := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(`{"username":"testuser","password":"password"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginW := httptest.NewRecorder()
+	r.ServeHTTP(loginW, loginReq)
+
+	type LoginResponse struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	var loginResp LoginResponse
+	if err := json.Unmarshal(loginW.Body.Bytes(), &loginResp); err != nil {
+		t.Fatalf("Failed to unmarshal login response: %v", err)
+	}
+	token := loginResp.Data.Token
+
+	// Extract seed from JWT token and set in cache
+	userId := user.Id
+	seedKey := fmt.Sprintf("%v.seed", userId)
+	userKey := fmt.Sprintf("%v.user", userId)
+	parts := strings.Split(token, ".")
+	if len(parts) == 3 {
+		payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err == nil {
+			var payload map[string]interface{}
+			if err := json.Unmarshal(payloadBytes, &payload); err == nil {
+				if seedStr, ok := payload["seed"].(string); ok {
+					store.Set(seedKey, seedStr, cache.NoExpiration)
+				}
+			}
+		}
+	}
+	store.Set(userKey, user, cache.NoExpiration)
+
+	// Test successful evidence generation with markdown format
+	evidenceReq := httptest.NewRequest("POST", "/api/v2/evidence/generate", strings.NewReader(`{"case_id":"test-case-789","format":"markdown"}`))
+	evidenceReq.Header.Set("Content-Type", "application/json")
+	evidenceReq.Header.Set("Access-Token", token)
+	evidenceW := httptest.NewRecorder()
+	r.ServeHTTP(evidenceW, evidenceReq)
+
+	if evidenceW.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d: %s", evidenceW.Code, evidenceW.Body.String())
+	}
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(evidenceW.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+	if response["code"].(float64) != 0 {
+		t.Errorf("Expected code 0, got %v", response["code"])
+	}
+
+	// Verify data.content is present for markdown format
+	data, ok := response["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map")
+	}
+	if data["content"] == nil {
+		t.Error("Expected content field in data for markdown format")
+	}
+	content, ok := data["content"].(string)
+	if !ok {
+		t.Fatal("Expected content to be a string")
+	}
+	if content == "" {
+		t.Error("Expected non-empty content for markdown format")
+	}
+}
+
+func TestV2GenerateEvidence_NoEvidence404(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &WebServerConfig{
+		Domain:     "test.example.com",
+		Driver:     "sqlite",
+		Dsn:        ":memory:",
+		AuthExpire: 3600,
+	}
+
+	store := cache.NewCache(300, 60)
+	server, err := NewWebServer(cfg, store)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	if err := server.initDatabase(); err != nil {
+		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Sync interactions table for evidence generation tests
+	if err := server.orm.Sync2(new(v2models.Interaction)); err != nil {
+		t.Fatalf("Failed to sync interactions table: %v", err)
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	user := &models.TblUser{
+		Name:  "testuser",
+		Email: "testuser@test.com",
+		Pass:  string(hashedPassword),
+		Role:  0,
+		Lang:  "en-US",
+	}
+	if _, err := server.orm.Insert(user); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	r := gin.New()
+	server.registerV2API(r)
+
+	loginReq := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(`{"username":"testuser","password":"password"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginW := httptest.NewRecorder()
+	r.ServeHTTP(loginW, loginReq)
+
+	type LoginResponse struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	var loginResp LoginResponse
+	if err := json.Unmarshal(loginW.Body.Bytes(), &loginResp); err != nil {
+		t.Fatalf("Failed to unmarshal login response: %v", err)
+	}
+	token := loginResp.Data.Token
+
+	// Extract seed from JWT token and set in cache
+	userId := user.Id
+	seedKey := fmt.Sprintf("%v.seed", userId)
+	userKey := fmt.Sprintf("%v.user", userId)
+	parts := strings.Split(token, ".")
+	if len(parts) == 3 {
+		payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err == nil {
+			var payload map[string]interface{}
+			if err := json.Unmarshal(payloadBytes, &payload); err == nil {
+				if seedStr, ok := payload["seed"].(string); ok {
+					store.Set(seedKey, seedStr, cache.NoExpiration)
+				}
+			}
+		}
+	}
+	store.Set(userKey, user, cache.NoExpiration)
+
+	// Test no evidence scenario (non-existent case_id)
+	evidenceReq := httptest.NewRequest("POST", "/api/v2/evidence/generate", strings.NewReader(`{"case_id":"nonexistent-case","format":"json"}`))
+	evidenceReq.Header.Set("Content-Type", "application/json")
+	evidenceReq.Header.Set("Access-Token", token)
+	evidenceW := httptest.NewRecorder()
+	r.ServeHTTP(evidenceW, evidenceReq)
+
+	if evidenceW.Code != http.StatusNotFound {
+		t.Fatalf("Expected status 404, got %d: %s", evidenceW.Code, evidenceW.Body.String())
+	}
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(evidenceW.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+	if response["code"].(float64) != 404 {
+		t.Errorf("Expected code 404, got %v", response["code"])
+	}
+}

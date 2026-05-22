@@ -384,6 +384,158 @@ func TestSummarizeEvidenceTool(t *testing.T) {
 	}
 }
 
+// TestSummarizeEvidenceToolPayloadOnly tests summarizeEvidence tool with payload_id only
+func TestSummarizeEvidenceToolPayloadOnly(t *testing.T) {
+	server := newTestServer(func(r *http.Request) string {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v2/evidence/generate" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		return `{"code":0,"message":"success","data":{"evidence":{"id":"evidence-1","payload_id":"payload-1","evidence_strength":"medium","confidence":75,"interaction_count":4,"unique_sources":2,"explainability":"Captured 4 interactions from 2 unique sources. Evidence strength: medium. Confidence: 75%.","timeline":[{"type":"interaction","description":"DNS interaction","timestamp":"2026-05-18T00:00:00Z"}]},"format":"json","content":"{\"id\":\"evidence-1\"}","metadata":{"interaction_count":4}}}`
+	})
+
+	args := map[string]interface{}{
+		"payload_id": "payload-1",
+	}
+
+	result, err := server.summarizeEvidence(nil, args)
+
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	toolResult, ok := result.(ToolResult)
+	if !ok {
+		t.Fatal("Result should be ToolResult type")
+	}
+
+	if !toolResult.Success {
+		t.Fatalf("Expected success, got error: %s", toolResult.Error)
+	}
+
+	if toolResult.Data == nil {
+		t.Fatal("Expected data to be present")
+	}
+
+	evidence, ok := toolResult.Data.(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map (structured evidence)")
+	}
+
+	if evidence["evidence_strength"] == nil {
+		t.Error("Expected evidence_strength field")
+	}
+	if evidence["confidence"] == nil {
+		t.Error("Expected confidence field")
+	}
+}
+
+// TestExportReportToolPayloadOnly tests exportReport tool with payload_id only
+func TestExportReportToolPayloadOnly(t *testing.T) {
+	server := newTestServer(func(r *http.Request) string {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v2/evidence/generate" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		return `{"code":0,"message":"success","data":{"format":"markdown","content":"# Evidence Report\n\n**Payload ID**: payload-1\n**Evidence Strength**: medium\n**Confidence**: 75%\n\n## Interactions\n\n- DNS interaction from 192.168.1.1\n- HTTP interaction from 192.168.1.2\n","metadata":{"interaction_count":2}}}`
+	})
+
+	args := map[string]interface{}{
+		"payload_id": "payload-1",
+		"format":     "markdown",
+	}
+
+	result, err := server.exportReport(nil, args)
+
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	toolResult, ok := result.(ToolResult)
+	if !ok {
+		t.Fatal("Result should be ToolResult type")
+	}
+
+	if !toolResult.Success {
+		t.Fatalf("Expected success, got error: %s", toolResult.Error)
+	}
+
+	if toolResult.Data == nil {
+		t.Fatal("Expected data to be present")
+	}
+
+	content, ok := toolResult.Data.(string)
+	if !ok {
+		t.Fatal("Expected data to be a string (content)")
+	}
+
+	if content == "" {
+		t.Error("Expected non-empty markdown content")
+	}
+}
+
+// TestSummarizeEvidenceToolEmptyParams tests summarizeEvidence tool with empty params
+func TestSummarizeEvidenceToolEmptyParams(t *testing.T) {
+	server := newTestServer(func(r *http.Request) string {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v2/evidence/generate" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		return `{"code":1,"message":"Either case_id or payload_id is required"}`
+	})
+
+	args := map[string]interface{}{}
+
+	result, err := server.summarizeEvidence(nil, args)
+
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	toolResult, ok := result.(ToolResult)
+	if !ok {
+		t.Fatal("Result should be ToolResult type")
+	}
+
+	if toolResult.Success {
+		t.Fatal("Expected failure with empty params")
+	}
+
+	if toolResult.Error == "" {
+		t.Error("Expected error message")
+	}
+}
+
+// TestExportReportToolEmptyParams tests exportReport tool with empty params
+func TestExportReportToolEmptyParams(t *testing.T) {
+	server := newTestServer(func(r *http.Request) string {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v2/evidence/generate" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		return `{"code":1,"message":"Either case_id or payload_id is required"}`
+	})
+
+	args := map[string]interface{}{
+		"format": "markdown",
+	}
+
+	result, err := server.exportReport(nil, args)
+
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	toolResult, ok := result.(ToolResult)
+	if !ok {
+		t.Fatal("Result should be ToolResult type")
+	}
+
+	if toolResult.Success {
+		t.Fatal("Expected failure with empty params")
+	}
+
+	if toolResult.Error == "" {
+		t.Error("Expected error message")
+	}
+}
+
 // TestExportReportTool tests exportReport tool
 func TestExportReportTool(t *testing.T) {
 	server := newTestServer(func(r *http.Request) string {

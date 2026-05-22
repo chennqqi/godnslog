@@ -43,10 +43,11 @@ type TimelineItem struct {
 }
 
 // EvidenceRequest represents the request for evidence generation
+// Either case_id or payload_id must be provided (at least one is required)
 type EvidenceRequest struct {
-	CaseID    string `json:"case_id" binding:"required"`
+	CaseID    string `json:"case_id,omitempty"`
 	PayloadID string `json:"payload_id,omitempty"`
-	Format    string `json:"format,omitempty"` // json, markdown
+	Format    string `json:"format" binding:"required,oneof=json markdown"` // json, markdown
 }
 
 // EvidenceResponse represents the response for evidence generation

@@ -36,29 +36,29 @@ func (h Headers) Value() (driver.Value, error) {
 // Unified from internal/interaction/interaction.go and models/v2.go TblInteraction
 // Also serves as unified storage for 1.0 TblDns and TblHttp
 type Interaction struct {
-	ID        string    `json:"id" xorm:"pk varchar(36) notnull"`
-	Type      string    `json:"type" xorm:"varchar(16) notnull index"` // dns, http, smtp, ldap, smb, ftp
-	CaseID    *string   `json:"case_id" xorm:"varchar(36) index"`
-	PayloadID *string   `json:"payload_id" xorm:"varchar(36) index"`
-	Token     *string   `json:"token" xorm:"varchar(64) index"`
-	Timestamp time.Time `json:"timestamp" xorm:"datetime notnull"`
-	SourceIP  string    `json:"source_ip" xorm:"varchar(64) notnull"`
+	ID        string    `json:"id" xorm:"'id' pk varchar(36) notnull"`
+	Type      string    `json:"type" xorm:"'type' varchar(16) notnull index"` // dns, http, smtp, ldap, smb, ftp
+	CaseID    *string   `json:"case_id" xorm:"'case_id' varchar(36) index"`
+	PayloadID *string   `json:"payload_id" xorm:"'payload_id' varchar(36) index"`
+	Token     *string   `json:"token" xorm:"'token' varchar(64) index"`
+	Timestamp time.Time `json:"timestamp" xorm:"'timestamp' datetime notnull"`
+	SourceIP  string    `json:"source_ip" xorm:"'source_ip' varchar(64) notnull"`
 
 	// DNS specific fields
-	Domain  *string `json:"domain" xorm:"varchar(255)"`
-	DNSType *string `json:"dns_type" xorm:"varchar(16)"` // A, AAAA, CNAME, etc.
+	Domain  *string `json:"domain" xorm:"'domain' varchar(255)"`
+	DNSType *string `json:"dns_type" xorm:"'dns_type' varchar(16)"` // A, AAAA, CNAME, etc.
 
 	// HTTP specific fields
-	Method      *string `json:"method" xorm:"varchar(16)"` // GET, POST, etc.
-	Path        *string `json:"path" xorm:"text"`
-	Headers     Headers `json:"headers" xorm:"json"`
-	Body        *string `json:"body" xorm:"mediumtext"`
-	UserAgent   *string `json:"user_agent" xorm:"text"`
-	ContentType *string `json:"content_type" xorm:"varchar(128)"`
+	Method      *string `json:"method" xorm:"'method' varchar(16)"` // GET, POST, etc.
+	Path        *string `json:"path" xorm:"'path' text"`
+	Headers     Headers `json:"headers" xorm:"'headers' json"`
+	Body        *string `json:"body" xorm:"'body' mediumtext"`
+	UserAgent   *string `json:"user_agent" xorm:"'user_agent' text"`
+	ContentType *string `json:"content_type" xorm:"'content_type' varchar(128)"`
 
 	// Common fields
-	RawData   string    `json:"raw_data" xorm:"mediumtext"`
-	CreatedAt time.Time `json:"created_at" xorm:"datetime created"`
+	RawData   string    `json:"raw_data" xorm:"'raw_data' mediumtext"`
+	CreatedAt time.Time `json:"created_at" xorm:"'created_at' datetime created"`
 }
 
 // MarshalJSON implements json.Marshaler interface for Interaction

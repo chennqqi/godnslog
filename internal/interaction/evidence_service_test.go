@@ -261,25 +261,31 @@ func TestGenerateExplainability(t *testing.T) {
 	}
 }
 
-func TestGenerateEvidence_NoInteractions(t *testing.T) {
+func TestGenerateEvidence_ErrEvidenceNotFound(t *testing.T) {
 	engine, err := xorm.NewEngine("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to create engine: %v", err)
 	}
 	defer engine.Close()
 
+	// Sync interactions table
+	err = engine.Sync2(new(models.Interaction))
+	if err != nil {
+		t.Fatalf("Failed to sync interactions table: %v", err)
+	}
+
 	service := NewEvidenceService(NewService(engine))
 
-	// Test that empty interactions return ErrEvidenceNotFound
-	// We test this by checking the calculateEvidenceStrength directly
-	interactions := []models.Interaction{}
-	strength, confidence := service.calculateEvidenceStrength(interactions)
-
-	if strength != EvidenceStrengthLow {
-		t.Errorf("Expected EvidenceStrengthLow for empty interactions, got %s", strength)
+	// Test with non-existent case_id
+	_, err = service.GenerateEvidence("nonexistent-case", "", "json")
+	if err != ErrEvidenceNotFound {
+		t.Errorf("Expected ErrEvidenceNotFound for non-existent case_id, got %v", err)
 	}
-	if confidence != 0 {
-		t.Errorf("Expected confidence 0 for empty interactions, got %d", confidence)
+
+	// Test with non-existent payload_id
+	_, err = service.GenerateEvidence("", "nonexistent-payload", "json")
+	if err != ErrEvidenceNotFound {
+		t.Errorf("Expected ErrEvidenceNotFound for non-existent payload_id, got %v", err)
 	}
 }
 

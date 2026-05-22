@@ -286,7 +286,7 @@ func (s *Server) summarizeEvidence(ctx context.Context, args map[string]interfac
 
 	// Validate that at least one of case_id or payload_id is provided
 	if len(caseID) == 0 && len(payloadID) == 0 {
-		return nil, fmt.Errorf("either case_id or payload_id is required")
+		return ToolResult{Success: false, Error: "either case_id or payload_id is required"}, nil
 	}
 
 	// Call API to generate evidence in JSON format
@@ -314,14 +314,19 @@ func (s *Server) summarizeEvidence(ctx context.Context, args map[string]interfac
 
 // export_report exports a report in specified format
 func (s *Server) exportReport(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-	caseID, ok := args["case_id"].(string)
-	if !ok {
-		return nil, fmt.Errorf("case_id is required")
-	}
-
+	caseID := ""
 	payloadID := ""
+
+	if cid, ok := args["case_id"].(string); ok {
+		caseID = cid
+	}
 	if pid, ok := args["payload_id"].(string); ok {
 		payloadID = pid
+	}
+
+	// Validate that at least one of case_id or payload_id is provided
+	if len(caseID) == 0 && len(payloadID) == 0 {
+		return ToolResult{Success: false, Error: "either case_id or payload_id is required"}, nil
 	}
 
 	format := "markdown"

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/chennqqi/godnslog/cache"
+	"github.com/chennqqi/godnslog/internal/auth"
 	"github.com/chennqqi/godnslog/internal/canary"
 	"github.com/chennqqi/godnslog/internal/interaction"
 	"github.com/chennqqi/godnslog/internal/listener"
@@ -121,6 +122,12 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		{
 			evidence.POST("/generate", self.v2GenerateEvidence)
 			evidence.GET("/:id", self.v2GetEvidence)
+		}
+
+		// Audit
+		audit := v2.Group("/audit", self.authHandler)
+		{
+			audit.GET("/logs", self.v2ListAuditLogs)
 		}
 
 		// Canary
@@ -3022,5 +3029,56 @@ func (self *WebServer) v2DeleteSetting(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
+	})
+}
+
+// v2ListAuditLogs lists audit logs with pagination and filtering
+func (self *WebServer) v2ListAuditLogs(c *gin.Context) {
+	// Parse query parameters
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
+	userID := c.Query("user_id")
+	action := c.Query("action")
+	resourceType := c.Query("resource_type")
+
+	// Parse time range
+	var startTime, endTime *time.Time
+	if startTimeStr := c.Query("start_time"); startTimeStr != "" {
+		if t, err := time.Parse(time.RFC3339, startTimeStr); err == nil {
+			startTime = &t
+		}
+	}
+	if endTimeStr := c.Query("end_time"); endTimeStr != "" {
+		if t, err := time.Parse(time.RFC3339, endTimeStr); err == nil {
+			endTime = &t
+		}
+	}
+
+	// Validate pagination
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 50
+	}
+
+	// TODO: Implement proper RBAC for audit log access
+	// For now, allow all authenticated users to see all logs
+
+	authService := auth.NewService(self.orm)
+	resp, err := authService.ListAuditLogs(userID, action, resourceType, startTime, endTime, page, pageSize)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2ListAuditLogs] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to list audit logs",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    resp,
 	})
 }
