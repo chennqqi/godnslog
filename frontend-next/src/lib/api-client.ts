@@ -18,6 +18,7 @@ import type {
   APIKeyListResponse,
   EvidenceRequest,
   EvidenceResponse,
+  AuditLogListResponse,
 } from '@/types'
 
 // Auth API
@@ -112,4 +113,17 @@ export const rulesApi = {
 // Evidence API
 export const evidenceApi = {
   generate: (data: EvidenceRequest) => api.post<EvidenceResponse>('/evidence/generate', data),
+}
+
+// Audit API
+export const auditApi = {
+  list: (params?: {
+    user_id?: string
+    action?: string
+    resource_type?: string
+    start_time?: string
+    end_time?: string
+    page?: number
+    page_size?: number
+  }) => api.get<AuditLogListResponse>('/audit/logs', params),
 }

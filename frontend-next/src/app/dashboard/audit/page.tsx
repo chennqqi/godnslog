@@ -12,20 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { api } from '@/lib/api'
-
-/** Audit log entry shape */
-interface AuditEntry {
-  id: string
-  timestamp: string
-  actor: string
-  actor_ip: string
-  action: string
-  resource_type: string
-  resource_id: string
-  result: 'success' | 'failure' | 'denied'
-  detail: string
-}
+import { auditApi } from '@/lib/api-client'
+import type { AuditLog } from '@/types'
 
 /** Colour mapping for audit result badges */
 const RESULT_STYLES: Record<string, string> = {
@@ -49,12 +37,11 @@ const ACTION_STYLES: Record<string, string> = {
 
 /** Returns an action category derived from the action string */
 function actionCategory(action: string): string {
-  if (action.startsWith('auth.')) return 'auth'
-  if (action.startsWith('case.')) return 'case'
-  if (action.startsWith('payload.')) return 'payload'
-  if (action.startsWith('apikey.')) return 'apikey'
-  if (action.startsWith('user.')) return 'user'
-  if (action.startsWith('settings.')) return 'settings'
+  if (action.startsWith('auth.') || action.includes('login') || action.includes('logout')) return 'auth'
+  if (action.includes('case')) return 'case'
+  if (action.includes('payload')) return 'payload'
+  if (action.includes('apikey') || action.includes('api_key')) return 'apikey'
+  if (action.includes('user')) return 'user'
   return 'settings'
 }
 
@@ -74,32 +61,38 @@ function AuditRowSkeleton() {
 /** Audit Log page — displays a filterable table of system-level audit events */
 export default function AuditPage() {
   const router = useRouter()
-  const [entries, setEntries] = useState<AuditEntry[]>([])
+  const [entries, setEntries] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>('')
   const [searchActor, setSearchActor] = useState('')
   const [resultFilter, setResultFilter] = useState(FILTER_ALL)
   const [categoryFilter, setCategoryFilter] = useState(FILTER_ALL)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
 
   const loadAudit = useCallback(async () => {
     setLoading(true)
+    setError('')
     try {
-      const resp = await api.get<{ items: AuditEntry[]; total: number }>('/audit/logs', {
-        page: 1,
+      const resp = await auditApi.list({
+        page,
         page_size: 100,
       })
-      setEntries(resp.data?.items ?? [])
-    } catch (err) {
-      const statusCode = (err as { originalError?: { response?: { status?: number } } })?.originalError?.response?.status
-      // Backend may not expose audit APIs yet; keep UI usable without noisy errors.
-      if (statusCode !== 404) {
-        console.error('Failed to load audit log:', err)
+      if (resp.code === 0 && resp.data) {
+        setEntries(resp.data.items || [])
+        setTotal(resp.data.total || 0)
+      } else {
+        setError(resp.message || '加载审计日志失败')
+        setEntries([])
       }
-      // Fall back to empty list so the page remains usable
+    } catch (err: any) {
+      console.error('Failed to load audit log:', err)
+      setError('加载审计日志失败: ' + (err.message || '未知错误'))
       setEntries([])
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -111,7 +104,7 @@ export default function AuditPage() {
   }, [router, loadAudit])
 
   const filtered = entries.filter((e) => {
-    if (searchActor && !e.actor.toLowerCase().includes(searchActor.toLowerCase())) return false
+    if (searchActor && !e.user_id?.toLowerCase().includes(searchActor.toLowerCase())) return false
     if (resultFilter !== FILTER_ALL && e.result !== resultFilter) return false
     if (categoryFilter !== FILTER_ALL && actionCategory(e.action) !== categoryFilter) return false
     return true
@@ -130,7 +123,7 @@ export default function AuditPage() {
         <Button variant="outline" size="sm" onClick={loadAudit}>
           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.001 0 01-15.357-2m15.357 2H15" />
           </svg>
           Refresh
         </Button>
@@ -141,7 +134,7 @@ export default function AuditPage() {
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-3">
             <Input
-              placeholder="Filter by actor / user..."
+              placeholder="Filter by user ID..."
               className="w-56"
               value={searchActor}
               onChange={(e) => setSearchActor(e.target.value)}
@@ -154,7 +147,6 @@ export default function AuditPage() {
                 <SelectItem value={FILTER_ALL}>All results</SelectItem>
                 <SelectItem value="success">Success</SelectItem>
                 <SelectItem value="failure">Failure</SelectItem>
-                <SelectItem value="denied">Denied</SelectItem>
               </SelectContent>
             </Select>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
@@ -188,11 +180,20 @@ export default function AuditPage() {
         </CardContent>
       </Card>
 
+      {/* Error display */}
+      {error && (
+        <Card className="dark:bg-gray-800 dark:border-gray-700 border-red-200">
+          <CardContent className="p-4">
+            <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Table */}
       <Card className="dark:bg-gray-800 dark:border-gray-700 overflow-hidden">
         <CardHeader className="pb-0 border-b border-gray-100 dark:border-gray-700">
           <CardTitle className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-            {loading ? 'Loading events...' : `${filtered.length} event${filtered.length !== 1 ? 's' : ''}`}
+            {loading ? 'Loading events...' : `${filtered.length} event${filtered.length !== 1 ? 's' : ''} (Total: ${total})`}
           </CardTitle>
         </CardHeader>
         <div className="overflow-x-auto">
@@ -200,12 +201,12 @@ export default function AuditPage() {
             <thead>
               <tr className="bg-gray-50 dark:bg-gray-900/40 text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                 <th className="px-4 py-3 text-left">Timestamp</th>
-                <th className="px-4 py-3 text-left">Actor</th>
+                <th className="px-4 py-3 text-left">User ID</th>
                 <th className="px-4 py-3 text-left">IP</th>
                 <th className="px-4 py-3 text-left">Action</th>
                 <th className="px-4 py-3 text-left">Resource</th>
                 <th className="px-4 py-3 text-left">Result</th>
-                <th className="px-4 py-3 text-left">Detail</th>
+                <th className="px-4 py-3 text-left">Details</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -218,7 +219,7 @@ export default function AuditPage() {
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No audit events found</p>
                     <p className="text-xs text-gray-400 mt-1">
                       {entries.length === 0
-                        ? 'Audit events will appear here once the backend audit endpoint is available'
+                        ? 'No audit events available'
                         : 'Try adjusting your filters'}
                     </p>
                   </td>
@@ -235,10 +236,10 @@ export default function AuditPage() {
                         {new Date(entry.timestamp).toLocaleString()}
                       </td>
                       <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
-                        {entry.actor}
+                        {entry.user_id || (entry.is_agent ? 'Agent' : 'System')}
                       </td>
                       <td className="px-4 py-3 text-gray-500 dark:text-gray-400 font-mono text-xs">
-                        {entry.actor_ip}
+                        {entry.ip_address}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${ACTION_STYLES[cat]}`}>
@@ -249,12 +250,12 @@ export default function AuditPage() {
                         {entry.resource_type}{entry.resource_id ? ` / ${entry.resource_id}` : ''}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium capitalize ${RESULT_STYLES[entry.result]}`}>
+                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium capitalize ${RESULT_STYLES[entry.result] || RESULT_STYLES.success}`}>
                           {entry.result}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs truncate max-w-[12rem]" title={entry.detail}>
-                        {entry.detail}
+                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs truncate max-w-[12rem]" title={entry.error_message || entry.parameters}>
+                        {entry.error_message || entry.parameters}
                       </td>
                     </tr>
                   )

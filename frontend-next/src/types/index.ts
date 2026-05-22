@@ -258,3 +258,31 @@ export interface EvidenceResponse {
     payload_id?: string
   }
 }
+
+// Audit types
+export interface AuditLog {
+  id: string
+  user_id?: string
+  api_key_id?: string
+  api_key_prefix?: string
+  is_agent: boolean
+  action: string
+  resource_type: string
+  resource_id?: string
+  parameters: string
+  result: string
+  error_message?: string
+  ip_address: string
+  user_agent: string
+  details?: Record<string, any>
+  timestamp: string
+  created_at: string
+}
+
+export interface AuditLogListResponse {
+  items: AuditLog[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
