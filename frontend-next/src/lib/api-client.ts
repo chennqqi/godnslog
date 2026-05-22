@@ -16,6 +16,8 @@ import type {
   APIKeyCreateRequest,
   APIKeyUpdateRequest,
   APIKeyListResponse,
+  EvidenceRequest,
+  EvidenceResponse,
 } from '@/types'
 
 // Auth API
@@ -105,4 +107,9 @@ export const rulesApi = {
   create: (data: any) => api.post<any>('/rules', data),
   update: (id: string, data: any) => api.put<any>(`/rules/${id}`, data),
   delete: (id: string) => api.delete(`/rules/${id}`),
+}
+
+// Evidence API
+export const evidenceApi = {
+  generate: (data: EvidenceRequest) => api.post<EvidenceResponse>('/evidence/generate', data),
 }

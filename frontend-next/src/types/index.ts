@@ -227,3 +227,34 @@ export interface UserListResponse {
   page_size: number
   total_pages: number
 }
+
+// Evidence types
+export interface Evidence {
+  id: string
+  case_id: string
+  payload_id?: string
+  evidence_strength: 'low' | 'medium' | 'high' | 'critical'
+  confidence: number
+  interaction_count: number
+  unique_sources: number
+  timeline: Interaction[]
+  explainability: string
+  generated_at: string
+}
+
+export interface EvidenceRequest {
+  case_id?: string
+  payload_id?: string
+  format: 'json' | 'markdown'
+}
+
+export interface EvidenceResponse {
+  evidence: Evidence
+  format: string
+  content: string
+  metadata: {
+    interaction_count: number
+    case_id?: string
+    payload_id?: string
+  }
+}
