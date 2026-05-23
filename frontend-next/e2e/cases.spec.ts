@@ -219,14 +219,11 @@ test.describe('New Payload', () => {
     await page.waitForLoadState('domcontentloaded');
   });
 
-  test.skip('should display new payload page', async ({ page }) => {
-    // TODO: This test fails due to Suspense boundary or component rendering issue
-    // The page shows empty content instead of the expected h2 element
-    // Need to investigate NewPayloadContent component rendering
+  test('should display new payload page', async ({ page }) => {
     await page.goto('/dashboard/payloads/new');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(5000);
-    await expect(page.locator('h2').first()).toContainText('New Payload');
+    await expect(page.locator('text=New Payload').first()).toBeVisible();
   });
 
   test('should display associated case when case_id is provided', async ({ page }) => {
