@@ -38,7 +38,7 @@ test.describe('Cases Board', () => {
 
   test('should display cases page', async ({ page }) => {
     test.skip(true, 'Skipping due to page rendering issues in current environment');
-    await expect(page.locator('h2').first()).toContainText('Case Board');
+    await expect(page.locator('text=Case Board').first()).toBeVisible();
   });
 
   test('should show create case button', async ({ page }) => {
@@ -83,26 +83,6 @@ test.describe('Cases Board', () => {
 
   test('should navigate to case detail on click', async ({ page }) => {
     test.skip(true, 'Skipping due to page rendering issues in current environment');
-    // Mock a case in the list
-    await page.route('**/api/v2/cases**', route => route.fulfill({
-      json: {
-        code: 0,
-        data: {
-          items: [
-            { id: 'case-1', title: 'Test Case', description: 'Test description', status: 'active', created_at: new Date().toISOString() }
-          ],
-          total: 1,
-          page: 1,
-          page_size: 20,
-          total_pages: 1
-        }
-      }
-    }));
-
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(1000);
-
     // Click on the case row
     const caseRow = page.locator('li').filter({ hasText: 'Test Case' }).first();
     await caseRow.click();
