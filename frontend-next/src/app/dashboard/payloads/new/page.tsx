@@ -378,7 +378,11 @@ function NewPayloadContent() {
           if (found) setSelectedCase(found)
         }
       })
-      .catch((e) => console.error('Failed to load cases:', e))
+      .catch((e) => {
+        console.error('Failed to load cases:', e)
+        // Set empty cases array on error to allow UI to render
+        setCases([])
+      })
   }, [presetCaseId])
 
   const handleFieldChange = (field: string, value: string | number) => {

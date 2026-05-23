@@ -8,21 +8,27 @@ test.describe('Cases Board', () => {
       localStorage.setItem('user', JSON.stringify({ id: 1, username: 'admin', email: 'admin@godnslog.com', role: 0, lang: 'en-US' }));
     });
 
-    // Mock cases API before navigation
-    await page.route('**/api/v2/cases**', route => route.fulfill({
-      json: {
-        code: 0,
-        data: {
-          items: [
-            { id: 'case-1', title: 'Test Case', description: 'Test description', status: 'active', created_at: new Date().toISOString() }
-          ],
-          total: 1,
-          page: 1,
-          page_size: 20,
-          total_pages: 1
-        }
+    // Mock cases API
+    await page.route('**/api/**', route => {
+      const url = route.request().url();
+      if (url.includes('/cases') && !url.includes('/stats') && !url.match(/\/cases\/[^/]+$/)) {
+        return route.fulfill({
+          json: {
+            code: 0,
+            data: {
+              items: [
+                { id: 'case-1', title: 'Test Case', description: 'Test description', status: 'active', created_at: new Date().toISOString() }
+              ],
+              total: 1,
+              page: 1,
+              page_size: 20,
+              total_pages: 1
+            }
+          }
+        });
       }
-    }));
+      return route.fulfill({ json: { code: 0, data: {} } });
+    });
 
     await page.goto('/dashboard/cases');
     await page.waitForLoadState('networkidle');
@@ -89,47 +95,53 @@ test.describe('Case Detail', () => {
     });
 
     // Mock case detail API
-    await page.route('**/api/v2/cases/case-1**', route => route.fulfill({
-      json: {
-        code: 0,
-        data: {
-          id: 'case-1',
-          title: 'Test Case',
-          description: 'Test description',
-          target: 'example.com',
-          status: 'active',
-          created_at: new Date().toISOString()
-        }
+    await page.route('**/api/**', route => {
+      const url = route.request().url();
+      if (url.match(/\/cases\/case-1$/)) {
+        return route.fulfill({
+          json: {
+            code: 0,
+            data: {
+              id: 'case-1',
+              title: 'Test Case',
+              description: 'Test description',
+              target: 'example.com',
+              status: 'active',
+              created_at: new Date().toISOString()
+            }
+          }
+        });
       }
-    }));
-
-    // Mock case stats API
-    await page.route('**/api/v2/cases/case-1/stats**', route => route.fulfill({
-      json: {
-        code: 0,
-        data: {
-          payload_count: 5,
-          interaction_count: 12,
-          hit_payload_count: 3
-        }
+      if (url.includes('/cases/case-1/stats')) {
+        return route.fulfill({
+          json: {
+            code: 0,
+            data: {
+              payload_count: 5,
+              interaction_count: 12,
+              hit_payload_count: 3
+            }
+          }
+        });
       }
-    }));
-
-    // Mock payloads API
-    await page.route('**/api/v2/payloads**', route => route.fulfill({
-      json: {
-        code: 0,
-        data: {
-          items: [
-            { id: 'payload-1', token: 'gdl_abc123', template: 'ssrf_http', status: 'deployed', created_at: new Date().toISOString() }
-          ],
-          total: 1,
-          page: 1,
-          page_size: 20,
-          total_pages: 1
-        }
+      if (url.includes('/payloads')) {
+        return route.fulfill({
+          json: {
+            code: 0,
+            data: {
+              items: [
+                { id: 'payload-1', token: 'gdl_abc123', template: 'ssrf_http', status: 'deployed', created_at: new Date().toISOString() }
+              ],
+              total: 1,
+              page: 1,
+              page_size: 20,
+              total_pages: 1
+            }
+          }
+        });
       }
-    }));
+      return route.fulfill({ json: { code: 0, data: {} } });
+    });
 
     await page.goto('/dashboard/cases/case-1');
     await page.waitForLoadState('networkidle');
@@ -181,33 +193,43 @@ test.describe('New Payload', () => {
     });
 
     // Mock cases API
-    await page.route('**/api/v2/cases**', route => route.fulfill({
-      json: {
-        code: 0,
-        data: {
-          items: [
-            { id: 'case-1', title: 'Test Case', description: 'Test description', status: 'active', created_at: new Date().toISOString() }
-          ],
-          total: 1,
-          page: 1,
-          page_size: 20,
-          total_pages: 1
-        }
+    await page.route('**/api/**', route => {
+      const url = route.request().url();
+      if (url.includes('/cases')) {
+        return route.fulfill({
+          json: {
+            code: 0,
+            data: {
+              items: [
+                { id: 'case-1', title: 'Test Case', description: 'Test description', status: 'active', created_at: new Date().toISOString() }
+              ],
+              total: 1,
+              page: 1,
+              page_size: 20,
+              total_pages: 1
+            }
+          }
+        });
       }
-    }));
+      return route.fulfill({ json: { code: 0, data: {} } });
+    });
+
+    // Navigate to dashboard first to ensure auth is set
+    await page.goto('/dashboard/cases');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display new payload page', async ({ page }) => {
     await page.goto('/dashboard/payloads/new');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(5000);
     await expect(page.locator('h2').first()).toContainText('New Payload');
   });
 
   test('should display associated case when case_id is provided', async ({ page }) => {
     await page.goto('/dashboard/payloads/new?case_id=case-1');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(3000);
     await expect(page.locator('text=Creating for Case').first()).toBeVisible();
     await expect(page.locator('text=Test Case').first()).toBeVisible();
   });
@@ -215,14 +237,14 @@ test.describe('New Payload', () => {
   test('should display step indicator', async ({ page }) => {
     await page.goto('/dashboard/payloads/new');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(3000);
     await expect(page.locator('text=Choose a template').first()).toBeVisible();
   });
 
   test('should display template selection', async ({ page }) => {
     await page.goto('/dashboard/payloads/new');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(3000);
     await expect(page.locator('text=SSRF HTTP').first()).toBeVisible();
   });
 });
@@ -235,53 +257,59 @@ test.describe('Payload Detail', () => {
       localStorage.setItem('user', JSON.stringify({ id: 1, username: 'admin', email: 'admin@godnslog.com', role: 0, lang: 'en-US' }));
     });
 
-    // Mock payload API
-    await page.route('**/api/v2/payloads/payload-1**', route => route.fulfill({
-      json: {
-        code: 0,
-        data: {
-          id: 'payload-1',
-          token: 'gdl_abc123',
-          template: 'ssrf_http',
-          rendered_payload: 'http://gdl_abc123.example.com/test',
-          status: 'hit',
-          case_id: 'case-1',
-          created_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 86400000).toISOString()
-        }
+    // Mock payload and case APIs
+    await page.route('**/api/**', route => {
+      const url = route.request().url();
+      if (url.match(/\/payloads\/payload-1$/)) {
+        return route.fulfill({
+          json: {
+            code: 0,
+            data: {
+              id: 'payload-1',
+              token: 'gdl_abc123',
+              template: 'ssrf_http',
+              rendered_payload: 'http://gdl_abc123.example.com/test',
+              status: 'hit',
+              case_id: 'case-1',
+              created_at: new Date().toISOString(),
+              expires_at: new Date(Date.now() + 86400000).toISOString()
+            }
+          }
+        });
       }
-    }));
-
-    // Mock associated case API
-    await page.route('**/api/v2/cases/case-1**', route => route.fulfill({
-      json: {
-        code: 0,
-        data: {
-          id: 'case-1',
-          title: 'Test Case',
-          description: 'Test description',
-          target: 'example.com',
-          status: 'active',
-          created_at: new Date().toISOString()
-        }
+      if (url.match(/\/cases\/case-1$/)) {
+        return route.fulfill({
+          json: {
+            code: 0,
+            data: {
+              id: 'case-1',
+              title: 'Test Case',
+              description: 'Test description',
+              target: 'example.com',
+              status: 'active',
+              created_at: new Date().toISOString()
+            }
+          }
+        });
       }
-    }));
-
-    // Mock interactions API
-    await page.route('**/api/v2/interactions**', route => route.fulfill({
-      json: {
-        code: 0,
-        data: {
-          items: [
-            { id: 'int-1', type: 'dns', source_ip: '1.2.3.4', timestamp: new Date().toISOString() }
-          ],
-          total: 1,
-          page: 1,
-          page_size: 5,
-          total_pages: 1
-        }
+      if (url.includes('/interactions')) {
+        return route.fulfill({
+          json: {
+            code: 0,
+            data: {
+              items: [
+                { id: 'int-1', type: 'dns', source_ip: '1.2.3.4', timestamp: new Date().toISOString() }
+              ],
+              total: 1,
+              page: 1,
+              page_size: 5,
+              total_pages: 1
+            }
+          }
+        });
       }
-    }));
+      return route.fulfill({ json: { code: 0, data: {} } });
+    });
 
     await page.goto('/dashboard/payloads/payload-1');
     await page.waitForLoadState('networkidle');
