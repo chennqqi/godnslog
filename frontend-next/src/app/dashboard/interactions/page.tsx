@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { interactionApi } from '@/lib/api-client'
 import type { Interaction } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,6 +28,7 @@ const TYPE_FILTER_ALL = 'all'
 
 export default function InteractionsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [interactions, setInteractions] = useState<Interaction[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
@@ -38,6 +39,18 @@ export default function InteractionsPage() {
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [refreshInterval, setRefreshInterval] = useState(5000)
 
+  // Get scope from URL
+  const caseId = searchParams.get('case_id')
+  const payloadId = searchParams.get('payload_id')
+  const typeParam = searchParams.get('type')
+
+  // Set type filter from URL param if present
+  useEffect(() => {
+    if (typeParam) {
+      setTypeFilter(typeParam)
+    }
+  }, [typeParam])
+
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) {
@@ -46,7 +59,7 @@ export default function InteractionsPage() {
     }
     loadInteractions()
     loadStats()
-  }, [router])
+  }, [router, caseId, payloadId])
 
   // Auto-refresh polling
   useEffect(() => {
@@ -62,7 +75,10 @@ export default function InteractionsPage() {
 
   const loadInteractions = async () => {
     try {
-      const response = await interactionApi.list({ page: 1, page_size: 100 })
+      const params: any = { page: 1, page_size: 100 }
+      if (caseId) params.case_id = caseId
+      if (payloadId) params.payload_id = payloadId
+      const response = await interactionApi.list(params)
       if (response.data) {
         setInteractions(response.data.items)
       }
@@ -75,7 +91,10 @@ export default function InteractionsPage() {
 
   const loadStats = async () => {
     try {
-      const response = await interactionApi.stats()
+      const params: any = {}
+      if (caseId) params.case_id = caseId
+      if (payloadId) params.payload_id = payloadId
+      const response = await interactionApi.stats(params)
       if (response.code === 0 && response.data) {
         setStats({
           total: response.data.total ?? 0,
@@ -88,6 +107,10 @@ export default function InteractionsPage() {
     } catch (error) {
       console.error('Failed to load stats:', error)
     }
+  }
+
+  const clearScope = () => {
+    router.push('/dashboard/interactions')
   }
 
   const filteredInteractions = interactions.filter(i => {
@@ -115,7 +138,38 @@ export default function InteractionsPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Interaction Timeline</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Interaction Timeline</h2>
+          {caseId && (
+            <p className="text-sm text-gray-500 mt-1">
+              Case scoped: {caseId}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearScope}
+                className="ml-2"
+              >
+                Clear scope
+              </Button>
+            </p>
+          )}
+          {payloadId && (
+            <p className="text-sm text-gray-500 mt-1">
+              Payload scoped: {payloadId}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearScope}
+                className="ml-2"
+              >
+                Clear scope
+              </Button>
+            </p>
+          )}
+          {!caseId && !payloadId && (
+            <p className="text-sm text-gray-500 mt-1">All Interactions</p>
+          )}
+        </div>
         <div className="flex space-x-2">
           <Button
             variant={autoRefresh ? "default" : "outline"}
@@ -203,7 +257,9 @@ export default function InteractionsPage() {
         </CardHeader>
         <CardContent>
           {filteredInteractions.length === 0 ? (
-            <p className="text-gray-500">暂无命中记录</p>
+            <p className="text-gray-500">
+              {caseId || payloadId ? '当前 Case/Payload 暂无交互' : '暂无命中记录'}
+            </p>
           ) : viewMode === 'table' ? (
             <Table>
               <TableHeader>
@@ -312,66 +368,159 @@ export default function InteractionsPage() {
 
       {/* Detail Drawer */}
       <Dialog open={!!selectedInteraction} onOpenChange={() => setSelectedInteraction(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>交互详情</DialogTitle>
+            <DialogTitle>Interaction Triage</DialogTitle>
           </DialogHeader>
           {selectedInteraction && (
             <div className="space-y-4">
-              <div>
-                <p className="text-sm font-medium text-gray-500">类型</p>
-                <p className="text-gray-900">{selectedInteraction.type.toUpperCase()}</p>
+              {/* Basic Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">类型</p>
+                  <p className="text-gray-900">{selectedInteraction.type.toUpperCase()}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">时间戳</p>
+                  <p className="text-gray-900">{new Date(selectedInteraction.timestamp).toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">来源 IP</p>
+                  <p className="text-gray-900">{selectedInteraction.source_ip}</p>
+                </div>
+                {selectedInteraction.token && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Token</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-gray-900 break-all">{selectedInteraction.token}</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigator.clipboard.writeText(selectedInteraction.token!)}
+                      >
+                        Copy
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">来源 IP</p>
-                <p className="text-gray-900">{selectedInteraction.source_ip}</p>
+
+              {/* Attribution Info */}
+              {(selectedInteraction.case_id || selectedInteraction.payload_id) && (
+                <div className="border-t pt-4">
+                  <p className="text-sm font-medium text-gray-900 mb-2">归因信息</p>
+                  <div className="space-y-2">
+                    {selectedInteraction.case_id && (
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-gray-600">Case ID: {selectedInteraction.case_id}</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => router.push(`/dashboard/cases/${selectedInteraction.case_id}`)}
+                        >
+                          View Case
+                        </Button>
+                      </div>
+                    )}
+                    {selectedInteraction.payload_id && (
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-gray-600">Payload ID: {selectedInteraction.payload_id}</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => router.push(`/dashboard/payloads/${selectedInteraction.payload_id}`)}
+                        >
+                          View Payload
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Protocol Details */}
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium text-gray-900 mb-2">协议细节</p>
+                {selectedInteraction.domain && (
+                  <div className="mb-2">
+                    <p className="text-sm font-medium text-gray-500">域名</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-gray-900">{selectedInteraction.domain}</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigator.clipboard.writeText(selectedInteraction.domain!)}
+                      >
+                        Copy
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {selectedInteraction.method && (
+                  <div className="mb-2">
+                    <p className="text-sm font-medium text-gray-500">方法</p>
+                    <p className="text-gray-900">{selectedInteraction.method}</p>
+                  </div>
+                )}
+                {selectedInteraction.path && (
+                  <div className="mb-2">
+                    <p className="text-sm font-medium text-gray-500">路径</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-gray-900 break-all">{selectedInteraction.path}</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigator.clipboard.writeText(selectedInteraction.path!)}
+                      >
+                        Copy
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {selectedInteraction.user_agent && (
+                  <div className="mb-2">
+                    <p className="text-sm font-medium text-gray-500">User Agent</p>
+                    <p className="text-gray-900 break-all text-sm">{selectedInteraction.user_agent}</p>
+                  </div>
+                )}
+                {selectedInteraction.headers && (
+                  <div className="mb-2">
+                    <p className="text-sm font-medium text-gray-500">Headers</p>
+                    <pre className="text-gray-900 bg-gray-50 p-2 rounded text-xs overflow-auto max-h-40">{JSON.stringify(selectedInteraction.headers, null, 2)}</pre>
+                  </div>
+                )}
+                {selectedInteraction.body && (
+                  <div className="mb-2">
+                    <p className="text-sm font-medium text-gray-500">Body</p>
+                    <pre className="text-gray-900 bg-gray-50 p-2 rounded text-xs overflow-auto max-h-40">{selectedInteraction.body}</pre>
+                  </div>
+                )}
               </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">时间戳</p>
-                <p className="text-gray-900">{new Date(selectedInteraction.timestamp).toLocaleString()}</p>
+
+              {/* Quick Actions */}
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium text-gray-900 mb-2">快捷动作</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedInteraction.case_id && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/dashboard/evidence?case_id=${selectedInteraction.case_id}`)}
+                    >
+                      Generate Evidence (Case)
+                    </Button>
+                  )}
+                  {selectedInteraction.payload_id && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/dashboard/evidence?payload_id=${selectedInteraction.payload_id}`)}
+                    >
+                      Generate Evidence (Payload)
+                    </Button>
+                  )}
+                </div>
               </div>
-              {selectedInteraction.domain && (
-                <div>
-                  <p className="text-sm font-medium text-gray-500">域名</p>
-                  <p className="text-gray-900">{selectedInteraction.domain}</p>
-                </div>
-              )}
-              {selectedInteraction.token && (
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Token</p>
-                  <p className="text-gray-900">{selectedInteraction.token}</p>
-                </div>
-              )}
-              {selectedInteraction.method && (
-                <div>
-                  <p className="text-sm font-medium text-gray-500">方法</p>
-                  <p className="text-gray-900">{selectedInteraction.method}</p>
-                </div>
-              )}
-              {selectedInteraction.path && (
-                <div>
-                  <p className="text-sm font-medium text-gray-500">路径</p>
-                  <p className="text-gray-900 break-all">{selectedInteraction.path}</p>
-                </div>
-              )}
-              {selectedInteraction.user_agent && (
-                <div>
-                  <p className="text-sm font-medium text-gray-500">User Agent</p>
-                  <p className="text-gray-900 break-all">{selectedInteraction.user_agent}</p>
-                </div>
-              )}
-              {selectedInteraction.body && (
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Body</p>
-                  <pre className="text-gray-900 bg-gray-50 p-2 rounded text-xs overflow-auto max-h-40">{selectedInteraction.body}</pre>
-                </div>
-              )}
-              {selectedInteraction.headers && (
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Headers</p>
-                  <pre className="text-gray-900 bg-gray-50 p-2 rounded text-xs overflow-auto max-h-40">{JSON.stringify(selectedInteraction.headers, null, 2)}</pre>
-                </div>
-              )}
             </div>
           )}
         </DialogContent>

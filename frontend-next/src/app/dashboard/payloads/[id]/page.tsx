@@ -206,14 +206,12 @@ export default function PayloadDetailPage() {
             >
               查看交互
             </button>
-            {associatedCase && (
-              <button
-                onClick={() => router.push(`/dashboard/evidence?case_id=${associatedCase.id}`)}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
-              >
-                查看证据
-              </button>
-            )}
+            <button
+              onClick={() => router.push(`/dashboard/evidence?payload_id=${payload.id}`)}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+            >
+              查看证据
+            </button>
           </div>
         </div>
       </div>

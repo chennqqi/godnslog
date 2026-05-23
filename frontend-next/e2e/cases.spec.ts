@@ -182,6 +182,24 @@ test.describe('Case Detail', () => {
     await page.waitForURL('**/dashboard/payloads/new?case_id=case-1');
     expect(page.url()).toContain('case_id=case-1');
   });
+
+  test('should navigate to interactions with case_id', async ({ page }) => {
+    const interactionsButton = page.locator('button').filter({ hasText: 'View Interactions' }).first();
+    await interactionsButton.click();
+
+    // Should navigate to interactions page with case_id
+    await page.waitForURL('**/dashboard/interactions?case_id=case-1');
+    expect(page.url()).toContain('case_id=case-1');
+  });
+
+  test('should navigate to evidence with case_id', async ({ page }) => {
+    const evidenceButton = page.locator('button').filter({ hasText: 'View Evidence' }).first();
+    await evidenceButton.click();
+
+    // Should navigate to evidence page with case_id
+    await page.waitForURL('**/dashboard/evidence?case_id=case-1');
+    expect(page.url()).toContain('case_id=case-1');
+  });
 });
 
 test.describe('New Payload', () => {
@@ -354,6 +372,13 @@ test.describe('Payload Detail', () => {
     const interactionsButton = page.locator('button').filter({ hasText: '查看交互' }).first();
     await interactionsButton.click();
     await page.waitForURL('**/dashboard/interactions?payload_id=payload-1');
+    expect(page.url()).toContain('payload_id=payload-1');
+  });
+
+  test('should navigate to evidence on quick action click', async ({ page }) => {
+    const evidenceButton = page.locator('button').filter({ hasText: '查看证据' }).first();
+    await evidenceButton.click();
+    await page.waitForURL('**/dashboard/evidence?payload_id=payload-1');
     expect(page.url()).toContain('payload_id=payload-1');
   });
 });

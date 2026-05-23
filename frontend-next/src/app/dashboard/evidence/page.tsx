@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { caseApi, evidenceApi } from '@/lib/api-client'
 import type { Case, Evidence, EvidenceResponse } from '@/types'
 
 export default function EvidenceReportPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedCase, setSelectedCase] = useState<string>('')
@@ -16,6 +17,18 @@ export default function EvidenceReportPage() {
   const [reportContent, setReportContent] = useState('')
   const [error, setError] = useState<string>('')
 
+  // Get scope from URL
+  const caseId = searchParams.get('case_id')
+  const payloadId = searchParams.get('payload_id')
+  const formatParam = searchParams.get('format')
+
+  // Set format from URL param if present
+  useEffect(() => {
+    if (formatParam === 'json' || formatParam === 'markdown') {
+      setFormat(formatParam)
+    }
+  }, [formatParam])
+
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) {
@@ -24,6 +37,16 @@ export default function EvidenceReportPage() {
     }
     loadCases()
   }, [router])
+
+  // Auto-generate evidence if case_id or payload_id is in URL
+  useEffect(() => {
+    if (caseId && cases.length > 0) {
+      setSelectedCase(caseId)
+      handleGenerateWithScope(caseId, 'case')
+    } else if (payloadId) {
+      handleGenerateWithScope(payloadId, 'payload')
+    }
+  }, [caseId, payloadId, cases])
 
   const loadCases = async () => {
     try {
@@ -60,6 +83,37 @@ export default function EvidenceReportPage() {
       console.error('Failed to generate evidence:', error)
       if (error.response?.status === 404) {
         setError('未找到该Case的证据数据')
+      } else {
+        setError('生成证据失败: ' + (error.message || '未知错误'))
+      }
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const handleGenerateWithScope = async (id: string, scope: 'case' | 'payload') => {
+    setGenerating(true)
+    setError('')
+    setEvidence(null)
+    setReportContent('')
+    try {
+      const params: any = { format }
+      if (scope === 'case') {
+        params.case_id = id
+      } else {
+        params.payload_id = id
+      }
+      const response = await evidenceApi.generate(params)
+      if (response.code === 0 && response.data) {
+        setEvidence(response.data.evidence)
+        setReportContent(response.data.content)
+      } else {
+        setError(response.message || '生成证据失败')
+      }
+    } catch (error: any) {
+      console.error('Failed to generate evidence:', error)
+      if (error.response?.status === 404) {
+        setError('未找到该证据数据')
       } else {
         setError('生成证据失败: ' + (error.message || '未知错误'))
       }
@@ -117,7 +171,36 @@ export default function EvidenceReportPage() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">证据报告</h2>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">证据报告</h2>
+          {caseId && (
+            <p className="text-sm text-gray-500 mt-1">
+              Case scoped: {caseId}
+              <button
+                onClick={() => router.push('/dashboard/evidence')}
+                className="ml-2 text-indigo-600 hover:text-indigo-800"
+              >
+                Clear scope
+              </button>
+            </p>
+          )}
+          {payloadId && (
+            <p className="text-sm text-gray-500 mt-1">
+              Payload scoped: {payloadId}
+              <button
+                onClick={() => router.push('/dashboard/evidence')}
+                className="ml-2 text-indigo-600 hover:text-indigo-800"
+              >
+                Clear scope
+              </button>
+            </p>
+          )}
+          {!caseId && !payloadId && (
+            <p className="text-sm text-gray-500 mt-1">All Evidence</p>
+          )}
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left panel: Controls */}
@@ -265,7 +348,9 @@ export default function EvidenceReportPage() {
             <div className="bg-white shadow rounded-lg">
               <div className="px-4 py-5 sm:p-6 text-center">
                 <p className="text-gray-500 py-8">
-                  {selectedCase ? '选择Case后点击"生成证据"按钮' : '请先选择一个Case'}
+                  {generating ? '生成中...' : 
+                   caseId || payloadId ? '暂无证据数据' : 
+                   selectedCase ? '选择Case后点击"生成证据"按钮' : '请先选择一个Case'}
                 </p>
               </div>
             </div>
