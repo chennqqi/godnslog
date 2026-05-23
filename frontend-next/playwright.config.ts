@@ -16,6 +16,13 @@ export default defineConfig({
     navigationTimeout: 10000,
   },
 
+  webServer: {
+    command: 'npm run dev',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120000,
+  },
+
   projects: [
     {
       name: 'chromium',

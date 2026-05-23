@@ -1,15 +1,31 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Cases Board', () => {
-  test.beforeEach(async ({ page }) => {
-    // Set token before navigation to avoid redirect to login
-    await page.goto('/');
-    await page.evaluate(() => {
+  test.beforeEach(async ({ context, page }) => {
+    // Set token in localStorage before any page loads
+    await context.addInitScript(() => {
       localStorage.setItem('token', 'mock-token');
       localStorage.setItem('user', JSON.stringify({ id: 1, username: 'admin', email: 'admin@godnslog.com', role: 0, lang: 'en-US' }));
     });
+
+    // Mock cases API before navigation
+    await page.route('**/api/v2/cases**', route => route.fulfill({
+      json: {
+        code: 0,
+        data: {
+          items: [
+            { id: 'case-1', title: 'Test Case', description: 'Test description', status: 'active', created_at: new Date().toISOString() }
+          ],
+          total: 1,
+          page: 1,
+          page_size: 20,
+          total_pages: 1
+        }
+      }
+    }));
+
     await page.goto('/dashboard/cases');
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
 
@@ -34,8 +50,9 @@ test.describe('Cases Board', () => {
   });
 
   test('should display status filter', async ({ page }) => {
-    const statusFilter = page.locator('select').first();
-    await expect(statusFilter).toBeVisible();
+    // Radix Select uses a button trigger, not a native select element
+    const statusFilterTrigger = page.locator('button').filter({ hasText: 'All statuses' }).first();
+    await expect(statusFilterTrigger).toBeVisible();
   });
 
   test('should not display batch operations', async ({ page }) => {
@@ -53,26 +70,6 @@ test.describe('Cases Board', () => {
   });
 
   test('should navigate to case detail on click', async ({ page }) => {
-    // Mock a case in the list
-    await page.route('**/api/v2/cases**', route => route.fulfill({
-      json: {
-        code: 0,
-        data: {
-          items: [
-            { id: 'case-1', title: 'Test Case', description: 'Test description', status: 'active', created_at: new Date().toISOString() }
-          ],
-          total: 1,
-          page: 1,
-          page_size: 20,
-          total_pages: 1
-        }
-      }
-    }));
-
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(1000);
-
     // Click on the case row
     const caseRow = page.locator('li').filter({ hasText: 'Test Case' }).first();
     await caseRow.click();
@@ -84,15 +81,15 @@ test.describe('Cases Board', () => {
 });
 
 test.describe('Case Detail', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.evaluate(() => {
+  test.beforeEach(async ({ context, page }) => {
+    // Set token in localStorage before any page loads
+    await context.addInitScript(() => {
       localStorage.setItem('token', 'mock-token');
       localStorage.setItem('user', JSON.stringify({ id: 1, username: 'admin', email: 'admin@godnslog.com', role: 0, lang: 'en-US' }));
     });
 
     // Mock case detail API
-    await page.route('**/api/v2/cases/case-1', route => route.fulfill({
+    await page.route('**/api/v2/cases/case-1**', route => route.fulfill({
       json: {
         code: 0,
         data: {
@@ -107,7 +104,7 @@ test.describe('Case Detail', () => {
     }));
 
     // Mock case stats API
-    await page.route('**/api/v2/cases/case-1/stats', route => route.fulfill({
+    await page.route('**/api/v2/cases/case-1/stats**', route => route.fulfill({
       json: {
         code: 0,
         data: {
@@ -119,7 +116,7 @@ test.describe('Case Detail', () => {
     }));
 
     // Mock payloads API
-    await page.route('**/api/v2/payloads?case_id=case-1', route => route.fulfill({
+    await page.route('**/api/v2/payloads**', route => route.fulfill({
       json: {
         code: 0,
         data: {
@@ -135,7 +132,7 @@ test.describe('Case Detail', () => {
     }));
 
     await page.goto('/dashboard/cases/case-1');
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
 
@@ -176,15 +173,15 @@ test.describe('Case Detail', () => {
 });
 
 test.describe('New Payload', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.evaluate(() => {
+  test.beforeEach(async ({ context, page }) => {
+    // Set token in localStorage before any page loads
+    await context.addInitScript(() => {
       localStorage.setItem('token', 'mock-token');
       localStorage.setItem('user', JSON.stringify({ id: 1, username: 'admin', email: 'admin@godnslog.com', role: 0, lang: 'en-US' }));
     });
 
     // Mock cases API
-    await page.route('**/api/v2/cases', route => route.fulfill({
+    await page.route('**/api/v2/cases**', route => route.fulfill({
       json: {
         code: 0,
         data: {
@@ -202,14 +199,14 @@ test.describe('New Payload', () => {
 
   test('should display new payload page', async ({ page }) => {
     await page.goto('/dashboard/payloads/new');
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
     await expect(page.locator('h2').first()).toContainText('New Payload');
   });
 
   test('should display associated case when case_id is provided', async ({ page }) => {
     await page.goto('/dashboard/payloads/new?case_id=case-1');
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
     await expect(page.locator('text=Creating for Case').first()).toBeVisible();
     await expect(page.locator('text=Test Case').first()).toBeVisible();
@@ -217,29 +214,29 @@ test.describe('New Payload', () => {
 
   test('should display step indicator', async ({ page }) => {
     await page.goto('/dashboard/payloads/new');
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
     await expect(page.locator('text=Choose a template').first()).toBeVisible();
   });
 
   test('should display template selection', async ({ page }) => {
     await page.goto('/dashboard/payloads/new');
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
     await expect(page.locator('text=SSRF HTTP').first()).toBeVisible();
   });
 });
 
 test.describe('Payload Detail', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.evaluate(() => {
+  test.beforeEach(async ({ context, page }) => {
+    // Set token in localStorage before any page loads
+    await context.addInitScript(() => {
       localStorage.setItem('token', 'mock-token');
       localStorage.setItem('user', JSON.stringify({ id: 1, username: 'admin', email: 'admin@godnslog.com', role: 0, lang: 'en-US' }));
     });
 
     // Mock payload API
-    await page.route('**/api/v2/payloads/payload-1', route => route.fulfill({
+    await page.route('**/api/v2/payloads/payload-1**', route => route.fulfill({
       json: {
         code: 0,
         data: {
@@ -256,7 +253,7 @@ test.describe('Payload Detail', () => {
     }));
 
     // Mock associated case API
-    await page.route('**/api/v2/cases/case-1', route => route.fulfill({
+    await page.route('**/api/v2/cases/case-1**', route => route.fulfill({
       json: {
         code: 0,
         data: {
@@ -271,7 +268,7 @@ test.describe('Payload Detail', () => {
     }));
 
     // Mock interactions API
-    await page.route('**/api/v2/interactions?payload_id=payload-1', route => route.fulfill({
+    await page.route('**/api/v2/interactions**', route => route.fulfill({
       json: {
         code: 0,
         data: {
@@ -287,7 +284,7 @@ test.describe('Payload Detail', () => {
     }));
 
     await page.goto('/dashboard/payloads/payload-1');
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
 

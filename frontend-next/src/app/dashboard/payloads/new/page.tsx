@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { payloadApi, caseApi } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
@@ -350,8 +350,8 @@ function StepPreview({
   )
 }
 
-/** Multi-step Payload creation wizard */
-export default function NewPayloadPage() {
+/** Inner component that uses useSearchParams, wrapped in Suspense */
+function NewPayloadContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const presetCaseId = searchParams.get('case_id') || ''
@@ -501,5 +501,14 @@ export default function NewPayloadPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+/** Multi-step Payload creation wizard */
+export default function NewPayloadPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12 text-gray-500">Loading...</div>}>
+      <NewPayloadContent />
+    </Suspense>
   )
 }
