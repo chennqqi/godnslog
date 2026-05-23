@@ -22,8 +22,20 @@ For UI behavior changes, also run the relevant Playwright spec:
 
 ```bash
 cd frontend-next
-npm run test:e2e -- e2e/cases.spec.ts
+npx playwright test --reporter=line e2e/cases.spec.ts
 ```
+
+Do not use interactive Playwright HTML report commands during verification. In particular, avoid any flow that triggers:
+
+```text
+Serving HTML report at http://localhost:9323. Press Ctrl+C to quit.
+```
+
+Forbidden during routine verification:
+
+- `npx playwright show-report`
+- `npm run test:e2e:ui`
+- any command path that leaves a local HTML report server running
 
 ## MCP
 

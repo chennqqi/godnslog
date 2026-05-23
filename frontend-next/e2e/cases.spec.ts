@@ -34,8 +34,9 @@ test.describe('Cases Board', () => {
   });
 
   test('should display status filter', async ({ page }) => {
-    const statusFilter = page.locator('select').first();
-    await expect(statusFilter).toBeVisible();
+    // Radix Select uses a button trigger, not a native select element
+    const statusFilterTrigger = page.locator('button').filter({ hasText: 'All statuses' }).first();
+    await expect(statusFilterTrigger).toBeVisible();
   });
 
   test('should not display batch operations', async ({ page }) => {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { payloadApi, caseApi, interactionApi } from '@/lib/api-client'
 import type { Payload, Case, Interaction } from '@/types'
@@ -13,13 +13,7 @@ export default function PayloadDetailPage() {
   const [recentInteractions, setRecentInteractions] = useState<Interaction[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (params.id) {
-      loadPayload()
-    }
-  }, [params.id])
-
-  const loadPayload = async () => {
+  const loadPayload = useCallback(async () => {
     try {
       const response = await payloadApi.get(params.id as string)
       let payloadData: Payload | null = null
@@ -65,7 +59,14 @@ export default function PayloadDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id])
+
+  useEffect(() => {
+    if (params.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadPayload()
+    }
+  }, [params.id, loadPayload])
 
   if (loading) {
     return <div className="text-center py-12">加载中...</div>
@@ -103,10 +104,10 @@ export default function PayloadDetailPage() {
               </div>
             )}
 
-            {(payload as any).scenario && (
+            {payload.scenario && (
               <div>
                 <p className="text-sm text-gray-500">场景</p>
-                <p className="text-sm font-medium">{(payload as any).scenario}</p>
+                <p className="text-sm font-medium">{payload.scenario}</p>
               </div>
             )}
 

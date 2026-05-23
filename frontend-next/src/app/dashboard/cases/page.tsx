@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { caseApi } from '@/lib/api-client'
 import type { Case, CaseCreateRequest } from '@/types'
@@ -41,16 +41,7 @@ export default function CasesPage() {
     tags: [],
   })
 
-  useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      router.push('/login')
-      return
-    }
-    loadCases()
-  }, [router])
-
-  const loadCases = async () => {
+  const loadCases = useCallback(async () => {
     try {
       console.log('Loading cases...')
       const response = await caseApi.list({
@@ -69,6 +60,24 @@ export default function CasesPage() {
     } finally {
       setLoading(false)
     }
+  }, [searchTerm, statusFilter])
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/login')
+      return
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadCases()
+  }, [router, loadCases])
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value)
+  }
+
+  const handleStatusChange = (value: string) => {
+    setStatusFilter(value)
   }
 
   const handleCreateCase = async (e: React.FormEvent) => {
@@ -108,9 +117,9 @@ export default function CasesPage() {
             placeholder="Search cases..."
             className="flex-1 min-w-[160px]"
             value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); loadCases() }}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
-          <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); loadCases() }}>
+          <Select value={statusFilter} onValueChange={handleStatusChange}>
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>

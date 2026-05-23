@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { caseApi, payloadApi } from '@/lib/api-client'
 import type { Case, Payload } from '@/types'
@@ -13,13 +13,7 @@ export default function CaseDetailPage() {
   const [stats, setStats] = useState({ payload_count: 0, interaction_count: 0, hit_payload_count: 0 })
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (params.id) {
-      loadData()
-    }
-  }, [params.id])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [caseResp, payloadsResp, statsResp] = await Promise.all([
         caseApi.get(params.id as string),
@@ -48,7 +42,14 @@ export default function CaseDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id])
+
+  useEffect(() => {
+    if (params.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadData()
+    }
+  }, [params.id, loadData])
 
   if (loading) {
     return <div className="text-center py-12">Loading...</div>

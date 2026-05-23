@@ -58,3 +58,5 @@ Scanner Hub 不应只集成 Nuclei，还应规划和支持 Burp Suite、Yakit/Ya
 
 ## windsurf约定
 - sub agent总是使用GPT-5.4 Mini模型
+- 执行前端 E2E 时，禁止使用会触发 `Serving HTML report at http://localhost:9323. Press Ctrl+C to quit.` 的 Playwright 打开式报告流程。
+- Windsurf 运行 E2E 只允许使用一次性、非交互式命令并直接退出，例如 `npx playwright test --reporter=line`、`npx playwright test --reporter=list`，不得执行 `npx playwright show-report`，不得让测试进程因本地报告服务常驻阻塞。

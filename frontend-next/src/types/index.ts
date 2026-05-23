@@ -97,6 +97,7 @@ export interface Payload {
   created_by: string
   created_at: string
   updated_at: string
+  scenario?: string
 }
 
 export interface PayloadCreateRequest {
