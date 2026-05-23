@@ -358,6 +358,7 @@ export default function NewPayloadPage() {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [cases, setCases] = useState<Array<{ id: string; title: string }>>([])
+  const [selectedCase, setSelectedCase] = useState<{ id: string; title: string } | null>(null)
   const [formData, setFormData] = useState({
     template: 'ssrf_http',
     scenario: '',
@@ -369,12 +370,23 @@ export default function NewPayloadPage() {
   useEffect(() => {
     caseApi
       .list({ page: 1, page_size: 100 })
-      .then((r) => setCases((r.data?.items || []).map((c) => ({ id: c.id, title: c.title }))))
+      .then((r) => {
+        const caseList = (r.data?.items || []).map((c) => ({ id: c.id, title: c.title }))
+        setCases(caseList)
+        if (presetCaseId) {
+          const found = caseList.find((c) => c.id === presetCaseId)
+          if (found) setSelectedCase(found)
+        }
+      })
       .catch((e) => console.error('Failed to load cases:', e))
-  }, [])
+  }, [presetCaseId])
 
   const handleFieldChange = (field: string, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+    if (field === 'case_id') {
+      const found = cases.find((c) => c.id === value)
+      setSelectedCase(found || null)
+    }
   }
 
   const handleVarChange = (field: string, value: string) => {
@@ -429,6 +441,11 @@ export default function NewPayloadPage() {
       <Card className="dark:bg-gray-800 dark:border-gray-700">
         <CardHeader>
           <CardTitle className="text-lg">New Payload</CardTitle>
+          {selectedCase && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Creating for Case: <span className="font-medium text-indigo-600 dark:text-indigo-400">{selectedCase.title}</span>
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           <StepIndicator current={step} total={3} />

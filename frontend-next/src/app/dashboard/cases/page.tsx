@@ -3,12 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { caseApi } from '@/lib/api-client'
-import type { Case, CaseCreateRequest, CaseUpdateRequest } from '@/types'
+import type { Case, CaseCreateRequest } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -19,7 +18,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -34,23 +32,12 @@ export default function CasesPage() {
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [selectedCase, setSelectedCase] = useState<Case | null>(null)
-  const [selectedCases, setSelectedCases] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState(STATUS_FILTER_ALL)
   const [newCase, setNewCase] = useState<CaseCreateRequest>({
     title: '',
     description: '',
     target: '',
-    tags: [],
-  })
-  const [editCase, setEditCase] = useState<CaseUpdateRequest>({
-    title: '',
-    description: '',
-    target: '',
-    status: undefined,
     tags: [],
   })
 
@@ -98,83 +85,6 @@ export default function CasesPage() {
     }
   }
 
-  const handleEditCase = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedCase) return
-    try {
-      const response = await caseApi.update(selectedCase.id, editCase)
-      if (response.code === 0) {
-        setShowEditModal(false)
-        setSelectedCase(null)
-        loadCases()
-      }
-    } catch (error) {
-      console.error('Failed to update case:', error)
-    }
-  }
-
-  const handleDeleteCase = async () => {
-    if (!selectedCase) return
-    try {
-      const response = await caseApi.delete(selectedCase.id)
-      if (response.code === 0) {
-        setShowDeleteModal(false)
-        setSelectedCase(null)
-        loadCases()
-      }
-    } catch (error) {
-      console.error('Failed to delete case:', error)
-    }
-  }
-
-  const handleBatchDelete = async () => {
-    if (selectedCases.size === 0) return
-    try {
-      for (const id of selectedCases) {
-        await caseApi.delete(id)
-      }
-      setSelectedCases(new Set())
-      loadCases()
-    } catch (error) {
-      console.error('Failed to batch delete cases:', error)
-    }
-  }
-
-  const openEditModal = (case_: Case) => {
-    setSelectedCase(case_)
-    setEditCase({
-      title: case_.title,
-      description: case_.description,
-      target: case_.target || '',
-      status: case_.status,
-      tags: case_.tags || [],
-    })
-    setShowEditModal(true)
-  }
-
-  const openDeleteModal = (case_: Case) => {
-    setSelectedCase(case_)
-    setShowDeleteModal(true)
-  }
-
-  const toggleSelect = (id: string) => {
-    const newSelected = new Set(selectedCases)
-    if (newSelected.has(id)) {
-      newSelected.delete(id)
-    } else {
-      newSelected.add(id)
-    }
-    setSelectedCases(newSelected)
-  }
-
-  const toggleSelectAll = () => {
-    if (selectedCases.size === cases.length) {
-      setSelectedCases(new Set())
-    } else {
-      setSelectedCases(new Set(cases.map(c => c.id)))
-    }
-  }
-
   if (loading) {
     return <div className="text-center py-12 text-gray-500">Loading cases...</div>
   }
@@ -214,18 +124,6 @@ export default function CasesPage() {
         </div>
       </div>
 
-      {/* Batch Operations */}
-      {selectedCases.size > 0 && (
-        <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-lg p-4 flex justify-between items-center">
-          <span className="text-sm text-indigo-700 dark:text-indigo-300">
-            {selectedCases.size} case{selectedCases.size !== 1 ? 's' : ''} selected
-          </span>
-          <Button variant="destructive" size="sm" onClick={handleBatchDelete}>
-            Delete selected
-          </Button>
-        </div>
-      )}
-
       <div className="bg-white dark:bg-gray-800 shadow rounded-lg border border-gray-200 dark:border-gray-700">
         <div className="px-4 py-5 sm:p-6">
           {cases.length === 0 ? (
@@ -237,30 +135,17 @@ export default function CasesPage() {
           ) : (
             <ul className="divide-y divide-gray-200 dark:divide-gray-700">
               <li className="py-2 flex items-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                <Checkbox
-                  checked={selectedCases.size === cases.length && cases.length > 0}
-                  onCheckedChange={toggleSelectAll}
-                  className="mr-4"
-                />
                 <span className="flex-1">Title</span>
                 <span className="w-24">Status</span>
                 <span className="w-32">Created</span>
-                <span className="w-24">Actions</span>
               </li>
               {cases.map((case_) => (
                 <li
                   key={case_.id}
-                  className="py-4 flex items-center hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                  className="py-4 flex items-center hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors cursor-pointer"
+                  onClick={() => router.push(`/dashboard/cases/${case_.id}`)}
                 >
-                  <Checkbox
-                    checked={selectedCases.has(case_.id)}
-                    onCheckedChange={() => toggleSelect(case_.id)}
-                    className="mr-4"
-                  />
-                  <div
-                    className="flex-1 cursor-pointer"
-                    onClick={() => router.push(`/dashboard/cases/${case_.id}`)}
-                  >
+                  <div className="flex-1">
                     <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">{case_.title}</p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">{case_.description}</p>
                     {case_.target && (
@@ -278,23 +163,6 @@ export default function CasesPage() {
                   </div>
                   <div className="w-32 text-xs text-gray-400">
                     {new Date(case_.created_at).toLocaleDateString()}
-                  </div>
-                  <div className="w-24 flex space-x-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openEditModal(case_)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openDeleteModal(case_)}
-                      className="text-red-600 hover:text-red-800 dark:text-red-400"
-                    >
-                      Delete
-                    </Button>
                   </div>
                 </li>
               ))}
@@ -346,86 +214,6 @@ export default function CasesPage() {
               </Button>
             </DialogFooter>
           </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Modal */}
-      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Case</DialogTitle>
-          </DialogHeader>
-          {selectedCase && (
-            <form onSubmit={handleEditCase}>
-              <div className="mb-4">
-                <Label htmlFor="edit-title">Title</Label>
-                <Input
-                  id="edit-title"
-                  required
-                  value={editCase.title}
-                  onChange={(e) => setEditCase({ ...editCase, title: e.target.value })}
-                />
-              </div>
-              <div className="mb-4">
-                <Label htmlFor="edit-description">Description</Label>
-                <Textarea
-                  id="edit-description"
-                  rows={3}
-                  value={editCase.description}
-                  onChange={(e) => setEditCase({ ...editCase, description: e.target.value })}
-                />
-              </div>
-              <div className="mb-4">
-                <Label htmlFor="edit-target">Target</Label>
-                <Input
-                  id="edit-target"
-                  value={editCase.target}
-                  onChange={(e) => setEditCase({ ...editCase, target: e.target.value })}
-                />
-              </div>
-              <div className="mb-4">
-                <Label htmlFor="edit-status">Status</Label>
-                <Select value={editCase.status} onValueChange={(value) => setEditCase({ ...editCase, status: value as 'active' | 'completed' | 'archived' })}>
-                  <SelectTrigger id="edit-status">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="archived">Archived</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setShowEditModal(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit">
-                  Save
-                </Button>
-              </DialogFooter>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Modal */}
-      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Delete</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete &quot;{selectedCase?.title}&quot;? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteCase}>
-              Delete
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

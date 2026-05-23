@@ -143,6 +143,27 @@ export default function CaseDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Quick Actions */}
+      <div className="bg-white shadow rounded-lg">
+        <div className="px-4 py-5 sm:p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => router.push(`/dashboard/evidence?case_id=${case_.id}`)}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+            >
+              View Evidence
+            </button>
+            <button
+              onClick={() => router.push(`/dashboard/interactions?case_id=${case_.id}`)}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+            >
+              View Interactions
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

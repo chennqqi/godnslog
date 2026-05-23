@@ -1,0 +1,89 @@
+<h2>Sprint F Main Flow</h2>
+<p class="subtitle">Compare two layouts for Cases -> Case Detail -> New Payload -> Payload Detail</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">Option A: Serial Flow</div>
+        <div class="mockup-body">
+          <div class="mock-nav">Cases Board</div>
+          <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:12px;margin-top:12px;">
+            <div class="mock-content">
+              <div style="font-weight:600;margin-bottom:8px;">Case list</div>
+              <div class="placeholder" style="height:44px;">Search + status filter</div>
+              <div class="placeholder" style="height:62px;margin-top:8px;">Case row 1</div>
+              <div class="placeholder" style="height:62px;margin-top:8px;">Case row 2</div>
+              <div class="placeholder" style="height:62px;margin-top:8px;">Case row 3</div>
+            </div>
+            <div class="mock-content">
+              <div style="font-weight:600;margin-bottom:8px;">Primary action</div>
+              <button class="mock-button" style="width:100%;">New Case</button>
+              <div class="placeholder" style="height:170px;margin-top:12px;">Case quick stats</div>
+            </div>
+          </div>
+          <div style="margin-top:14px;border-top:1px solid #dbe3f0;padding-top:10px;font-size:12px;color:#4b5563;">
+            Click case row -> Case Detail -> Create Payload -> Payload Detail
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Option A: Serial Flow</h3>
+      <p>Strongest business path. Cases page stays list-first, then each next page deepens the workflow in order.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">Option B: Case Control Tower</div>
+        <div class="mockup-body">
+          <div class="mock-nav">Cases Board</div>
+          <div style="display:grid;grid-template-columns:1fr 320px;gap:12px;margin-top:12px;">
+            <div class="mock-content">
+              <div style="font-weight:600;margin-bottom:8px;">Case board</div>
+              <div class="placeholder" style="height:44px;">Search + filters + bulk actions</div>
+              <div class="placeholder" style="height:82px;margin-top:8px;">Selected case summary card</div>
+              <div class="placeholder" style="height:62px;margin-top:8px;">Case row 1</div>
+              <div class="placeholder" style="height:62px;margin-top:8px;">Case row 2</div>
+            </div>
+            <div class="mock-sidebar">
+              <div style="font-weight:600;margin-bottom:8px;">Quick actions</div>
+              <button class="mock-button" style="width:100%;margin-bottom:8px;">Create Payload</button>
+              <button class="mock-button" style="width:100%;margin-bottom:8px;">Open Evidence</button>
+              <button class="mock-button" style="width:100%;">Open Interactions</button>
+              <div class="placeholder" style="height:150px;margin-top:12px;">Pinned payloads</div>
+            </div>
+          </div>
+          <div style="margin-top:14px;border-top:1px solid #dbe3f0;padding-top:10px;font-size:12px;color:#4b5563;">
+            Case list and quick actions stay on one screen longer before drilling in.
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Option B: Case Control Tower</h3>
+      <p>Higher information density and faster repeat operations, but weaker page hierarchy and easier to overbuild in Sprint F.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>My Recommendation</h4>
+      <ul>
+        <li>Pick A if Sprint F is about closing the primary Case -> Payload workflow.</li>
+        <li>It keeps Case Detail meaningful instead of collapsing too much back into the list page.</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>Tradeoff</h4>
+      <ul>
+        <li>B is denser and may feel faster for experienced operators.</li>
+        <li>But B increases scope because the list page starts absorbing detail-page responsibilities.</li>
+      </ul>
+    </div>
+  </div>
+</div>
