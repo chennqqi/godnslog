@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useEffect, useState, Suspense, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { interactionApi } from '@/lib/api-client'
 import type { Interaction } from '@/types'
@@ -26,7 +27,7 @@ import {
 /** Radix SelectItem cannot use value="" for "all types" */
 const TYPE_FILTER_ALL = 'all'
 
-export default function InteractionsPage() {
+function InteractionsPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [interactions, setInteractions] = useState<Interaction[]>([])
@@ -44,38 +45,9 @@ export default function InteractionsPage() {
   const payloadId = searchParams.get('payload_id')
   const typeParam = searchParams.get('type')
 
-  // Set type filter from URL param if present
-  useEffect(() => {
-    if (typeParam) {
-      setTypeFilter(typeParam)
-    }
-  }, [typeParam])
-
-  useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      router.push('/login')
-      return
-    }
-    loadInteractions()
-    loadStats()
-  }, [router, caseId, payloadId])
-
-  // Auto-refresh polling
-  useEffect(() => {
-    if (!autoRefresh) return
-
-    const interval = setInterval(() => {
-      loadInteractions()
-      loadStats()
-    }, refreshInterval)
-
-    return () => clearInterval(interval)
-  }, [autoRefresh, refreshInterval])
-
-  const loadInteractions = async () => {
+  const loadInteractions = useCallback(async () => {
     try {
-      const params: any = { page: 1, page_size: 100 }
+      const params: { page: number; page_size: number; case_id?: string; payload_id?: string } = { page: 1, page_size: 100 }
       if (caseId) params.case_id = caseId
       if (payloadId) params.payload_id = payloadId
       const response = await interactionApi.list(params)
@@ -87,11 +59,11 @@ export default function InteractionsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [caseId, payloadId])
 
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
-      const params: any = {}
+      const params: { case_id?: string; payload_id?: string } = {}
       if (caseId) params.case_id = caseId
       if (payloadId) params.payload_id = payloadId
       const response = await interactionApi.stats(params)
@@ -107,7 +79,36 @@ export default function InteractionsPage() {
     } catch (error) {
       console.error('Failed to load stats:', error)
     }
-  }
+  }, [caseId, payloadId])
+
+  // Set type filter from URL param if present
+  useEffect(() => {
+    if (typeParam) {
+      setTypeFilter(typeParam)
+    }
+  }, [typeParam])
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/login')
+      return
+    }
+    loadInteractions()
+    loadStats()
+  }, [router, caseId, payloadId, loadInteractions, loadStats])
+
+  // Auto-refresh polling
+  useEffect(() => {
+    if (!autoRefresh) return
+
+    const interval = setInterval(() => {
+      loadInteractions()
+      loadStats()
+    }, refreshInterval)
+
+    return () => clearInterval(interval)
+  }, [autoRefresh, refreshInterval, loadInteractions, loadStats])
 
   const clearScope = () => {
     router.push('/dashboard/interactions')
@@ -526,5 +527,13 @@ export default function InteractionsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function InteractionsPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12">加载中...</div>}>
+      <InteractionsPageContent />
+    </Suspense>
   )
 }

@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useEffect, useState, Suspense, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { caseApi, evidenceApi } from '@/lib/api-client'
-import type { Case, Evidence, EvidenceResponse } from '@/types'
+import type { Case, Evidence } from '@/types'
 
-export default function EvidenceReportPage() {
+function EvidenceReportContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [cases, setCases] = useState<Case[]>([])
@@ -22,6 +23,56 @@ export default function EvidenceReportPage() {
   const payloadId = searchParams.get('payload_id')
   const formatParam = searchParams.get('format')
 
+  const loadCases = useCallback(async () => {
+    try {
+      const response = await caseApi.list({ page: 1, page_size: 100 })
+      if (response.data) {
+        setCases(response.data.items || [])
+      }
+    } catch (error) {
+      console.error('Failed to load cases:', error)
+      setError('加载Case列表失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const handleGenerateWithScope = useCallback(async (id: string, scope: 'case' | 'payload') => {
+    setGenerating(true)
+    setError('')
+    setEvidence(null)
+    setReportContent('')
+    try {
+      const params: { format: 'json' | 'markdown'; case_id?: string; payload_id?: string } = { format }
+      if (scope === 'case') {
+        params.case_id = id
+      } else {
+        params.payload_id = id
+      }
+      const response = await evidenceApi.generate(params)
+      if (response.code === 0 && response.data) {
+        setEvidence(response.data.evidence)
+        setReportContent(response.data.content)
+      } else {
+        setError(response.message || '生成证据失败')
+      }
+    } catch (error: unknown) {
+      console.error('Failed to generate evidence:', error)
+      if (error && typeof error === 'object' && 'response' in error) {
+        const err = error as { response?: { status?: number } }
+        if (err.response?.status === 404) {
+          setError('未找到该证据数据')
+        } else {
+          setError('生成证据失败: 未知错误')
+        }
+      } else {
+        setError('生成证据失败: 未知错误')
+      }
+    } finally {
+      setGenerating(false)
+    }
+  }, [format])
+
   // Set format from URL param if present
   useEffect(() => {
     if (formatParam === 'json' || formatParam === 'markdown') {
@@ -36,7 +87,7 @@ export default function EvidenceReportPage() {
       return
     }
     loadCases()
-  }, [router])
+  }, [router, loadCases])
 
   // Auto-generate evidence if case_id or payload_id is in URL
   useEffect(() => {
@@ -46,21 +97,7 @@ export default function EvidenceReportPage() {
     } else if (payloadId) {
       handleGenerateWithScope(payloadId, 'payload')
     }
-  }, [caseId, payloadId, cases])
-
-  const loadCases = async () => {
-    try {
-      const response = await caseApi.list({ page: 1, page_size: 100 })
-      if (response.data) {
-        setCases(response.data.items || [])
-      }
-    } catch (error) {
-      console.error('Failed to load cases:', error)
-      setError('加载Case列表失败')
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [caseId, payloadId, cases, handleGenerateWithScope])
 
   const handleGenerate = async () => {
     if (!selectedCase) return
@@ -79,43 +116,17 @@ export default function EvidenceReportPage() {
       } else {
         setError(response.message || '生成证据失败')
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to generate evidence:', error)
-      if (error.response?.status === 404) {
-        setError('未找到该Case的证据数据')
+      if (error && typeof error === 'object' && 'response' in error) {
+        const err = error as { response?: { status?: number } }
+        if (err.response?.status === 404) {
+          setError('未找到该Case的证据数据')
+        } else {
+          setError('生成证据失败: 未知错误')
+        }
       } else {
-        setError('生成证据失败: ' + (error.message || '未知错误'))
-      }
-    } finally {
-      setGenerating(false)
-    }
-  }
-
-  const handleGenerateWithScope = async (id: string, scope: 'case' | 'payload') => {
-    setGenerating(true)
-    setError('')
-    setEvidence(null)
-    setReportContent('')
-    try {
-      const params: any = { format }
-      if (scope === 'case') {
-        params.case_id = id
-      } else {
-        params.payload_id = id
-      }
-      const response = await evidenceApi.generate(params)
-      if (response.code === 0 && response.data) {
-        setEvidence(response.data.evidence)
-        setReportContent(response.data.content)
-      } else {
-        setError(response.message || '生成证据失败')
-      }
-    } catch (error: any) {
-      console.error('Failed to generate evidence:', error)
-      if (error.response?.status === 404) {
-        setError('未找到该证据数据')
-      } else {
-        setError('生成证据失败: ' + (error.message || '未知错误'))
+        setError('生成证据失败: 未知错误')
       }
     } finally {
       setGenerating(false)
@@ -358,5 +369,13 @@ export default function EvidenceReportPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function EvidenceReportPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12">加载中...</div>}>
+      <EvidenceReportContent />
+    </Suspense>
   )
 }
