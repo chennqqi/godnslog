@@ -21,6 +21,14 @@ import type {
   AuditLogListResponse,
 } from '@/types'
 
+interface UnknownItemListResponse {
+  items: never[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
 // Auth API
 export const authApi = {
   login: (data: LoginRequest) => api.post<LoginResponse>('/auth/login', data),
@@ -71,7 +79,7 @@ export const interactionApi = {
     api.get<InteractionStats>('/interactions/stats', params),
   get: (id: string) => api.get<{ data: Interaction }>(`/interactions/${id}`),
   delete: (ids: string[]) => api.post('/interactions/delete', { ids }),
-  export: (data: any) => api.post('/interactions/export', data),
+  export: (data: Record<string, unknown>) => api.post('/interactions/export', data),
 }
 
 // APIKey API
@@ -87,26 +95,26 @@ export const apiKeyApi = {
 // Users API
 export const usersApi = {
   list: (params?: { page?: number; page_size?: number }) =>
-    api.get<any>('/users', params),
+    api.get<UnknownItemListResponse>('/users', params),
 }
 
 // Marketplace API
 export const marketplaceApi = {
   listPlugins: (params?: { page?: number; page_size?: number }) =>
-    api.get<any>('/marketplace/plugins', params),
-  getPlugin: (id: string) => api.get<any>(`/marketplace/plugins/${id}`),
+    api.get<UnknownItemListResponse>('/marketplace/plugins', params),
+  getPlugin: (id: string) => api.get<unknown>(`/marketplace/plugins/${id}`),
   listTemplates: (params?: { page?: number; page_size?: number }) =>
-    api.get<any>('/marketplace/templates', params),
-  getTemplate: (id: string) => api.get<any>(`/marketplace/templates/${id}`),
+    api.get<UnknownItemListResponse>('/marketplace/templates', params),
+  getTemplate: (id: string) => api.get<unknown>(`/marketplace/templates/${id}`),
 }
 
 // Rules/Workflow API
 export const rulesApi = {
   list: (params?: { page?: number; page_size?: number }) =>
-    api.get<any>('/rules', params),
-  get: (id: string) => api.get<any>(`/rules/${id}`),
-  create: (data: any) => api.post<any>('/rules', data),
-  update: (id: string, data: any) => api.put<any>(`/rules/${id}`, data),
+    api.get<UnknownItemListResponse>('/rules', params),
+  get: (id: string) => api.get<unknown>(`/rules/${id}`),
+  create: (data: Record<string, unknown>) => api.post<never>('/rules', data),
+  update: (id: string, data: Record<string, unknown>) => api.put<unknown>(`/rules/${id}`, data),
   delete: (id: string) => api.delete(`/rules/${id}`),
 }
 

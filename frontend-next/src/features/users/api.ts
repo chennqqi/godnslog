@@ -4,7 +4,7 @@ import type { User, UserCreateRequest, UserListResponse } from '@/types'
 export const userFeaturesApi = {
   list: async (params: { page?: number; page_size?: number }): Promise<UserListResponse> => {
     const response = await usersApi.list(params)
-    return response.data
+    return response.data as UserListResponse
   },
 
   get: async (id: string): Promise<User> => {

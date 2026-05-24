@@ -1,5 +1,5 @@
 // API Response types
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   code: number
   message: string
   timestamp?: number
@@ -209,9 +209,9 @@ export interface Settings {
   log_retention_days: number
 }
 
-export interface SettingsCreateRequest extends Partial<Settings> {}
+export type SettingsCreateRequest = Partial<Settings>
 
-export interface SettingsUpdateRequest extends Partial<Settings> {}
+export type SettingsUpdateRequest = Partial<Settings>
 
 // User management types
 export interface UserCreateRequest {
@@ -275,7 +275,7 @@ export interface AuditLog {
   error_message?: string
   ip_address: string
   user_agent: string
-  details?: Record<string, any>
+  details?: Record<string, unknown>
   timestamp: string
   created_at: string
 }
