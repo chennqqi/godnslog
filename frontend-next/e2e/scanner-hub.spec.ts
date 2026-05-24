@@ -25,6 +25,22 @@ const mockPayload = {
   updated_at: '2026-05-24T00:00:00Z',
 }
 
+const mockScannerRun = {
+  id: 'scanner-run-1',
+  case_id: 'case-1',
+  payload_id: 'payload-1',
+  scanner: 'nuclei',
+  target: 'https://target.example',
+  template: 'ssrf-basic',
+  delivery_method: 'nuclei-jsonl',
+  command: "nuclei -u 'https://target.example' -t godnslog-ssrf-basic.yaml -var 'godnslog_payload=http://tok-abc123.example.com/callback'",
+  jsonl: '{"scanner":"nuclei","case_id":"case-1","payload_id":"payload-1","token":"tok-abc123","target":"https://target.example","template":"ssrf-basic","rendered_payload":"http://tok-abc123.example.com/callback","interactions_url":"http://localhost:3000/api/v2/interactions?payload_id=payload-1","evidence_url":"http://localhost:3000/dashboard/evidence?payload_id=payload-1","created_at":"2026-05-24T00:00:00.000Z"}',
+  status: 'created',
+  created_by: 'admin',
+  created_at: '2026-05-24T00:00:00Z',
+  updated_at: '2026-05-24T00:00:00Z',
+}
+
 async function installScannerHubMocks(page: Page) {
   await page.route('**/api/v2/cases**', route => {
     route.fulfill({
@@ -58,6 +74,32 @@ async function installScannerHubMocks(page: Page) {
         code: 0,
         data: {
           items: [mockPayload],
+          total: 1,
+          page: 1,
+          page_size: 100,
+          total_pages: 1,
+        },
+      },
+    })
+  })
+
+  await page.route('**/api/v2/scanner-runs**', route => {
+    if (route.request().method() === 'POST') {
+      return route.fulfill({
+        json: {
+          code: 0,
+          data: {
+            data: mockScannerRun,
+          },
+        },
+      })
+    }
+
+    return route.fulfill({
+      json: {
+        code: 0,
+        data: {
+          items: [mockScannerRun],
           total: 1,
           page: 1,
           page_size: 100,
@@ -167,6 +209,97 @@ test.describe('Scanner Hub', () => {
       interactions_url: 'http://localhost:3000/api/v2/interactions?payload_id=payload-1',
       evidence_url: 'http://localhost:3000/dashboard/evidence?payload_id=payload-1',
     })
+  })
+
+  test('should call scanner-runs API when generating scanner run', async ({ page }) => {
+    await openScannerHub(page)
+    const scannerRunRequest = page.waitForRequest(request => {
+      if (!request.url().endsWith('/api/v2/scanner-runs') || request.method() !== 'POST') return false
+      const body = request.postDataJSON() as { case_id?: string; payload_id?: string; scanner?: string }
+      return body.case_id === 'case-1' && body.payload_id === 'payload-1' && body.scanner === 'nuclei'
+    })
+
+    await page.getByRole('combobox').nth(0).click()
+    await page.getByRole('option', { name: 'Nuclei SSRF Scan' }).click()
+    await page.getByPlaceholder('example.com').fill('https://target.example')
+    await page.getByRole('combobox').nth(2).click()
+    await page.getByRole('option', { name: 'tok-abc123' }).click()
+    await page.getByRole('button', { name: '生成 Scanner Run' }).click()
+    await scannerRunRequest
+  })
+
+  test('should display recent scanner runs list', async ({ page }) => {
+    await openScannerHub(page)
+    await expect(page.getByText('最近的 Scanner Runs')).toBeVisible()
+    // The empty state message may vary, just check the section exists
+    await expect(page.locator('text=最近的 Scanner Runs')).toBeVisible()
+  })
+
+  test('should navigate to scanner run detail page', async ({ page }) => {
+    await openScannerHub(page)
+    await page.getByRole('combobox').nth(0).click()
+    await page.getByRole('option', { name: 'Nuclei SSRF Scan' }).click()
+    await page.getByPlaceholder('example.com').fill('https://target.example')
+    await page.getByRole('combobox').nth(2).click()
+    await page.getByRole('option', { name: 'tok-abc123' }).click()
+    await page.getByRole('button', { name: '生成 Scanner Run' }).click()
+
+    // Wait for scanner run to be created and navigate to detail
+    await page.waitForTimeout(1000)
+    await page.getByRole('button', { name: '查看详情' }).click()
+    await page.waitForURL('**/dashboard/scanner-hub/**')
+    expect(page.url()).toContain('/dashboard/scanner-hub/')
+  })
+
+  test('should update scanner run status on detail page', async ({ page }) => {
+    // Directly navigate to detail page with proper mock
+    await page.goto('http://localhost:3000/dashboard/scanner-hub/run-1')
+
+    // Mock detail page API and status update API
+    await page.route('**/api/v2/scanner-runs/*', route => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill({
+          json: {
+            code: 0,
+            message: 'success',
+            data: {
+              data: {
+                ...mockScannerRun,
+                id: 'run-1',
+                status: 'created',
+                interaction_count: 0,
+                evidence_count: 0,
+                interactions_url: 'http://localhost:3000/api/v2/interactions?payload_id=payload-1',
+                evidence_url: 'http://localhost:3000/dashboard/evidence?payload_id=payload-1',
+              },
+            },
+          },
+        })
+      }
+      if (route.request().method() === 'PUT' && route.request().url().includes('/status')) {
+        return route.fulfill({
+          json: {
+            code: 0,
+            message: 'success',
+            data: { ...mockScannerRun, status: 'distributed' },
+          },
+        })
+      }
+    })
+
+    // Wait for page to load
+    await page.waitForLoadState('networkidle')
+
+    // Wait for status update request
+    const statusUpdateRequest = page.waitForRequest(request => {
+      if (!request.url().includes('/api/v2/scanner-runs/') || !request.url().includes('/status') || request.method() !== 'PUT') return false
+      const body = request.postDataJSON() as { status?: string }
+      return body.status === 'distributed'
+    })
+
+    // Click status update button
+    await page.getByRole('button', { name: 'Distributed' }).click()
+    await statusUpdateRequest
   })
 
   test('should expose copy controls for payload command and JSONL', async ({ page }) => {

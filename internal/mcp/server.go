@@ -322,13 +322,32 @@ func (s *Server) waitForInteraction(ctx context.Context, args map[string]interfa
 	// In production, use WebSocket or SSE
 	result, err := s.pollInteractions(ctx, token, timeout)
 	if err != nil {
-		// Update agent run status to failed if agent_run_id is provided
+		// Update agent run status to failed and append failed operation if agent_run_id is provided
 		if agentRunID != "" {
+			// Try to update status to failed
 			_, err2 := s.apiCall("PUT", fmt.Sprintf("/api/v2/agent-runs/%s/status", agentRunID), map[string]interface{}{
 				"status": "failed",
 			})
 			if err2 != nil {
 				log.Printf("Failed to update agent run status to failed: %v", err2)
+			}
+
+			// Always try to append failed operation even if status update failed
+			_, err3 := s.apiCall("POST", fmt.Sprintf("/api/v2/agent-runs/%s/operations", agentRunID), map[string]interface{}{
+				"action":     "wait_for_interaction",
+				"risk_level": "high",
+				"request": map[string]interface{}{
+					"token":   token,
+					"timeout": timeout,
+				},
+				"result": map[string]interface{}{
+					"success": false,
+					"error":   err.Error(),
+				},
+				"error": err.Error(),
+			})
+			if err3 != nil {
+				log.Printf("Failed to append failed agent operation: %v", err3)
 			}
 		}
 		return ToolResult{Success: false, Error: err.Error()}, nil

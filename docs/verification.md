@@ -167,10 +167,17 @@ cd frontend-next && npm run build
 **Frontend E2E Tests:**
 ```bash
 cd frontend-next && npx playwright test agent-runs.spec.ts --reporter=line
-# Result: 2 passed (4.5s)
-# Tests cover: list page load, detail page load
+# Result: 3 passed (6.4s)
+# Tests cover:
+#   - API request assertions (verify GET /api/v2/agent-runs is called)
+#   - Filter query verification (status filter returns empty results)
+#   - Detail page data verification (title, agent_id, operator_id, target, interaction_count)
+#   - Operation timeline verification (2 operations, actions, risk levels)
+#   - Interactions/Evidence backlink verification (href contains payload_id)
+#   - Case/Payload link verification (href contains correct paths)
+#   - Status update API call verification (PUT /api/v2/agent-runs/{id}/status)
 # Note: Tests use auth mocking to bypass login redirect
-# Basic page load verification - no skip
+# No test.skip - all tests are real chain tests
 ```
 
 **Frontend Lint:**
@@ -196,23 +203,24 @@ Sprint J implementation completed with all high-priority tasks:
   - waitForInteraction updates Agent Run status and appends operations
   - summarizeEvidence and exportReport append operations to Agent Run
 - ✅ MCP operation/status failures now return errors instead of silent logging
+- ✅ MCP wait_for_interaction poll failure writes failed operation even if status update fails
 - ✅ Frontend types updated (frontend-next/src/types/index.ts)
 - ✅ Frontend API client updated (frontend-next/src/lib/api-client.ts)
 - ✅ Agent Runs list page created (frontend-next/src/app/dashboard/agent-runs/page.tsx)
 - ✅ Agent Run detail page created (frontend-next/src/app/dashboard/agent-runs/[id]/page.tsx)
-- ✅ E2E test file created with auth mocking (frontend-next/e2e/agent-runs.spec.ts)
+- ✅ E2E tests with real chain assertions (frontend-next/e2e/agent-runs.spec.ts)
+  - API request assertions
+  - Filter query verification
+  - Detail data verification
+  - Operation timeline verification
+  - Interactions/Evidence backlink verification
+  - Status update API call verification
 - ✅ Frontend build successful
 - ✅ SQLite column name compatibility fixed (agent_i_d, case_i_d, etc.)
 - ✅ UpdateAgentRunStatus audit now correctly records from_status
 - ✅ AppendAgentOperation returns error for non-existent Agent Run
 - ✅ MCP server tests adapted to mock /api/v2/agent-runs calls
 - ✅ ESLint react-hooks/set-state-in-effect issue fixed
-
-**Known Limitations (deferred to Sprint J+):**
-- ⚠️ E2E tests are basic page load tests only
-  - TODO: Add full chain tests with API call assertions, filter queries, operation timeline verification
-  - Current: Basic page load verification with auth mocking
-  - This is acceptable for Sprint J as core functionality is verified via backend tests
 
 **Core Achievement:**
 Sprint J establishes the Agent Run persistence model with:
@@ -223,4 +231,6 @@ Sprint J establishes the Agent Run persistence model with:
 - Audit events implemented (agent_run.created, agent_run.status_updated, agent_operation.<action>)
 - MCP audit binding: all MCP tool operations are now tracked in Agent Run context
 - MCP operation/status failures return errors instead of being silently swallowed
+- MCP wait_for_interaction poll failure reliably writes failed operation even if status update fails
 - Audit logs correctly record status transitions with from_status/to_status
+- E2E tests verify real chain behavior with API assertions, filter queries, detail data, operation timeline, and backlinks

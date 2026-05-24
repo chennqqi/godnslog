@@ -1,24 +1,12 @@
 /**
  * Scanner Hub Helper Functions
- * 
+ *
  * Provides utilities for generating Nuclei commands and JSONL records
  * for scanner integration with GODNSLOG.
  */
 
-export interface ScannerRun {
-  id: string
-  case_id: string
-  payload_id: string
-  scanner: 'nuclei'
-  target: string
-  template: 'ssrf-basic' | 'xxe-basic' | 'rce-callback'
-  delivery_method: 'nuclei-jsonl' | 'nuclei-var'
-  command: string
-  jsonl: string
-  status: 'created' | 'distributed' | 'observed' | 'evidenced'
-  created_at: string
-  updated_at: string
-}
+import { scannerRunApi } from './api-client'
+import type { ScannerRun, ScannerRunCreateRequest } from '@/types'
 
 export interface ScannerRunInput {
   case_id: string
@@ -85,25 +73,24 @@ export function generateWebUrls(input: ScannerRunInput): {
 }
 
 /**
- * Create a Scanner Run object (in-memory, not persisted)
+ * Create a Scanner Run via API (persisted to backend)
  */
-export function createScannerRun(input: ScannerRunInput, deliveryMethod: 'nuclei-jsonl' | 'nuclei-var'): ScannerRun {
-  const command = generateNucleiCommand(input)
-  const jsonl = generateJsonlRecord(input)
-  const now = new Date().toISOString()
-  
-  return {
-    id: `scanner-${Date.now()}`,
+export async function createScannerRun(
+  input: ScannerRunInput,
+  deliveryMethod: 'nuclei-jsonl' | 'nuclei-var'
+): Promise<ScannerRun> {
+  const req: ScannerRunCreateRequest = {
     case_id: input.case_id,
     payload_id: input.payload_id,
     scanner: 'nuclei',
     target: input.target,
     template: input.template,
     delivery_method: deliveryMethod,
-    command,
-    jsonl,
-    status: 'created',
-    created_at: now,
-    updated_at: now
   }
+
+  const response = await scannerRunApi.create(req)
+  if (!response || !response.data) {
+    throw new Error('Failed to create scanner run: invalid response')
+  }
+  return response.data.data
 }

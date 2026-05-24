@@ -287,3 +287,130 @@ export interface AuditLogListResponse {
   page_size: number
   total_pages: number
 }
+
+// Scanner Run types
+export interface ScannerRun {
+  id: string
+  case_id: string
+  payload_id: string
+  scanner: 'nuclei'
+  target: string
+  template: 'ssrf-basic' | 'xxe-basic' | 'rce-callback'
+  delivery_method: 'nuclei-jsonl' | 'nuclei-var'
+  command: string
+  jsonl: string
+  status: 'created' | 'distributed' | 'observed' | 'evidenced'
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ScannerRunDetail extends ScannerRun {
+  interaction_count: number
+  last_interaction_at?: string
+  evidence_count: number
+  latest_evidence_id?: string
+  interactions_url: string
+  evidence_url: string
+}
+
+export interface ScannerRunCreateRequest {
+  case_id: string
+  payload_id: string
+  scanner: 'nuclei'
+  target: string
+  template: string
+  delivery_method: 'nuclei-jsonl' | 'nuclei-var'
+}
+
+export interface ScannerRunUpdateStatusRequest {
+  status: 'created' | 'distributed' | 'observed' | 'evidenced'
+}
+
+export interface ScannerRunListResponse {
+  items: ScannerRun[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+// Agent Run types
+export type AgentRunStatus = 'created' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled' | 'timed_out'
+
+export interface AgentRun {
+  id: string
+  agent_id: string
+  operator_id: string
+  case_id: string
+  payload_id: string
+  target: string
+  title: string
+  status: AgentRunStatus
+  started_at?: string
+  ended_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AgentOperation {
+  id: string
+  agent_run_id: string
+  agent_id: string
+  action: string
+  risk_level?: string
+  request: string
+  result: string
+  error?: string
+  started_at: string
+  ended_at?: string
+  created_at: string
+}
+
+export interface AgentRunDetail extends AgentRun {
+  interaction_count: number
+  last_interaction_at?: string
+  operations: AgentOperation[]
+  case_url: string
+  payload_url: string
+  interactions_url: string
+  evidence_url: string
+}
+
+export interface AgentRunCreateRequest {
+  agent_id: string
+  operator_id: string
+  case_id?: string
+  payload_id?: string
+  target: string
+  title: string
+}
+
+export interface AgentRunUpdateStatusRequest {
+  status: AgentRunStatus
+}
+
+export interface AgentRunListRequest {
+  agent_id?: string
+  case_id?: string
+  payload_id?: string
+  status?: string
+  page?: number
+  page_size?: number
+}
+
+export interface AgentRunListResponse {
+  items: AgentRunDetail[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+export interface AgentOperationCreateRequest {
+  action: string
+  risk_level?: string
+  request?: Record<string, unknown>
+  result?: Record<string, unknown>
+  error?: string
+}

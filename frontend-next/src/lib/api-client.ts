@@ -19,6 +19,18 @@ import type {
   EvidenceRequest,
   EvidenceResponse,
   AuditLogListResponse,
+  ScannerRun,
+  ScannerRunDetail,
+  ScannerRunCreateRequest,
+  ScannerRunUpdateStatusRequest,
+  ScannerRunListResponse,
+  AgentRun,
+  AgentRunDetail,
+  AgentRunCreateRequest,
+  AgentRunUpdateStatusRequest,
+  AgentRunListRequest,
+  AgentRunListResponse,
+  AgentOperationCreateRequest,
 } from '@/types'
 
 interface UnknownItemListResponse {
@@ -134,4 +146,32 @@ export const auditApi = {
     page?: number
     page_size?: number
   }) => api.get<AuditLogListResponse>('/audit/logs', params),
+}
+
+// Scanner Run API
+export const scannerRunApi = {
+  list: (params?: {
+    case_id?: string
+    payload_id?: string
+    scanner?: string
+    status?: string
+    page?: number
+    page_size?: number
+  }) => api.get<ScannerRunListResponse>('/scanner-runs', params),
+  get: (id: string) => api.get<{ data: ScannerRunDetail }>(`/scanner-runs/${id}`),
+  create: (data: ScannerRunCreateRequest) => api.post<{ data: ScannerRun }>('/scanner-runs', data),
+  updateStatus: (id: string, data: ScannerRunUpdateStatusRequest) =>
+    api.put<{ data: ScannerRun }>(`/scanner-runs/${id}/status`, data),
+}
+
+// Agent Run API
+export const agentRunApi = {
+  list: (params?: AgentRunListRequest) =>
+    api.get<AgentRunListResponse>('/agent-runs', params),
+  get: (id: string) => api.get<{ data: AgentRunDetail }>(`/agent-runs/${id}`),
+  create: (data: AgentRunCreateRequest) => api.post<{ data: AgentRun }>('/agent-runs', data),
+  updateStatus: (id: string, data: AgentRunUpdateStatusRequest) =>
+    api.put<{ data: AgentRun }>(`/agent-runs/${id}/status`, data),
+  appendOperation: (id: string, data: AgentOperationCreateRequest) =>
+    api.post<{ data: AgentRun }>(`/agent-runs/${id}/operations`, data),
 }

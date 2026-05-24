@@ -8,12 +8,14 @@ import (
 	"time"
 
 	"github.com/chennqqi/godnslog/cache"
+	"github.com/chennqqi/godnslog/internal/agentrun"
 	"github.com/chennqqi/godnslog/internal/auth"
 	"github.com/chennqqi/godnslog/internal/canary"
 	"github.com/chennqqi/godnslog/internal/interaction"
 	"github.com/chennqqi/godnslog/internal/listener"
 	"github.com/chennqqi/godnslog/internal/notification"
 	"github.com/chennqqi/godnslog/internal/payload"
+	"github.com/chennqqi/godnslog/internal/scannerhub"
 	"github.com/dgrijalva/jwt-go"
 
 	v2models "github.com/chennqqi/godnslog/internal/models"
@@ -172,6 +174,25 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			settings.GET("/:key", self.v2GetSetting)
 			settings.PUT("/:key", self.v2UpdateSetting)
 			settings.DELETE("/:key", self.v2DeleteSetting)
+		}
+
+		// Scanner Hub
+		scannerRuns := v2.Group("/scanner-runs", self.authHandler)
+		{
+			scannerRuns.GET("", self.v2ListScannerRuns)
+			scannerRuns.POST("", self.v2CreateScannerRun)
+			scannerRuns.GET("/:id", self.v2GetScannerRun)
+			scannerRuns.PUT("/:id/status", self.v2UpdateScannerRunStatus)
+		}
+
+		// Agent Runs
+		agentRuns := v2.Group("/agent-runs", self.authHandler)
+		{
+			agentRuns.GET("", self.v2ListAgentRuns)
+			agentRuns.POST("", self.v2CreateAgentRun)
+			agentRuns.GET("/:id", self.v2GetAgentRun)
+			agentRuns.PUT("/:id/status", self.v2UpdateAgentRunStatus)
+			agentRuns.POST("/:id/operations", self.v2AppendAgentOperation)
 		}
 	}
 }
@@ -3080,5 +3101,354 @@ func (self *WebServer) v2ListAuditLogs(c *gin.Context) {
 		"code":    0,
 		"message": "success",
 		"data":    resp,
+	})
+}
+
+// v2ListScannerRuns lists scanner runs with filtering
+func (self *WebServer) v2ListScannerRuns(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	caseID := c.Query("case_id")
+	payloadID := c.Query("payload_id")
+	scanner := c.Query("scanner")
+	status := c.Query("status")
+
+	scannerHubService := scannerhub.NewService(self.orm)
+	resp, err := scannerHubService.ListScannerRuns(caseID, payloadID, scanner, status, page, pageSize)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2ListScannerRuns] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to list scanner runs",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    resp,
+	})
+}
+
+// v2CreateScannerRun creates a new scanner run
+func (self *WebServer) v2CreateScannerRun(c *gin.Context) {
+	var req v2models.ScannerRunCreateRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": fmt.Sprintf("invalid request: %v", err),
+		})
+		return
+	}
+
+	user := c.MustGet("user").(*models.TblUser)
+	userID := strconv.FormatInt(user.Id, 10)
+
+	// Build base URL from request
+	baseURL := fmt.Sprintf("%s://%s", c.Request.URL.Scheme, c.Request.Host)
+	if baseURL == "://" {
+		baseURL = "http://" + c.Request.Host
+	}
+
+	scannerHubService := scannerhub.NewService(self.orm)
+	scannerRun, err := scannerHubService.CreateScannerRun(&req, userID, baseURL)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2CreateScannerRun] error: %v", err)
+		if err == scannerhub.ErrInvalidCase {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"code":    400,
+				"message": "case not found",
+			})
+			return
+		}
+		if err == scannerhub.ErrInvalidPayload {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"code":    400,
+				"message": "payload not found",
+			})
+			return
+		}
+		if err == scannerhub.ErrPayloadNotInCase {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"code":    400,
+				"message": "payload does not belong to case",
+			})
+			return
+		}
+		if err == scannerhub.ErrInvalidScanner || err == scannerhub.ErrInvalidDelivery {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"code":    400,
+				"message": "invalid scanner or delivery method",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to create scanner run",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    scannerRun,
+	})
+}
+
+// v2GetScannerRun gets a scanner run by ID with derived fields
+func (self *WebServer) v2GetScannerRun(c *gin.Context) {
+	id := c.Param("id")
+
+	// Build base URL from request
+	baseURL := fmt.Sprintf("%s://%s", c.Request.URL.Scheme, c.Request.Host)
+	if baseURL == "://" {
+		baseURL = "http://" + c.Request.Host
+	}
+
+	scannerHubService := scannerhub.NewService(self.orm)
+	detail, err := scannerHubService.GetScannerRunDetail(id, baseURL)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2GetScannerRun] error: %v", err)
+		if err == scannerhub.ErrScannerRunNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"code":    404,
+				"message": "scanner run not found",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to get scanner run",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    detail,
+	})
+}
+
+// v2UpdateScannerRunStatus updates the status of a scanner run
+func (self *WebServer) v2UpdateScannerRunStatus(c *gin.Context) {
+	id := c.Param("id")
+
+	var req v2models.ScannerRunUpdateStatusRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": fmt.Sprintf("invalid request: %v", err),
+		})
+		return
+	}
+
+	user := c.MustGet("user").(*models.TblUser)
+	userID := strconv.FormatInt(user.Id, 10)
+
+	scannerHubService := scannerhub.NewService(self.orm)
+	err := scannerHubService.UpdateScannerRunStatus(id, &req, userID)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2UpdateScannerRunStatus] error: %v", err)
+		if err == scannerhub.ErrScannerRunNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"code":    404,
+				"message": "scanner run not found",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to update scanner run status",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+	})
+}
+
+// v2ListAgentRuns lists agent runs with filtering
+func (self *WebServer) v2ListAgentRuns(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	agentID := c.Query("agent_id")
+	caseID := c.Query("case_id")
+	payloadID := c.Query("payload_id")
+	status := c.Query("status")
+
+	authService := auth.NewService(self.orm)
+	agentRunService := agentrun.NewService(self.orm, authService)
+
+	req := &v2models.AgentRunListRequest{
+		AgentID:   agentID,
+		CaseID:    caseID,
+		PayloadID: payloadID,
+		Status:    status,
+		Page:      page,
+		PageSize:  pageSize,
+	}
+
+	resp, err := agentRunService.ListAgentRuns(req)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2ListAgentRuns] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to list agent runs",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    resp,
+	})
+}
+
+// v2CreateAgentRun creates a new agent run
+func (self *WebServer) v2CreateAgentRun(c *gin.Context) {
+	var req v2models.AgentRunCreateRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": fmt.Sprintf("invalid request: %v", err),
+		})
+		return
+	}
+
+	user := c.MustGet("user").(*models.TblUser)
+	userID := strconv.FormatInt(user.Id, 10)
+
+	authService := auth.NewService(self.orm)
+	agentRunService := agentrun.NewService(self.orm, authService)
+
+	agentRun, err := agentRunService.CreateAgentRun(&req, userID)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2CreateAgentRun] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to create agent run",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    agentRun,
+	})
+}
+
+// v2GetAgentRun retrieves an agent run by ID
+func (self *WebServer) v2GetAgentRun(c *gin.Context) {
+	id := c.Param("id")
+
+	baseURL := ""
+	if c.Request.TLS != nil {
+		baseURL = "https://" + c.Request.Host
+	} else {
+		baseURL = "http://" + c.Request.Host
+	}
+
+	authService := auth.NewService(self.orm)
+	agentRunService := agentrun.NewService(self.orm, authService)
+
+	detail, err := agentRunService.GetAgentRunDetail(id, baseURL)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2GetAgentRun] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to get agent run",
+		})
+		return
+	}
+
+	if detail == nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    404,
+			"message": "agent run not found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    detail,
+	})
+}
+
+// v2UpdateAgentRunStatus updates the status of an agent run
+func (self *WebServer) v2UpdateAgentRunStatus(c *gin.Context) {
+	id := c.Param("id")
+
+	var req v2models.AgentRunUpdateStatusRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": fmt.Sprintf("invalid request: %v", err),
+		})
+		return
+	}
+
+	user := c.MustGet("user").(*models.TblUser)
+	userID := strconv.FormatInt(user.Id, 10)
+
+	authService := auth.NewService(self.orm)
+	agentRunService := agentrun.NewService(self.orm, authService)
+
+	err := agentRunService.UpdateAgentRunStatus(id, &req, userID)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2UpdateAgentRunStatus] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to update agent run status",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+	})
+}
+
+// v2AppendAgentOperation appends an operation to an agent run
+func (self *WebServer) v2AppendAgentOperation(c *gin.Context) {
+	id := c.Param("id")
+
+	var req v2models.AgentOperationCreateRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": fmt.Sprintf("invalid request: %v", err),
+		})
+		return
+	}
+
+	user := c.MustGet("user").(*models.TblUser)
+	userID := strconv.FormatInt(user.Id, 10)
+
+	authService := auth.NewService(self.orm)
+	agentRunService := agentrun.NewService(self.orm, authService)
+
+	err := agentRunService.AppendAgentOperation(id, &req, userID)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2AppendAgentOperation] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to append agent operation",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
 	})
 }

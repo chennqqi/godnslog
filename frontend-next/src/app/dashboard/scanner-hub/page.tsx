@@ -3,9 +3,9 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { caseApi, payloadApi } from '@/lib/api-client'
-import { createScannerRun, generateWebUrls, type ScannerRun, type ScannerRunInput } from '@/lib/scanner-hub'
-import type { Case, Payload } from '@/types'
+import { caseApi, payloadApi, scannerRunApi } from '@/lib/api-client'
+import { createScannerRun, generateWebUrls, type ScannerRunInput } from '@/lib/scanner-hub'
+import type { Case, Payload, ScannerRun } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -31,6 +31,8 @@ export default function ScannerHubPage() {
   const [generating, setGenerating] = useState(false)
   const [scannerRun, setScannerRun] = useState<ScannerRun | null>(null)
   const [error, setError] = useState<string>('')
+  const [recentScannerRuns, setRecentScannerRuns] = useState<ScannerRun[]>([])
+  const [loadingRuns, setLoadingRuns] = useState(false)
 
   const loadCases = useCallback(async () => {
     try {
@@ -57,6 +59,20 @@ export default function ScannerHubPage() {
     }
   }, [])
 
+  const loadRecentScannerRuns = useCallback(async () => {
+    setLoadingRuns(true)
+    try {
+      const response = await scannerRunApi.list({ page: 1, page_size: 10 })
+      if (response.data) {
+        setRecentScannerRuns(response.data.items || [])
+      }
+    } catch (error) {
+      console.error('Failed to load scanner runs:', error)
+    } finally {
+      setLoadingRuns(false)
+    }
+  }, [])
+
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) {
@@ -64,7 +80,8 @@ export default function ScannerHubPage() {
       return
     }
     loadCases()
-  }, [router, loadCases])
+    loadRecentScannerRuns()
+  }, [router, loadCases, loadRecentScannerRuns])
 
   useEffect(() => {
     if (selectedCase) {
@@ -98,7 +115,7 @@ export default function ScannerHubPage() {
     }
   }
 
-  const handleGenerateScannerRun = () => {
+  const handleGenerateScannerRun = async () => {
     if (!selectedCase || !selectedPayload || !target) {
       setError('请选择Case、Payload并输入Target')
       return
@@ -110,18 +127,29 @@ export default function ScannerHubPage() {
       return
     }
 
-    const input: ScannerRunInput = {
-      case_id: selectedCase,
-      payload_id: selectedPayload,
-      token: payload.token,
-      target,
-      template,
-      rendered_payload: payload.rendered_payload || payload.token,
-      baseUrl: window.location.origin
-    }
+    setGenerating(true)
+    setError('')
 
-    const run = createScannerRun(input, 'nuclei-jsonl')
-    setScannerRun(run)
+    try {
+      const input: ScannerRunInput = {
+        case_id: selectedCase,
+        payload_id: selectedPayload,
+        token: payload.token,
+        target,
+        template,
+        rendered_payload: payload.rendered_payload || payload.token,
+        baseUrl: window.location.origin
+      }
+
+      const run = await createScannerRun(input, 'nuclei-jsonl')
+      setScannerRun(run)
+      loadRecentScannerRuns()
+    } catch (error: unknown) {
+      console.error('Failed to create scanner run:', error)
+      setError('创建Scanner Run失败')
+    } finally {
+      setGenerating(false)
+    }
   }
 
   const handleCopy = (text: string) => {
@@ -150,6 +178,45 @@ export default function ScannerHubPage() {
       </div>
 
       <div className="grid gap-6">
+        {/* Recent Scanner Runs */}
+        <Card>
+          <CardHeader>
+            <CardTitle>最近的 Scanner Runs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingRuns ? (
+              <div className="text-sm text-muted-foreground">加载中...</div>
+            ) : recentScannerRuns.length === 0 ? (
+              <div className="text-sm text-muted-foreground">暂无 Scanner Runs</div>
+            ) : (
+              <div className="space-y-2">
+                {recentScannerRuns.map(run => (
+                  <div
+                    key={run.id}
+                    className="flex items-center justify-between p-3 border rounded hover:bg-muted cursor-pointer"
+                    onClick={() => router.push(`/dashboard/scanner-hub/${run.id}`)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Badge variant={run.status === 'created' ? 'default' : 'secondary'}>
+                        {run.status}
+                      </Badge>
+                      <div className="text-sm">
+                        <div className="font-medium">{run.target}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {run.template} · {new Date(run.created_at).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="ghost">
+                      查看详情
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Case Selection */}
         <Card>
           <CardHeader>
@@ -229,8 +296,8 @@ export default function ScannerHubPage() {
         </Card>
 
         {/* Generate Button */}
-        <Button onClick={handleGenerateScannerRun} className="w-full" size="lg">
-          生成 Scanner Run
+        <Button onClick={handleGenerateScannerRun} className="w-full" size="lg" disabled={generating}>
+          {generating ? '生成中...' : '生成 Scanner Run'}
         </Button>
 
         {error && (

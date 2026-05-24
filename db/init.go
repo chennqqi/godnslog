@@ -44,6 +44,10 @@ func InitDatabase(orm *xorm.Engine, testMode bool, defaultLanguage string, defau
 		&models.Canary{},
 		&models.RebindingRule{},
 		&models.Listener{},
+		&models.ScannerRun{},
+		&models.AuditLog{},
+		&models.AgentRun{},
+		&models.AgentOperation{},
 	)
 	if err != nil {
 		logrus.Errorf("[db::InitDatabase] orm.Sync 2.0 models: %v", err)
