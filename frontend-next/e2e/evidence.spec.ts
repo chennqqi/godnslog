@@ -76,7 +76,14 @@ test.describe('Evidence Page', () => {
   });
 
   test('should auto-generate evidence for case_id', async ({ page }) => {
+    const evidenceRequestPromise = page.waitForRequest(request => {
+      if (!request.url().includes('/api/v2/evidence/generate')) return false;
+      const body = request.postDataJSON() as { case_id?: string; payload_id?: string; format?: string };
+      return body.case_id === 'case-1' && !body.payload_id && body.format === 'markdown';
+    });
+
     await page.goto('/dashboard/evidence?case_id=case-1');
+    await evidenceRequestPromise;
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
     await expect(page.locator('text=证据摘要')).toBeVisible();
@@ -84,11 +91,31 @@ test.describe('Evidence Page', () => {
   });
 
   test('should auto-generate evidence for payload_id', async ({ page }) => {
+    const evidenceRequestPromise = page.waitForRequest(request => {
+      if (!request.url().includes('/api/v2/evidence/generate')) return false;
+      const body = request.postDataJSON() as { case_id?: string; payload_id?: string; format?: string };
+      return body.payload_id === 'payload-1' && !body.case_id && body.format === 'markdown';
+    });
+
     await page.goto('/dashboard/evidence?payload_id=payload-1');
+    await evidenceRequestPromise;
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
     await expect(page.locator('text=证据摘要')).toBeVisible();
     await expect(page.locator('text=置信度')).toBeVisible();
+  });
+
+  test('should use requested evidence format from URL scope', async ({ page }) => {
+    const evidenceRequestPromise = page.waitForRequest(request => {
+      if (!request.url().includes('/api/v2/evidence/generate')) return false;
+      const body = request.postDataJSON() as { case_id?: string; format?: string };
+      return body.case_id === 'case-1' && body.format === 'json';
+    });
+
+    await page.goto('/dashboard/evidence?case_id=case-1&format=json');
+    await evidenceRequestPromise;
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('text=Case scoped: case-1')).toBeVisible();
   });
 
   test('should display evidence summary after generation', async ({ page }) => {

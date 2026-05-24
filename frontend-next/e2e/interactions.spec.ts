@@ -48,7 +48,19 @@ test.describe('Interactions Page', () => {
   });
 
   test('should display case scoped interactions', async ({ page }) => {
+    const listRequestPromise = page.waitForRequest(request => {
+      const url = new URL(request.url());
+      return url.pathname.endsWith('/api/v2/interactions') &&
+        url.searchParams.get('case_id') === 'case-1';
+    });
+    const statsRequestPromise = page.waitForRequest(request => {
+      const url = new URL(request.url());
+      return url.pathname.endsWith('/api/v2/interactions/stats') &&
+        url.searchParams.get('case_id') === 'case-1';
+    });
+
     await page.goto('/dashboard/interactions?case_id=case-1');
+    await Promise.all([listRequestPromise, statsRequestPromise]);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
     await expect(page.locator('text=Case scoped: case-1')).toBeVisible();
@@ -56,11 +68,41 @@ test.describe('Interactions Page', () => {
   });
 
   test('should display payload scoped interactions', async ({ page }) => {
+    const listRequestPromise = page.waitForRequest(request => {
+      const url = new URL(request.url());
+      return url.pathname.endsWith('/api/v2/interactions') &&
+        url.searchParams.get('payload_id') === 'payload-1';
+    });
+    const statsRequestPromise = page.waitForRequest(request => {
+      const url = new URL(request.url());
+      return url.pathname.endsWith('/api/v2/interactions/stats') &&
+        url.searchParams.get('payload_id') === 'payload-1';
+    });
+
     await page.goto('/dashboard/interactions?payload_id=payload-1');
+    await Promise.all([listRequestPromise, statsRequestPromise]);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
     await expect(page.locator('text=Payload scoped: payload-1')).toBeVisible();
     await expect(page.locator('button:has-text("Clear scope")')).toBeVisible();
+  });
+
+  test('should render stats from the scoped stats request', async ({ page }) => {
+    await page.route('**/api/v2/interactions/stats**', route => {
+      const url = new URL(route.request().url());
+      const total = url.searchParams.get('payload_id') === 'payload-1' ? 2 : 10;
+      return route.fulfill({
+        json: {
+          code: 0,
+          data: { total, dns_count: 1, http_count: 1, smtp_count: 0, ldap_count: 0 }
+        }
+      });
+    });
+
+    await page.goto('/dashboard/interactions?payload_id=payload-1');
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('text=Payload scoped: payload-1')).toBeVisible();
+    await expect(page.locator('text=总数').locator('..').getByText('2')).toBeVisible();
   });
 
   test('should clear scope and return to all interactions', async ({ page }) => {
