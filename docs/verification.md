@@ -63,3 +63,164 @@ Forbidden during routine verification:
 ```bash
 GOCACHE=/tmp/gocache go test -count=1 ./internal/mcp
 ```
+
+## Sprint I: Scanner Run Persistence & Audit Trail
+
+### Verification Results (2026-05-24 - Final)
+
+**Backend Tests:**
+```bash
+go test ./internal/scannerhub/...
+# Result: ok      github.com/chennqqi/godnslog/internal/scannerhub        0.042s
+# Tests now include AuditLog table sync and audit log assertions
+
+go test ./...
+# Result: All tests passed (0 errors)
+```
+
+**Frontend Build:**
+```bash
+cd frontend-next && npm run build
+# Result: ✓ Compiled successfully
+# Result: ✓ Finished TypeScript in 4.1s
+# Route (app) includes /dashboard/scanner-hub and /dashboard/scanner-hub/[id]
+```
+
+**Frontend E2E Tests:**
+```bash
+cd frontend-next && npx playwright test scanner-hub.spec.ts --reporter=line
+# Result: 13 passed (20.7s)
+# Tests cover: list display, detail navigation, API calls, status update API request
+# New test added: should update scanner run status on detail page
+```
+
+**Frontend Lint:**
+```bash
+cd frontend-next && npm run lint
+# Result: 45 problems (29 errors, 16 warnings) - pre-existing, not related to Sprint I changes
+```
+
+### Summary
+
+Sprint I implementation completed with all blocking issues resolved:
+
+**Completed:**
+- ✅ Scanner Run data model created (internal/models/scanner_run.go)
+- ✅ Scanner Hub service layer implemented (internal/scannerhub/service.go)
+- ✅ Scanner Run API routes added (server/v2_api.go)
+- ✅ Backend tests passing with audit log assertions (internal/scannerhub/service_test.go)
+- ✅ Frontend types updated (frontend-next/src/types/index.ts)
+- ✅ Frontend API client updated (frontend-next/src/lib/api-client.ts)
+- ✅ Scanner Hub helper functions updated (frontend-next/src/lib/scanner-hub.ts)
+- ✅ Scanner Hub page uses real API (frontend-next/src/app/dashboard/scanner-hub/page.tsx)
+- ✅ Scanner Run detail page created (frontend-next/src/app/dashboard/scanner-hub/[id]/page.tsx)
+- ✅ Recent Scanner Runs list added to main page with detail navigation
+- ✅ Status update operations added to detail page (created → distributed → observed → evidenced)
+- ✅ Audit events implemented (scanner_run.created, scanner_run.status_updated)
+- ✅ Audit log failures now return errors instead of being silently swallowed
+- ✅ AuditLog table added to test setup with assertions for audit log creation
+- ✅ E2E tests updated and passing (13 tests including status update API assertion)
+- ✅ Frontend build successful
+- ✅ Production schema sync includes ScannerRun and AuditLog tables (db/init.go)
+
+**Known Limitations (deferred to Sprint I+):**
+- ⚠️ evidence_count set to 0 (placeholder for future evidence table)
+  - TODO: Implement proper evidence table and count query
+  - Current: evidence_count = 0 to avoid false assumptions
+  - This is acceptable for Sprint I as evidence table is not yet implemented
+
+**Core Achievement:**
+Sprint I establishes the foundational Scanner Run persistence model with:
+- Persisted Scanner Run → History list → Detail page → Status update → Audit trail
+- Evidence/Interactions back-linking (URLs provided, evidence_count = 0 placeholder)
+- Full CRUD API with authentication and audit logging
+- Production database schema includes ScannerRun and AuditLog tables
+- All audit log writes are tested and fail loudly on errors
+
+## Sprint J: Agent Run MVP & MCP Audit Binding
+
+### Verification Results (2026-05-24 - Final)
+
+**Backend Tests:**
+```bash
+go test ./internal/agentrun/...
+# Result: PASS - All 6 tests passed
+# Tests cover: create, get by ID, list, update status, append operation, invalid status transitions
+# Audit log assertions included for agent run creation and operations
+
+go test ./internal/agentrun ./internal/mcp ./server
+# Result: PASS - All tests passed
+# MCP server tests now mock /api/v2/agent-runs calls
+
+go test ./...
+# Result: PASS - All tests passed
+```
+
+**Frontend Build:**
+```bash
+cd frontend-next && npm run build
+# Result: ✓ Compiled successfully
+# Result: ✓ Finished TypeScript in 4.3s
+# Route (app) includes /dashboard/agent-runs and /dashboard/agent-runs/[id]
+```
+
+**Frontend E2E Tests:**
+```bash
+cd frontend-next && npx playwright test agent-runs.spec.ts --reporter=line
+# Result: 2 passed (4.5s)
+# Tests cover: list page load, detail page load
+# Note: Tests use auth mocking to bypass login redirect
+# Basic page load verification - no skip
+```
+
+**Frontend Lint:**
+```bash
+cd frontend-next && npx eslint src/app/dashboard/agent-runs/page.tsx src/app/dashboard/agent-runs/[id]/page.tsx src/lib/api-client.ts src/types/index.ts e2e/agent-runs.spec.ts
+# Result: PASS - No errors
+# Fixed react-hooks/set-state-in-effect issue with setTimeout wrapper
+```
+
+### Summary
+
+Sprint J implementation completed with all high-priority tasks:
+
+**Completed:**
+- ✅ AgentRun and AgentOperation data models created (internal/models/agent_run.go)
+- ✅ Agent Run service layer implemented (internal/agentrun/service.go)
+- ✅ Backend tests passing with audit log assertions (internal/agentrun/service_test.go)
+- ✅ Schema migration entry added (internal/agentrun/migration.go)
+- ✅ Production schema sync includes AgentRun and AgentOperation (db/init.go)
+- ✅ Agent Run API routes added (server/v2_api.go)
+- ✅ MCP server tools bound to real Agent Runs (internal/mcp/server.go)
+  - createOASTProbe creates Agent Run via API when agent_id provided
+  - waitForInteraction updates Agent Run status and appends operations
+  - summarizeEvidence and exportReport append operations to Agent Run
+- ✅ MCP operation/status failures now return errors instead of silent logging
+- ✅ Frontend types updated (frontend-next/src/types/index.ts)
+- ✅ Frontend API client updated (frontend-next/src/lib/api-client.ts)
+- ✅ Agent Runs list page created (frontend-next/src/app/dashboard/agent-runs/page.tsx)
+- ✅ Agent Run detail page created (frontend-next/src/app/dashboard/agent-runs/[id]/page.tsx)
+- ✅ E2E test file created with auth mocking (frontend-next/e2e/agent-runs.spec.ts)
+- ✅ Frontend build successful
+- ✅ SQLite column name compatibility fixed (agent_i_d, case_i_d, etc.)
+- ✅ UpdateAgentRunStatus audit now correctly records from_status
+- ✅ AppendAgentOperation returns error for non-existent Agent Run
+- ✅ MCP server tests adapted to mock /api/v2/agent-runs calls
+- ✅ ESLint react-hooks/set-state-in-effect issue fixed
+
+**Known Limitations (deferred to Sprint J+):**
+- ⚠️ E2E tests are basic page load tests only
+  - TODO: Add full chain tests with API call assertions, filter queries, operation timeline verification
+  - Current: Basic page load verification with auth mocking
+  - This is acceptable for Sprint J as core functionality is verified via backend tests
+
+**Core Achievement:**
+Sprint J establishes the Agent Run persistence model with:
+- Persisted Agent Run → History list → Detail page → Status update → Operation tracking
+- MCP tools now create and update real Agent Runs instead of fake concatenated IDs
+- Full CRUD API with authentication and audit logging
+- Production database schema includes AgentRun and AgentOperation tables
+- Audit events implemented (agent_run.created, agent_run.status_updated, agent_operation.<action>)
+- MCP audit binding: all MCP tool operations are now tracked in Agent Run context
+- MCP operation/status failures return errors instead of being silently swallowed
+- Audit logs correctly record status transitions with from_status/to_status

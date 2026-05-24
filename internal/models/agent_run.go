@@ -1,0 +1,139 @@
+package models
+
+import (
+	"database/sql/driver"
+	"encoding/json"
+	"time"
+)
+
+// AgentRunStatus represents the status of an agent run
+type AgentRunStatus string
+
+const (
+	AgentRunStatusCreated   AgentRunStatus = "created"
+	AgentRunStatusRunning   AgentRunStatus = "running"
+	AgentRunStatusWaiting   AgentRunStatus = "waiting"
+	AgentRunStatusCompleted AgentRunStatus = "completed"
+	AgentRunStatusFailed    AgentRunStatus = "failed"
+	AgentRunStatusCancelled AgentRunStatus = "cancelled"
+	AgentRunStatusTimedOut  AgentRunStatus = "timed_out"
+)
+
+// AgentRun represents a single task execution lifecycle for an Agent
+type AgentRun struct {
+	ID         string         `json:"id" xorm:"pk varchar(36) notnull"`
+	AgentID    string         `json:"agent_id" xorm:"varchar(128) index"`
+	OperatorID string         `json:"operator_id" xorm:"varchar(128) index"`
+	CaseID     string         `json:"case_id" xorm:"varchar(36) index"`
+	PayloadID  string         `json:"payload_id" xorm:"varchar(36) index"`
+	Target     string         `json:"target" xorm:"text"`
+	Title      string         `json:"title" xorm:"varchar(256)"`
+	Status     AgentRunStatus `json:"status" xorm:"varchar(32) index"`
+	StartedAt  *time.Time     `json:"started_at" xorm:"datetime index"`
+	EndedAt    *time.Time     `json:"ended_at" xorm:"datetime index"`
+	CreatedAt  time.Time      `json:"created_at" xorm:"created"`
+	UpdatedAt  time.Time      `json:"updated_at" xorm:"updated"`
+}
+
+// TableName returns the table name for AgentRun
+func (AgentRun) TableName() string {
+	return "agent_runs"
+}
+
+// AgentRunDetail represents an agent run with computed fields
+type AgentRunDetail struct {
+	AgentRun
+	InteractionCount  int              `json:"interaction_count"`
+	LastInteractionAt *time.Time       `json:"last_interaction_at"`
+	Operations        []AgentOperation `json:"operations"`
+	CaseURL           string           `json:"case_url"`
+	PayloadURL        string           `json:"payload_url"`
+	InteractionsURL   string           `json:"interactions_url"`
+	EvidenceURL       string           `json:"evidence_url"`
+}
+
+// AgentOperation represents an operation within an agent run
+type AgentOperation struct {
+	ID         string     `json:"id" xorm:"pk varchar(36) notnull"`
+	AgentRunID string     `json:"agent_run_id" xorm:"varchar(36) index"`
+	AgentID    string     `json:"agent_id" xorm:"varchar(128) index"`
+	Action     string     `json:"action" xorm:"varchar(64) index"`
+	RiskLevel  string     `json:"risk_level" xorm:"varchar(32)"`
+	Request    string     `json:"request" xorm:"text"`
+	Result     string     `json:"result" xorm:"text"`
+	Error      string     `json:"error" xorm:"text"`
+	StartedAt  time.Time  `json:"started_at" xorm:"datetime index"`
+	EndedAt    *time.Time `json:"ended_at" xorm:"datetime"`
+	CreatedAt  time.Time  `json:"created_at" xorm:"created"`
+}
+
+// TableName returns the table name for AgentOperation
+func (AgentOperation) TableName() string {
+	return "agent_operations"
+}
+
+// AgentOperations is a slice of AgentOperation for JSON handling
+type AgentOperations []AgentOperation
+
+// Scan implements sql.Scanner for AgentOperations
+func (o *AgentOperations) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	bytes, ok := value.([]byte)
+	if !ok {
+		return nil
+	}
+	return json.Unmarshal(bytes, o)
+}
+
+// Value implements driver.Valuer for AgentOperations
+func (o AgentOperations) Value() (driver.Value, error) {
+	if o == nil {
+		return nil, nil
+	}
+	return json.Marshal(o)
+}
+
+// AgentRunCreateRequest represents a request to create an agent run
+type AgentRunCreateRequest struct {
+	AgentID    string `json:"agent_id" binding:"required"`
+	OperatorID string `json:"operator_id" binding:"required"`
+	CaseID     string `json:"case_id"`
+	PayloadID  string `json:"payload_id"`
+	Target     string `json:"target" binding:"required"`
+	Title      string `json:"title" binding:"required"`
+}
+
+// AgentRunUpdateStatusRequest represents a request to update agent run status
+type AgentRunUpdateStatusRequest struct {
+	Status AgentRunStatus `json:"status" binding:"required"`
+}
+
+// AgentRunListRequest represents a request to list agent runs
+type AgentRunListRequest struct {
+	AgentID   string `form:"agent_id"`
+	CaseID    string `form:"case_id"`
+	PayloadID string `form:"payload_id"`
+	Status    string `form:"status"`
+	Page      int    `form:"page" binding:"min=1"`
+	PageSize  int    `form:"page_size" binding:"min=1,max=100"`
+}
+
+// AgentRunListResponse represents the response for listing agent runs
+type AgentRunListResponse struct {
+	Items      []AgentRunDetail `json:"items"`
+	Total      int64            `json:"total"`
+	Page       int              `json:"page"`
+	PageSize   int              `json:"page_size"`
+	TotalPages int              `json:"total_pages"`
+}
+
+// AgentOperationCreateRequest represents a request to create an agent operation
+type AgentOperationCreateRequest struct {
+	Action    string                 `json:"action" binding:"required"`
+	RiskLevel string                 `json:"risk_level"`
+	Request   map[string]interface{} `json:"request"`
+	Result    map[string]interface{} `json:"result"`
+	Error     string                 `json:"error"`
+}

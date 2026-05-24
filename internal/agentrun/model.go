@@ -11,19 +11,3 @@ type AgentRun struct {
 	CreatedAt time.Time `json:"created_at" xorm:"created"`
 	UpdatedAt time.Time `json:"updated_at" xorm:"updated"`
 }
-
-func NewAgentRun(agentID, caseID, target string) *AgentRun {
-	return &AgentRun{
-		ID:       generateID(),
-		AgentID:  agentID,
-		CaseID:   caseID,
-		Target:   target,
-		Status:   "running",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-}
-
-func generateID() string {
-	return "agent-run-" + time.Now().Format("20060102150405")
-}

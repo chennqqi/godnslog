@@ -627,6 +627,12 @@ func TestCreateOASTProbeToolCreatesCaseThenPayload(t *testing.T) {
 			createdPayloadCaseID, _ = body["case_id"].(string)
 			payloadRequestBody = body
 			return `{"data":{"id":"payload-1","token":"tok-1","value":"https://tok-1.example.com/callback"}}`
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v2/agent-runs":
+			return `{"data":{"id":"agent-run-1","agent_id":"agent-1","status":"created"}}`
+		case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/api/v2/agent-runs/") && strings.HasSuffix(r.URL.Path, "/operations"):
+			return `{"data":{"id":"op-1","action":"create_oast_probe"}}`
+		case r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/api/v2/agent-runs/") && strings.HasSuffix(r.URL.Path, "/status"):
+			return `{"data":{"id":"agent-run-1","status":"running"}}`
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}

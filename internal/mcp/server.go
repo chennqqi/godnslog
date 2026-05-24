@@ -139,10 +139,54 @@ func (s *Server) createOASTProbe(ctx context.Context, args map[string]interface{
 	}
 	token := extractString(payloadResult, "token")
 
-	// Generate agent_run_id if agent_id is provided
+	// Create real Agent Run if agent_id is provided
 	agentRunID := ""
 	if agentID != "" {
-		agentRunID = agentID + ":" + caseID + ":" + payloadID
+		// Use "system" as operator_id for agent-created runs
+		agentRunResult, err := s.apiCall("POST", "/api/v2/agent-runs", map[string]interface{}{
+			"agent_id":    agentID,
+			"operator_id": "system",
+			"case_id":     caseID,
+			"payload_id":  payloadID,
+			"target":      target,
+			"title":       title,
+		})
+		if err != nil {
+			return ToolResult{Success: false, Error: fmt.Sprintf("failed to create agent run: %v", err)}, nil
+		}
+		agentRunID = extractString(agentRunResult, "id")
+		if agentRunID == "" {
+			return ToolResult{Success: false, Error: "agent run creation response did not include an id"}, nil
+		}
+
+		// Append operation for create_oast_probe
+		_, err = s.apiCall("POST", fmt.Sprintf("/api/v2/agent-runs/%s/operations", agentRunID), map[string]interface{}{
+			"action":     "create_oast_probe",
+			"risk_level": "medium",
+			"request": map[string]interface{}{
+				"title":       title,
+				"template_id": templateID,
+				"target":      target,
+				"variables":   variables,
+			},
+			"result": map[string]interface{}{
+				"case_id":    caseID,
+				"payload_id": payloadID,
+				"token":      token,
+				"success":    true,
+			},
+		})
+		if err != nil {
+			return ToolResult{Success: false, Error: fmt.Sprintf("failed to append agent operation: %v", err)}, nil
+		}
+
+		// Update agent run status to running
+		_, err = s.apiCall("PUT", fmt.Sprintf("/api/v2/agent-runs/%s/status", agentRunID), map[string]interface{}{
+			"status": "running",
+		})
+		if err != nil {
+			return ToolResult{Success: false, Error: fmt.Sprintf("failed to update agent run status: %v", err)}, nil
+		}
 	}
 
 	responseData := map[string]interface{}{
@@ -262,11 +306,58 @@ func (s *Server) waitForInteraction(ctx context.Context, args map[string]interfa
 		timeout = int(t)
 	}
 
+	agentRunID, _ := args["agent_run_id"].(string)
+
+	// Update agent run status to waiting if agent_run_id is provided
+	if agentRunID != "" {
+		_, err := s.apiCall("PUT", fmt.Sprintf("/api/v2/agent-runs/%s/status", agentRunID), map[string]interface{}{
+			"status": "waiting",
+		})
+		if err != nil {
+			return ToolResult{Success: false, Error: fmt.Sprintf("failed to update agent run status to waiting: %v", err)}, nil
+		}
+	}
+
 	// Poll for interactions (simplified)
 	// In production, use WebSocket or SSE
 	result, err := s.pollInteractions(ctx, token, timeout)
 	if err != nil {
+		// Update agent run status to failed if agent_run_id is provided
+		if agentRunID != "" {
+			_, err2 := s.apiCall("PUT", fmt.Sprintf("/api/v2/agent-runs/%s/status", agentRunID), map[string]interface{}{
+				"status": "failed",
+			})
+			if err2 != nil {
+				log.Printf("Failed to update agent run status to failed: %v", err2)
+			}
+		}
 		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	// Update agent run status to running and append operation if agent_run_id is provided
+	if agentRunID != "" {
+		_, err = s.apiCall("PUT", fmt.Sprintf("/api/v2/agent-runs/%s/status", agentRunID), map[string]interface{}{
+			"status": "running",
+		})
+		if err != nil {
+			return ToolResult{Success: false, Error: fmt.Sprintf("failed to update agent run status to running: %v", err)}, nil
+		}
+
+		_, err = s.apiCall("POST", fmt.Sprintf("/api/v2/agent-runs/%s/operations", agentRunID), map[string]interface{}{
+			"action":     "wait_for_interaction",
+			"risk_level": "low",
+			"request": map[string]interface{}{
+				"token":   token,
+				"timeout": timeout,
+			},
+			"result": map[string]interface{}{
+				"success":      true,
+				"interactions": result,
+			},
+		})
+		if err != nil {
+			return ToolResult{Success: false, Error: fmt.Sprintf("failed to append agent operation: %v", err)}, nil
+		}
 	}
 
 	return ToolResult{Success: true, Data: result}, nil
@@ -284,6 +375,8 @@ func (s *Server) summarizeEvidence(ctx context.Context, args map[string]interfac
 		payloadID = pid
 	}
 
+	agentRunID, _ := args["agent_run_id"].(string)
+
 	// Validate that at least one of case_id or payload_id is provided
 	if len(caseID) == 0 && len(payloadID) == 0 {
 		return ToolResult{Success: false, Error: "either case_id or payload_id is required"}, nil
@@ -298,6 +391,25 @@ func (s *Server) summarizeEvidence(ctx context.Context, args map[string]interfac
 
 	if err != nil {
 		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	// Append operation if agent_run_id is provided
+	if agentRunID != "" {
+		_, err = s.apiCall("POST", fmt.Sprintf("/api/v2/agent-runs/%s/operations", agentRunID), map[string]interface{}{
+			"action":     "summarize_evidence",
+			"risk_level": "low",
+			"request": map[string]interface{}{
+				"case_id":    caseID,
+				"payload_id": payloadID,
+			},
+			"result": map[string]interface{}{
+				"success":  true,
+				"evidence": result,
+			},
+		})
+		if err != nil {
+			return ToolResult{Success: false, Error: fmt.Sprintf("failed to append agent operation: %v", err)}, nil
+		}
 	}
 
 	// Extract the evidence field from API response (structured Evidence)
@@ -324,6 +436,8 @@ func (s *Server) exportReport(ctx context.Context, args map[string]interface{}) 
 		payloadID = pid
 	}
 
+	agentRunID, _ := args["agent_run_id"].(string)
+
 	// Validate that at least one of case_id or payload_id is provided
 	if len(caseID) == 0 && len(payloadID) == 0 {
 		return ToolResult{Success: false, Error: "either case_id or payload_id is required"}, nil
@@ -343,6 +457,26 @@ func (s *Server) exportReport(ctx context.Context, args map[string]interface{}) 
 
 	if err != nil {
 		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	// Append operation if agent_run_id is provided
+	if agentRunID != "" {
+		_, err = s.apiCall("POST", fmt.Sprintf("/api/v2/agent-runs/%s/operations", agentRunID), map[string]interface{}{
+			"action":     "export_report",
+			"risk_level": "low",
+			"request": map[string]interface{}{
+				"case_id":    caseID,
+				"payload_id": payloadID,
+				"format":     format,
+			},
+			"result": map[string]interface{}{
+				"success": true,
+				"report":  result,
+			},
+		})
+		if err != nil {
+			return ToolResult{Success: false, Error: fmt.Sprintf("failed to append agent operation: %v", err)}, nil
+		}
 	}
 
 	// Extract the content field from API response
