@@ -63,6 +63,9 @@ func (s *WebServer) authenticateAPIKey(c *gin.Context) (*models.TblAPIKey, error
 	// Update last used timestamp
 	_ = s.authService.UpdateLastUsed(apiKey)
 
+	// Store the full APIKey in context for v2UserInfo to use
+	c.Set("api_key_full", key)
+
 	// Convert to TblAPIKey for backward compatibility
 	tblKey := &models.TblAPIKey{
 		Key:       key.Key,

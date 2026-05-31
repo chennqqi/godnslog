@@ -402,18 +402,24 @@ Operators can view:
 
 ## Implementation Checklist
 
-- [ ] Agent identity model implemented (Agent, Operator, Workspace, Agent Run)
-- [ ] Agent Run lifecycle management implemented
-- [ ] AgentScopes defined and validation implemented
-- [ ] Risk classification system implemented
-- [ ] Audit event structure defined and logging implemented
-- [ ] MCP tool registration and validation implemented
-- [ ] Tool timeout system implemented
-- [ ] Agent Run dashboard implemented
-- [ ] Agent Run export implemented
-- [ ] Agent revocation implemented
-- [ ] Agent analytics implemented
-- [ ] Security best practices documented
+- [x] Agent identity model implemented (Agent, Operator, Workspace, Agent Run)
+- [x] Agent Run lifecycle management implemented
+- [x] AgentScopes defined and validation implemented
+- [x] Risk classification system implemented
+- [x] Audit event structure defined and logging implemented
+- [x] MCP tool registration and validation implemented
+- [x] Tool timeout system implemented
+- [x] Agent Run dashboard implemented
+- [x] Agent Run export implemented
+- [x] Agent revocation implemented
+- [x] Agent analytics implemented
+- [x] Security best practices documented
+- [x] Agent API Key permission gate implemented (Sprint K)
+- [x] MCP tool scope/risk gate implemented (Sprint K)
+- [x] Agent Key creation with enforced expiration and risk tolerance (Sprint K)
+- [x] Permission denied audit logging (Sprint K)
+- [x] Frontend API Keys page Agent Key support (Sprint K)
+- [x] E2E tests for Agent Key operations (Sprint K)
 
 ## Conclusion
 

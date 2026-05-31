@@ -19,6 +19,16 @@ type Server struct {
 	httpClient *http.Client
 }
 
+// APIKeyInfo represents the information about the current API key
+type APIKeyInfo struct {
+	ID            string
+	KeyPrefix     string
+	Scopes        []string
+	IsAgent       bool
+	RiskTolerance string
+	WorkspaceID   *string
+}
+
 // NewServer creates a new MCP server
 func NewServer(apiURL, apiKey string) *Server {
 	return &Server{
@@ -26,6 +36,132 @@ func NewServer(apiURL, apiKey string) *Server {
 		apiKey:     apiKey,
 		httpClient: &http.Client{},
 	}
+}
+
+// checkToolPermission checks if the current API key has permission to execute a tool
+func (s *Server) checkToolPermission(ctx context.Context, toolName string) error {
+	// Get tool permission configuration
+	perm, exists := GetToolPermission(toolName)
+	if !exists {
+		return fmt.Errorf("tool %s not found in permission configuration", toolName)
+	}
+
+	// Get API key info (simplified - in production, cache this)
+	apiKeyInfo, err := s.getAPIKeyInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get API key info: %v", err)
+	}
+
+	// Check if API key has required scope
+	hasScope := false
+	for _, scope := range apiKeyInfo.Scopes {
+		if scope == perm.RequiredScope || scope == "admin:all" {
+			hasScope = true
+			break
+		}
+	}
+	if !hasScope {
+		// Write audit log for permission denied
+		s.writePermissionDeniedAudit(ctx, toolName, perm.RequiredScope, perm.RiskLevel, apiKeyInfo, "missing scope")
+		return fmt.Errorf("permission denied: missing required scope '%s'", perm.RequiredScope)
+	}
+
+	// Check risk level tolerance
+	if apiKeyInfo.IsAgent {
+		tolerance := RiskLevel(apiKeyInfo.RiskTolerance)
+		if !IsRiskLevelAllowed(perm.RiskLevel, tolerance) {
+			// Write audit log for permission denied
+			s.writePermissionDeniedAudit(ctx, toolName, perm.RequiredScope, perm.RiskLevel, apiKeyInfo, "risk level exceeds tolerance")
+			return fmt.Errorf("permission denied: tool risk level '%s' exceeds tolerance '%s'", perm.RiskLevel, tolerance)
+		}
+	}
+
+	return nil
+}
+
+// getAPIKeyInfo retrieves information about the current API key
+func (s *Server) getAPIKeyInfo(ctx context.Context) (*APIKeyInfo, error) {
+	// Call /api/v2/auth/info to get current user/key info
+	resp, err := s.apiCall("GET", "/api/v2/auth/info", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	respMap, ok := resp.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid response format")
+	}
+
+	// Extract data field
+	data, ok := respMap["data"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid data format")
+	}
+
+	// Check if this is an API key authentication (has api_key_id field)
+	if _, hasAPIKeyID := data["api_key_id"]; hasAPIKeyID {
+		// Extract API key fields
+		scopes := []string{}
+		if scopesRaw, ok := data["scopes"].([]interface{}); ok {
+			for _, s := range scopesRaw {
+				if scopeStr, ok := s.(string); ok {
+					scopes = append(scopes, scopeStr)
+				}
+			}
+		}
+
+		isAgent := false
+		if isAgentRaw, ok := data["is_agent"].(bool); ok {
+			isAgent = isAgentRaw
+		}
+
+		riskTolerance := "medium"
+		if riskToleranceRaw, ok := data["risk_tolerance"].(string); ok {
+			riskTolerance = riskToleranceRaw
+		}
+
+		var workspaceID *string
+		if workspaceIDRaw, ok := data["workspace_id"].(string); ok && len(workspaceIDRaw) > 0 {
+			workspaceID = &workspaceIDRaw
+		}
+
+		return &APIKeyInfo{
+			ID:            fmt.Sprintf("%v", data["api_key_id"]),
+			KeyPrefix:     fmt.Sprintf("%v", data["api_key_prefix"]),
+			Scopes:        scopes,
+			IsAgent:       isAgent,
+			RiskTolerance: riskTolerance,
+			WorkspaceID:   workspaceID,
+		}, nil
+	}
+
+	// Default for JWT authentication (non-agent, admin privileges)
+	return &APIKeyInfo{
+		ID:            fmt.Sprintf("%v", data["id"]),
+		KeyPrefix:     s.apiKey[:8],
+		Scopes:        []string{"admin:all"},
+		IsAgent:       false,
+		RiskTolerance: "high",
+		WorkspaceID:   nil,
+	}, nil
+}
+
+// writePermissionDeniedAudit writes an audit log for permission denied events
+func (s *Server) writePermissionDeniedAudit(ctx context.Context, toolName, requiredScope string, riskLevel RiskLevel, apiKeyInfo *APIKeyInfo, reason string) {
+	auditData := map[string]interface{}{
+		"action":         "agent_permission.denied",
+		"resource_type":  "mcp_tool",
+		"tool_name":      toolName,
+		"required_scope": requiredScope,
+		"risk_level":     string(riskLevel),
+		"reason":         reason,
+		"api_key_id":     apiKeyInfo.ID,
+		"key_prefix":     apiKeyInfo.KeyPrefix,
+		"is_agent":       apiKeyInfo.IsAgent,
+	}
+
+	// Call audit log API (simplified - in production, use proper audit service)
+	_, _ = s.apiCall("POST", "/api/v2/audit/logs", auditData)
 }
 
 // Run starts the MCP server
@@ -72,6 +208,11 @@ type ToolResult struct {
 
 // createOASTProbe creates a case and payload in one agent-friendly operation.
 func (s *Server) createOASTProbe(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	// Check permissions before execution
+	if err := s.checkToolPermission(ctx, "create_oast_probe"); err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
 	title, ok := args["title"].(string)
 	if !ok || strings.TrimSpace(title) == "" {
 		return nil, fmt.Errorf("title is required")
@@ -209,6 +350,11 @@ func (s *Server) createOASTProbe(ctx context.Context, args map[string]interface{
 
 // create_case creates a new case
 func (s *Server) createCase(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	// Check permissions before execution
+	if err := s.checkToolPermission(ctx, "create_case"); err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
 	title, ok := args["title"].(string)
 	if !ok {
 		return nil, fmt.Errorf("title is required")
@@ -270,6 +416,11 @@ func (s *Server) createPayload(ctx context.Context, args map[string]interface{})
 
 // list_interactions lists interactions
 func (s *Server) listInteractions(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	// Check permissions before execution
+	if err := s.checkToolPermission(ctx, "list_interactions"); err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
 	caseID, _ := args["case_id"].(string)
 	limit := 50
 	if l, ok := args["limit"].(float64); ok {
@@ -292,6 +443,11 @@ func (s *Server) listInteractions(ctx context.Context, args map[string]interface
 
 // wait_for_interaction waits for an interaction
 func (s *Server) waitForInteraction(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	// Check permissions before execution
+	if err := s.checkToolPermission(ctx, "wait_for_interaction"); err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -384,6 +540,11 @@ func (s *Server) waitForInteraction(ctx context.Context, args map[string]interfa
 
 // summarizeEvidence summarizes evidence for a case or payload (returns structured evidence data)
 func (s *Server) summarizeEvidence(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	// Check permissions before execution
+	if err := s.checkToolPermission(ctx, "summarize_evidence"); err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
 	caseID := ""
 	payloadID := ""
 
@@ -445,6 +606,11 @@ func (s *Server) summarizeEvidence(ctx context.Context, args map[string]interfac
 
 // export_report exports a report in specified format
 func (s *Server) exportReport(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	// Check permissions before execution
+	if err := s.checkToolPermission(ctx, "export_report"); err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
 	caseID := ""
 	payloadID := ""
 
@@ -512,6 +678,11 @@ func (s *Server) exportReport(ctx context.Context, args map[string]interface{}) 
 
 // revoke_token revokes an API key
 func (s *Server) revokeToken(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	// Check permissions before execution
+	if err := s.checkToolPermission(ctx, "revoke_token"); err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
 	keyID, ok := args["key_id"].(string)
 	if !ok {
 		return nil, fmt.Errorf("key_id is required")

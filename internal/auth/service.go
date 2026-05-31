@@ -30,6 +30,7 @@ func NewService(engine *xorm.Engine) *Service {
 
 // ValidScopes defines all valid API key scopes
 var ValidScopes = map[string]bool{
+	// Human/General scopes
 	"case:read":         true,
 	"case:write":        true,
 	"payload:read":      true,
@@ -39,6 +40,16 @@ var ValidScopes = map[string]bool{
 	"evidence:read":     true,
 	"evidence:write":    true,
 	"admin:all":         true,
+	// Agent scopes (Sprint K naming convention)
+	"agent:create_probe":       true,
+	"agent:wait_interaction":   true,
+	"agent:read_interactions":  true,
+	"agent:summarize_evidence": true,
+	"agent:export_report":      true,
+	"agent:read_runs":          true,
+	"agent:revoke_token":       true,
+	"agent:delete_payload":     true,
+	"agent:modify_config":      true,
 }
 
 // generateAPIKey generates a new API key
@@ -70,6 +81,17 @@ func (s *Service) CreateAPIKey(req *models.APIKeyCreateRequest, userID string) (
 	if req.IsAgent {
 		if !models.ValidateAgentScopes(req.Scopes) {
 			return nil, errors.New("invalid agent scope")
+		}
+
+		// Force expiration time for agent keys (default 24 hours if not set)
+		if req.ExpiresAt == nil {
+			defaultExpires := time.Now().Add(24 * time.Hour)
+			req.ExpiresAt = &defaultExpires
+		}
+
+		// Force risk tolerance to medium or lower if not set
+		if req.RiskTolerance == "" {
+			req.RiskTolerance = "medium"
 		}
 	}
 

@@ -164,6 +164,8 @@ export interface APIKey {
   name: string
   scopes: string[]
   enabled: boolean
+  is_agent?: boolean
+  risk_tolerance?: string
   expires_at?: string
   last_used_at?: string
   created_by: string
@@ -175,6 +177,8 @@ export interface APIKey {
 export interface APIKeyCreateRequest {
   name: string
   scopes: string[]
+  is_agent?: boolean
+  risk_tolerance?: string
   expires_at?: string
 }
 

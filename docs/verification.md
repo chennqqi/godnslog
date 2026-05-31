@@ -234,3 +234,108 @@ Sprint J establishes the Agent Run persistence model with:
 - MCP wait_for_interaction poll failure reliably writes failed operation even if status update fails
 - Audit logs correctly record status transitions with from_status/to_status
 - E2E tests verify real chain behavior with API assertions, filter queries, detail data, operation timeline, and backlinks
+
+---
+
+## Sprint K Verification (Agent API Key Permission Gate)
+
+**Initial Status:** ❌ 未通过验收，需要返修
+
+**Issues Found:**
+1. MCP getAPIKeyInfo 没有读取真实 API Key scopes/is_agent/risk_tolerance，直接返回 admin:all、IsAgent=false、RiskTolerance=high
+2. agent:revoke_token 被列入 valid scope，但 ValidateAgentScopes 不允许它，无法实现"显式 high scope + high risk tolerance 才允许"的完整门禁
+3. agent_permission.denied 写到 POST /api/v2/audit，但真实路由是 /api/v2/audit/logs
+4. 前端 ESLint 失败：apikeys/page.tsx 中 loadAPIKeys 在声明前被 effect 访问
+5. API Keys E2E 失败：3 passed, 4 failed，失败项全部在 apikeys.spec.ts，页面实际停留在登录页
+6. 创建 Agent Key 后没有一次性展示明文 key
+7. docs/verification.md 对 Sprint K 结果记录过度乐观
+
+**Fixes Applied:**
+
+**Backend Changes:**
+- ✅ Updated `internal/models/apikey.go` with Sprint K scope naming convention
+  - AgentScopes: agent:create_probe, agent:wait_interaction, agent:read_interactions, agent:summarize_evidence, agent:export_report, agent:read_runs
+  - HighRiskAgentScopes: agent:revoke_token, agent:delete_payload, agent:modify_config
+- ✅ Updated `internal/auth/service.go` ValidScopes to include all new agent scopes
+- ✅ Updated `internal/auth/service.go` CreateAPIKey to enforce expiration (default 24h) and risk tolerance (default medium) for agent keys
+- ✅ Refactored `server/v2_api.go` to use `internal/auth.Service` and `internal/models.APIKey`
+  - v2ListAPIKeys uses authService.ListAPIKeys
+  - v2CreateAPIKey uses authService.CreateAPIKey with audit logging
+  - v2DeleteAPIKey uses authService.RevokeAPIKey with audit logging
+  - v2GetAPIKey uses authService.GetAPIKeyByID
+  - v2UpdateAPIKey uses authService.GetAPIKeyByID with scope validation
+- ✅ **Fixed v2UserInfo to return real API Key scopes/is_agent/risk_tolerance** (server/v2_api.go)
+  - Added API key authentication path detection
+  - Returns api_key_id, api_key_prefix, scopes, is_agent, risk_tolerance, workspace_id
+- ✅ Created `internal/mcp/permissions.go` defining MCP tool scope/risk mapping
+  - ToolPermissions map with required scopes and risk levels
+  - RiskLevelOrder for comparison
+  - IsRiskLevelAllowed function
+- ✅ Updated `internal/mcp/server.go` with unified scope/risk gate
+  - Added checkToolPermission method
+  - **Fixed getAPIKeyInfo to parse real scopes/is_agent/risk_tolerance from /api/v2/auth/info response**
+  - **Fixed writePermissionDeniedAudit to use /api/v2/audit/logs route**
+  - Added permission checks to all MCP tools (create_oast_probe, list_interactions, wait_for_interaction, summarize_evidence, export_report, revoke_token)
+- ✅ **Fixed ValidateAgentScopes to allow HighRiskAgentScopes** (internal/models/apikey.go)
+  - High-risk scopes are now allowed, controlled via risk_tolerance in MCP permission checks
+  - Enables "explicit high scope + high risk tolerance" gate pattern
+- ✅ revoke_token tool has High risk level, requires high risk tolerance for agents
+
+**Frontend Changes:**
+- ✅ Updated `frontend-next/src/types/index.ts` APIKeyCreateRequest with is_agent, risk_tolerance fields
+- ✅ Updated `frontend-next/src/types/index.ts` APIKey with is_agent, risk_tolerance fields
+- ✅ Updated `frontend-next/src/app/dashboard/apikeys/page.tsx` with Agent Key support
+  - Added newKeyIsAgent, newKeyRiskTolerance, newKeyExpiresIn state
+  - Updated handleCreateKey to support agent fields
+  - Updated availableScopes to new naming convention (case:read, payload:read, etc.)
+  - Added agentScopes list
+  - Added riskToleranceOptions and expiresInOptions
+  - Added Agent Key type checkbox in create modal
+  - Added risk tolerance and expiry time selectors for agent keys
+  - Updated list display to show Agent badge and risk tolerance
+  - Updated key display to use key_prefix instead of key_masked
+  - **Fixed ESLint error: moved loadAPIKeys before useEffect and wrapped with useCallback**
+  - **Added createdKey and showKeyModal state to display full key after creation**
+  - **Added Show Key Modal to display full API key for copying**
+- ✅ Created `frontend-next/e2e/apikeys.spec.ts` with E2E tests
+  - Test for API keys list display
+  - Test for agent API key creation
+  - Test for API key revocation
+  - Test for full key not leaked in list
+  - **Fixed auth issue: use context.addInitScript to set localStorage token before page load**
+
+**Documentation Changes:**
+- ✅ Updated `docs/MCP_SERVER_USAGE.md` with Agent API Key permission control section
+  - Added tool-to-scope mapping table
+  - Added risk tolerance levels explanation
+  - Added permission denied behavior
+  - Added Agent Key creation requirements
+- ✅ Updated `docs/agent-native-specification.md` implementation checklist with Sprint K items marked complete
+- ✅ **Updated docs/verification.md to reflect real Sprint K status and fixes**
+
+**Verification Commands:**
+
+```bash
+# Backend tests
+GOCACHE=/tmp/gocache go test ./...
+
+# Frontend lint and build
+cd frontend-next
+npm run lint
+npm run build
+
+# E2E tests for API Keys
+cd frontend-next
+npx playwright test --reporter=line e2e/apikeys.spec.ts
+```
+
+**Core Achievement:**
+Sprint K implements Agent API Key Permission Gate and MCP Safety Controls:
+- Unified API key contract between /api/v2/apikeys and internal/models.APIKey
+- Agent API Key creation with enforced expiration (default 24h) and risk tolerance (default medium)
+- Agent-safe scopes only for agent keys
+- MCP tool scope/risk gate with permission checking before tool execution
+- High-risk actions (revoke_token) require high risk tolerance
+- Permission denied events written to audit logs (action: agent_permission.denied)
+- Frontend API Keys page supports Agent Key creation, display, and revocation
+- E2E tests cover Agent Key creation, listing, revocation, and key leakage prevention

@@ -130,6 +130,7 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		audit := v2.Group("/audit", self.authHandler)
 		{
 			audit.GET("/logs", self.v2ListAuditLogs)
+			audit.POST("/logs", self.v2CreateAuditLog)
 		}
 
 		// Canary
@@ -315,6 +316,34 @@ func (self *WebServer) v2Logout(c *gin.Context) {
 func (self *WebServer) v2UserInfo(c *gin.Context) {
 	T := getTranslateFunc(c)
 
+	// Check if authenticated via API key
+	if apiKeyFull, exists := c.Get("api_key_full"); exists {
+		key, ok := apiKeyFull.(*v2models.APIKey)
+		if !ok {
+			c.JSON(500, gin.H{
+				"code":    500,
+				"message": "api key data type error",
+			})
+			return
+		}
+
+		c.JSON(200, gin.H{
+			"code":    0,
+			"message": T("OK"),
+			"data": gin.H{
+				"user_id":        key.CreatedBy,
+				"api_key_id":     key.ID,
+				"api_key_prefix": key.KeyPrefix,
+				"scopes":         key.Scopes,
+				"is_agent":       key.IsAgent,
+				"risk_tolerance": key.RiskTolerance,
+				"workspace_id":   key.WorkspaceID,
+			},
+		})
+		return
+	}
+
+	// JWT authentication
 	store := self.store
 	id := c.GetInt64("id")
 	userValue, found := store.Get(fmt.Sprintf("%v.user", id))
@@ -1489,15 +1518,13 @@ func (self *WebServer) v2ListAPIKeys(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 
-	session := self.orm.NewSession()
-	defer session.Close()
+	user := c.MustGet("user").(*models.TblUser)
+	userID := strconv.FormatInt(user.Id, 10)
 
-	var apiKeys []models.TblAPIKey
-	query := session.Table(new(models.TblAPIKey)).Where("is_revoked = ?", false)
-
-	total, err := query.Count()
+	// Use auth service to list API keys
+	response, err := self.authService.ListAPIKeys(userID, page, pageSize)
 	if err != nil {
-		logrus.Errorf("[v2_api.go::v2ListAPIKeys] count error: %v", err)
+		logrus.Errorf("[v2_api.go::v2ListAPIKeys] list error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "server internal error",
@@ -1505,63 +1532,21 @@ func (self *WebServer) v2ListAPIKeys(c *gin.Context) {
 		return
 	}
 
-	err = query.OrderBy("created_at DESC").Limit(pageSize, (page-1)*pageSize).Find(&apiKeys)
-	if err != nil {
-		logrus.Errorf("[v2_api.go::v2ListAPIKeys] find error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "server internal error",
-		})
-		return
-	}
-
-	items := make([]models.APIKey, len(apiKeys))
-	for i, item := range apiKeys {
-		var scopes []string
-		if item.Scopes != "" {
-			json.Unmarshal([]byte(item.Scopes), &scopes)
-		}
-		items[i] = models.APIKey{
-			Id:        strconv.FormatInt(item.Id, 10),
-			KeyPrefix: item.KeyPrefix,
-			Name:      item.Name,
-			Scopes:    scopes,
-			CreatedBy: strconv.FormatInt(item.CreatedBy, 10),
-			CreatedAt: item.CreatedAt.Format(time.RFC3339),
-			IsRevoked: item.IsRevoked,
-		}
-		if !item.ExpiresAt.IsZero() {
-			items[i].ExpiresAt = item.ExpiresAt.Format(time.RFC3339)
-		}
-		if !item.LastUsedAt.IsZero() {
-			items[i].LastUsedAt = item.LastUsedAt.Format(time.RFC3339)
-		}
-		if !item.RevokedAt.IsZero() {
-			items[i].RevokedAt = item.RevokedAt.Format(time.RFC3339)
-		}
-	}
-
-	totalPages := int(total) / pageSize
-	if int(total)%pageSize > 0 {
-		totalPages++
+	// Mask keys in response (never return full key in list)
+	for i := range response.Items {
+		response.Items[i].Key = ""
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
-		"data": models.APIKeyListResponse{
-			Items:      items,
-			Total:      int(total),
-			Page:       page,
-			PageSize:   pageSize,
-			TotalPages: totalPages,
-		},
+		"data":    response,
 	})
 }
 
 // v2CreateAPIKey creates an API key
 func (self *WebServer) v2CreateAPIKey(c *gin.Context) {
-	var req models.APIKeyCreateRequest
+	var req v2models.APIKeyCreateRequest
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
@@ -1579,93 +1564,96 @@ func (self *WebServer) v2CreateAPIKey(c *gin.Context) {
 	}
 
 	user := c.MustGet("user").(*models.TblUser)
+	userID := strconv.FormatInt(user.Id, 10)
 
-	// Generate API key
-	key := generateAPIKey()
-	keyPrefix := key[:8]
-
-	apiKeyItem := models.TblAPIKey{
-		Key:       key,
-		KeyPrefix: keyPrefix,
-		Name:      req.Name,
-		CreatedBy: user.Id,
-		IsRevoked: false,
-	}
-
-	if req.Scopes != nil {
-		scopesJson, _ := json.Marshal(req.Scopes)
-		apiKeyItem.Scopes = string(scopesJson)
-	}
-
-	if req.ExpiresAt != "" {
-		expiresAt, err := time.Parse(time.RFC3339, req.ExpiresAt)
-		if err == nil {
-			apiKeyItem.ExpiresAt = expiresAt
-		}
-	}
-
-	session := self.orm.NewSession()
-	defer session.Close()
-
-	_, err := session.Insert(&apiKeyItem)
+	// Use auth service to create API key
+	apiKey, err := self.authService.CreateAPIKey(&req, userID)
 	if err != nil {
-		logrus.Errorf("[v2_api.go::v2CreateAPIKey] insert error: %v", err)
+		logrus.Errorf("[v2_api.go::v2CreateAPIKey] create error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
-			"message": "server internal error",
+			"message": err.Error(),
 		})
 		return
 	}
 
-	var scopes []string
-	if apiKeyItem.Scopes != "" {
-		json.Unmarshal([]byte(apiKeyItem.Scopes), &scopes)
+	// Write audit log
+	userIDPtr := &userID
+	resourceIDPtr := &apiKey.ID
+	auditLog := &v2models.AuditLog{
+		ID:           generateRandomString(36),
+		UserID:       userIDPtr,
+		Action:       "api_key.created",
+		ResourceType: "api_key",
+		ResourceID:   resourceIDPtr,
+		Details: v2models.AuditDetails{
+			"api_key_id":     apiKey.ID,
+			"key_prefix":     apiKey.KeyPrefix,
+			"is_agent":       apiKey.IsAgent,
+			"scopes":         apiKey.Scopes,
+			"risk_tolerance": apiKey.RiskTolerance,
+		},
+		Timestamp: time.Now(),
+	}
+	if err := self.authService.CreateAuditLog(auditLog); err != nil {
+		logrus.Errorf("[v2_api.go::v2CreateAPIKey] audit log error: %v", err)
 	}
 
-	result := models.APIKey{
-		Id:        strconv.FormatInt(apiKeyItem.Id, 10),
-		Key:       apiKeyItem.Key,
-		KeyPrefix: apiKeyItem.KeyPrefix,
-		Name:      apiKeyItem.Name,
-		Scopes:    scopes,
-		CreatedBy: strconv.FormatInt(apiKeyItem.CreatedBy, 10),
-		CreatedAt: apiKeyItem.CreatedAt.Format(time.RFC3339),
-		IsRevoked: apiKeyItem.IsRevoked,
-	}
-	if !apiKeyItem.ExpiresAt.IsZero() {
-		result.ExpiresAt = apiKeyItem.ExpiresAt.Format(time.RFC3339)
-	}
-
+	// Return API key with full key (only shown on creation)
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
-		"data":    result,
+		"data":    apiKey,
 	})
 }
 
 // v2DeleteAPIKey deletes an API key
 func (self *WebServer) v2DeleteAPIKey(c *gin.Context) {
 	id := c.Param("id")
-	apiKeyId, err := strconv.ParseInt(id, 10, 64)
+
+	// Get API key for audit log before revoking
+	apiKey, err := self.authService.GetAPIKeyByID(id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "invalid api key id",
+		logrus.Errorf("[v2_api.go::v2DeleteAPIKey] get error: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    404,
+			"message": "api key not found",
 		})
 		return
 	}
 
-	session := self.orm.NewSession()
-	defer session.Close()
-
-	_, err = session.ID(apiKeyId).Update(&models.TblAPIKey{IsRevoked: true, RevokedAt: time.Now()})
-	if err != nil {
-		logrus.Errorf("[v2_api.go::v2DeleteAPIKey] update error: %v", err)
+	// Revoke API key
+	if err := self.authService.RevokeAPIKey(id); err != nil {
+		logrus.Errorf("[v2_api.go::v2DeleteAPIKey] revoke error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "server internal error",
 		})
 		return
+	}
+
+	// Write audit log
+	user := c.MustGet("user").(*models.TblUser)
+	userID := strconv.FormatInt(user.Id, 10)
+	userIDPtr := &userID
+	resourceIDPtr := &id
+	auditLog := &v2models.AuditLog{
+		ID:           generateRandomString(36),
+		UserID:       userIDPtr,
+		Action:       "api_key.revoked",
+		ResourceType: "api_key",
+		ResourceID:   resourceIDPtr,
+		Details: v2models.AuditDetails{
+			"api_key_id":     apiKey.ID,
+			"key_prefix":     apiKey.KeyPrefix,
+			"is_agent":       apiKey.IsAgent,
+			"scopes":         apiKey.Scopes,
+			"risk_tolerance": apiKey.RiskTolerance,
+		},
+		Timestamp: time.Now(),
+	}
+	if err := self.authService.CreateAuditLog(auditLog); err != nil {
+		logrus.Errorf("[v2_api.go::v2DeleteAPIKey] audit log error: %v", err)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -1677,29 +1665,11 @@ func (self *WebServer) v2DeleteAPIKey(c *gin.Context) {
 // v2GetAPIKey gets an API key by ID
 func (self *WebServer) v2GetAPIKey(c *gin.Context) {
 	id := c.Param("id")
-	apiKeyId, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "invalid api key id",
-		})
-		return
-	}
 
-	session := self.orm.NewSession()
-	defer session.Close()
-
-	var apiKey models.TblAPIKey
-	has, err := session.ID(apiKeyId).Get(&apiKey)
+	// Use auth service to get API key
+	apiKey, err := self.authService.GetAPIKeyByID(id)
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2GetAPIKey] get error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "server internal error",
-		})
-		return
-	}
-	if !has {
 		c.JSON(http.StatusNotFound, gin.H{
 			"code":    404,
 			"message": "api key not found",
@@ -1707,8 +1677,8 @@ func (self *WebServer) v2GetAPIKey(c *gin.Context) {
 		return
 	}
 
-	// Mask the key for security
-	apiKey.Key = apiKey.KeyPrefix + "********"
+	// Mask the key for security (never return full key in get)
+	apiKey.Key = ""
 
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
@@ -1720,16 +1690,8 @@ func (self *WebServer) v2GetAPIKey(c *gin.Context) {
 // v2UpdateAPIKey updates an API key
 func (self *WebServer) v2UpdateAPIKey(c *gin.Context) {
 	id := c.Param("id")
-	apiKeyId, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "invalid api key id",
-		})
-		return
-	}
 
-	var req models.APIKeyUpdateRequest
+	var req v2models.APIKeyCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
@@ -1738,27 +1700,52 @@ func (self *WebServer) v2UpdateAPIKey(c *gin.Context) {
 		return
 	}
 
-	session := self.orm.NewSession()
-	defer session.Close()
+	// Get existing API key
+	apiKey, err := self.authService.GetAPIKeyByID(id)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2UpdateAPIKey] get error: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    404,
+			"message": "api key not found",
+		})
+		return
+	}
 
-	// Build update fields
-	updateData := &models.TblAPIKey{}
+	// Update fields if provided
 	if req.Name != "" {
-		updateData.Name = req.Name
+		apiKey.Name = req.Name
 	}
 	if req.Scopes != nil {
-		scopesJson, _ := json.Marshal(req.Scopes)
-		updateData.Scopes = string(scopesJson)
-	}
-	if req.ExpiresAt != "" {
-		expiresAt, err := time.Parse(time.RFC3339, req.ExpiresAt)
-		if err == nil {
-			updateData.ExpiresAt = expiresAt
+		// Validate scopes
+		for _, scope := range req.Scopes {
+			if !auth.ValidScopes[scope] {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"code":    400,
+					"message": "invalid scope",
+				})
+				return
+			}
 		}
+		// Validate agent scopes if this is an agent key
+		if apiKey.IsAgent {
+			if !v2models.ValidateAgentScopes(req.Scopes) {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"code":    400,
+					"message": "invalid agent scope",
+				})
+				return
+			}
+		}
+		apiKey.Scopes = v2models.Scopes(req.Scopes)
+	}
+	if req.ExpiresAt != nil {
+		apiKey.ExpiresAt = req.ExpiresAt
 	}
 
-	_, err = session.ID(apiKeyId).Cols("name", "scopes", "expires_at").Update(updateData)
-	if err != nil {
+	// Update in database
+	session := self.orm.NewSession()
+	defer session.Close()
+	if _, err := session.ID(id).Update(apiKey); err != nil {
 		logrus.Errorf("[v2_api.go::v2UpdateAPIKey] update error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
@@ -3101,6 +3088,39 @@ func (self *WebServer) v2ListAuditLogs(c *gin.Context) {
 		"code":    0,
 		"message": "success",
 		"data":    resp,
+	})
+}
+
+// v2CreateAuditLog creates an audit log entry
+func (self *WebServer) v2CreateAuditLog(c *gin.Context) {
+	var req v2models.AuditLog
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": fmt.Sprintf("invalid request: %v", err),
+		})
+		return
+	}
+
+	// Set timestamp if not provided
+	if req.Timestamp.IsZero() {
+		req.Timestamp = time.Now()
+	}
+
+	// Create audit log using auth service
+	authService := auth.NewService(self.orm)
+	if err := authService.CreateAuditLog(&req); err != nil {
+		logrus.Errorf("[v2_api.go::v2CreateAuditLog] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to create audit log",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
 	})
 }
 

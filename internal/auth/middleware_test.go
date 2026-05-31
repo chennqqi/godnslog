@@ -225,10 +225,10 @@ func TestAuthMiddlewareAPIKey(t *testing.T) {
 		// Create auth service
 		authService := NewService(engine)
 
-		// Create an agent API key with valid agent scopes (singular forms)
+		// Create an agent API key with valid agent scopes
 		req := &models.APIKeyCreateRequest{
 			Name:    "Agent Key",
-			Scopes:  []string{"case:read", "payload:read", "interaction:read", "evidence:read"},
+			Scopes:  []string{"agent:create_probe", "agent:wait_interaction", "agent:read_interactions"},
 			IsAgent: true,
 		}
 		apiKey, err := authService.CreateAPIKey(req, "user-1")

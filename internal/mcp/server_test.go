@@ -19,6 +19,24 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 func newTestServer(handler func(*http.Request) string) *Server {
 	server := NewServer("http://godnslog.test", "test-key")
 	server.httpClient.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		// Handle auth/info request for permission checking
+		if strings.Contains(req.URL.Path, "/api/v2/auth/info") {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(`{"code":0,"message":"success","data":{"user_id":"test-user"}}`)),
+				Request:    req,
+			}, nil
+		}
+		// Handle audit/logs POST request for permission denied logging
+		if req.Method == http.MethodPost && strings.Contains(req.URL.Path, "/api/v2/audit/logs") {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(`{"code":0,"message":"success"}`)),
+				Request:    req,
+			}, nil
+		}
 		return &http.Response{
 			StatusCode: http.StatusOK,
 			Header:     make(http.Header),
@@ -710,5 +728,217 @@ func TestCreateOASTProbeToolCreatesCaseThenPayload(t *testing.T) {
 		if payloadRequestExpectedProtocol != "dns" {
 			t.Errorf("expected_protocol should be 'dns' (first value), got %v", payloadRequestExpectedProtocol)
 		}
+	}
+}
+
+// TestPermissionGateMissingScope tests that tools are blocked when API key lacks required scope
+func TestPermissionGateMissingScope(t *testing.T) {
+	var businessAPICalled bool
+
+	// Override to capture auth/info and business API calls
+	server := NewServer("http://godnslog.test", "test-key")
+	server.httpClient.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		// Handle auth/info request for permission checking
+		if strings.Contains(req.URL.Path, "/api/v2/auth/info") {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(`{"code":0,"message":"success","data":{"user_id":"test-user","api_key_id":"key-123","api_key_prefix":"gdl_abc","scopes":["case:read"],"is_agent":true,"risk_tolerance":"medium"}}`)),
+				Request:    req,
+			}, nil
+		}
+		// Track if business API was called
+		if strings.Contains(req.URL.Path, "/api/v2/cases") || strings.Contains(req.URL.Path, "/api/v2/payloads") {
+			businessAPICalled = true
+		}
+		// Handle audit/logs POST request
+		if req.Method == http.MethodPost && strings.Contains(req.URL.Path, "/api/v2/audit/logs") {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(`{"code":0,"message":"success"}`)),
+				Request:    req,
+			}, nil
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(`{"data":{"id":"test-id"}}`)),
+			Request:    req,
+		}, nil
+	})
+
+	// Try to call createCase which requires case:create scope
+	args := map[string]interface{}{
+		"title":       "Test Case",
+		"description": "Test description",
+		"target":      "example.com",
+	}
+
+	result, err := server.createCase(nil, args)
+
+	// Should succeed with permission denied error
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	toolResult, ok := result.(ToolResult)
+	if !ok {
+		t.Fatal("Result should be ToolResult type")
+	}
+
+	// Should have permission denied error
+	if toolResult.Success {
+		t.Fatal("Expected permission denied, but tool succeeded")
+	}
+
+	// Business API should NOT have been called
+	if businessAPICalled {
+		t.Fatal("Business API should not be called when scope is missing")
+	}
+}
+
+// TestPermissionGateExceedsRiskTolerance tests that tools are blocked when tool risk exceeds API key tolerance
+func TestPermissionGateExceedsRiskTolerance(t *testing.T) {
+	var businessAPICalled bool
+
+	// Override to capture auth/info and business API calls
+	server := NewServer("http://godnslog.test", "test-key")
+	server.httpClient.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		// Handle auth/info request for permission checking
+		if strings.Contains(req.URL.Path, "/api/v2/auth/info") {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(`{"code":0,"message":"success","data":{"user_id":"test-user","api_key_id":"key-123","api_key_prefix":"gdl_abc","scopes":["agent:revoke_token"],"is_agent":true,"risk_tolerance":"low"}}`)),
+				Request:    req,
+			}, nil
+		}
+		// Track if business API was called
+		if strings.Contains(req.URL.Path, "/api/v2/apikeys") {
+			businessAPICalled = true
+		}
+		// Handle audit/logs POST request
+		if req.Method == http.MethodPost && strings.Contains(req.URL.Path, "/api/v2/audit/logs") {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(`{"code":0,"message":"success"}`)),
+				Request:    req,
+			}, nil
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(`{"data":{"revoked":true}}`)),
+			Request:    req,
+		}, nil
+	})
+
+	// Try to call revokeToken which has high risk
+	args := map[string]interface{}{
+		"key_id": "key-1",
+	}
+
+	result, err := server.revokeToken(nil, args)
+
+	// Should succeed with permission denied error
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	toolResult, ok := result.(ToolResult)
+	if !ok {
+		t.Fatal("Result should be ToolResult type")
+	}
+
+	// Should have permission denied error
+	if toolResult.Success {
+		t.Fatal("Expected permission denied, but tool succeeded")
+	}
+
+	// Business API should NOT have been called
+	if businessAPICalled {
+		t.Fatal("Business API should not be called when risk tolerance is exceeded")
+	}
+}
+
+// TestPermissionDeniedAuditLog tests that permission denied events are logged to audit
+func TestPermissionDeniedAuditLog(t *testing.T) {
+	var auditLogPosted bool
+	var auditLogBody string
+
+	// Override to capture auth/info and audit log POST
+	server := NewServer("http://godnslog.test", "test-key")
+	server.httpClient.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		// Handle auth/info request for permission checking
+		if strings.Contains(req.URL.Path, "/api/v2/auth/info") {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(`{"code":0,"message":"success","data":{"user_id":"test-user","api_key_id":"key-123","api_key_prefix":"gdl_abc","scopes":["case:read"],"is_agent":true,"risk_tolerance":"medium"}}`)),
+				Request:    req,
+			}, nil
+		}
+		// Capture audit/log POST
+		if req.Method == http.MethodPost && strings.Contains(req.URL.Path, "/api/v2/audit/logs") {
+			auditLogPosted = true
+			bodyBytes, _ := io.ReadAll(req.Body)
+			auditLogBody = string(bodyBytes)
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(`{"code":0,"message":"success"}`)),
+				Request:    req,
+			}, nil
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(`{"data":{"id":"test-id"}}`)),
+			Request:    req,
+		}, nil
+	})
+
+	// Try to call createCase which requires case:create scope
+	args := map[string]interface{}{
+		"title":       "Test Case",
+		"description": "Test description",
+		"target":      "example.com",
+	}
+
+	result, err := server.createCase(nil, args)
+
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	toolResult, ok := result.(ToolResult)
+	if !ok {
+		t.Fatal("Result should be ToolResult type")
+	}
+
+	// Should have permission denied error
+	if toolResult.Success {
+		t.Fatal("Expected permission denied, but tool succeeded")
+	}
+
+	// Audit log should have been posted
+	if !auditLogPosted {
+		t.Fatal("Audit log should be posted when permission is denied")
+	}
+
+	// Verify audit log contains permission denied information
+	if auditLogBody == "" {
+		t.Fatal("Audit log body should not be empty")
+	}
+
+	var auditLog map[string]interface{}
+	if err := json.Unmarshal([]byte(auditLogBody), &auditLog); err != nil {
+		t.Fatalf("Failed to parse audit log body: %v", err)
+	}
+
+	if action, ok := auditLog["action"].(string); !ok || action != "agent_permission.denied" {
+		t.Fatalf("Expected action 'agent_permission.denied', got %v", auditLog["action"])
 	}
 }

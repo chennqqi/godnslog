@@ -176,6 +176,50 @@ godnslog-mcp-server
 
 ## 安全性
 
+### Agent API Key 权限控制
+
+Sprint K 引入了 Agent API Key 权限控制系统，为 MCP 工具提供细粒度的权限和风险控制。
+
+#### 权限 Scope
+
+每个 MCP 工具都需要特定的权限 scope：
+
+| 工具 | 必需 Scope | 风险等级 |
+|------|-----------|---------|
+| create_oast_probe | agent:create_probe | Medium |
+| wait_for_interaction | agent:wait_interaction | Low |
+| list_interactions | agent:read_interactions | Low |
+| summarize_evidence | agent:summarize_evidence | Low |
+| export_report | agent:export_report | Low |
+| list_agent_runs | agent:read_runs | Low |
+| get_agent_run | agent:read_runs | Low |
+| revoke_token | agent:revoke_token | High |
+
+#### 风险容忍度
+
+Agent API Key 支持三种风险容忍度级别：
+
+- **low**：仅允许低风险操作（list_interactions, wait_for_interaction, summarize_evidence, export_report, list_agent_runs, get_agent_run）
+- **medium**：允许低风险和中风险操作（包括 create_oast_probe）
+- **high**：允许所有操作（包括高风险的 revoke_token）
+
+默认风险容忍度为 `medium`。
+
+#### 权限拒绝
+
+当 Agent 尝试执行超出其权限或风险容忍度的操作时：
+- 操作会被拒绝
+- 拒绝事件会记录到审计日志（action: `agent_permission.denied`）
+- 返回明确的错误信息说明拒绝原因
+
+#### 创建 Agent API Key
+
+通过 Web UI 创建 Agent API Key 时：
+- 必须选择 Agent Key 类型
+- Scope 限制为 Agent-safe scopes
+- 必须设置过期时间（默认 24 小时）
+- 必须设置风险容忍度（默认 medium）
+
 ### 最小权限
 
 MCP Server 使用的 API Key 应该具有最小权限：
@@ -185,7 +229,7 @@ MCP Server 使用的 API Key 应该具有最小权限：
 
 ### 过期时间
 
-MCP API Key 应该设置合理的过期时间（如 24 小时）。
+MCP API Key 应该设置合理的过期时间（如 24 小时）。Agent API Key 强制要求设置过期时间。
 
 ### 审计日志
 
@@ -194,13 +238,14 @@ MCP API Key 应该设置合理的过期时间（如 24 小时）。
 - 调用的工具
 - 使用的参数
 - 调用结果
+- 权限拒绝事件（action: `agent_permission.denied`）
 
 ### 高风险动作限制
 
-以下高风险动作默认禁用：
-- DNS Rebinding 的 C2 模式
-- 修改系统配置
-- 删除其他用户的数据
+以下高风险动作默认禁用（需要 `high` 风险容忍度）：
+- revoke_token（撤销 API Key）
+- agent:delete_payload（删除 Payload）
+- agent:modify_config（修改配置）
 
 ## 使用示例
 
