@@ -31,6 +31,7 @@ import type {
   AgentRunListRequest,
   AgentRunListResponse,
   AgentOperationCreateRequest,
+  AgentRunReviewPacket,
 } from '@/types'
 
 interface UnknownItemListResponse {
@@ -169,6 +170,8 @@ export const agentRunApi = {
   list: (params?: AgentRunListRequest) =>
     api.get<AgentRunListResponse>('/agent-runs', params),
   get: (id: string) => api.get<{ data: AgentRunDetail }>(`/agent-runs/${id}`),
+  getReview: (id: string, format: 'json' | 'markdown' = 'json') =>
+    api.get<{ data: AgentRunReviewPacket }>(`/agent-runs/${id}/review`, { format }),
   create: (data: AgentRunCreateRequest) => api.post<{ data: AgentRun }>('/agent-runs', data),
   updateStatus: (id: string, data: AgentRunUpdateStatusRequest) =>
     api.put<{ data: AgentRun }>(`/agent-runs/${id}/status`, data),

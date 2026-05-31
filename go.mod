@@ -12,6 +12,7 @@ require (
 	github.com/go-sql-driver/mysql v1.7.0
 	github.com/google/subcommands v1.2.0
 	github.com/hashicorp/go-retryablehttp v0.7.8
+	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/miekg/dns v1.1.62
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/sirupsen/logrus v1.9.3

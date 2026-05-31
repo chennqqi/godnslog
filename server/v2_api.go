@@ -192,6 +192,7 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			agentRuns.GET("", self.v2ListAgentRuns)
 			agentRuns.POST("", self.v2CreateAgentRun)
 			agentRuns.GET("/:id", self.v2GetAgentRun)
+			agentRuns.GET("/:id/review", self.v2GetAgentRunReview)
 			agentRuns.PUT("/:id/status", self.v2UpdateAgentRunStatus)
 			agentRuns.POST("/:id/operations", self.v2AppendAgentOperation)
 		}
@@ -3400,6 +3401,57 @@ func (self *WebServer) v2GetAgentRun(c *gin.Context) {
 		"code":    0,
 		"message": "success",
 		"data":    detail,
+	})
+}
+
+// v2GetAgentRunReview generates a review packet for an agent run
+func (self *WebServer) v2GetAgentRunReview(c *gin.Context) {
+	id := c.Param("id")
+	format := c.DefaultQuery("format", "json")
+
+	// Validate format
+	if format != "json" && format != "markdown" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "invalid format, must be 'json' or 'markdown'",
+		})
+		return
+	}
+
+	baseURL := ""
+	if c.Request.TLS != nil {
+		baseURL = "https://" + c.Request.Host
+	} else {
+		baseURL = "http://" + c.Request.Host
+	}
+
+	authService := auth.NewService(self.orm)
+	agentRunService := agentrun.NewService(self.orm, authService)
+	interactionService := interaction.NewService(self.orm)
+	evidenceService := interaction.NewEvidenceService(interactionService)
+	reviewService := agentrun.NewReviewService(self.orm, agentRunService, authService, evidenceService, interactionService)
+
+	packet, err := reviewService.BuildReviewPacket(id, format, baseURL)
+	if err != nil {
+		if err == agentrun.ErrAgentRunNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"code":    404,
+				"message": "Agent run not found",
+			})
+			return
+		}
+		logrus.Errorf("[v2_api.go::v2GetAgentRunReview] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to generate review packet",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    packet,
 	})
 }
 

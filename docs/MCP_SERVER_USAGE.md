@@ -146,17 +146,41 @@ godnslog-mcp-server
 
 ### 7. export_report
 
-导出 Case 报告。
+导出证据报告或 Agent Run Review Packet。
 
 **参数**：
-- `case_id` (string, required)：Case ID
-- `format` (string, optional)：报告格式（markdown/json/csv），默认 markdown
+- `case_id` (string, optional)：关联的 Case ID
+- `payload_id` (string, optional)：关联的 Payload ID
+- `agent_run_id` (string, optional)：关联的 Agent Run ID（优先使用 Review API）
+- `format` (string, optional)：输出格式，默认 `markdown`，可选 `json`
 
-**示例**：
+**说明**：
+- 当提供 `agent_run_id` 时，优先调用 `/api/v2/agent-runs/:id/review` 生成 Review Packet
+- 当不提供 `agent_run_id` 时，调用 `/api/v2/evidence/generate` 生成证据报告（兼容路径）
+- 至少需要提供 `case_id` 或 `payload_id`（当不提供 `agent_run_id` 时）
+
+**示例（Agent Run Review）**：
+```json
+{
+  "agent_run_id": "agent-run-123",
+  "format": "markdown"
+}
+```
+
+**示例（Evidence Report）**：
 ```json
 {
   "case_id": "case-123",
   "format": "markdown"
+}
+```
+
+或
+
+```json
+{
+  "payload_id": "payload-123",
+  "format": "json"
 }
 ```
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { agentRunApi } from '@/lib/api-client'
-import type { AgentRunDetail, AgentRunStatus } from '@/types'
+import type { AgentRunDetail, AgentRunStatus, AgentRunReviewPacket } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -15,6 +15,9 @@ export default function AgentRunDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [reviewPacket, setReviewPacket] = useState<AgentRunReviewPacket | null>(null)
+  const [generatingReview, setGeneratingReview] = useState(false)
+  const [reviewFormat, setReviewFormat] = useState<'json' | 'markdown'>('json')
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -55,6 +58,24 @@ export default function AgentRunDetailPage() {
       setError('更新状态失败')
     } finally {
       setUpdatingStatus(false)
+    }
+  }
+
+  const handleGenerateReview = async (format: 'json' | 'markdown') => {
+    if (!agentRun) return
+    setGeneratingReview(true)
+    setError('')
+    try {
+      const response = await agentRunApi.getReview(agentRun.id, format)
+      if (response.data) {
+        setReviewPacket(response.data.data)
+        setReviewFormat(format)
+      }
+    } catch (error: unknown) {
+      console.error('Failed to generate review:', error)
+      setError('生成Review失败')
+    } finally {
+      setGeneratingReview(false)
     }
   }
 
@@ -296,6 +317,88 @@ export default function AgentRunDetailPage() {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Review Packet */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Review Packet</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                onClick={() => handleGenerateReview('json')}
+                disabled={generatingReview}
+                variant={reviewFormat === 'json' ? 'default' : 'outline'}
+                size="sm"
+              >
+                生成 JSON Review
+              </Button>
+              <Button
+                onClick={() => handleGenerateReview('markdown')}
+                disabled={generatingReview}
+                variant={reviewFormat === 'markdown' ? 'default' : 'outline'}
+                size="sm"
+              >
+                生成 Markdown Review
+              </Button>
+              {agentRun.payload_id && (
+                <Button
+                  onClick={() => router.push(`/dashboard/evidence?payload_id=${agentRun.payload_id}`)}
+                  variant="outline"
+                  size="sm"
+                >
+                  查看证据
+                </Button>
+              )}
+            </div>
+
+            {generatingReview && (
+              <p className="text-muted-foreground">生成中...</p>
+            )}
+
+            {reviewPacket && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {reviewPacket.evidence && (
+                    <>
+                      <div>
+                        <p className="text-sm font-medium">Evidence Strength</p>
+                        <Badge className={getRiskLevelColor(reviewPacket.evidence.evidence_strength)}>
+                          {reviewPacket.evidence.evidence_strength}
+                        </Badge>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Confidence</p>
+                        <span>{reviewPacket.evidence.confidence}%</span>
+                      </div>
+                    </>
+                  )}
+                  <div>
+                    <p className="text-sm font-medium">Interaction Count</p>
+                    <span>{reviewPacket.interaction_summary.total}</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Unique Sources</p>
+                    <span>{reviewPacket.interaction_summary.unique_sources}</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Generated At</p>
+                    <span>{new Date(reviewPacket.generated_at).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                {reviewFormat === 'markdown' && reviewPacket.content && (
+                  <div>
+                    <p className="text-sm font-medium mb-2">Markdown Preview</p>
+                    <pre className="text-xs bg-muted p-4 rounded overflow-x-auto max-h-96">
+                      {reviewPacket.content}
+                    </pre>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

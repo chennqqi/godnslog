@@ -61,7 +61,7 @@ test.describe('API Keys Page', () => {
 
   test('should create agent API key', async ({ page }) => {
     let createCalled = false;
-    let createRequestBody: any = null;
+    let createRequestBody: Record<string, unknown> = null;
     // Set up mock BEFORE navigation - match both GET and POST
     await page.route('**/api/v2/apikeys**', async (route) => {
       const method = route.request().method();
@@ -138,14 +138,13 @@ test.describe('API Keys Page', () => {
     await expect(page.locator(".fixed").locator("text=gdl_")).toBeVisible();
 
     // Close the modal
-    await page.locator('.fixed').locator('button:has-text("关闭")').click();
+    await page.locator('.fixed').locator('button:has-text("我已复制")').click();
   });
 
   test('should revoke API key', async ({ page }) => {
     // Set up mock BEFORE navigation - handle both GET and DELETE
     let deleteCalled = false;
     await page.route('**/api/v2/apikeys**', async (route) => {
-      const url = route.request().url();
       const method = route.request().method();
 
       if (method === 'DELETE') {

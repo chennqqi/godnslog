@@ -623,25 +623,74 @@ func (s *Server) exportReport(ctx context.Context, args map[string]interface{}) 
 
 	agentRunID, _ := args["agent_run_id"].(string)
 
-	// Validate that at least one of case_id or payload_id is provided
-	if len(caseID) == 0 && len(payloadID) == 0 {
-		return ToolResult{Success: false, Error: "either case_id or payload_id is required"}, nil
-	}
-
 	format := "markdown"
 	if f, ok := args["format"].(string); ok {
 		format = f
 	}
 
-	// Call API to generate evidence
-	result, err := s.apiCall("POST", "/api/v2/evidence/generate", map[string]interface{}{
-		"case_id":    caseID,
-		"payload_id": payloadID,
-		"format":     format,
-	})
+	var result map[string]interface{}
+	var err error
 
-	if err != nil {
-		return ToolResult{Success: false, Error: err.Error()}, nil
+	// If agent_run_id is provided, use the review API
+	if agentRunID != "" {
+		resultRaw, err := s.apiCall("GET", fmt.Sprintf("/api/v2/agent-runs/%s/review?format=%s", agentRunID, format), nil)
+		if err != nil {
+			return ToolResult{Success: false, Error: err.Error()}, nil
+		}
+		var ok bool
+		result, ok = resultRaw.(map[string]interface{})
+		if !ok {
+			return ToolResult{Success: false, Error: "invalid response from review API"}, nil
+		}
+	} else {
+		// Validate that at least one of case_id or payload_id is provided
+		if len(caseID) == 0 && len(payloadID) == 0 {
+			return ToolResult{Success: false, Error: "either case_id or payload_id is required when agent_run_id is not provided"}, nil
+		}
+
+		// Call API to generate evidence (compatibility path)
+		resultRaw, err := s.apiCall("POST", "/api/v2/evidence/generate", map[string]interface{}{
+			"case_id":    caseID,
+			"payload_id": payloadID,
+			"format":     format,
+		})
+		if err != nil {
+			return ToolResult{Success: false, Error: err.Error()}, nil
+		}
+		var ok bool
+		result, ok = resultRaw.(map[string]interface{})
+		if !ok {
+			return ToolResult{Success: false, Error: "invalid response from evidence API"}, nil
+		}
+	}
+
+	// Extract review summary for operation logging
+	reviewSummary := map[string]interface{}{
+		"format": format,
+	}
+
+	if agentRunID != "" {
+		reviewSummary["agent_run_id"] = agentRunID
+	}
+	if caseID != "" {
+		reviewSummary["case_id"] = caseID
+	}
+	if payloadID != "" {
+		reviewSummary["payload_id"] = payloadID
+	}
+
+	// Extract interaction_count and evidence_strength from result if available
+	if data, ok := result["data"].(map[string]interface{}); ok {
+		if interactionSummary, ok := data["interaction_summary"].(map[string]interface{}); ok {
+			if interactionCount, ok := interactionSummary["total"]; ok {
+				reviewSummary["interaction_count"] = interactionCount
+			}
+		}
+		if evidence, ok := data["evidence"].(map[string]interface{}); ok {
+			if evidenceStrength, ok := evidence["evidence_strength"]; ok {
+				reviewSummary["evidence_strength"] = evidenceStrength
+			}
+		}
 	}
 
 	// Append operation if agent_run_id is provided
@@ -650,26 +699,24 @@ func (s *Server) exportReport(ctx context.Context, args map[string]interface{}) 
 			"action":     "export_report",
 			"risk_level": "low",
 			"request": map[string]interface{}{
-				"case_id":    caseID,
-				"payload_id": payloadID,
-				"format":     format,
+				"agent_run_id": agentRunID,
+				"format":       format,
 			},
-			"result": map[string]interface{}{
-				"success": true,
-				"report":  result,
-			},
+			"result": reviewSummary,
 		})
 		if err != nil {
-			return ToolResult{Success: false, Error: fmt.Sprintf("failed to append agent operation: %v", err)}, nil
+			// Log error but don't fail the export
+			fmt.Printf("Warning: failed to append agent operation: %v\n", err)
 		}
+
+		// Return full review packet for agent_run_id path
+		return ToolResult{Success: true, Data: result}, nil
 	}
 
-	// Extract the content field from API response
-	if resp, ok := result.(map[string]interface{}); ok {
-		if data, ok := resp["data"].(map[string]interface{}); ok {
-			if content, ok := data["content"]; ok {
-				return ToolResult{Success: true, Data: content}, nil
-			}
+	// For compatibility path (case_id/payload_id), extract and return content
+	if data, ok := result["data"].(map[string]interface{}); ok {
+		if content, ok := data["content"]; ok {
+			return ToolResult{Success: true, Data: content}, nil
 		}
 	}
 

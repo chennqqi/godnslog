@@ -394,6 +394,46 @@ export interface AgentRunUpdateStatusRequest {
   status: AgentRunStatus
 }
 
+export interface AgentRunInteractionSummary {
+  total: number
+  dns_count: number
+  http_count: number
+  unique_sources: number
+  last_interaction_at?: string
+}
+
+export interface AgentRunAuditRef {
+  id: string
+  action: string
+  resource_type: string
+  resource_id?: string
+  timestamp: string
+}
+
+export interface AgentRunReviewPacket {
+  id: string
+  agent_run: AgentRunDetail
+  case_id?: string
+  payload_id?: string
+  target?: string
+  interaction_summary: AgentRunInteractionSummary
+  evidence?: {
+    id: string
+    case_id?: string
+    payload_id?: string
+    evidence_strength: string
+    confidence: number
+    interaction_count: number
+    unique_sources: number
+    explainability: string
+    generated_at: string
+  }
+  audit_refs: AgentRunAuditRef[]
+  generated_at: string
+  format: string
+  content?: string
+}
+
 export interface AgentRunListRequest {
   agent_id?: string
   case_id?: string
