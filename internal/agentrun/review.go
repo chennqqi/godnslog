@@ -109,7 +109,7 @@ func (s *ReviewService) BuildReviewPacket(agentRunID, format, baseURL string) (*
 
 	// Build review packet
 	packet := &AgentRunReviewPacket{
-		ID:                 fmt.Sprintf("review-%s", agentRunID),
+		ID:                 agentRunID,
 		AgentRun:           *agentRunDetail,
 		CaseID:             agentRunDetail.CaseID,
 		PayloadID:          agentRunDetail.PayloadID,

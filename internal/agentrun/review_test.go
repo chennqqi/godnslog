@@ -136,8 +136,8 @@ func TestBuildReviewPacket(t *testing.T) {
 			t.Fatalf("Failed to build review packet: %v", err)
 		}
 
-		if packet.ID != "review-agent-run-1" {
-			t.Errorf("Expected ID 'review-agent-run-1', got '%s'", packet.ID)
+		if packet.ID != "agent-run-1" {
+			t.Errorf("Expected ID 'agent-run-1', got '%s'", packet.ID)
 		}
 
 		if packet.AgentRun.ID != "agent-run-1" {

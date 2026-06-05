@@ -1794,14 +1794,15 @@ func TestV2GetAgentRunReview(t *testing.T) {
 	caseID := "test-case-1"
 	payloadID := "test-payload-1"
 	agentRunID := "agent-run-1"
+	tokenStr := "test-token"
 
 	// Create agent run
 	agentRun := &v2models.AgentRun{
 		ID:         agentRunID,
 		AgentID:    "agent-1",
-		OperatorID: userId,
-		CaseID:     &caseID,
-		PayloadID:  &payloadID,
+		OperatorID: fmt.Sprintf("%d", userId),
+		CaseID:     caseID,
+		PayloadID:  payloadID,
 		Target:     "example.com",
 		Title:      "Test Agent Run",
 		Status:     "completed",
@@ -1813,12 +1814,12 @@ func TestV2GetAgentRunReview(t *testing.T) {
 
 	// Create interaction
 	interaction := &v2models.Interaction{
-		Token:     "test-token",
-		Protocol:  "dns",
+		Token:     &tokenStr,
+		Type:      "dns",
 		SourceIP:  "192.168.1.1",
 		CaseID:    &caseID,
 		PayloadID: &payloadID,
-		CreatedAt: time.Now(),
+		Timestamp: time.Now(),
 	}
 	if _, err := server.orm.Insert(interaction); err != nil {
 		t.Fatalf("Failed to create test interaction: %v", err)

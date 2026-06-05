@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 
 const mockAgentRun = {
   id: 'agent-run-1',
@@ -139,6 +139,122 @@ test.describe('Agent Runs', () => {
         })
       }
     })
+
+    // Mock agent run review API
+    await page.route('**/api/v2/agent-runs/agent-run-1/review**', route => {
+      if (route.request().method() === 'GET') {
+        const url = new URL(route.request().url())
+        const format = url.searchParams.get('format') || 'json'
+        
+        if (format === 'json') {
+          route.fulfill({
+            json: {
+              code: 0,
+              data: {
+                data: {
+                  id: 'agent-run-1',
+                  agent_run: {
+                    id: 'agent-run-1',
+                    agent_id: 'agent-1',
+                    operator_id: 'user-1',
+                    case_id: 'case-1',
+                    payload_id: 'payload-1',
+                    target: 'example.com',
+                    title: 'Test Agent Run',
+                    status: 'completed',
+                    created_at: '2026-05-31T10:00:00Z',
+                    updated_at: '2026-05-31T10:00:00Z',
+                    interaction_count: 5,
+                    last_interaction_at: '2026-05-31T10:00:00Z',
+                    operations: [],
+                    case_url: '/dashboard/cases/case-1',
+                    payload_url: '/dashboard/payloads/payload-1',
+                    interactions_url: '/dashboard/interactions?case_id=case-1',
+                    evidence_url: '/dashboard/evidence?case_id=case-1',
+                  },
+                  interaction_summary: {
+                    total: 5,
+                    dns_count: 3,
+                    http_count: 2,
+                    unique_sources: 2,
+                    last_interaction_at: '2026-05-31T10:00:00Z',
+                  },
+                  evidence: {
+                    id: 'evidence-1',
+                    case_id: 'case-1',
+                    payload_id: 'payload-1',
+                    evidence_strength: 'high',
+                    confidence: 85,
+                    interaction_count: 5,
+                    unique_sources: 2,
+                    explainability: 'Captured 5 interactions from 2 unique sources',
+                    generated_at: '2026-05-31T10:00:00Z',
+                  },
+                  audit_refs: [],
+                  generated_at: '2026-05-31T10:00:00Z',
+                  format: 'json',
+                  content: undefined,
+                },
+              },
+            },
+          })
+        } else if (format === 'markdown') {
+          route.fulfill({
+            json: {
+              code: 0,
+              data: {
+                data: {
+                  id: 'agent-run-1',
+                  agent_run: {
+                    id: 'agent-run-1',
+                    agent_id: 'agent-1',
+                    operator_id: 'user-1',
+                    case_id: 'case-1',
+                    payload_id: 'payload-1',
+                    target: 'example.com',
+                    title: 'Test Agent Run',
+                    status: 'completed',
+                    created_at: '2026-05-31T10:00:00Z',
+                    updated_at: '2026-05-31T10:00:00Z',
+                    interaction_count: 5,
+                    last_interaction_at: '2026-05-31T10:00:00Z',
+                    operations: [],
+                    case_url: '/dashboard/cases/case-1',
+                    payload_url: '/dashboard/payloads/payload-1',
+                    interactions_url: '/dashboard/interactions?case_id=case-1',
+                    evidence_url: '/dashboard/evidence?case_id=case-1',
+                  },
+                  interaction_summary: {
+                    total: 5,
+                    dns_count: 3,
+                    http_count: 2,
+                    unique_sources: 2,
+                    last_interaction_at: '2026-05-31T10:00:00Z',
+                  },
+                  evidence: {
+                    id: 'evidence-1',
+                    case_id: 'case-1',
+                    payload_id: 'payload-1',
+                    evidence_strength: 'high',
+                    confidence: 85,
+                    interaction_count: 5,
+                    unique_sources: 2,
+                    explainability: 'Captured 5 interactions from 2 unique sources',
+                    generated_at: '2026-05-31T10:00:00Z',
+                  },
+                  audit_refs: [],
+                  generated_at: '2026-05-31T10:00:00Z',
+                  format: 'markdown',
+                  content: '# Agent Run Review\n\n**Evidence Strength**: high\n**Confidence**: 85%\n**Interaction Count**: 5\n\n## Summary\n\nThis agent run captured 5 interactions from 2 unique sources.',
+                },
+              },
+            },
+          })
+        }
+      } else {
+        route.continue()
+      }
+    })
   })
 
   test('should display agent runs list with API call and filter query', async ({ page }) => {
@@ -196,13 +312,13 @@ test.describe('Agent Runs', () => {
     await expect(page.getByText('low', { exact: true })).toBeVisible()
 
     // Check quick links (Interactions/Evidence backlinks)
-    const interactionsLink = page.getByText('查看交互记录')
+    const interactionsLink = page.getByRole('link', { name: '查看交互记录' })
     await expect(interactionsLink).toBeVisible()
     const interactionsHref = await interactionsLink.getAttribute('href')
     expect(interactionsHref).toContain('/api/v2/interactions')
     expect(interactionsHref).toContain('payload_id=payload-1')
 
-    const evidenceLink = page.getByText('查看证据')
+    const evidenceLink = page.getByRole('link', { name: '查看证据' })
     await expect(evidenceLink).toBeVisible()
     const evidenceHref = await evidenceLink.getAttribute('href')
     expect(evidenceHref).toContain('/dashboard/evidence')
@@ -237,5 +353,83 @@ test.describe('Agent Runs', () => {
 
     await expect(putRequestCount).toBeGreaterThan(0)
     expect(putRequestUrl).toContain('/agent-runs/agent-run-1/status')
+  })
+
+  test('should generate and display review packet with API calls', async ({ page }) => {
+    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.waitForLoadState('networkidle')
+
+    // Check if Review Packet section exists
+    await expect(page.getByText('Review Packet')).toBeVisible()
+
+    // Set up request listener for review API
+    const reviewRequests: { url: string; format: string }[] = []
+    page.on('request', request => {
+      if (request.url().includes('/agent-runs/agent-run-1/review') && request.method() === 'GET') {
+        const url = new URL(request.url())
+        const format = url.searchParams.get('format') || 'json'
+        reviewRequests.push({ url: request.url(), format })
+      }
+    })
+
+    // Click "生成 JSON Review" button and wait for review API request
+    const jsonReviewPromise = page.waitForRequest(request => 
+      request.url().includes('/agent-runs/agent-run-1/review') && 
+      request.url().includes('format=json')
+    )
+    await page.getByRole('button', { name: '生成 JSON Review' }).click()
+    await jsonReviewPromise
+    await page.waitForLoadState('networkidle')
+
+    // Verify review API was called with format=json
+    expect(reviewRequests.length).toBeGreaterThan(0)
+    expect(reviewRequests[0].format).toBe('json')
+    expect(reviewRequests[0].url).toContain('format=json')
+
+    // Wait for React state update and UI rendering
+    // Use waitForFunction to check if review packet content is in DOM
+    await page.waitForFunction(() => {
+      const body = document.body
+      return body.textContent?.includes('Evidence Strength') && 
+             body.textContent?.includes('high') &&
+             body.textContent?.includes('Confidence') &&
+             body.textContent?.includes('85%')
+    }, { timeout: 10000 })
+    
+    await expect(page.getByText('Evidence Strength')).toBeVisible()
+    await expect(page.getByText('high')).toBeVisible()
+    await expect(page.getByText('Confidence')).toBeVisible()
+    await expect(page.getByText('85%')).toBeVisible()
+    await expect(page.getByText('Interaction Count')).toBeVisible()
+    // Use locator with context to avoid strict mode violation
+    await expect(page.getByText('Interaction Count').locator('..').getByText('5')).toBeVisible()
+    await expect(page.getByText('Unique Sources')).toBeVisible()
+    await expect(page.getByText('Unique Sources').locator('..').getByText('2')).toBeVisible()
+
+    // Click "生成 Markdown Review" button and wait for review API request
+    reviewRequests.length = 0 // clear previous requests
+    const markdownReviewPromise = page.waitForRequest(request =>
+      request.url().includes('/agent-runs/agent-run-1/review') &&
+      request.url().includes('format=markdown')
+    )
+    await page.getByRole('button', { name: '生成 Markdown Review' }).click()
+    await markdownReviewPromise
+    await page.waitForLoadState('networkidle')
+
+    // Verify review API was called with format=markdown
+    expect(reviewRequests.length).toBeGreaterThan(0)
+    expect(reviewRequests[0].format).toBe('markdown')
+    expect(reviewRequests[0].url).toContain('format=markdown')
+
+    // Wait for markdown preview to be displayed and verify markdown content rendering
+    await page.waitForFunction(() => {
+      const body = document.body
+      return body.textContent?.includes('Markdown Preview') && 
+             body.textContent?.includes('# Agent Run Review')
+    }, { timeout: 10000 })
+    await expect(page.getByText('Markdown Preview')).toBeVisible()
+    await expect(page.getByText('# Agent Run Review')).toBeVisible()
+    await expect(page.getByText('**Evidence Strength**: high')).toBeVisible()
+    await expect(page.getByText('**Confidence**: 85%')).toBeVisible()
   })
 })
