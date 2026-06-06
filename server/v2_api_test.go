@@ -1908,3 +1908,179 @@ func TestV2GetAgentRunReview(t *testing.T) {
 		}
 	})
 }
+
+func TestV2CreateAgentRunFollowup(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &WebServerConfig{
+		Domain:     "test.example.com",
+		Driver:     "sqlite",
+		Dsn:        ":memory:",
+		AuthExpire: 3600,
+	}
+
+	store := cache.NewCache(300, 60)
+	server, err := NewWebServer(cfg, store)
+	if err != nil {
+		t.Fatalf("Failed to create web server: %v", err)
+	}
+
+	if err := server.initDatabase(); err != nil {
+		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Sync required tables
+	if err := server.orm.Sync2(new(v2models.AuditLog)); err != nil {
+		t.Fatalf("Failed to sync audit logs table: %v", err)
+	}
+	if err := server.orm.Sync2(new(v2models.Case)); err != nil {
+		t.Fatalf("Failed to sync cases table: %v", err)
+	}
+	if err := server.orm.Sync2(new(v2models.Payload)); err != nil {
+		t.Fatalf("Failed to sync payloads table: %v", err)
+	}
+	if err := server.orm.Sync2(new(v2models.AgentRun)); err != nil {
+		t.Fatalf("Failed to sync agent runs table: %v", err)
+	}
+	if err := server.orm.Sync2(new(v2models.AgentOperation)); err != nil {
+		t.Fatalf("Failed to sync agent operations table: %v", err)
+	}
+
+	r := gin.New()
+	server.registerV2API(r)
+
+	// Create test user
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	user := &models.TblUser{
+		Name:  "testuser",
+		Email: "testuser@test.com",
+		Pass:  string(hashedPassword),
+		Role:  0,
+		Lang:  "en-US",
+	}
+	if _, err := server.orm.Insert(user); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Login to get token
+	loginBody := `{"username":"testuser","password":"password"}`
+	loginHTTPReq := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(loginBody))
+	loginHTTPReq.Header.Set("Content-Type", "application/json")
+	loginW := httptest.NewRecorder()
+	r.ServeHTTP(loginW, loginHTTPReq)
+
+	var loginResp struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(loginW.Body.Bytes(), &loginResp); err != nil {
+		t.Fatalf("Failed to parse login response: %v, body=%s", err, loginW.Body.String())
+	}
+	if loginResp.Code != 0 {
+		t.Fatalf("Login failed: %s", loginResp.Message)
+	}
+	token := loginResp.Data.Token
+	userID := user.Id
+
+	// Extract seed from JWT token and set in cache
+	seedKey := fmt.Sprintf("%v.seed", userID)
+	userKey := fmt.Sprintf("%v.user", userID)
+	parts := strings.Split(token, ".")
+	if len(parts) == 3 {
+		payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err == nil {
+			var payload map[string]interface{}
+			if err := json.Unmarshal(payloadBytes, &payload); err == nil {
+				if seedStr, ok := payload["seed"].(string); ok {
+					store.Set(seedKey, seedStr, cache.NoExpiration)
+				}
+			}
+		}
+	}
+	store.Set(userKey, user, cache.NoExpiration)
+
+	// Create test case
+	caseID := "case-followup-1"
+	caseItem := &v2models.Case{
+		ID:        caseID,
+		Title:     "Test Case",
+		Status:    "active",
+		CreatedBy: fmt.Sprintf("%d", userID),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	if _, err := server.orm.Insert(caseItem); err != nil {
+		t.Fatalf("Failed to create test case: %v", err)
+	}
+
+	// Create test payload
+	payloadID := "payload-followup-1"
+	payload := &v2models.Payload{
+		ID:               payloadID,
+		CaseID:           caseID,
+		Token:            "test-token",
+		TemplateRendered: "http://{{.Token}}.example.com",
+		CreatedAt:        time.Now(),
+		UpdatedAt:        time.Now(),
+	}
+	if _, err := server.orm.Insert(payload); err != nil {
+		t.Fatalf("Failed to create test payload: %v", err)
+	}
+
+	agentRunID := "agent-run-followup-1"
+	agentRun := &v2models.AgentRun{
+		ID:         agentRunID,
+		AgentID:    "agent-1",
+		OperatorID: fmt.Sprintf("%d", userID),
+		CaseID:     caseID,
+		PayloadID:  payloadID,
+		Target:     "https://target.example",
+		Title:      "Followup target",
+		Status:     "completed",
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	if _, err := server.orm.Insert(agentRun); err != nil {
+		t.Fatalf("insert agent run: %v", err)
+	}
+
+	body := strings.NewReader(`{"action_type":"recheck_evidence","reason":"Evidence needs second review","review_packet_id":"agent-run-followup-1"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/agent-runs/"+agentRunID+"/followups", body)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Code int `json:"code"`
+		Data struct {
+			AgentRunID  string `json:"agent_run_id"`
+			OperationID string `json:"operation_id"`
+			ActionType  string `json:"action_type"`
+			Reason      string `json:"reason"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse response: %v", err)
+	}
+	if resp.Code != 0 {
+		t.Fatalf("expected code 0")
+	}
+	if resp.Data.OperationID == "" {
+		t.Fatalf("expected operation id")
+	}
+	if strings.Contains(w.Body.String(), "Authorization") || strings.Contains(w.Body.String(), "secret") {
+		t.Fatalf("response leaks sensitive data")
+	}
+}

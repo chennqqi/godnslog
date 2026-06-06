@@ -3,10 +3,14 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { agentRunApi } from '@/lib/api-client'
-import type { AgentRunDetail, AgentRunStatus, AgentRunReviewPacket } from '@/types'
+import type { AgentRunDetail, AgentRunStatus, AgentRunReviewPacket, AgentRunFollowupActionType } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
 
 export default function AgentRunDetailPage() {
   const router = useRouter()
@@ -18,6 +22,10 @@ export default function AgentRunDetailPage() {
   const [reviewPacket, setReviewPacket] = useState<AgentRunReviewPacket | null>(null)
   const [generatingReview, setGeneratingReview] = useState(false)
   const [reviewFormat, setReviewFormat] = useState<'json' | 'markdown'>('json')
+  const [followupDialogOpen, setFollowupDialogOpen] = useState(false)
+  const [followupActionType, setFollowupActionType] = useState<AgentRunFollowupActionType>('recheck_evidence')
+  const [followupReason, setFollowupReason] = useState('')
+  const [creatingFollowup, setCreatingFollowup] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -76,6 +84,30 @@ export default function AgentRunDetailPage() {
       setError('生成Review失败')
     } finally {
       setGeneratingReview(false)
+    }
+  }
+
+  const handleCreateFollowup = async () => {
+    if (!agentRun || !followupReason.trim()) return
+    setCreatingFollowup(true)
+    setError('')
+    try {
+      await agentRunApi.createFollowup(agentRun.id, {
+        action_type: followupActionType,
+        reason: followupReason.trim(),
+        review_packet_id: reviewPacket?.id,
+      })
+      setFollowupDialogOpen(false)
+      setFollowupReason('')
+      const response = await agentRunApi.get(agentRun.id)
+      if (response.data) {
+        setAgentRun(response.data.data)
+      }
+    } catch (error: unknown) {
+      console.error('Failed to create followup:', error)
+      setError('创建Follow-up失败')
+    } finally {
+      setCreatingFollowup(false)
     }
   }
 
@@ -345,6 +377,60 @@ export default function AgentRunDetailPage() {
               >
                 生成 Markdown Review
               </Button>
+              {reviewPacket && (
+                <Dialog open={followupDialogOpen} onOpenChange={setFollowupDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="secondary" size="sm">
+                      创建 Follow-up Action
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>创建 Follow-up Action</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="action-type">Action Type</Label>
+                        <Select value={followupActionType} onValueChange={(value: AgentRunFollowupActionType) => setFollowupActionType(value)}>
+                          <SelectTrigger id="action-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="recheck_evidence">Recheck Evidence</SelectItem>
+                            <SelectItem value="wait_more_interactions">Wait More Interactions</SelectItem>
+                            <SelectItem value="create_followup_note">Create Followup Note</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="reason">Reason</Label>
+                        <Textarea
+                          id="reason"
+                          placeholder="请输入原因..."
+                          value={followupReason}
+                          onChange={(e) => setFollowupReason(e.target.value)}
+                          rows={4}
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => setFollowupDialogOpen(false)}
+                          disabled={creatingFollowup}
+                        >
+                          取消
+                        </Button>
+                        <Button
+                          onClick={handleCreateFollowup}
+                          disabled={creatingFollowup || !followupReason.trim()}
+                        >
+                          {creatingFollowup ? '创建中...' : '创建'}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
               {agentRun.payload_id && (
                 <Button
                   onClick={() => router.push(`/dashboard/evidence?payload_id=${agentRun.payload_id}`)}
@@ -363,20 +449,24 @@ export default function AgentRunDetailPage() {
             {reviewPacket && (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {reviewPacket.evidence && (
-                    <>
-                      <div>
-                        <p className="text-sm font-medium">Evidence Strength</p>
-                        <Badge className={getRiskLevelColor(reviewPacket.evidence.evidence_strength)}>
-                          {reviewPacket.evidence.evidence_strength}
-                        </Badge>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Confidence</p>
-                        <span>{reviewPacket.evidence.confidence}%</span>
-                      </div>
-                    </>
-                  )}
+                  <div>
+                    <p className="text-sm font-medium">Evidence Strength</p>
+                    {reviewPacket.evidence ? (
+                      <Badge className={getRiskLevelColor(reviewPacket.evidence.evidence_strength)}>
+                        {reviewPacket.evidence.evidence_strength}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">N/A</span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Confidence</p>
+                    {reviewPacket.evidence ? (
+                      <span>{reviewPacket.evidence.confidence}%</span>
+                    ) : (
+                      <span className="text-muted-foreground">N/A</span>
+                    )}
+                  </div>
                   <div>
                     <p className="text-sm font-medium">Interaction Count</p>
                     <span>{reviewPacket.interaction_summary.total}</span>

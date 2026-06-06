@@ -32,6 +32,8 @@ import type {
   AgentRunListResponse,
   AgentOperationCreateRequest,
   AgentRunReviewPacket,
+  AgentRunFollowupRequest,
+  AgentRunFollowupResponse,
 } from '@/types'
 
 interface UnknownItemListResponse {
@@ -177,4 +179,6 @@ export const agentRunApi = {
     api.put<{ data: AgentRun }>(`/agent-runs/${id}/status`, data),
   appendOperation: (id: string, data: AgentOperationCreateRequest) =>
     api.post<{ data: AgentRun }>(`/agent-runs/${id}/operations`, data),
+  createFollowup: (id: string, data: AgentRunFollowupRequest) =>
+    api.post<{ data: AgentRunFollowupResponse }>(`/agent-runs/${id}/followups`, data),
 }

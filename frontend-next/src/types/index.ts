@@ -458,3 +458,22 @@ export interface AgentOperationCreateRequest {
   result?: Record<string, unknown>
   error?: string
 }
+
+export type AgentRunFollowupActionType = 'recheck_evidence' | 'wait_more_interactions' | 'create_followup_note'
+
+export interface AgentRunFollowupRequest {
+  action_type: AgentRunFollowupActionType
+  reason: string
+  review_packet_id?: string
+}
+
+export interface AgentRunFollowupResponse {
+  agent_run_id: string
+  operation_id: string
+  action_type: AgentRunFollowupActionType
+  reason: string
+  review_packet_id?: string
+  operation: AgentOperation
+  created_at: string
+}
+

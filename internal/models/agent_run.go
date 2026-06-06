@@ -137,3 +137,40 @@ type AgentOperationCreateRequest struct {
 	Result    map[string]interface{} `json:"result"`
 	Error     string                 `json:"error"`
 }
+
+// AgentRunFollowupActionType constants
+const (
+	AgentRunFollowupRecheckEvidence      = "recheck_evidence"
+	AgentRunFollowupWaitMoreInteractions = "wait_more_interactions"
+	AgentRunFollowupCreateNote           = "create_followup_note"
+)
+
+// AgentRunFollowupRequest represents a request to create a follow-up action
+type AgentRunFollowupRequest struct {
+	ActionType     string `json:"action_type" binding:"required"`
+	Reason         string `json:"reason" binding:"required"`
+	ReviewPacketID string `json:"review_packet_id,omitempty"`
+}
+
+// AgentRunFollowupResponse represents the response for creating a follow-up action
+type AgentRunFollowupResponse struct {
+	AgentRunID     string         `json:"agent_run_id"`
+	OperationID    string         `json:"operation_id"`
+	ActionType     string         `json:"action_type"`
+	Reason         string         `json:"reason"`
+	ReviewPacketID string         `json:"review_packet_id,omitempty"`
+	Operation      AgentOperation `json:"operation"`
+	CreatedAt      time.Time      `json:"created_at"`
+}
+
+// IsAllowedAgentRunFollowupAction checks if the action type is allowed for follow-up
+func IsAllowedAgentRunFollowupAction(action string) bool {
+	switch action {
+	case AgentRunFollowupRecheckEvidence,
+		AgentRunFollowupWaitMoreInteractions,
+		AgentRunFollowupCreateNote:
+		return true
+	default:
+		return false
+	}
+}

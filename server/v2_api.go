@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/chennqqi/godnslog/cache"
@@ -195,6 +196,7 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			agentRuns.GET("/:id/review", self.v2GetAgentRunReview)
 			agentRuns.PUT("/:id/status", self.v2UpdateAgentRunStatus)
 			agentRuns.POST("/:id/operations", self.v2AppendAgentOperation)
+			agentRuns.POST("/:id/followups", self.v2CreateAgentRunFollowup)
 		}
 	}
 }
@@ -3523,4 +3525,38 @@ func (self *WebServer) v2AppendAgentOperation(c *gin.Context) {
 		"code":    0,
 		"message": "success",
 	})
+}
+
+// v2CreateAgentRunFollowup creates a follow-up action for an agent run
+func (self *WebServer) v2CreateAgentRunFollowup(c *gin.Context) {
+	id := c.Param("id")
+	var req v2models.AgentRunFollowupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "Invalid request body"})
+		return
+	}
+
+	user := c.MustGet("user").(*models.TblUser)
+	userID := strconv.FormatInt(user.Id, 10)
+
+	authService := auth.NewService(self.orm)
+	agentRunService := agentrun.NewService(self.orm, authService)
+	resp, err := agentRunService.CreateFollowupAction(id, &req, userID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "Agent run not found"})
+			return
+		}
+		if strings.Contains(err.Error(), "invalid followup") ||
+			strings.Contains(err.Error(), "reason") ||
+			strings.Contains(err.Error(), "request is required") {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+			return
+		}
+		logrus.Errorf("[v2_api.go::v2CreateAgentRunFollowup] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to create followup"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": resp})
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/chennqqi/godnslog/internal/auth"
@@ -315,6 +316,92 @@ func (s *Service) AppendAgentOperation(agentRunID string, req *models.AgentOpera
 	}
 
 	return nil
+}
+
+// CreateFollowupAction creates a follow-up action for an agent run
+func (s *Service) CreateFollowupAction(agentRunID string, req *models.AgentRunFollowupRequest, userID string) (*models.AgentRunFollowupResponse, error) {
+	agentRun, err := s.GetAgentRunByID(agentRunID)
+	if err != nil {
+		return nil, err
+	}
+	if agentRun == nil {
+		return nil, errors.New("agent run not found")
+	}
+	if req == nil {
+		return nil, errors.New("request is required")
+	}
+	if !models.IsAllowedAgentRunFollowupAction(req.ActionType) {
+		return nil, fmt.Errorf("invalid followup action type: %s", req.ActionType)
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		return nil, errors.New("reason is required")
+	}
+	if len(reason) > 500 {
+		return nil, errors.New("reason must be 500 characters or less")
+	}
+
+	result := map[string]interface{}{
+		"success":             true,
+		"source_agent_run_id": agentRun.ID,
+		"action_type":         req.ActionType,
+		"reason":              reason,
+		"review_packet_id":    req.ReviewPacketID,
+		"case_id":             agentRun.CaseID,
+		"payload_id":          agentRun.PayloadID,
+	}
+
+	now := time.Now()
+	opReq := &models.AgentOperationCreateRequest{
+		Action:    "followup." + req.ActionType,
+		RiskLevel: "low",
+		Request:   map[string]interface{}{"reason": reason, "review_packet_id": req.ReviewPacketID},
+		Result:    result,
+	}
+
+	if err := s.AppendAgentOperation(agentRun.ID, opReq, userID); err != nil {
+		return nil, err
+	}
+
+	// Get the created operation
+	var operation models.AgentOperation
+	has, err := s.engine.Where("agent_run_i_d = ? AND action = ?", agentRun.ID, "followup."+req.ActionType).OrderBy("created_at DESC").Limit(1).Get(&operation)
+	if err != nil || !has {
+		return nil, fmt.Errorf("failed to retrieve created operation: has=%v err=%v", has, err)
+	}
+
+	userIDPtr := &userID
+	resourceIDPtr := &agentRun.ID
+	auditLog := &models.AuditLog{
+		ID:           generateID(),
+		UserID:       userIDPtr,
+		Action:       "agent_run.followup_created",
+		ResourceType: "agent_run",
+		ResourceID:   resourceIDPtr,
+		Details: models.AuditDetails{
+			"agent_run_id":     agentRun.ID,
+			"operation_id":     operation.ID,
+			"action_type":      req.ActionType,
+			"reason":           reason,
+			"review_packet_id": req.ReviewPacketID,
+			"case_id":          agentRun.CaseID,
+			"payload_id":       agentRun.PayloadID,
+		},
+		Timestamp: now,
+	}
+	if err := s.authService.CreateAuditLog(auditLog); err != nil {
+		return nil, fmt.Errorf("failed to create followup audit log: %w", err)
+	}
+
+	return &models.AgentRunFollowupResponse{
+		AgentRunID:     agentRun.ID,
+		OperationID:    operation.ID,
+		ActionType:     req.ActionType,
+		Reason:         reason,
+		ReviewPacketID: req.ReviewPacketID,
+		Operation:      operation,
+		CreatedAt:      now,
+	}, nil
 }
 
 // isValidAgentRunStatusTransition validates if a status transition is allowed

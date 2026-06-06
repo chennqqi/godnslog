@@ -432,4 +432,147 @@ test.describe('Agent Runs', () => {
     await expect(page.getByText('**Evidence Strength**: high')).toBeVisible()
     await expect(page.getByText('**Confidence**: 85%')).toBeVisible()
   })
+
+  test('should create follow-up action', async ({ page }) => {
+    // Mock agent run detail API
+    await page.route('**/api/v2/agent-runs/agent-run-1**', route => {
+      if (route.request().method() === 'GET') {
+        route.fulfill({
+          json: {
+            code: 0,
+            data: {
+              data: mockAgentRun,
+            },
+          },
+        })
+      }
+    })
+
+    // Mock agent run review API
+    await page.route('**/api/v2/agent-runs/agent-run-1/review**', route => {
+      if (route.request().method() === 'GET') {
+        route.fulfill({
+          json: {
+            code: 0,
+            data: {
+              data: {
+                id: 'agent-run-1',
+                agent_run: {
+                  id: 'agent-run-1',
+                  agent_id: 'agent-1',
+                  operator_id: 'user-1',
+                  case_id: 'case-1',
+                  payload_id: 'payload-1',
+                  target: 'example.com',
+                  title: 'Test Agent Run',
+                  status: 'completed',
+                  created_at: '2026-05-31T10:00:00Z',
+                  updated_at: '2026-05-31T10:00:00Z',
+                  interaction_count: 5,
+                  last_interaction_at: '2026-05-31T10:00:00Z',
+                  operations: [],
+                  case_url: '/dashboard/cases/case-1',
+                  payload_url: '/dashboard/payloads/payload-1',
+                  interactions_url: '/dashboard/interactions?case_id=case-1',
+                  evidence_url: '/dashboard/evidence?case_id=case-1',
+                },
+                interaction_summary: {
+                  total: 5,
+                  dns_count: 3,
+                  http_count: 2,
+                  unique_sources: 2,
+                  last_interaction_at: '2026-05-31T10:00:00Z',
+                },
+                evidence: {
+                  id: 'evidence-1',
+                  case_id: 'case-1',
+                  payload_id: 'payload-1',
+                  evidence_strength: 'high',
+                  confidence: 85,
+                  interaction_count: 5,
+                  unique_sources: 2,
+                  explainability: 'Captured 5 interactions from 2 unique sources',
+                  generated_at: '2026-05-31T10:00:00Z',
+                },
+                audit_refs: [],
+                generated_at: '2026-05-31T10:00:00Z',
+                format: 'json',
+                content: undefined,
+              },
+            },
+          },
+        })
+      }
+    })
+
+    // Mock followup API
+    await page.route('**/api/v2/agent-runs/agent-run-1/followups', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          message: 'success',
+          data: {
+            agent_run_id: 'agent-run-1',
+            operation_id: 'op-followup-1',
+            action_type: 'recheck_evidence',
+            reason: 'Evidence needs second review',
+            review_packet_id: 'agent-run-1',
+            operation: {
+              id: 'op-followup-1',
+              agent_run_id: 'agent-run-1',
+              action: 'followup.recheck_evidence',
+              risk_level: 'low',
+              started_at: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+            },
+            created_at: new Date().toISOString(),
+          },
+        }),
+      })
+    })
+
+    // Navigate to agent run detail page
+    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.waitForLoadState('networkidle')
+
+    // Generate review first to enable followup button
+    const reviewPromise = page.waitForRequest(request =>
+      request.url().includes('/agent-runs/agent-run-1/review')
+    )
+    await page.getByRole('button', { name: '生成 JSON Review' }).click()
+    await reviewPromise
+    await page.waitForLoadState('networkidle')
+
+    // Wait for review packet to be displayed
+    await page.waitForFunction(() => {
+      const body = document.body
+      return body.textContent?.includes('Evidence Strength')
+    }, { timeout: 10000 })
+
+    // Click "创建 Follow-up Action" button
+    await page.getByRole('button', { name: '创建 Follow-up Action' }).click()
+
+    // Wait for dialog to open - check for dialog title specifically
+    await expect(page.getByRole('heading', { name: '创建 Follow-up Action' })).toBeVisible()
+
+    // Select action type
+    await page.getByRole('combobox').click()
+    await page.getByRole('option', { name: 'Recheck Evidence' }).click()
+
+    // Enter reason
+    await page.getByPlaceholder('请输入原因...').fill('Evidence needs second review')
+
+    // Click create button and wait for API request
+    const followupPromise = page.waitForRequest(request =>
+      request.url().includes('/agent-runs/agent-run-1/followups')
+    )
+    await page.getByRole('button', { name: '创建' }).click()
+    await followupPromise
+    await page.waitForLoadState('networkidle')
+
+    // Verify dialog is closed
+    await expect(page.getByRole('heading', { name: '创建 Follow-up Action' })).not.toBeVisible()
+  })
 })

@@ -1,6 +1,7 @@
 package agentrun
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -357,5 +358,123 @@ func TestInvalidStatusTransition(t *testing.T) {
 	err = service.UpdateAgentRunStatus(created.ID, updateReq, "1")
 	if err == nil {
 		t.Error("Expected error for invalid status transition")
+	}
+}
+
+func TestCreateFollowupAction(t *testing.T) {
+	engine := setupTestEngine(t)
+	defer engine.Close()
+
+	authService := auth.NewService(engine)
+	service := NewService(engine, authService)
+
+	created, err := service.CreateAgentRun(&models.AgentRunCreateRequest{
+		AgentID:    "agent-1",
+		OperatorID: "operator-1",
+		CaseID:     "case-1",
+		PayloadID:  "payload-1",
+		Target:     "https://target.example",
+		Title:      "Review target",
+	}, "1")
+	if err != nil {
+		t.Fatalf("create agent run: %v", err)
+	}
+
+	resp, err := service.CreateFollowupAction(created.ID, &models.AgentRunFollowupRequest{
+		ActionType:     "recheck_evidence",
+		Reason:         "Evidence is high confidence and needs second review",
+		ReviewPacketID: created.ID,
+	}, "1")
+	if err != nil {
+		t.Fatalf("create followup: %v", err)
+	}
+
+	if resp.AgentRunID != created.ID {
+		t.Fatalf("expected agent run id %s, got %s", created.ID, resp.AgentRunID)
+	}
+	if resp.OperationID == "" {
+		t.Fatal("expected operation id")
+	}
+	if resp.ActionType != "recheck_evidence" {
+		t.Fatalf("unexpected action type %s", resp.ActionType)
+	}
+
+	var op models.AgentOperation
+	has, err := engine.ID(resp.OperationID).Get(&op)
+	if err != nil || !has {
+		t.Fatalf("expected operation row, has=%v err=%v", has, err)
+	}
+	if op.Action != "followup.recheck_evidence" {
+		t.Fatalf("unexpected operation action %s", op.Action)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(op.Result), &result); err != nil {
+		t.Fatalf("parse operation result: %v", err)
+	}
+	if result["source_agent_run_id"] != created.ID {
+		t.Fatalf("operation result missing source_agent_run_id")
+	}
+	if result["action_type"] != "recheck_evidence" {
+		t.Fatalf("operation result missing action_type")
+	}
+
+	var auditLog models.AuditLog
+	has, err = engine.Where("action = ? AND resource_type = ?", "agent_run.followup_created", "agent_run").Get(&auditLog)
+	if err != nil || !has {
+		t.Fatalf("expected followup audit, has=%v err=%v", has, err)
+	}
+	if auditLog.Details["agent_run_id"] != created.ID {
+		t.Fatalf("audit missing agent_run_id")
+	}
+}
+
+func TestCreateFollowupActionValidation(t *testing.T) {
+	engine := setupTestEngine(t)
+	defer engine.Close()
+
+	authService := auth.NewService(engine)
+	service := NewService(engine, authService)
+
+	created, err := service.CreateAgentRun(&models.AgentRunCreateRequest{
+		AgentID:    "agent-1",
+		OperatorID: "operator-1",
+		CaseID:     "case-1",
+		PayloadID:  "payload-1",
+		Target:     "https://target.example",
+		Title:      "Review target",
+	}, "1")
+	if err != nil {
+		t.Fatalf("create agent run: %v", err)
+	}
+
+	cases := []struct {
+		name string
+		id   string
+		req  *models.AgentRunFollowupRequest
+	}{
+		{
+			name: "unknown run",
+			id:   "missing",
+			req:  &models.AgentRunFollowupRequest{ActionType: "recheck_evidence", Reason: "valid reason"},
+		},
+		{
+			name: "invalid action",
+			id:   created.ID,
+			req:  &models.AgentRunFollowupRequest{ActionType: "delete_payload", Reason: "valid reason"},
+		},
+		{
+			name: "empty reason",
+			id:   created.ID,
+			req:  &models.AgentRunFollowupRequest{ActionType: "recheck_evidence", Reason: ""},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := service.CreateFollowupAction(tc.id, tc.req, "1"); err == nil {
+				t.Fatal("expected error")
+			}
+		})
 	}
 }
