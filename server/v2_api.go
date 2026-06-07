@@ -197,6 +197,8 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			agentRuns.PUT("/:id/status", self.v2UpdateAgentRunStatus)
 			agentRuns.POST("/:id/operations", self.v2AppendAgentOperation)
 			agentRuns.POST("/:id/followups", self.v2CreateAgentRunFollowup)
+			agentRuns.GET("/review-queue", self.v2ListReviewQueue)
+			agentRuns.GET("/:id/followups", self.v2ListFollowupHistory)
 		}
 	}
 }
@@ -3559,4 +3561,70 @@ func (self *WebServer) v2CreateAgentRunFollowup(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": resp})
+}
+
+// v2ListReviewQueue lists the review queue with filters
+func (self *WebServer) v2ListReviewQueue(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	reviewState := c.Query("review_state")
+	status := c.Query("status")
+	evidenceStrength := c.Query("evidence_strength")
+	agentID := c.Query("agent_id")
+	caseID := c.Query("case_id")
+	payloadID := c.Query("payload_id")
+
+	authService := auth.NewService(self.orm)
+	agentRunService := agentrun.NewService(self.orm, authService)
+
+	filters := agentrun.ReviewQueueFilters{
+		ReviewState:      reviewState,
+		Status:           status,
+		EvidenceStrength: evidenceStrength,
+		AgentID:          agentID,
+		CaseID:           caseID,
+		PayloadID:        payloadID,
+		Page:             page,
+		PageSize:         pageSize,
+	}
+
+	resp, err := agentRunService.ListReviewQueue(filters)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2ListReviewQueue] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to list review queue",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    resp,
+	})
+}
+
+// v2ListFollowupHistory lists the follow-up history for an agent run
+func (self *WebServer) v2ListFollowupHistory(c *gin.Context) {
+	id := c.Param("id")
+
+	authService := auth.NewService(self.orm)
+	agentRunService := agentrun.NewService(self.orm, authService)
+
+	history, err := agentRunService.ListFollowupHistory(id)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2ListFollowupHistory] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to list follow-up history",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    history,
+	})
 }

@@ -341,6 +341,24 @@ cd frontend-next && npx playwright test --reporter=line e2e/agent-runs.spec.ts e
 
 本轮未发现越界到 Scanner Hub、生命周期治理、批量操作或完整 Agent 管理。
 
+## Playwright 重试（2026-06-06）
+
+结论：E2E 运行通过。
+
+按用户要求重新尝试 Playwright：
+
+```bash
+cd frontend-next && npx playwright install chromium
+# PASS
+# Chromium downloaded to /home/chenq/.cache/ms-playwright/chromium-1223
+# Chrome Headless Shell downloaded to /home/chenq/.cache/ms-playwright/chromium_headless_shell-1223
+
+cd frontend-next && npx playwright test --reporter=line e2e/agent-runs.spec.ts e2e/evidence.spec.ts
+# 16 passed (36.9s)
+```
+
+本次使用一次性非交互式 `--reporter=line`，没有启动 HTML report 服务。Dev server 已在测试后停止。
+
 ## 二次返修复验（2026-06-04）
 
 结论：未通过。
@@ -384,3 +402,56 @@ cd frontend-next && npx playwright test --reporter=line e2e/agent-runs.spec.ts e
 4. 保持无 `test.skip` / `test.only` / `waitForTimeout`。
 
 本轮仍未发现越界到 Scanner Hub、生命周期治理、批量操作或完整 Agent 管理。
+
+## 三次返修复验（2026-06-06）
+
+结论：代码层验收点已补齐；E2E 运行结果受当前环境缺少 Playwright Chromium 阻塞，不能声明 E2E 通过。
+
+本轮修复已补齐上一轮唯一剩余的 E2E 覆盖缺口：
+
+- `frontend-next/e2e/agent-runs.spec.ts` 继续使用 `page.waitForRequest` 断言 JSON Review API 请求。
+- JSON 分支点击 `生成 JSON Review` 后，断言页面渲染 `Evidence Strength`、`high`、`Confidence`、`85%`、`Interaction Count`、`Unique Sources`。
+- Markdown 分支点击 `生成 Markdown Review` 后，断言页面渲染 `Markdown Preview`、`# Agent Run Review`、`**Evidence Strength**: high`、`**Confidence**: 85%`。
+- 未发现 `test.skip` / `test.only` / `waitForTimeout`。
+
+本轮验证命令：
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/agentrun ./internal/mcp ./server
+# PASS
+
+GOCACHE=/tmp/gocache go test ./...
+# PASS
+
+cd frontend-next && npx eslint src/app/dashboard/agent-runs/[id]/page.tsx src/lib/api-client.ts src/types/index.ts e2e/agent-runs.spec.ts
+# PASS
+
+cd frontend-next && npm run build
+# PASS（沙箱内 Turbopack bind port 权限失败，非沙箱重跑通过）
+
+cd frontend-next && npx playwright test --reporter=line e2e/agent-runs.spec.ts e2e/evidence.spec.ts
+# 16 failed，失败原因均为当前环境缺少 chromium_headless_shell-1223
+
+cd frontend-next && npx playwright install chromium
+# FAIL，外网下载多次 ECONNRESET
+```
+
+E2E 失败原因不是业务断言失败，而是 Playwright 浏览器缺失：
+
+```text
+Executable doesn't exist at /home/chenq/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell
+```
+
+尝试安装浏览器失败：
+
+```text
+Failed to download Chrome for Testing 148.0.7778.96 (playwright chromium v1223)
+ECONNRESET
+```
+
+额外发现一个非 Sprint L 产品范围差异：
+
+- `.windsurf/rules/e2e-tests.md` 被移动为 `.devin/rules/e2e-tests.md`。
+- 这会移除 Windsurf 的 E2E 执行约定文件，建议提交前恢复或确认该迁移是用户明确要求。
+
+本轮未发现越界到 Scanner Hub、生命周期治理、批量操作或完整 Agent 管理。

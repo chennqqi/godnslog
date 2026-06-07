@@ -34,6 +34,9 @@ import type {
   AgentRunReviewPacket,
   AgentRunFollowupRequest,
   AgentRunFollowupResponse,
+  ReviewQueueFilters,
+  AgentRunReviewQueueResponse,
+  AgentRunFollowupHistoryItem,
 } from '@/types'
 
 interface UnknownItemListResponse {
@@ -144,6 +147,7 @@ export const auditApi = {
     user_id?: string
     action?: string
     resource_type?: string
+    resource_id?: string
     start_time?: string
     end_time?: string
     page?: number
@@ -181,4 +185,8 @@ export const agentRunApi = {
     api.post<{ data: AgentRun }>(`/agent-runs/${id}/operations`, data),
   createFollowup: (id: string, data: AgentRunFollowupRequest) =>
     api.post<{ data: AgentRunFollowupResponse }>(`/agent-runs/${id}/followups`, data),
+  listReviewQueue: (params?: ReviewQueueFilters) =>
+    api.get<AgentRunReviewQueueResponse>('/agent-runs/review-queue', params),
+  listFollowupHistory: (id: string) =>
+    api.get<{ data: AgentRunFollowupHistoryItem[] }>(`/agent-runs/${id}/followups`),
 }

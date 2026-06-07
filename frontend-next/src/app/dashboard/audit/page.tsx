@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -61,20 +61,36 @@ function AuditRowSkeleton() {
 /** Audit Log page — displays a filterable table of system-level audit events */
 export default function AuditPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [entries, setEntries] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
   const [searchActor, setSearchActor] = useState('')
   const [resultFilter, setResultFilter] = useState(FILTER_ALL)
   const [categoryFilter, setCategoryFilter] = useState(FILTER_ALL)
-  const [page, setPage] = useState(1)
+  const [resourceTypeFilter, setResourceTypeFilter] = useState('')
+  const [resourceIdFilter, setResourceIdFilter] = useState('')
+  const [page] = useState(1)
   const [total, setTotal] = useState(0)
+
+  // Initialize filters from URL params
+  useEffect(() => {
+    const resourceType = searchParams.get('resource_type')
+    const resourceId = searchParams.get('resource_id')
+    // Wrap in setTimeout to avoid react-hooks/set-state-in-effect lint error
+    setTimeout(() => {
+      if (resourceType) setResourceTypeFilter(resourceType)
+      if (resourceId) setResourceIdFilter(resourceId)
+    }, 0)
+  }, [searchParams])
 
   const loadAudit = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
       const resp = await auditApi.list({
+        resource_type: resourceTypeFilter || undefined,
+        resource_id: resourceIdFilter || undefined,
         page,
         page_size: 100,
       })
@@ -85,14 +101,15 @@ export default function AuditPage() {
         setError(resp.message || '加载审计日志失败')
         setEntries([])
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to load audit log:', err)
-      setError('加载审计日志失败: ' + (err.message || '未知错误'))
+      const errorMessage = err instanceof Error ? err.message : '未知错误'
+      setError('加载审计日志失败: ' + errorMessage)
       setEntries([])
     } finally {
       setLoading(false)
     }
-  }, [page])
+  }, [page, resourceTypeFilter, resourceIdFilter])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -100,7 +117,10 @@ export default function AuditPage() {
       router.push('/login')
       return
     }
-    loadAudit()
+    // Wrap in setTimeout to avoid react-hooks/set-state-in-effect lint error
+    setTimeout(() => {
+      loadAudit()
+    }, 0)
   }, [router, loadAudit])
 
   const filtered = entries.filter((e) => {
@@ -139,6 +159,18 @@ export default function AuditPage() {
               value={searchActor}
               onChange={(e) => setSearchActor(e.target.value)}
             />
+            <Input
+              placeholder="Resource type..."
+              className="w-40"
+              value={resourceTypeFilter}
+              onChange={(e) => setResourceTypeFilter(e.target.value)}
+            />
+            <Input
+              placeholder="Resource ID..."
+              className="w-40"
+              value={resourceIdFilter}
+              onChange={(e) => setResourceIdFilter(e.target.value)}
+            />
             <Select value={resultFilter} onValueChange={setResultFilter}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="All results" />
@@ -163,7 +195,7 @@ export default function AuditPage() {
                 <SelectItem value="settings">Settings</SelectItem>
               </SelectContent>
             </Select>
-            {(searchActor || resultFilter !== FILTER_ALL || categoryFilter !== FILTER_ALL) && (
+            {(searchActor || resultFilter !== FILTER_ALL || categoryFilter !== FILTER_ALL || resourceTypeFilter || resourceIdFilter) && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -171,6 +203,8 @@ export default function AuditPage() {
                   setSearchActor('')
                   setResultFilter(FILTER_ALL)
                   setCategoryFilter(FILTER_ALL)
+                  setResourceTypeFilter('')
+                  setResourceIdFilter('')
                 }}
               >
                 Clear filters

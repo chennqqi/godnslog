@@ -2083,4 +2083,325 @@ func TestV2CreateAgentRunFollowup(t *testing.T) {
 	if strings.Contains(w.Body.String(), "Authorization") || strings.Contains(w.Body.String(), "secret") {
 		t.Fatalf("response leaks sensitive data")
 	}
+
+	// Test error cases
+	t.Run("unknown agent run 404", func(t *testing.T) {
+		body := strings.NewReader(`{"action_type":"recheck_evidence","reason":"test reason"}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/agent-runs/unknown-run/followups", body)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d body=%s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("invalid action 400", func(t *testing.T) {
+		body := strings.NewReader(`{"action_type":"invalid_action","reason":"test reason"}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/agent-runs/"+agentRunID+"/followups", body)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d body=%s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("empty reason 400", func(t *testing.T) {
+		body := strings.NewReader(`{"action_type":"recheck_evidence","reason":""}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/agent-runs/"+agentRunID+"/followups", body)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d body=%s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("too long reason 400", func(t *testing.T) {
+		longReason := string(make([]byte, 501))
+		body := strings.NewReader(fmt.Sprintf(`{"action_type":"recheck_evidence","reason":"%s"}`, longReason))
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/agent-runs/"+agentRunID+"/followups", body)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d body=%s", w.Code, w.Body.String())
+		}
+	})
+}
+
+func TestV2ListReviewQueue(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &WebServerConfig{
+		Domain:     "test.example.com",
+		Driver:     "sqlite",
+		Dsn:        ":memory:",
+		AuthExpire: 3600,
+	}
+
+	store := cache.NewCache(300, 60)
+	server, err := NewWebServer(cfg, store)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	if err := server.initDatabase(); err != nil {
+		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Sync tables
+	if err := server.orm.Sync2(new(v2models.Case)); err != nil {
+		t.Fatalf("Failed to sync Case table: %v", err)
+	}
+	if err := server.orm.Sync2(new(v2models.Payload)); err != nil {
+		t.Fatalf("Failed to sync Payload table: %v", err)
+	}
+	if err := server.orm.Sync2(new(v2models.AgentRun)); err != nil {
+		t.Fatalf("Failed to sync AgentRun table: %v", err)
+	}
+	if err := server.orm.Sync2(new(v2models.AgentOperation)); err != nil {
+		t.Fatalf("Failed to sync AgentOperation table: %v", err)
+	}
+	if err := server.orm.Sync2(new(v2models.AuditLog)); err != nil {
+		t.Fatalf("Failed to sync AuditLog table: %v", err)
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	user := &models.TblUser{
+		Name:  "testuser",
+		Email: "testuser@test.com",
+		Pass:  string(hashedPassword),
+		Role:  0,
+		Lang:  "en-US",
+	}
+	if _, err := server.orm.Insert(user); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	r := gin.New()
+	server.registerV2API(r)
+
+	loginReq := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(`{"username":"testuser","password":"password"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginW := httptest.NewRecorder()
+	r.ServeHTTP(loginW, loginReq)
+
+	type LoginResponse struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	var loginResp LoginResponse
+	if err := json.Unmarshal(loginW.Body.Bytes(), &loginResp); err != nil {
+		t.Fatalf("Failed to unmarshal login response: %v", err)
+	}
+	token := loginResp.Data.Token
+
+	// Extract seed from JWT token and set in cache
+	userId := user.Id
+	seedKey := fmt.Sprintf("%v.seed", userId)
+	userKey := fmt.Sprintf("%v.user", userId)
+	parts := strings.Split(token, ".")
+	if len(parts) == 3 {
+		payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err == nil {
+			var payload map[string]interface{}
+			if err := json.Unmarshal(payloadBytes, &payload); err == nil {
+				if seedStr, ok := payload["seed"].(string); ok {
+					store.Set(seedKey, seedStr, 3600*time.Second)
+					store.Set(userKey, user, 3600*time.Second)
+				}
+			}
+		}
+	}
+
+	// Test unauthenticated
+	t.Run("unauthenticated", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/v2/agent-runs/review-queue", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("Expected 401, got %d", w.Code)
+		}
+	})
+
+	// Test authenticated request
+	t.Run("authenticated", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/v2/agent-runs/review-queue", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d: %s", w.Code, w.Body.String())
+		}
+
+		var resp struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+			Data    struct {
+				Items   []interface{} `json:"items"`
+				Summary struct {
+					Total           int `json:"total"`
+					NotReviewed     int `json:"not_reviewed"`
+					Reviewed        int `json:"reviewed"`
+					FollowupCreated int `json:"followup_created"`
+					NeedsAttention  int `json:"needs_attention"`
+				} `json:"summary"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		if resp.Code != 0 {
+			t.Errorf("Expected code 0, got %d", resp.Code)
+		}
+	})
+}
+
+func TestV2ListFollowupHistory(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &WebServerConfig{
+		Domain:     "test.example.com",
+		Driver:     "sqlite",
+		Dsn:        ":memory:",
+		AuthExpire: 3600,
+	}
+
+	store := cache.NewCache(300, 60)
+	server, err := NewWebServer(cfg, store)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	if err := server.initDatabase(); err != nil {
+		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Sync tables
+	if err := server.orm.Sync2(new(v2models.Case)); err != nil {
+		t.Fatalf("Failed to sync Case table: %v", err)
+	}
+	if err := server.orm.Sync2(new(v2models.Payload)); err != nil {
+		t.Fatalf("Failed to sync Payload table: %v", err)
+	}
+	if err := server.orm.Sync2(new(v2models.AgentRun)); err != nil {
+		t.Fatalf("Failed to sync AgentRun table: %v", err)
+	}
+	if err := server.orm.Sync2(new(v2models.AgentOperation)); err != nil {
+		t.Fatalf("Failed to sync AgentOperation table: %v", err)
+	}
+	if err := server.orm.Sync2(new(v2models.AuditLog)); err != nil {
+		t.Fatalf("Failed to sync AuditLog table: %v", err)
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	user := &models.TblUser{
+		Name:  "testuser",
+		Email: "testuser@test.com",
+		Pass:  string(hashedPassword),
+		Role:  0,
+		Lang:  "en-US",
+	}
+	if _, err := server.orm.Insert(user); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	r := gin.New()
+	server.registerV2API(r)
+
+	loginReq := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(`{"username":"testuser","password":"password"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginW := httptest.NewRecorder()
+	r.ServeHTTP(loginW, loginReq)
+
+	type LoginResponse struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	var loginResp LoginResponse
+	if err := json.Unmarshal(loginW.Body.Bytes(), &loginResp); err != nil {
+		t.Fatalf("Failed to unmarshal login response: %v", err)
+	}
+	token := loginResp.Data.Token
+
+	// Extract seed from JWT token and set in cache
+	userId := user.Id
+	seedKey := fmt.Sprintf("%v.seed", userId)
+	userKey := fmt.Sprintf("%v.user", userId)
+	parts := strings.Split(token, ".")
+	if len(parts) == 3 {
+		payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err == nil {
+			var payload map[string]interface{}
+			if err := json.Unmarshal(payloadBytes, &payload); err == nil {
+				if seedStr, ok := payload["seed"].(string); ok {
+					store.Set(seedKey, seedStr, 3600*time.Second)
+					store.Set(userKey, user, 3600*time.Second)
+				}
+			}
+		}
+	}
+
+	// Test unauthenticated
+	t.Run("unauthenticated", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/v2/agent-runs/test-run/followups", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("Expected 401, got %d", w.Code)
+		}
+	})
+
+	// Test authenticated request
+	t.Run("authenticated", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/v2/agent-runs/test-run/followups", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d: %s", w.Code, w.Body.String())
+		}
+
+		var resp struct {
+			Code    int           `json:"code"`
+			Message string        `json:"message"`
+			Data    []interface{} `json:"data"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		if resp.Code != 0 {
+			t.Errorf("Expected code 0, got %d", resp.Code)
+		}
+	})
 }

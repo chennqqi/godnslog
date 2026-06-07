@@ -3,11 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { agentRunApi } from '@/lib/api-client'
-import type { AgentRunDetail, AgentRunStatus, AgentRunReviewPacket, AgentRunFollowupActionType } from '@/types'
+import type { AgentRunDetail, AgentRunStatus, AgentRunReviewPacket, AgentRunFollowupActionType, AgentRunFollowupHistoryItem } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -26,6 +26,8 @@ export default function AgentRunDetailPage() {
   const [followupActionType, setFollowupActionType] = useState<AgentRunFollowupActionType>('recheck_evidence')
   const [followupReason, setFollowupReason] = useState('')
   const [creatingFollowup, setCreatingFollowup] = useState(false)
+  const [followupHistory, setFollowupHistory] = useState<AgentRunFollowupHistoryItem[]>([])
+  const [loadingFollowupHistory, setLoadingFollowupHistory] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -48,7 +50,22 @@ export default function AgentRunDetailPage() {
       }
     }
 
+    const loadFollowupHistory = async () => {
+      setLoadingFollowupHistory(true)
+      try {
+        const response = await agentRunApi.listFollowupHistory(params.id as string)
+        if (response.data) {
+          setFollowupHistory(response.data.data || [])
+        }
+      } catch (error: unknown) {
+        console.error('Failed to load followup history:', error)
+      } finally {
+        setLoadingFollowupHistory(false)
+      }
+    }
+
     loadAgentRun()
+    loadFollowupHistory()
   }, [router, params.id])
 
   const handleUpdateStatus = async (newStatus: AgentRunStatus) => {
@@ -76,7 +93,7 @@ export default function AgentRunDetailPage() {
     try {
       const response = await agentRunApi.getReview(agentRun.id, format)
       if (response.data) {
-        setReviewPacket(response.data.data)
+        setReviewPacket(response.data.data || response.data)
         setReviewFormat(format)
       }
     } catch (error: unknown) {
@@ -102,6 +119,11 @@ export default function AgentRunDetailPage() {
       const response = await agentRunApi.get(agentRun.id)
       if (response.data) {
         setAgentRun(response.data.data)
+      }
+      // Refresh followup history
+      const historyResponse = await agentRunApi.listFollowupHistory(agentRun.id)
+      if (historyResponse.data) {
+        setFollowupHistory(historyResponse.data.data || [])
       }
     } catch (error: unknown) {
       console.error('Failed to create followup:', error)
@@ -354,6 +376,63 @@ export default function AgentRunDetailPage() {
           </CardContent>
         </Card>
 
+        {/* Follow-up History */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Follow-up History ({followupHistory.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingFollowupHistory ? (
+              <p className="text-muted-foreground">加载中...</p>
+            ) : followupHistory.length === 0 ? (
+              <p className="text-muted-foreground">暂无 Follow-up 记录</p>
+            ) : (
+              <div className="space-y-4">
+                {followupHistory.map((item) => (
+                  <div key={item.operation_id} className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold">{item.action_type}</h4>
+                      <div className="flex gap-2">
+                        {item.risk_level && (
+                          <Badge className={getRiskLevelColor(item.risk_level)}>
+                            {item.risk_level}
+                          </Badge>
+                        )}
+                        <span className="text-sm text-muted-foreground">
+                          {new Date(item.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                    {item.reason && (
+                      <div className="mb-2">
+                        <p className="text-sm font-medium">Reason:</p>
+                        <p className="text-sm">{item.reason}</p>
+                      </div>
+                    )}
+                    {item.review_packet_id && (
+                      <div className="mb-2">
+                        <p className="text-sm font-medium">Review Packet ID:</p>
+                        <p className="text-sm text-muted-foreground">{item.review_packet_id}</p>
+                      </div>
+                    )}
+                    {item.audit_ref_id && (
+                      <div>
+                        <p className="text-sm font-medium">Audit Ref:</p>
+                        <a
+                          href={`/dashboard/audit?resource_type=agent_run&resource_id=${agentRun.id}`}
+                          className="text-sm text-blue-500 hover:underline"
+                        >
+                          {item.audit_ref_id}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Review Packet */}
         <Card>
           <CardHeader>
@@ -387,6 +466,9 @@ export default function AgentRunDetailPage() {
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>创建 Follow-up Action</DialogTitle>
+                      <DialogDescription>
+                        为此 Agent Run 创建一个 Follow-up Action 以进行后续操作
+                      </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
                       <div>

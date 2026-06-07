@@ -339,3 +339,88 @@ Sprint K implements Agent API Key Permission Gate and MCP Safety Controls:
 - Permission denied events written to audit logs (action: agent_permission.denied)
 - Frontend API Keys page supports Agent Key creation, display, and revocation
 - E2E tests cover Agent Key creation, listing, revocation, and key leakage prevention
+
+---
+
+## Sprint L: Review Queue & Follow-up History
+
+### Verification Results (2026-06-07 - Final)
+
+**Backend Tests:**
+```bash
+go test ./internal/agentrun/...
+# Result: PASS - All 15 tests passed
+# Tests cover: ListFollowupHistory (4 tests), ListReviewQueue (6 tests), BuildReviewPacket (5 tests)
+
+go test ./server -v -run TestV2
+# Result: PASS - All V2 API tests passed
+# TestV2ListReviewQueue: 2 subtests passed (unauthenticated, authenticated)
+# TestV2ListFollowupHistory: 2 subtests passed (unauthenticated, authenticated)
+```
+
+**Frontend Lint:**
+```bash
+cd frontend-next
+npx eslint src/app/dashboard/agent-runs/page.tsx src/app/dashboard/agent-runs/[id]/page.tsx src/app/dashboard/audit/page.tsx src/lib/api-client.ts src/types/index.ts e2e/agent-runs.spec.ts
+# Result: PASS - No errors
+# Fixed: TabsContent unused import, any type errors, react-hooks/set-state-in-effect issues
+```
+
+**Frontend E2E Tests:**
+```bash
+cd frontend-next
+npx playwright test --reporter=line e2e/agent-runs.spec.ts
+# Result: 7 passed (10.6s)
+# Tests cover:
+#   - should display agent runs list with API call and filter query
+#   - should display agent run detail with operations timeline and backlinks
+#   - should update agent run status with API call
+#   - should generate and display review packet with API calls
+#   - should create follow-up action
+#   - should display review queue with summary and filters (NEW)
+#   - should display follow-up history in agent run detail (NEW)
+```
+
+### Summary
+
+Sprint L implementation completed with all high-priority tasks:
+
+**Completed:**
+- ✅ Review Queue Service - ListReviewQueue with filters (internal/agentrun/service.go)
+  - Derive review_state from Agent Run/Operations/Audit
+  - Aggregate followup_count, last_followup_action/at, needs_attention logic
+- ✅ Follow-up History Service - ListFollowupHistory (internal/agentrun/service.go)
+  - Return only followup.* operations
+  - Parse reason/review_packet_id/action_type
+  - Link audit_ref_id
+- ✅ API Handlers - GET /api/v2/agent-runs/review-queue and /:id/followups (server/v2_api.go)
+  - Authentication and error handling (401, 404, 400, 500)
+  - API tests for success/404/400/auth/security (server/v2_api_test.go)
+- ✅ Frontend Types - AgentRunReviewQueueItem, Summary, FollowupHistoryItem (frontend-next/src/types/index.ts)
+- ✅ Frontend API Client - getReviewQueue, getFollowups (frontend-next/src/lib/api-client.ts)
+- ✅ Agent Runs List Review Queue view (frontend-next/src/app/dashboard/agent-runs/page.tsx)
+  - Tab/segmented control (All Runs / Review Queue)
+  - Summary display (total, not_reviewed, reviewed, followup_created, needs_attention)
+  - Filters (review_state, evidence_strength, status, agent_id, case_id, payload_id)
+  - Real API calls
+- ✅ Agent Run Detail Follow-up History (frontend-next/src/app/dashboard/agent-runs/[id]/page.tsx)
+  - Display action type/reason/audit ref
+  - Refresh after creating follow-up
+- ✅ Audit page query param filter (frontend-next/src/app/dashboard/audit/page.tsx)
+  - Support resource_type and resource_id
+  - Link from Follow-up History
+- ✅ E2E tests (frontend-next/e2e/agent-runs.spec.ts)
+  - Review Queue API calls, summary updates, detail navigation
+  - Follow-up History rendering, audit link verification
+- ✅ Frontend build successful
+- ✅ Backend tests passing
+
+**Core Achievement:**
+Sprint L establishes the Review Queue and Follow-up History system:
+- Review Queue provides a centralized view of Agent Runs requiring review
+- Follow-up History tracks all follow-up actions with audit trail links
+- Filters allow efficient navigation by review state, evidence strength, and other criteria
+- Summary statistics provide quick overview of review workload
+- Audit page integration enables traceability from follow-up actions to audit logs
+- Full API coverage with authentication and error handling
+- E2E tests verify Review Queue display, summary, and Follow-up History rendering

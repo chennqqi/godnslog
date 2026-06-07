@@ -174,3 +174,56 @@ func IsAllowedAgentRunFollowupAction(action string) bool {
 		return false
 	}
 }
+
+// AgentRunReviewQueueItem represents an agent run in the review queue
+type AgentRunReviewQueueItem struct {
+	ID                 string     `json:"id"`
+	AgentID            string     `json:"agent_id,omitempty"`
+	OperatorID         string     `json:"operator_id,omitempty"`
+	CaseID             string     `json:"case_id,omitempty"`
+	PayloadID          string     `json:"payload_id,omitempty"`
+	Target             string     `json:"target,omitempty"`
+	Status             string     `json:"status"`
+	ReviewState        string     `json:"review_state"`
+	EvidenceStrength   string     `json:"evidence_strength,omitempty"`
+	InteractionCount   int        `json:"interaction_count"`
+	OperationCount     int        `json:"operation_count"`
+	FollowupCount      int        `json:"followup_count"`
+	LastFollowupAction string     `json:"last_followup_action,omitempty"`
+	LastReviewedAt     *time.Time `json:"last_reviewed_at,omitempty"`
+	LastFollowupAt     *time.Time `json:"last_followup_at,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+	DetailURL          string     `json:"detail_url"`
+	EvidenceURL        string     `json:"evidence_url,omitempty"`
+}
+
+// AgentRunReviewQueueResponse represents the response for listing review queue
+type AgentRunReviewQueueResponse struct {
+	Items      []AgentRunReviewQueueItem  `json:"items"`
+	Total      int64                      `json:"total"`
+	Page       int                        `json:"page"`
+	PageSize   int                        `json:"page_size"`
+	TotalPages int                        `json:"total_pages"`
+	Summary    AgentRunReviewQueueSummary `json:"summary"`
+}
+
+// AgentRunReviewQueueSummary represents summary statistics for the review queue
+type AgentRunReviewQueueSummary struct {
+	Total           int64 `json:"total"`
+	NotReviewed     int64 `json:"not_reviewed"`
+	Reviewed        int64 `json:"reviewed"`
+	FollowupCreated int64 `json:"followup_created"`
+	NeedsAttention  int64 `json:"needs_attention"`
+}
+
+// AgentRunFollowupHistoryItem represents a follow-up action in history
+type AgentRunFollowupHistoryItem struct {
+	OperationID    string    `json:"operation_id"`
+	ActionType     string    `json:"action_type"`
+	Reason         string    `json:"reason,omitempty"`
+	ReviewPacketID string    `json:"review_packet_id,omitempty"`
+	RiskLevel      string    `json:"risk_level"`
+	AuditRefID     string    `json:"audit_ref_id,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+}

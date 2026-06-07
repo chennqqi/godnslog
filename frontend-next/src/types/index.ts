@@ -477,3 +477,71 @@ export interface AgentRunFollowupResponse {
   created_at: string
 }
 
+// Review Queue types
+export type ReviewState = 'not_reviewed' | 'reviewed' | 'followup_created' | 'needs_attention'
+export type EvidenceStrength = 'none' | 'low' | 'medium' | 'high'
+
+export interface AgentRunReviewQueueItem {
+  id: string
+  agent_id: string
+  operator_id: string
+  case_id: string
+  payload_id: string
+  target: string
+  title: string
+  status: AgentRunStatus
+  review_state: ReviewState
+  evidence_strength: EvidenceStrength
+  interaction_count: number
+  operation_count: number
+  followup_count: number
+  last_followup_action?: string
+  last_followup_at?: string
+  last_reviewed_at?: string
+  needs_attention: boolean
+  created_at: string
+  updated_at: string
+  case_url: string
+  payload_url: string
+  evidence_url: string
+}
+
+export interface AgentRunReviewQueueSummary {
+  total: number
+  not_reviewed: number
+  reviewed: number
+  followup_created: number
+  needs_attention: number
+}
+
+export interface AgentRunReviewQueueResponse {
+  items: AgentRunReviewQueueItem[]
+  summary: AgentRunReviewQueueSummary
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+export interface ReviewQueueFilters {
+  review_state?: ReviewState
+  status?: AgentRunStatus
+  evidence_strength?: EvidenceStrength
+  agent_id?: string
+  case_id?: string
+  payload_id?: string
+  page?: number
+  page_size?: number
+}
+
+// Follow-up History types
+export interface AgentRunFollowupHistoryItem {
+  operation_id: string
+  action_type: string
+  risk_level?: string
+  reason?: string
+  review_packet_id?: string
+  audit_ref_id?: string
+  created_at: string
+}
+

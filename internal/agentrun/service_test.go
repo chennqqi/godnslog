@@ -461,12 +461,17 @@ func TestCreateFollowupActionValidation(t *testing.T) {
 		{
 			name: "invalid action",
 			id:   created.ID,
-			req:  &models.AgentRunFollowupRequest{ActionType: "delete_payload", Reason: "valid reason"},
+			req:  &models.AgentRunFollowupRequest{ActionType: "invalid_action", Reason: "valid reason"},
 		},
 		{
 			name: "empty reason",
 			id:   created.ID,
 			req:  &models.AgentRunFollowupRequest{ActionType: "recheck_evidence", Reason: ""},
+		},
+		{
+			name: "too long reason",
+			id:   created.ID,
+			req:  &models.AgentRunFollowupRequest{ActionType: "recheck_evidence", Reason: string(make([]byte, 501))},
 		},
 	}
 
