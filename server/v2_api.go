@@ -3669,6 +3669,10 @@ func (self *WebServer) v2DeliverReviewPackage(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
 			return
 		}
+		if strings.Contains(err.Error(), "timed out") {
+			c.JSON(http.StatusGatewayTimeout, gin.H{"code": 504, "message": "Webhook request timed out"})
+			return
+		}
 		if strings.Contains(err.Error(), "delivery failed") {
 			c.JSON(http.StatusBadGateway, gin.H{"code": 502, "message": err.Error()})
 			return

@@ -614,7 +614,13 @@ func (s *ReviewService) DeliverReviewPackage(agentRunID string, req *models.Agen
 	}
 	destinationHost := parsedURL.Hostname()
 
-	// Build webhook payload
+	// Create pending delivery operation first to get real operation ID
+	pendingOperationID, err := s.createPendingDeliveryOperation(agentRunID, req, destinationHost, exportResp.OperationID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pending delivery operation: %w", err)
+	}
+
+	// Build webhook payload with real operation ID
 	webhookPayload := map[string]interface{}{
 		"event":        "agent_run.review_evidence_delivered",
 		"agent_run_id": agentRunID,
@@ -626,7 +632,7 @@ func (s *ReviewService) DeliverReviewPackage(agentRunID string, req *models.Agen
 		},
 		"refs": map[string]interface{}{
 			"export_operation_id":   exportResp.OperationID,
-			"delivery_operation_id": deliveryID,
+			"delivery_operation_id": pendingOperationID,
 			"audit_ref_id":          exportResp.AuditRefID,
 		},
 	}
@@ -668,6 +674,11 @@ func (s *ReviewService) DeliverReviewPackage(agentRunID string, req *models.Agen
 	// Send request
 	resp, err := client.Do(httpReq)
 	if err != nil {
+		// Check if error is a timeout
+		if netErr, ok := err.(interface{ Timeout() bool }); ok && netErr.Timeout() {
+			timeoutErr := fmt.Errorf("webhook request timed out")
+			return s.createDeliveryFailure(agentRunID, req, deliveryID, destinationHost, exportResp.OperationID, timeoutErr, userID)
+		}
 		// Create failure operation and audit
 		return s.createDeliveryFailure(agentRunID, req, deliveryID, destinationHost, exportResp.OperationID, err, userID)
 	}
@@ -686,23 +697,19 @@ func (s *ReviewService) DeliverReviewPackage(agentRunID string, req *models.Agen
 	return s.createDeliverySuccess(agentRunID, req, deliveryID, destinationHost, exportResp.OperationID, resp.StatusCode, userID)
 }
 
-// createDeliverySuccess creates success operation and audit records
-func (s *ReviewService) createDeliverySuccess(agentRunID string, req *models.AgentRunReviewDeliveryRequest, deliveryID, destinationHost, exportOperationID string, statusCode int, userID string) (*models.AgentRunReviewDeliveryResponse, error) {
-	now := time.Now()
-
+// createPendingDeliveryOperation creates a pending delivery operation and returns its ID
+func (s *ReviewService) createPendingDeliveryOperation(agentRunID string, req *models.AgentRunReviewDeliveryRequest, destinationHost, exportOperationID string, userID string) (string, error) {
 	// Extract header names for operation request (sanitized)
 	headerNames := make([]string, 0, len(req.Headers))
 	for headerName := range req.Headers {
 		headerNames = append(headerNames, headerName)
 	}
 
-	// Create review_delivery.webhook operation
+	// Create review_delivery.webhook operation with pending status
 	result := map[string]interface{}{
-		"result":              "delivered",
-		"status_code":         statusCode,
-		"delivery_id":         deliveryID,
+		"result":              "pending",
+		"status_code":         0,
 		"export_operation_id": exportOperationID,
-		"audit_action":        "agent_run.review_delivered",
 	}
 
 	opReq := &models.AgentOperationCreateRequest{
@@ -719,7 +726,7 @@ func (s *ReviewService) createDeliverySuccess(agentRunID string, req *models.Age
 	}
 
 	if err := s.agentRunService.AppendAgentOperation(agentRunID, opReq, userID); err != nil {
-		return nil, fmt.Errorf("failed to append delivery operation: %w", err)
+		return "", fmt.Errorf("failed to append pending delivery operation: %w", err)
 	}
 
 	// Get the created operation
@@ -727,7 +734,39 @@ func (s *ReviewService) createDeliverySuccess(agentRunID string, req *models.Age
 	has, err := s.engine.Where("agent_run_i_d = ? AND action = ?", agentRunID, "review_delivery.webhook").
 		OrderBy("created_at DESC").Limit(1).Get(&operation)
 	if err != nil || !has {
-		return nil, fmt.Errorf("failed to retrieve created operation: has=%v err=%v", has, err)
+		return "", fmt.Errorf("failed to retrieve created operation: has=%v err=%v", has, err)
+	}
+
+	return operation.ID, nil
+}
+
+// createDeliverySuccess creates success operation and audit records
+func (s *ReviewService) createDeliverySuccess(agentRunID string, req *models.AgentRunReviewDeliveryRequest, deliveryID, destinationHost, exportOperationID string, statusCode int, userID string) (*models.AgentRunReviewDeliveryResponse, error) {
+	now := time.Now()
+
+	// Get the pending delivery operation
+	var operation models.AgentOperation
+	has, err := s.engine.Where("agent_run_i_d = ? AND action = ?", agentRunID, "review_delivery.webhook").
+		OrderBy("created_at DESC").Limit(1).Get(&operation)
+	if err != nil || !has {
+		return nil, fmt.Errorf("failed to retrieve pending operation: has=%v err=%v", has, err)
+	}
+
+	// Update operation result to delivered
+	resultMap := map[string]interface{}{
+		"result":              "delivered",
+		"status_code":         statusCode,
+		"delivery_id":         deliveryID,
+		"export_operation_id": exportOperationID,
+		"audit_action":        "agent_run.review_delivered",
+	}
+	resultJSON, err := json.Marshal(resultMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal operation result: %w", err)
+	}
+	operation.Result = string(resultJSON)
+	if _, err := s.engine.ID(operation.ID).Cols("result").Update(&operation); err != nil {
+		return nil, fmt.Errorf("failed to update delivery operation: %w", err)
 	}
 
 	// Create audit log
@@ -771,43 +810,28 @@ func (s *ReviewService) createDeliverySuccess(agentRunID string, req *models.Age
 func (s *ReviewService) createDeliveryFailure(agentRunID string, req *models.AgentRunReviewDeliveryRequest, deliveryID, destinationHost, exportOperationID string, deliveryError error, userID string) (*models.AgentRunReviewDeliveryResponse, error) {
 	now := time.Now()
 
-	// Extract header names for operation request (sanitized)
-	headerNames := make([]string, 0, len(req.Headers))
-	for headerName := range req.Headers {
-		headerNames = append(headerNames, headerName)
+	// Get the pending delivery operation
+	var operation models.AgentOperation
+	has, err := s.engine.Where("agent_run_i_d = ? AND action = ?", agentRunID, "review_delivery.webhook").
+		OrderBy("created_at DESC").Limit(1).Get(&operation)
+	if err != nil || !has {
+		return nil, fmt.Errorf("failed to retrieve pending operation: has=%v err=%v", has, err)
 	}
 
-	// Create review_delivery.webhook operation with failure result
-	result := map[string]interface{}{
+	// Update operation result to failed
+	resultMap := map[string]interface{}{
 		"result":      "failed",
 		"status_code": 0,
 		"error":       deliveryError.Error(),
 		"delivery_id": deliveryID,
 	}
-
-	opReq := &models.AgentOperationCreateRequest{
-		Action:    "review_delivery.webhook",
-		RiskLevel: "low",
-		Request: map[string]interface{}{
-			"format":           req.Format,
-			"review_packet_id": req.ReviewPacketID,
-			"destination_host": destinationHost,
-			"include_audit":    req.IncludeAudit,
-			"header_names":     headerNames,
-		},
-		Result: result,
+	resultJSON, err := json.Marshal(resultMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal operation result: %w", err)
 	}
-
-	if err := s.agentRunService.AppendAgentOperation(agentRunID, opReq, userID); err != nil {
-		return nil, fmt.Errorf("failed to append delivery operation: %w", err)
-	}
-
-	// Get the created operation
-	var operation models.AgentOperation
-	has, err := s.engine.Where("agent_run_i_d = ? AND action = ?", agentRunID, "review_delivery.webhook").
-		OrderBy("created_at DESC").Limit(1).Get(&operation)
-	if err != nil || !has {
-		return nil, fmt.Errorf("failed to retrieve created operation: has=%v err=%v", has, err)
+	operation.Result = string(resultJSON)
+	if _, err := s.engine.ID(operation.ID).Cols("result").Update(&operation); err != nil {
+		return nil, fmt.Errorf("failed to update delivery operation: %w", err)
 	}
 
 	// Create audit log for failure

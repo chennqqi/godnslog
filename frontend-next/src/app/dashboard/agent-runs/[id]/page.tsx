@@ -41,6 +41,7 @@ export default function AgentRunDetailPage() {
   const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false)
   const [deliveryFormat, setDeliveryFormat] = useState<'json' | 'markdown'>('markdown')
   const [deliveryWebhookURL, setDeliveryWebhookURL] = useState('')
+  const [deliveryHeaders, setDeliveryHeaders] = useState<Array<{ key: string; value: string }>>([])
   const [delivering, setDelivering] = useState(false)
   const [deliveryResult, setDeliveryResult] = useState<AgentRunReviewDeliveryResponse | null>(null)
   const [deliveryError, setDeliveryError] = useState('')
@@ -209,10 +210,19 @@ export default function AgentRunDetailPage() {
     setDeliveryError('')
     setDeliveryResult(null)
     try {
+      // Convert headers array to map
+      const headersMap: Record<string, string> = {}
+      deliveryHeaders.forEach(header => {
+        if (header.key && header.value) {
+          headersMap[header.key] = header.value
+        }
+      })
+
       const response = await agentRunApi.deliverReview(agentRun.id, {
         format: deliveryFormat,
         review_packet_id: agentRun.id,
         webhook_url: deliveryWebhookURL,
+        headers: headersMap,
         include_audit: true,
       })
       if (response.data) {
@@ -229,6 +239,20 @@ export default function AgentRunDetailPage() {
     } finally {
       setDelivering(false)
     }
+  }
+
+  const handleAddHeader = () => {
+    setDeliveryHeaders([...deliveryHeaders, { key: '', value: '' }])
+  }
+
+  const handleRemoveHeader = (index: number) => {
+    setDeliveryHeaders(deliveryHeaders.filter((_, i) => i !== index))
+  }
+
+  const handleHeaderChange = (index: number, field: 'key' | 'value', value: string) => {
+    const newHeaders = [...deliveryHeaders]
+    newHeaders[index][field] = value
+    setDeliveryHeaders(newHeaders)
   }
 
   if (loading) {
@@ -795,6 +819,46 @@ export default function AgentRunDetailPage() {
                             value={deliveryWebhookURL}
                             onChange={(e) => setDeliveryWebhookURL(e.target.value)}
                           />
+                        </div>
+                        <div>
+                          <Label>Headers (Optional)</Label>
+                          <div className="space-y-2 mt-2">
+                            {deliveryHeaders.map((header, index) => (
+                              <div key={index} className="flex gap-2">
+                                <Input
+                                  placeholder="X-Custom-Header"
+                                  value={header.key}
+                                  onChange={(e) => handleHeaderChange(index, 'key', e.target.value)}
+                                  className="flex-1"
+                                />
+                                <Input
+                                  placeholder="value"
+                                  value={header.value}
+                                  onChange={(e) => handleHeaderChange(index, 'value', e.target.value)}
+                                  className="flex-1"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleRemoveHeader(index)}
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            ))}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={handleAddHeader}
+                            >
+                              Add Header
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Only Content-Type and X-* headers are allowed
+                          </p>
                         </div>
                         <div className="flex justify-end gap-2">
                           <Button

@@ -389,6 +389,15 @@ func TestDeliverReviewPackage(t *testing.T) {
 
 	// Test forbidden header
 	t.Run("Forbidden header", func(t *testing.T) {
+		// Inject custom URL validator that skips DNS resolution for test
+		reviewService.urlValidator = func(url string) error {
+			// Skip DNS resolution for test URLs
+			if strings.Contains(url, "hooks.example.com") {
+				return nil
+			}
+			return ValidateWebhookURL(url)
+		}
+
 		req := &models.AgentRunReviewDeliveryRequest{
 			Format:     "markdown",
 			WebhookURL: "https://hooks.example.com/review",
@@ -407,6 +416,15 @@ func TestDeliverReviewPackage(t *testing.T) {
 
 	// Test unknown Agent Run
 	t.Run("Unknown Agent Run", func(t *testing.T) {
+		// Inject custom URL validator that skips DNS resolution for test
+		reviewService.urlValidator = func(url string) error {
+			// Skip DNS resolution for test URLs
+			if strings.Contains(url, "hooks.example.com") {
+				return nil
+			}
+			return ValidateWebhookURL(url)
+		}
+
 		req := &models.AgentRunReviewDeliveryRequest{
 			Format:     "markdown",
 			WebhookURL: "https://hooks.example.com/review",
@@ -422,6 +440,15 @@ func TestDeliverReviewPackage(t *testing.T) {
 
 	// Test review_packet_id mismatch
 	t.Run("Review packet ID mismatch", func(t *testing.T) {
+		// Inject custom URL validator that skips DNS resolution for test
+		reviewService.urlValidator = func(url string) error {
+			// Skip DNS resolution for test URLs
+			if strings.Contains(url, "hooks.example.com") {
+				return nil
+			}
+			return ValidateWebhookURL(url)
+		}
+
 		req := &models.AgentRunReviewDeliveryRequest{
 			Format:         "markdown",
 			WebhookURL:     "https://hooks.example.com/review",
@@ -524,6 +551,73 @@ func TestDeliverReviewPackage(t *testing.T) {
 		auditJSON, _ := json.Marshal(auditLog.Details)
 		if strings.Contains(string(auditJSON), server.URL) {
 			t.Error("Audit details should not contain full webhook URL")
+		}
+	})
+
+	// Test webhook timeout
+	t.Run("Webhook timeout", func(t *testing.T) {
+		// Create mock webhook server with TLS that delays response
+		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(6 * time.Second) // Exceed the 5s timeout
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"status":"received"}`))
+		}))
+		defer server.Close()
+
+		// Inject custom URL validator that allows test server
+		reviewService.urlValidator = func(url string) error {
+			if url == server.URL {
+				return nil
+			}
+			return ValidateWebhookURL(url)
+		}
+
+		// Inject custom HTTP client with short timeout
+		reviewService.httpClient = &http.Client{
+			Timeout: 1 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
+
+		req := &models.AgentRunReviewDeliveryRequest{
+			Format:     "markdown",
+			WebhookURL: server.URL,
+		}
+
+		resp, err := reviewService.DeliverReviewPackage("agent-run-1", req, "user-1")
+		if err == nil {
+			t.Error("Expected error for webhook timeout")
+		}
+		if !strings.Contains(err.Error(), "timed out") {
+			t.Errorf("Expected timeout error, got: %v", err)
+		}
+
+		// Verify response indicates failure
+		if resp != nil && resp.Result != "failed" {
+			t.Error("Expected failed result in response")
+		}
+
+		// Verify failure operation was created
+		var operation models.AgentOperation
+		has, err := engine.Where("action = ?", "review_delivery.webhook").Get(&operation)
+		if err != nil || !has {
+			t.Error("Expected delivery operation to be created")
+		}
+
+		// Verify operation result contains timeout error
+		if !strings.Contains(operation.Result, "timed out") {
+			t.Error("Expected operation result to contain timeout error")
+		}
+
+		// Verify failure audit was created
+		var auditLog models.AuditLog
+		has, err = engine.Where("action = ?", "agent_run.review_delivery_failed").Get(&auditLog)
+		if err != nil || !has {
+			t.Error("Expected delivery failure audit log to be created")
 		}
 	})
 

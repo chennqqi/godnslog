@@ -1,16 +1,32 @@
 package agentrun
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/url"
 	"strings"
 )
 
+// IPResolver is a function that resolves a hostname to IP addresses
+type IPResolver func(ctx context.Context, hostname string) ([]net.IP, error)
+
+// DefaultIPResolver uses net.LookupIP to resolve hostnames
+func DefaultIPResolver(ctx context.Context, hostname string) ([]net.IP, error) {
+	return net.LookupIP(hostname)
+}
+
 // ValidateWebhookURL checks if the webhook URL is safe for delivery
 // Only https:// is allowed by default
 // Rejects localhost, link-local, private RFC1918 ranges, metadata IPs
+// Uses default resolver to check DNS resolution results for SSRF protection
 func ValidateWebhookURL(webhookURL string) error {
+	return ValidateWebhookURLWithResolver(context.Background(), webhookURL, DefaultIPResolver)
+}
+
+// ValidateWebhookURLWithResolver checks if the webhook URL is safe for delivery
+// with a custom IP resolver for testing and SSRF protection
+func ValidateWebhookURLWithResolver(ctx context.Context, webhookURL string, resolver IPResolver) error {
 	if webhookURL == "" {
 		return fmt.Errorf("webhook URL cannot be empty")
 	}
@@ -44,6 +60,29 @@ func ValidateWebhookURL(webhookURL string) error {
 	// Reject private RFC1918 ranges
 	if isPrivateIP(host) {
 		return fmt.Errorf("private IP addresses are not allowed")
+	}
+
+	// Resolve hostname to IPs and check each resolved IP for SSRF
+	// Skip DNS resolution for IP addresses (already validated above)
+	if net.ParseIP(host) == nil {
+		ips, err := resolver(ctx, host)
+		if err != nil {
+			return fmt.Errorf("failed to resolve hostname: %w", err)
+		}
+		for _, ip := range ips {
+			if isMetadataIP(ip.String()) {
+				return fmt.Errorf("hostname resolves to metadata IP: %s", ip.String())
+			}
+			if isLocalhost(ip.String()) {
+				return fmt.Errorf("hostname resolves to localhost: %s", ip.String())
+			}
+			if isLinkLocal(ip.String()) {
+				return fmt.Errorf("hostname resolves to link-local address: %s", ip.String())
+			}
+			if isPrivateIP(ip.String()) {
+				return fmt.Errorf("hostname resolves to private IP: %s", ip.String())
+			}
+		}
 	}
 
 	// Only allow https:// by default

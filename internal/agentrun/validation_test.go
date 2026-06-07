@@ -1,6 +1,9 @@
 package agentrun
 
 import (
+	"context"
+	"fmt"
+	"net"
 	"testing"
 )
 
@@ -11,8 +14,8 @@ func TestValidateWebhookURL(t *testing.T) {
 		wantError bool
 	}{
 		{
-			name:      "valid https URL",
-			url:       "https://hooks.example.com/review",
+			name:      "valid https URL with IP",
+			url:       "https://8.8.8.8/review",
 			wantError: false,
 		},
 		{
@@ -82,6 +85,81 @@ func TestValidateWebhookURL(t *testing.T) {
 			err := ValidateWebhookURL(tt.url)
 			if (err != nil) != tt.wantError {
 				t.Errorf("ValidateWebhookURL() error = %v, wantError %v", err, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestValidateWebhookURLWithResolver(t *testing.T) {
+	tests := []struct {
+		name      string
+		url       string
+		resolver  IPResolver
+		wantError bool
+	}{
+		{
+			name: "hostname resolves to public IP - allowed",
+			url:  "https://safe.example.com/hook",
+			resolver: func(ctx context.Context, hostname string) ([]net.IP, error) {
+				return []net.IP{net.ParseIP("8.8.8.8")}, nil
+			},
+			wantError: false,
+		},
+		{
+			name: "hostname resolves to private IP - rejected",
+			url:  "https://internal.example.com/hook",
+			resolver: func(ctx context.Context, hostname string) ([]net.IP, error) {
+				return []net.IP{net.ParseIP("10.0.0.1")}, nil
+			},
+			wantError: true,
+		},
+		{
+			name: "hostname resolves to metadata IP - rejected",
+			url:  "https://metadata.example.com/hook",
+			resolver: func(ctx context.Context, hostname string) ([]net.IP, error) {
+				return []net.IP{net.ParseIP("169.254.169.254")}, nil
+			},
+			wantError: true,
+		},
+		{
+			name: "hostname resolves to localhost - rejected",
+			url:  "https://local.example.com/hook",
+			resolver: func(ctx context.Context, hostname string) ([]net.IP, error) {
+				return []net.IP{net.ParseIP("127.0.0.1")}, nil
+			},
+			wantError: true,
+		},
+		{
+			name: "hostname resolves to link-local - rejected",
+			url:  "https://link.example.com/hook",
+			resolver: func(ctx context.Context, hostname string) ([]net.IP, error) {
+				return []net.IP{net.ParseIP("169.254.1.1")}, nil
+			},
+			wantError: true,
+		},
+		{
+			name: "hostname resolves to multiple IPs, one private - rejected",
+			url:  "https://multi.example.com/hook",
+			resolver: func(ctx context.Context, hostname string) ([]net.IP, error) {
+				return []net.IP{net.ParseIP("8.8.8.8"), net.ParseIP("10.0.0.1")}, nil
+			},
+			wantError: true,
+		},
+		{
+			name: "resolver fails - fail-closed",
+			url:  "https://safe.example.com/hook",
+			resolver: func(ctx context.Context, hostname string) ([]net.IP, error) {
+				return nil, fmt.Errorf("resolver error")
+			},
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateWebhookURLWithResolver(context.Background(), tt.url, tt.resolver)
+			if (err != nil) != tt.wantError {
+				t.Errorf("ValidateWebhookURLWithResolver() error = %v, wantError %v", err, tt.wantError)
 			}
 		})
 	}

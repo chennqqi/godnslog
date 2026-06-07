@@ -1359,6 +1359,31 @@ test.describe('Agent Runs', () => {
   })
 
   test('should deliver review evidence to webhook successfully', async ({ page }) => {
+    // Mock audit API at the very beginning - use broader pattern
+    await page.route('**/audit/logs**', route => {
+      route.fulfill({
+        json: {
+          code: 0,
+          message: 'success',
+          data: {
+            items: [
+              {
+                id: 'audit-delivery-1',
+                action: 'agent_run.review_delivered',
+                resource_type: 'agent_run',
+                resource_id: 'agent-run-1',
+                timestamp: '2026-06-07T00:00:00Z',
+              },
+            ],
+            total: 1,
+            page: 1,
+            page_size: 20,
+            total_pages: 1,
+          },
+        },
+      })
+    })
+
     // Mock agent run detail API to include review packet
     await page.route('**/api/v2/agent-runs/agent-run-1', route => {
       route.fulfill({
@@ -1464,6 +1489,201 @@ test.describe('Agent Runs', () => {
     await expect(deliveryDialog.getByText('hooks.example.test')).toBeVisible()
     await expect(deliveryDialog.getByText('200')).toBeVisible()
     await expect(deliveryDialog.getByText('Result: delivered')).toBeVisible()
+
+    // Close delivery dialog
+    await deliveryDialog.getByRole('button', { name: '取消' }).click()
+    await page.waitForSelector('[role="dialog"]', { state: 'hidden' })
+
+    // Mock agent run detail API to include delivery operation
+    await page.route('**/api/v2/agent-runs/agent-run-1', route => {
+      route.fulfill({
+        json: {
+          code: 0,
+          message: 'success',
+          data: {
+            data: {
+              id: 'agent-run-1',
+              agent_id: 'agent-123',
+              case_id: 'case-1',
+              payload_id: 'payload-1',
+              target: 'https://target.example',
+              title: 'Test Agent Run',
+              status: 'completed',
+              created_at: '2026-06-07T00:00:00Z',
+              operations: [
+                {
+                  id: 'op-delivery-1',
+                  action: 'review_delivery.webhook',
+                  status: 'completed',
+                  created_at: '2026-06-07T00:00:00Z',
+                },
+              ],
+              review_packet: {
+                id: 'agent-run-1',
+                evidence_strength: 'high',
+                confidence: 85,
+                interaction_count: 5,
+                unique_sources: 2,
+                interaction_summary: {
+                  total: 5,
+                  dns_count: 2,
+                  http_count: 3,
+                  unique_sources: 2,
+                },
+              },
+            },
+          },
+        },
+      })
+    })
+
+    // Refresh the page to get updated operations
+    await page.reload()
+    await page.waitForLoadState('networkidle')
+
+    // Verify operation timeline shows review_delivery.webhook
+    await expect(page.getByText('review_delivery.webhook')).toBeVisible()
+
+    // Navigate to audit page
+    await page.goto('/dashboard/audit?resource_type=agent_run&resource_id=agent-run-1')
+    await page.waitForLoadState('networkidle')
+
+    // Verify audit log shows agent_run.review_delivered
+    await expect(page.getByText('agent_run.review_delivered')).toBeVisible()
+  })
+
+  test('should deliver with sanitized headers', async ({ page }) => {
+    // Mock audit API
+    await page.route('**/audit/logs**', route => {
+      route.fulfill({
+        json: {
+          code: 0,
+          message: 'success',
+          data: {
+            items: [
+              {
+                id: 'audit-delivery-1',
+                action: 'agent_run.review_delivered',
+                resource_type: 'agent_run',
+                resource_id: 'agent-run-1',
+                timestamp: '2026-06-07T00:00:00Z',
+              },
+            ],
+            total: 1,
+            page: 1,
+            page_size: 20,
+            total_pages: 1,
+          },
+        },
+      })
+    })
+
+    // Mock agent run detail API to include review packet
+    await page.route('**/api/v2/agent-runs/agent-run-1', route => {
+      route.fulfill({
+        json: {
+          code: 0,
+          message: 'success',
+          data: {
+            data: {
+              id: 'agent-run-1',
+              agent_id: 'agent-123',
+              case_id: 'case-1',
+              payload_id: 'payload-1',
+              target: 'https://target.example',
+              title: 'Test Agent Run',
+              status: 'completed',
+              created_at: '2026-06-07T00:00:00Z',
+              operations: [],
+              review_packet: {
+                id: 'agent-run-1',
+                evidence_strength: 'high',
+                confidence: 85,
+                interaction_count: 5,
+                unique_sources: 2,
+                interaction_summary: {
+                  total: 5,
+                  dns_count: 2,
+                  http_count: 3,
+                  unique_sources: 2,
+                },
+              },
+            },
+          },
+        },
+      })
+    })
+
+    // Mock delivery API
+    let deliveryRequestBody: Record<string, unknown> | null = null
+    await page.route('**/api/v2/agent-runs/agent-run-1/review-delivery', route => {
+      const body = route.request().postData() || ''
+      deliveryRequestBody = JSON.parse(body) as Record<string, unknown>
+      route.fulfill({
+        json: {
+          code: 0,
+          message: 'success',
+          data: {
+            data: {
+              agent_run_id: 'agent-run-1',
+              format: 'markdown',
+              delivery_id: 'delivery-123',
+              delivery_operation_id: 'op-delivery-1',
+              export_operation_id: 'op-export-1',
+              audit_ref_id: 'audit-delivery-1',
+              destination_host: 'hooks.example.test',
+              status_code: 200,
+              result: 'delivered',
+              delivered_at: '2026-06-07T00:00:00Z',
+            },
+          },
+        },
+      })
+    })
+
+    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.waitForLoadState('networkidle')
+
+    // Click Deliver to Webhook button
+    const deliverButton = page.getByText('Deliver to Webhook')
+    await expect(deliverButton).toBeVisible({ timeout: 5000 })
+    await deliverButton.click()
+    await page.waitForSelector('[role="dialog"]', { state: 'visible' })
+
+    // Locate delivery dialog
+    const deliveryDialog = page.locator('[role="dialog"]')
+
+    // Select format and enter webhook URL
+    await deliveryDialog.getByRole('combobox').click()
+    await page.getByRole('option', { name: 'Markdown' }).click()
+    await deliveryDialog.getByPlaceholder('https://hooks.example.com/review').fill('https://hooks.example.test/review')
+
+    // Add custom header
+    await deliveryDialog.getByText('Add Header').click()
+    await deliveryDialog.getByPlaceholder('X-Custom-Header').fill('X-Test-Header')
+    await deliveryDialog.getByPlaceholder('value').nth(0).fill('test-value')
+
+    // Click send button
+    await deliveryDialog.getByRole('button', { name: '发送' }).click()
+    await page.waitForLoadState('networkidle')
+
+    // Verify delivery API was called with headers
+    expect(deliveryRequestBody).toMatchObject({
+      format: 'markdown',
+      review_packet_id: 'agent-run-1',
+      webhook_url: 'https://hooks.example.test/review',
+      include_audit: true,
+      headers: {
+        'X-Test-Header': 'test-value',
+      },
+    })
+
+    // Wait for delivery receipt to appear
+    await expect(deliveryDialog.getByText('Delivery Receipt')).toBeVisible({ timeout: 10000 })
+
+    // Close delivery dialog
+    await deliveryDialog.getByRole('button', { name: '取消' }).click()
+    await page.waitForSelector('[role="dialog"]', { state: 'hidden' })
   })
 
   test('should fail delivery for blocked URLs', async ({ page }) => {
