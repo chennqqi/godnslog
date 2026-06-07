@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { agentRunApi } from '@/lib/api-client'
-import type { AgentRunDetail, AgentRunStatus, AgentRunReviewPacket, AgentRunFollowupActionType, AgentRunFollowupHistoryItem, ReviewDecisionType, AgentRunReviewExportResponse } from '@/types'
+import type { AgentRunDetail, AgentRunStatus, AgentRunReviewPacket, AgentRunFollowupActionType, AgentRunFollowupHistoryItem, ReviewDecisionType, AgentRunReviewExportResponse, AgentRunReviewDeliveryResponse } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Input } from '@/components/ui/input'
 
 export default function AgentRunDetailPage() {
   const router = useRouter()
@@ -37,6 +38,12 @@ export default function AgentRunDetailPage() {
   const [exportFormat, setExportFormat] = useState<'json' | 'markdown'>('json')
   const [exporting, setExporting] = useState(false)
   const [exportResult, setExportResult] = useState<AgentRunReviewExportResponse | null>(null)
+  const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false)
+  const [deliveryFormat, setDeliveryFormat] = useState<'json' | 'markdown'>('markdown')
+  const [deliveryWebhookURL, setDeliveryWebhookURL] = useState('')
+  const [delivering, setDelivering] = useState(false)
+  const [deliveryResult, setDeliveryResult] = useState<AgentRunReviewDeliveryResponse | null>(null)
+  const [deliveryError, setDeliveryError] = useState('')
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -193,6 +200,34 @@ export default function AgentRunDetailPage() {
       setError('导出Review Evidence失败')
     } finally {
       setExporting(false)
+    }
+  }
+
+  const handleDeliverReview = async () => {
+    if (!agentRun) return
+    setDelivering(true)
+    setDeliveryError('')
+    setDeliveryResult(null)
+    try {
+      const response = await agentRunApi.deliverReview(agentRun.id, {
+        format: deliveryFormat,
+        review_packet_id: agentRun.id,
+        webhook_url: deliveryWebhookURL,
+        include_audit: true,
+      })
+      if (response.data) {
+        setDeliveryResult(response.data.data)
+        // Immediately refresh agent run to update timeline
+        const agentRunResponse = await agentRunApi.get(agentRun.id)
+        if (agentRunResponse.data) {
+          setAgentRun(agentRunResponse.data.data)
+        }
+      }
+    } catch (error: unknown) {
+      console.error('Failed to deliver review:', error)
+      setDeliveryError('Delivery failed')
+    } finally {
+      setDelivering(false)
     }
   }
 
@@ -718,6 +753,87 @@ export default function AgentRunDetailPage() {
                                 View Audit Log ({exportResult.audit_ref_id})
                               </Button>
                             )}
+                          </div>
+                        )}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDeliveryDialogOpen(true)}
+                  >
+                    Deliver to Webhook
+                  </Button>
+                  <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Deliver Review Evidence to Webhook</DialogTitle>
+                        <DialogDescription>
+                          将复核证据包发送到外部 Webhook
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="delivery-format">Format</Label>
+                          <Select value={deliveryFormat} onValueChange={(value: 'json' | 'markdown') => setDeliveryFormat(value)}>
+                            <SelectTrigger id="delivery-format">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="json">JSON</SelectItem>
+                              <SelectItem value="markdown">Markdown</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="webhook-url">Webhook URL</Label>
+                          <Input
+                            id="webhook-url"
+                            type="url"
+                            placeholder="https://hooks.example.com/review"
+                            value={deliveryWebhookURL}
+                            onChange={(e) => setDeliveryWebhookURL(e.target.value)}
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => setDeliveryDialogOpen(false)}
+                            disabled={delivering}
+                          >
+                            取消
+                          </Button>
+                          <Button
+                            onClick={handleDeliverReview}
+                            disabled={delivering || !deliveryWebhookURL}
+                          >
+                            {delivering ? '发送中...' : '发送'}
+                          </Button>
+                        </div>
+                        {deliveryError && (
+                          <div className="text-red-500 text-sm">{deliveryError}</div>
+                        )}
+                        {deliveryResult && (
+                          <div className="mt-4 border rounded-md p-4">
+                            <Label>Delivery Receipt</Label>
+                            <div className="mt-2 space-y-2 text-sm">
+                              <div><strong>Delivery ID:</strong> {deliveryResult.delivery_id}</div>
+                              <div><strong>Format:</strong> {deliveryResult.format}</div>
+                              <div><strong>Destination:</strong> {deliveryResult.destination_host}</div>
+                              <div><strong>Status Code:</strong> {deliveryResult.status_code}</div>
+                              <div><strong>Result:</strong> {deliveryResult.result}</div>
+                              <div><strong>Delivered At:</strong> {new Date(deliveryResult.delivered_at).toLocaleString()}</div>
+                              {deliveryResult.audit_ref_id && (
+                                <Button
+                                  variant="link"
+                                  className="p-0 h-auto"
+                                  onClick={() => router.push(`/dashboard/audit?resource_type=agent_run&resource_id=${agentRun.id}`)}
+                                >
+                                  View Audit Log ({deliveryResult.audit_ref_id})
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>

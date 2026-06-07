@@ -269,3 +269,26 @@ type AgentRunReviewExportResponse struct {
 	Package        map[string]interface{} `json:"package,omitempty"`
 	GeneratedAt    time.Time              `json:"generated_at"`
 }
+
+// AgentRunReviewDeliveryRequest represents a request to deliver review evidence package to webhook
+type AgentRunReviewDeliveryRequest struct {
+	Format         string            `json:"format" binding:"required"`
+	ReviewPacketID string            `json:"review_packet_id,omitempty"`
+	WebhookURL     string            `json:"webhook_url" binding:"required"`
+	Headers        map[string]string `json:"headers,omitempty"`
+	IncludeAudit   bool              `json:"include_audit,omitempty"`
+}
+
+// AgentRunReviewDeliveryResponse represents the response for delivering review evidence package
+type AgentRunReviewDeliveryResponse struct {
+	AgentRunID        string    `json:"agent_run_id"`
+	Format            string    `json:"format"`
+	DeliveryID        string    `json:"delivery_id"`
+	DeliveryOperation string    `json:"delivery_operation_id"`
+	ExportOperationID string    `json:"export_operation_id,omitempty"`
+	AuditRefID        string    `json:"audit_ref_id,omitempty"`
+	DestinationHost   string    `json:"destination_host"`
+	StatusCode        int       `json:"status_code"`
+	Result            string    `json:"result"`
+	DeliveredAt       time.Time `json:"delivered_at"`
+}

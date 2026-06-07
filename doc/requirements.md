@@ -416,3 +416,17 @@ GODNSLOG 2.0 所有计划阶段已全部完成，共计 35 个主要功能模块
 ## 2026-05-10（用户列表 API）
 
 修复 `/api/v2/users` code 5：`v2ListUsers` 使用不存在的 `created_at` 排序（`TblUser` 为 `atime`/`utime`），改为按 `id` 倒序并规范分页参数。
+
+## 2026-06-07 Sprint Q: Review Evidence Delivery
+
+实现 Agent Run Review Evidence Package 的 Webhook 交付功能：
+- 添加 delivery request/response DTOs (AgentRunReviewDeliveryRequest/Response)
+- 添加 URL/header 验证 helpers (ValidateWebhookURL, ValidateWebhookHeaders) 及单元测试
+- 添加 delivery service 方法 DeliverReviewPackage，复用 Sprint P export package
+- 添加 API 路由 POST /api/v2/agent-runs/:id/review-delivery
+- 实现成功/失败 operation/audit 记录 (review_delivery.webhook, agent_run.review_delivered/failed)
+- 添加后端测试覆盖成功、失败、安全验证、sanitization 场景
+- 添加前端 API client/types (deliverReview, AgentRunReviewDeliveryRequest/Response)
+- 添加 Agent Run Detail 页面的 delivery dialog 和 receipt 显示
+- 添加 E2E 测试覆盖 happy path 和 blocked URL path
+- 安全特性：仅允许 HTTPS，拒绝 localhost/private IP/metadata IP，仅允许 Content-Type 和 X-* headers

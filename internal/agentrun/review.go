@@ -1,9 +1,13 @@
 package agentrun
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -23,6 +27,8 @@ type ReviewService struct {
 	authService        *auth.Service
 	evidenceService    *interaction.EvidenceService
 	interactionService *interaction.Service
+	urlValidator       func(string) error // For testing: inject custom URL validator
+	httpClient         *http.Client       // For testing: inject custom HTTP client
 }
 
 // NewReviewService creates a new review service
@@ -549,4 +555,282 @@ func (s *ReviewService) generateExportMarkdownContent(packet *AgentRunReviewPack
 	md += fmt.Sprintf("Generated at: %s\n", time.Now().Format(time.RFC3339))
 
 	return md
+}
+
+// DeliverReviewPackage delivers a review evidence package to a webhook
+func (s *ReviewService) DeliverReviewPackage(agentRunID string, req *models.AgentRunReviewDeliveryRequest, userID string) (*models.AgentRunReviewDeliveryResponse, error) {
+	// Validate format
+	if req.Format != "json" && req.Format != "markdown" {
+		return nil, errors.New("invalid format: must be json or markdown")
+	}
+
+	// Validate webhook URL
+	validator := s.urlValidator
+	if validator == nil {
+		validator = ValidateWebhookURL
+	}
+	if err := validator(req.WebhookURL); err != nil {
+		return nil, fmt.Errorf("invalid webhook URL: %w", err)
+	}
+
+	// Validate headers
+	if err := ValidateWebhookHeaders(req.Headers); err != nil {
+		return nil, fmt.Errorf("invalid headers: %w", err)
+	}
+
+	// Get agent run
+	agentRun, err := s.agentRunService.GetAgentRunByID(agentRunID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get agent run: %w", err)
+	}
+	if agentRun == nil {
+		return nil, ErrAgentRunNotFound
+	}
+
+	// Validate review_packet_id if provided
+	if req.ReviewPacketID != "" && req.ReviewPacketID != agentRunID {
+		return nil, errors.New("review_packet_id must match the current agent run")
+	}
+
+	// First, export the review package to get the content
+	exportReq := &models.AgentRunReviewExportRequest{
+		Format:         req.Format,
+		ReviewPacketID: req.ReviewPacketID,
+		IncludeAudit:   req.IncludeAudit,
+	}
+	exportResp, err := s.ExportReviewPackage(agentRunID, exportReq, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to export review package: %w", err)
+	}
+
+	// Generate delivery ID
+	deliveryID := generateID()
+	now := time.Now()
+
+	// Parse webhook URL to get destination host
+	parsedURL, err := url.Parse(req.WebhookURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse webhook URL: %w", err)
+	}
+	destinationHost := parsedURL.Hostname()
+
+	// Build webhook payload
+	webhookPayload := map[string]interface{}{
+		"event":        "agent_run.review_evidence_delivered",
+		"agent_run_id": agentRunID,
+		"format":       req.Format,
+		"delivery_id":  deliveryID,
+		"generated_at": now.Format(time.RFC3339),
+		"package": map[string]interface{}{
+			"content": exportResp.Content,
+		},
+		"refs": map[string]interface{}{
+			"export_operation_id":   exportResp.OperationID,
+			"delivery_operation_id": deliveryID,
+			"audit_ref_id":          exportResp.AuditRefID,
+		},
+	}
+
+	// For JSON format, include the package in the payload
+	if req.Format == "json" && exportResp.Package != nil {
+		webhookPayload["package"] = exportResp.Package
+	}
+
+	// Marshal payload
+	payloadBytes, err := json.Marshal(webhookPayload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal webhook payload: %w", err)
+	}
+
+	// Create HTTP request with timeout
+	client := s.httpClient
+	if client == nil {
+		client = &http.Client{
+			Timeout: 5 * time.Second,
+			// Do not follow redirects
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
+	}
+
+	httpReq, err := http.NewRequest("POST", req.WebhookURL, bytes.NewReader(payloadBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	// Set headers
+	httpReq.Header.Set("Content-Type", "application/json")
+	for key, value := range req.Headers {
+		httpReq.Header.Set(key, value)
+	}
+
+	// Send request
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		// Create failure operation and audit
+		return s.createDeliveryFailure(agentRunID, req, deliveryID, destinationHost, exportResp.OperationID, err, userID)
+	}
+	defer resp.Body.Close()
+
+	// Read response body (but don't store it)
+	_, _ = io.Copy(io.Discard, resp.Body)
+
+	// Check status code
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		err := fmt.Errorf("webhook returned non-2xx status: %d", resp.StatusCode)
+		return s.createDeliveryFailure(agentRunID, req, deliveryID, destinationHost, exportResp.OperationID, err, userID)
+	}
+
+	// Create success operation and audit
+	return s.createDeliverySuccess(agentRunID, req, deliveryID, destinationHost, exportResp.OperationID, resp.StatusCode, userID)
+}
+
+// createDeliverySuccess creates success operation and audit records
+func (s *ReviewService) createDeliverySuccess(agentRunID string, req *models.AgentRunReviewDeliveryRequest, deliveryID, destinationHost, exportOperationID string, statusCode int, userID string) (*models.AgentRunReviewDeliveryResponse, error) {
+	now := time.Now()
+
+	// Extract header names for operation request (sanitized)
+	headerNames := make([]string, 0, len(req.Headers))
+	for headerName := range req.Headers {
+		headerNames = append(headerNames, headerName)
+	}
+
+	// Create review_delivery.webhook operation
+	result := map[string]interface{}{
+		"result":              "delivered",
+		"status_code":         statusCode,
+		"delivery_id":         deliveryID,
+		"export_operation_id": exportOperationID,
+		"audit_action":        "agent_run.review_delivered",
+	}
+
+	opReq := &models.AgentOperationCreateRequest{
+		Action:    "review_delivery.webhook",
+		RiskLevel: "low",
+		Request: map[string]interface{}{
+			"format":           req.Format,
+			"review_packet_id": req.ReviewPacketID,
+			"destination_host": destinationHost,
+			"include_audit":    req.IncludeAudit,
+			"header_names":     headerNames,
+		},
+		Result: result,
+	}
+
+	if err := s.agentRunService.AppendAgentOperation(agentRunID, opReq, userID); err != nil {
+		return nil, fmt.Errorf("failed to append delivery operation: %w", err)
+	}
+
+	// Get the created operation
+	var operation models.AgentOperation
+	has, err := s.engine.Where("agent_run_i_d = ? AND action = ?", agentRunID, "review_delivery.webhook").
+		OrderBy("created_at DESC").Limit(1).Get(&operation)
+	if err != nil || !has {
+		return nil, fmt.Errorf("failed to retrieve created operation: has=%v err=%v", has, err)
+	}
+
+	// Create audit log
+	userIDPtr := &userID
+	resourceIDPtr := &agentRunID
+	auditLog := &models.AuditLog{
+		ID:           generateID(),
+		UserID:       userIDPtr,
+		Action:       "agent_run.review_delivered",
+		ResourceType: "agent_run",
+		ResourceID:   resourceIDPtr,
+		Details: models.AuditDetails{
+			"format":                req.Format,
+			"delivery_id":           deliveryID,
+			"delivery_operation_id": operation.ID,
+			"export_operation_id":   exportOperationID,
+			"destination_host":      destinationHost,
+			"status_code":           statusCode,
+		},
+		Timestamp: now,
+	}
+	if err := s.authService.CreateAuditLog(auditLog); err != nil {
+		return nil, fmt.Errorf("failed to create delivery audit log: %w", err)
+	}
+
+	return &models.AgentRunReviewDeliveryResponse{
+		AgentRunID:        agentRunID,
+		Format:            req.Format,
+		DeliveryID:        deliveryID,
+		DeliveryOperation: operation.ID,
+		ExportOperationID: exportOperationID,
+		AuditRefID:        auditLog.ID,
+		DestinationHost:   destinationHost,
+		StatusCode:        statusCode,
+		Result:            "delivered",
+		DeliveredAt:       now,
+	}, nil
+}
+
+// createDeliveryFailure creates failure operation and audit records
+func (s *ReviewService) createDeliveryFailure(agentRunID string, req *models.AgentRunReviewDeliveryRequest, deliveryID, destinationHost, exportOperationID string, deliveryError error, userID string) (*models.AgentRunReviewDeliveryResponse, error) {
+	now := time.Now()
+
+	// Extract header names for operation request (sanitized)
+	headerNames := make([]string, 0, len(req.Headers))
+	for headerName := range req.Headers {
+		headerNames = append(headerNames, headerName)
+	}
+
+	// Create review_delivery.webhook operation with failure result
+	result := map[string]interface{}{
+		"result":      "failed",
+		"status_code": 0,
+		"error":       deliveryError.Error(),
+		"delivery_id": deliveryID,
+	}
+
+	opReq := &models.AgentOperationCreateRequest{
+		Action:    "review_delivery.webhook",
+		RiskLevel: "low",
+		Request: map[string]interface{}{
+			"format":           req.Format,
+			"review_packet_id": req.ReviewPacketID,
+			"destination_host": destinationHost,
+			"include_audit":    req.IncludeAudit,
+			"header_names":     headerNames,
+		},
+		Result: result,
+	}
+
+	if err := s.agentRunService.AppendAgentOperation(agentRunID, opReq, userID); err != nil {
+		return nil, fmt.Errorf("failed to append delivery operation: %w", err)
+	}
+
+	// Get the created operation
+	var operation models.AgentOperation
+	has, err := s.engine.Where("agent_run_i_d = ? AND action = ?", agentRunID, "review_delivery.webhook").
+		OrderBy("created_at DESC").Limit(1).Get(&operation)
+	if err != nil || !has {
+		return nil, fmt.Errorf("failed to retrieve created operation: has=%v err=%v", has, err)
+	}
+
+	// Create audit log for failure
+	userIDPtr := &userID
+	resourceIDPtr := &agentRunID
+	auditLog := &models.AuditLog{
+		ID:           generateID(),
+		UserID:       userIDPtr,
+		Action:       "agent_run.review_delivery_failed",
+		ResourceType: "agent_run",
+		ResourceID:   resourceIDPtr,
+		Details: models.AuditDetails{
+			"format":                req.Format,
+			"delivery_id":           deliveryID,
+			"delivery_operation_id": operation.ID,
+			"destination_host":      destinationHost,
+			"error":                 deliveryError.Error(),
+		},
+		Timestamp: now,
+	}
+	if err := s.authService.CreateAuditLog(auditLog); err != nil {
+		return nil, fmt.Errorf("failed to create delivery failure audit log: %w", err)
+	}
+
+	return nil, fmt.Errorf("delivery failed: %w", deliveryError)
 }

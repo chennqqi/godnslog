@@ -496,6 +496,27 @@ export interface AgentRunReviewExportResponse {
   generated_at: string
 }
 
+export interface AgentRunReviewDeliveryRequest {
+  format: 'json' | 'markdown'
+  review_packet_id?: string
+  webhook_url: string
+  headers?: Record<string, string>
+  include_audit?: boolean
+}
+
+export interface AgentRunReviewDeliveryResponse {
+  agent_run_id: string
+  format: string
+  delivery_id: string
+  delivery_operation_id: string
+  export_operation_id?: string
+  audit_ref_id?: string
+  destination_host: string
+  status_code: number
+  result: string
+  delivered_at: string
+}
+
 // Review Queue types
 export type ReviewState = 'not_reviewed' | 'reviewed' | 'followup_created' | 'needs_attention'
 export type EvidenceStrength = 'none' | 'low' | 'medium' | 'high'

@@ -199,6 +199,7 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			agentRuns.POST("/:id/followups", self.v2CreateAgentRunFollowup)
 			agentRuns.POST("/:id/review-decision", self.v2RecordReviewDecision)
 			agentRuns.POST("/:id/review-export", self.v2ExportReviewPackage)
+			agentRuns.POST("/:id/review-delivery", self.v2DeliverReviewPackage)
 			agentRuns.GET("/review-queue", self.v2ListReviewQueue)
 			agentRuns.GET("/:id/followups", self.v2ListFollowupHistory)
 		}
@@ -3631,6 +3632,49 @@ func (self *WebServer) v2ExportReviewPackage(c *gin.Context) {
 		}
 		logrus.Errorf("[v2_api.go::v2ExportReviewPackage] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to export review package"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": resp})
+}
+
+// v2DeliverReviewPackage delivers a review evidence package to a webhook
+func (self *WebServer) v2DeliverReviewPackage(c *gin.Context) {
+	id := c.Param("id")
+	var req v2models.AgentRunReviewDeliveryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "Invalid request body"})
+		return
+	}
+
+	user := c.MustGet("user").(*models.TblUser)
+	userID := strconv.FormatInt(user.Id, 10)
+
+	authService := auth.NewService(self.orm)
+	agentRunService := agentrun.NewService(self.orm, authService)
+	interactionService := interaction.NewService(self.orm)
+	evidenceService := interaction.NewEvidenceService(interactionService)
+	reviewService := agentrun.NewReviewService(self.orm, agentRunService, authService, evidenceService, interactionService)
+
+	resp, err := reviewService.DeliverReviewPackage(id, &req, userID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "Agent run not found"})
+			return
+		}
+		if strings.Contains(err.Error(), "invalid format") ||
+			strings.Contains(err.Error(), "invalid webhook URL") ||
+			strings.Contains(err.Error(), "invalid headers") ||
+			strings.Contains(err.Error(), "review_packet_id") {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+			return
+		}
+		if strings.Contains(err.Error(), "delivery failed") {
+			c.JSON(http.StatusBadGateway, gin.H{"code": 502, "message": err.Error()})
+			return
+		}
+		logrus.Errorf("[v2_api.go::v2DeliverReviewPackage] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to deliver review package"})
 		return
 	}
 

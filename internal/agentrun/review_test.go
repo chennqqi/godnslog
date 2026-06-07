@@ -1,6 +1,11 @@
 package agentrun
 
 import (
+	"crypto/tls"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -269,6 +274,308 @@ func TestBuildReviewPacket(t *testing.T) {
 		_, err := reviewService.BuildReviewPacket("non-existent", "json", "http://localhost:3000")
 		if err == nil {
 			t.Error("Expected error for non-existent agent run")
+		}
+	})
+}
+
+// TestDeliverReviewPackage tests the DeliverReviewPackage function
+func TestDeliverReviewPackage(t *testing.T) {
+	// Setup in-memory database
+	engine, err := xorm.NewEngine("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to create engine: %v", err)
+	}
+	defer engine.Close()
+
+	// Sync tables
+	if err := engine.Sync2(new(models.AgentRun)); err != nil {
+		t.Fatalf("Failed to sync agent_runs table: %v", err)
+	}
+	if err := engine.Sync2(new(models.AgentOperation)); err != nil {
+		t.Fatalf("Failed to sync agent_operations table: %v", err)
+	}
+	if err := engine.Sync2(new(models.Interaction)); err != nil {
+		t.Fatalf("Failed to sync interactions table: %v", err)
+	}
+	if err := engine.Sync2(new(models.AuditLog)); err != nil {
+		t.Fatalf("Failed to sync audit_logs table: %v", err)
+	}
+
+	// Create services
+	authService := auth.NewService(engine)
+	agentRunService := NewService(engine, authService)
+	interactionService := interaction.NewService(engine)
+	evidenceService := interaction.NewEvidenceService(interactionService)
+	reviewService := NewReviewService(engine, agentRunService, authService, evidenceService, interactionService)
+
+	// Create test agent run
+	agentRun := &models.AgentRun{
+		ID:         "agent-run-1",
+		AgentID:    "agent-1",
+		OperatorID: "user-1",
+		CaseID:     "case-1",
+		PayloadID:  "payload-1",
+		Target:     "https://example.com",
+		Title:      "Test Agent Run",
+		Status:     models.AgentRunStatusCompleted,
+		StartedAt:  func() *time.Time { t := time.Now(); return &t }(),
+		EndedAt:    func() *time.Time { t := time.Now(); return &t }(),
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	if _, err := engine.Insert(agentRun); err != nil {
+		t.Fatalf("Failed to insert agent run: %v", err)
+	}
+
+	// Test invalid format
+	t.Run("Invalid format", func(t *testing.T) {
+		req := &models.AgentRunReviewDeliveryRequest{
+			Format:     "pdf",
+			WebhookURL: "https://hooks.example.com/review",
+		}
+		_, err := reviewService.DeliverReviewPackage("agent-run-1", req, "user-1")
+		if err == nil {
+			t.Error("Expected error for invalid format")
+		}
+		if !strings.Contains(err.Error(), "invalid format") {
+			t.Errorf("Expected invalid format error, got: %v", err)
+		}
+	})
+
+	// Test blocked localhost URL
+	t.Run("Blocked localhost URL", func(t *testing.T) {
+		req := &models.AgentRunReviewDeliveryRequest{
+			Format:     "markdown",
+			WebhookURL: "https://localhost:8080/hook",
+		}
+		_, err := reviewService.DeliverReviewPackage("agent-run-1", req, "user-1")
+		if err == nil {
+			t.Error("Expected error for localhost URL")
+		}
+		if !strings.Contains(err.Error(), "localhost") {
+			t.Errorf("Expected localhost error, got: %v", err)
+		}
+	})
+
+	// Test blocked private IP
+	t.Run("Blocked private IP", func(t *testing.T) {
+		req := &models.AgentRunReviewDeliveryRequest{
+			Format:     "markdown",
+			WebhookURL: "https://192.168.1.1/hook",
+		}
+		_, err := reviewService.DeliverReviewPackage("agent-run-1", req, "user-1")
+		if err == nil {
+			t.Error("Expected error for private IP")
+		}
+		if !strings.Contains(err.Error(), "private") {
+			t.Errorf("Expected private IP error, got: %v", err)
+		}
+	})
+
+	// Test blocked metadata IP
+	t.Run("Blocked metadata IP", func(t *testing.T) {
+		req := &models.AgentRunReviewDeliveryRequest{
+			Format:     "markdown",
+			WebhookURL: "https://169.254.169.254/hook",
+		}
+		_, err := reviewService.DeliverReviewPackage("agent-run-1", req, "user-1")
+		if err == nil {
+			t.Error("Expected error for metadata IP")
+		}
+		if !strings.Contains(err.Error(), "metadata") {
+			t.Errorf("Expected metadata IP error, got: %v", err)
+		}
+	})
+
+	// Test forbidden header
+	t.Run("Forbidden header", func(t *testing.T) {
+		req := &models.AgentRunReviewDeliveryRequest{
+			Format:     "markdown",
+			WebhookURL: "https://hooks.example.com/review",
+			Headers: map[string]string{
+				"Authorization": "Bearer token",
+			},
+		}
+		_, err := reviewService.DeliverReviewPackage("agent-run-1", req, "user-1")
+		if err == nil {
+			t.Error("Expected error for forbidden header")
+		}
+		if !strings.Contains(err.Error(), "header") {
+			t.Errorf("Expected header error, got: %v", err)
+		}
+	})
+
+	// Test unknown Agent Run
+	t.Run("Unknown Agent Run", func(t *testing.T) {
+		req := &models.AgentRunReviewDeliveryRequest{
+			Format:     "markdown",
+			WebhookURL: "https://hooks.example.com/review",
+		}
+		_, err := reviewService.DeliverReviewPackage("non-existent", req, "user-1")
+		if err == nil {
+			t.Error("Expected error for non-existent agent run")
+		}
+		if !strings.Contains(err.Error(), "not found") {
+			t.Errorf("Expected not found error, got: %v", err)
+		}
+	})
+
+	// Test review_packet_id mismatch
+	t.Run("Review packet ID mismatch", func(t *testing.T) {
+		req := &models.AgentRunReviewDeliveryRequest{
+			Format:         "markdown",
+			WebhookURL:     "https://hooks.example.com/review",
+			ReviewPacketID: "different-id",
+		}
+		_, err := reviewService.DeliverReviewPackage("agent-run-1", req, "user-1")
+		if err == nil {
+			t.Error("Expected error for review_packet_id mismatch")
+		}
+		if !strings.Contains(err.Error(), "review_packet_id") {
+			t.Errorf("Expected review_packet_id error, got: %v", err)
+		}
+	})
+
+	// Test successful delivery with mock webhook server
+	t.Run("Successful markdown delivery", func(t *testing.T) {
+		// Create mock webhook server with TLS
+		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"status":"received"}`))
+		}))
+		defer server.Close()
+
+		// Inject custom URL validator that allows test server
+		reviewService.urlValidator = func(url string) error {
+			if url == server.URL {
+				return nil
+			}
+			return ValidateWebhookURL(url)
+		}
+
+		// Inject custom HTTP client that skips TLS verification for testing
+		reviewService.httpClient = &http.Client{
+			Timeout: 5 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
+
+		req := &models.AgentRunReviewDeliveryRequest{
+			Format:     "markdown",
+			WebhookURL: server.URL,
+			Headers: map[string]string{
+				"X-GODNSLOG-Source": "operator",
+			},
+		}
+		resp, err := reviewService.DeliverReviewPackage("agent-run-1", req, "user-1")
+		if err != nil {
+			t.Fatalf("Expected successful delivery, got error: %v", err)
+		}
+
+		if resp.AgentRunID != "agent-run-1" {
+			t.Errorf("Expected agent_run_id 'agent-run-1', got '%s'", resp.AgentRunID)
+		}
+
+		if resp.Format != "markdown" {
+			t.Errorf("Expected format 'markdown', got '%s'", resp.Format)
+		}
+
+		if resp.Result != "delivered" {
+			t.Errorf("Expected result 'delivered', got '%s'", resp.Result)
+		}
+
+		if resp.StatusCode != 200 {
+			t.Errorf("Expected status code 200, got %d", resp.StatusCode)
+		}
+
+		if resp.DeliveryID == "" {
+			t.Error("Expected delivery_id to be set")
+		}
+
+		if resp.DeliveryOperation == "" {
+			t.Error("Expected delivery_operation_id to be set")
+		}
+
+		if resp.AuditRefID == "" {
+			t.Error("Expected audit_ref_id to be set")
+		}
+
+		// Verify operation was created
+		var operation models.AgentOperation
+		has, err := engine.Where("action = ?", "review_delivery.webhook").Get(&operation)
+		if err != nil || !has {
+			t.Error("Expected delivery operation to be created")
+		}
+
+		// Verify operation does not contain full webhook URL
+		if strings.Contains(operation.Request, server.URL) {
+			t.Error("Operation request should not contain full webhook URL")
+		}
+
+		// Verify audit was created
+		var auditLog models.AuditLog
+		has, err = engine.Where("action = ?", "agent_run.review_delivered").Get(&auditLog)
+		if err != nil || !has {
+			t.Error("Expected delivery audit log to be created")
+		}
+
+		// Verify audit does not contain full webhook URL
+		auditJSON, _ := json.Marshal(auditLog.Details)
+		if strings.Contains(string(auditJSON), server.URL) {
+			t.Error("Audit details should not contain full webhook URL")
+		}
+	})
+
+	// Test webhook non-2xx response
+	t.Run("Webhook non-2xx response", func(t *testing.T) {
+		// Create mock webhook server with TLS that returns 500
+		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{"error":"internal error"}`))
+		}))
+		defer server.Close()
+
+		// Inject custom URL validator that allows test server
+		reviewService.urlValidator = func(url string) error {
+			if url == server.URL {
+				return nil
+			}
+			return ValidateWebhookURL(url)
+		}
+
+		// Inject custom HTTP client that skips TLS verification for testing
+		reviewService.httpClient = &http.Client{
+			Timeout: 5 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
+
+		req := &models.AgentRunReviewDeliveryRequest{
+			Format:     "markdown",
+			WebhookURL: server.URL,
+		}
+		_, err := reviewService.DeliverReviewPackage("agent-run-1", req, "user-1")
+		if err == nil {
+			t.Error("Expected error for non-2xx response")
+		}
+		if !strings.Contains(err.Error(), "delivery failed") {
+			t.Errorf("Expected delivery failed error, got: %v", err)
+		}
+
+		// Verify failure operation was created
+		var operation models.AgentOperation
+		has, err := engine.Where("action = ?", "review_delivery.webhook").OrderBy("created_at DESC").Limit(1).Get(&operation)
+		if err != nil || !has {
+			t.Error("Expected delivery operation to be created")
+		}
+
+		// Verify failure audit was created
+		var auditLog models.AuditLog
+		has, err = engine.Where("action = ?", "agent_run.review_delivery_failed").OrderBy("timestamp DESC").Limit(1).Get(&auditLog)
+		if err != nil || !has {
+			t.Error("Expected delivery failure audit log to be created")
 		}
 	})
 }
