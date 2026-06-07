@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { agentRunApi } from '@/lib/api-client'
-import type { AgentRunDetail, AgentRunStatus, AgentRunReviewPacket, AgentRunFollowupActionType, AgentRunFollowupHistoryItem } from '@/types'
+import type { AgentRunDetail, AgentRunStatus, AgentRunReviewPacket, AgentRunFollowupActionType, AgentRunFollowupHistoryItem, ReviewDecisionType, AgentRunReviewExportResponse } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 export default function AgentRunDetailPage() {
   const router = useRouter()
@@ -28,6 +29,14 @@ export default function AgentRunDetailPage() {
   const [creatingFollowup, setCreatingFollowup] = useState(false)
   const [followupHistory, setFollowupHistory] = useState<AgentRunFollowupHistoryItem[]>([])
   const [loadingFollowupHistory, setLoadingFollowupHistory] = useState(false)
+  const [reviewDecisionDialogOpen, setReviewDecisionDialogOpen] = useState(false)
+  const [reviewDecision, setReviewDecision] = useState<ReviewDecisionType>('accepted')
+  const [reviewDecisionReason, setReviewDecisionReason] = useState('')
+  const [creatingReviewDecision, setCreatingReviewDecision] = useState(false)
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [exportFormat, setExportFormat] = useState<'json' | 'markdown'>('json')
+  const [exporting, setExporting] = useState(false)
+  const [exportResult, setExportResult] = useState<AgentRunReviewExportResponse | null>(null)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -39,8 +48,12 @@ export default function AgentRunDetailPage() {
     const loadAgentRun = async () => {
       try {
         const response = await agentRunApi.get(params.id as string)
-        if (response.data) {
+        if (response.data && response.data.data) {
           setAgentRun(response.data.data)
+          // Extract review packet from agent run data if available
+          if (response.data.data.review_packet) {
+            setReviewPacket(response.data.data.review_packet)
+          }
         }
       } catch (error: unknown) {
         console.error('Failed to load agent run:', error)
@@ -130,6 +143,55 @@ export default function AgentRunDetailPage() {
       setError('创建Follow-up失败')
     } finally {
       setCreatingFollowup(false)
+    }
+  }
+
+  const handleCreateReviewDecision = async () => {
+    if (!agentRun) return
+    setCreatingReviewDecision(true)
+    setError('')
+    try {
+      await agentRunApi.createReviewDecision(agentRun.id, {
+        decision: reviewDecision,
+        reason: reviewDecisionReason.trim(),
+        review_packet_id: reviewPacket?.id,
+      })
+      setReviewDecisionDialogOpen(false)
+      setReviewDecisionReason('')
+      const response = await agentRunApi.get(agentRun.id)
+      if (response.data) {
+        setAgentRun(response.data.data)
+      }
+    } catch (error: unknown) {
+      console.error('Failed to create review decision:', error)
+      setError('创建Review Decision失败')
+    } finally {
+      setCreatingReviewDecision(false)
+    }
+  }
+
+  const handleExportReview = async () => {
+    if (!agentRun) return
+    setExporting(true)
+    setError('')
+    try {
+      const response = await agentRunApi.exportReview(agentRun.id, {
+        format: exportFormat,
+        review_packet_id: reviewPacket?.id,
+        include_audit: true,
+      })
+      if (response.data) {
+        setExportResult(response.data.data)
+        const agentRunResponse = await agentRunApi.get(agentRun.id)
+        if (agentRunResponse.data) {
+          setAgentRun(agentRunResponse.data.data)
+        }
+      }
+    } catch (error: unknown) {
+      console.error('Failed to export review:', error)
+      setError('导出Review Evidence失败')
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -361,6 +423,27 @@ export default function AgentRunDetailPage() {
                         <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">
                           {op.result}
                         </pre>
+                        {/* Parse result for audit ref */}
+                        {(() => {
+                          try {
+                            const resultData = JSON.parse(op.result)
+                            if (resultData.audit_ref_id) {
+                              return (
+                                <div className="mt-2">
+                                  <a
+                                    href={`/dashboard/audit?resource_type=agent_run&resource_id=${agentRun.id}`}
+                                    className="text-sm text-blue-500 hover:underline"
+                                  >
+                                    View Audit Log ({resultData.audit_ref_id})
+                                  </a>
+                                </div>
+                              )
+                            }
+                          } catch (e) {
+                            // Ignore parse errors
+                          }
+                          return null
+                        })()}
                       </div>
                     )}
                     {op.error && (
@@ -512,6 +595,134 @@ export default function AgentRunDetailPage() {
                     </div>
                   </DialogContent>
                 </Dialog>
+              )}
+              {reviewPacket && (
+                <Dialog open={reviewDecisionDialogOpen} onOpenChange={setReviewDecisionDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="default" size="sm">
+                      记录 Review Decision
+                    </Button>
+                  </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>记录 Review Decision</DialogTitle>
+                    <DialogDescription>
+                      为此 Agent Run 记录复核结论
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="decision">Decision</Label>
+                      <Select value={reviewDecision} onValueChange={(value: ReviewDecisionType) => setReviewDecision(value)}>
+                        <SelectTrigger id="decision">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="accepted">Accepted</SelectItem>
+                          <SelectItem value="false_positive">False Positive</SelectItem>
+                          <SelectItem value="needs_manual_followup">Needs Manual Follow-up</SelectItem>
+                          <SelectItem value="insufficient_evidence">Insufficient Evidence</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="decision-reason">Reason</Label>
+                      <Textarea
+                        id="decision-reason"
+                        placeholder="请输入原因..."
+                        value={reviewDecisionReason}
+                        onChange={(e) => setReviewDecisionReason(e.target.value)}
+                        rows={4}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setReviewDecisionDialogOpen(false)}
+                        disabled={creatingReviewDecision}
+                      >
+                        取消
+                      </Button>
+                      <Button
+                        onClick={handleCreateReviewDecision}
+                        disabled={creatingReviewDecision}
+                      >
+                        {creatingReviewDecision ? '记录中...' : '记录'}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              )}
+              {reviewPacket && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setExportFormat('json')
+                      setExportDialogOpen(true)
+                    }}
+                  >
+                    Export JSON
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setExportFormat('markdown')
+                      setExportDialogOpen(true)
+                    }}
+                  >
+                    Export Markdown
+                  </Button>
+                  <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+                    <DialogContent className="max-w-3xl max-h-[80vh]">
+                      <DialogHeader>
+                        <DialogTitle>Export Review Evidence</DialogTitle>
+                        <DialogDescription>
+                          导出复核证据包 ({exportFormat.toUpperCase()})
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => setExportDialogOpen(false)}
+                            disabled={exporting}
+                          >
+                            取消
+                          </Button>
+                          <Button
+                            onClick={handleExportReview}
+                            disabled={exporting}
+                          >
+                            {exporting ? '导出中...' : '导出'}
+                          </Button>
+                        </div>
+                        {exportResult && (
+                          <div className="mt-4">
+                            <Label>Export Result</Label>
+                            <ScrollArea className="h-[400px] w-full rounded-md border p-4">
+                              <pre className="text-xs whitespace-pre-wrap">
+                                {exportFormat === 'json' ? JSON.stringify(exportResult.package, null, 2) : exportResult.content}
+                              </pre>
+                            </ScrollArea>
+                            {exportResult.audit_ref_id && (
+                              <Button
+                                variant="link"
+                                className="mt-2"
+                                onClick={() => router.push(`/dashboard/audit?resource_type=agent_run&resource_id=${agentRun.id}`)}
+                              >
+                                View Audit Log ({exportResult.audit_ref_id})
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </>
               )}
               {agentRun.payload_id && (
                 <Button

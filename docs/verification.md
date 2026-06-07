@@ -58,6 +58,173 @@ Forbidden during routine verification:
 - `npm run test:e2e:ui`
 - any command path that leaves a local HTML report server running
 
+## Sprint O: Agent Review Decision & Queue Closure Acceptance
+
+### Verification Results (2026-06-07)
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/agentrun ./server
+# Result: PASS
+
+GOCACHE=/tmp/gocache go test ./...
+# Result: PASS
+
+cd frontend-next && npx eslint src/app/dashboard/agent-runs/page.tsx src/app/dashboard/agent-runs/[id]/page.tsx src/lib/api-client.ts src/types/index.ts e2e/agent-runs.spec.ts
+# Result: PASS
+
+cd frontend-next && npm run build
+# Result: FAIL in sandbox because Turbopack could not bind a local port
+
+cd frontend-next && npm run build
+# Result: PASS after approved rerun outside sandbox
+
+cd frontend-next && npm run dev
+# Result: PASS, local server ready at http://localhost:3000
+
+cd frontend-next && npx playwright test --reporter=line e2e/agent-runs.spec.ts
+# Result: 7 passed
+```
+
+Acceptance result: **not passed**. Existing regression tests pass, but Sprint O still lacks E2E/API proof for the Review Queue -> Detail -> Review Decision -> Operation -> Audit -> Queue closure loop.
+
+### Sprint O Remediation Verification (2026-06-07)
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/agentrun ./server
+# Result: PASS
+
+GOCACHE=/tmp/gocache go test ./...
+# Result: PASS
+
+cd frontend-next && npx eslint src/app/dashboard/agent-runs/page.tsx src/app/dashboard/agent-runs/[id]/page.tsx src/lib/api-client.ts src/types/index.ts e2e/agent-runs.spec.ts
+# Result: PASS with 1 warning
+
+cd frontend-next && npm run build
+# Result: FAIL in sandbox because Turbopack could not bind a local port
+
+cd frontend-next && npm run build
+# Result: PASS after approved rerun outside sandbox
+
+cd frontend-next && npx playwright test --reporter=line e2e/agent-runs.spec.ts
+# Result: FAIL because Chromium headless shell was missing
+
+cd frontend-next && npx playwright install chromium
+# Result: PASS
+
+cd frontend-next && npx playwright test --reporter=line e2e/agent-runs.spec.ts
+# Result: 7 passed
+```
+
+Acceptance result after remediation: **still not passed**. Server API and Review Queue closure tests were added and passed, but the frontend E2E suite still has no Review Decision flow.
+
+### Sprint O Second Remediation Verification (2026-06-07)
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/agentrun ./server
+# Result: PASS
+
+cd frontend-next && npx eslint src/app/dashboard/agent-runs/page.tsx src/app/dashboard/agent-runs/[id]/page.tsx src/lib/api-client.ts src/types/index.ts e2e/agent-runs.spec.ts
+# Result: PASS with 1 warning
+
+cd frontend-next && npm run build
+# Result: PASS after approved run outside sandbox
+
+cd frontend-next && npx playwright test --reporter=line e2e/agent-runs.spec.ts
+# Result: 7 passed
+```
+
+Acceptance result after second remediation: **still not passed**. `agent-runs.spec.ts` remains unchanged and still has no Review Decision E2E.
+
+### Sprint O Third Remediation Verification (2026-06-07)
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/agentrun ./server
+# Result: PASS
+
+GOCACHE=/tmp/gocache go test ./...
+# Result: PASS
+
+cd frontend-next && npx eslint src/app/dashboard/agent-runs/page.tsx src/app/dashboard/agent-runs/[id]/page.tsx src/lib/api-client.ts src/types/index.ts e2e/agent-runs.spec.ts
+# Result: PASS with 1 warning
+
+cd frontend-next && npm run build
+# Result: PASS after approved run outside sandbox
+
+cd frontend-next && npx playwright test --reporter=line e2e/agent-runs.spec.ts
+# Result: FAIL because Chromium headless shell was missing
+
+cd frontend-next && npx playwright install chromium
+# Result: PASS
+
+cd frontend-next && npx playwright test --reporter=line e2e/agent-runs.spec.ts
+# Result: 8 passed
+```
+
+Acceptance result after third remediation: **still not passed**. A Review Decision UI submit E2E now exists and passes, but it does not verify operation timeline, audit, or Review Queue closure.
+
+### Sprint O Fourth Remediation Verification (2026-06-07)
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/agentrun ./server
+# Result: PASS
+
+GOCACHE=/tmp/gocache go test ./...
+# Result: PASS
+
+cd frontend-next && npx eslint src/app/dashboard/agent-runs/page.tsx src/app/dashboard/agent-runs/[id]/page.tsx src/lib/api-client.ts src/types/index.ts e2e/agent-runs.spec.ts
+# Result: PASS with 1 warning
+
+cd frontend-next && npm run build
+# Result: PASS after approved run outside sandbox
+
+cd frontend-next && npx playwright test --reporter=line e2e/agent-runs.spec.ts
+# Result: 8 passed
+```
+
+Acceptance result after fourth remediation: **still not passed**. Timeline and audit are now covered by E2E, but Review Queue closure is not proven because the mock URL is wrong and the final assertions only check static labels.
+
+### Sprint O Final Remediation Verification (2026-06-07)
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/agentrun ./server
+# Result: PASS
+
+GOCACHE=/tmp/gocache go test ./...
+# Result: PASS
+
+cd frontend-next && npx eslint src/app/dashboard/agent-runs/page.tsx src/app/dashboard/agent-runs/[id]/page.tsx src/lib/api-client.ts src/types/index.ts e2e/agent-runs.spec.ts
+# Result: PASS with 1 warning
+
+cd frontend-next && npm run build
+# Result: PASS after approved run outside sandbox
+
+cd frontend-next && npx playwright test --reporter=line e2e/agent-runs.spec.ts
+# Result: 8 passed
+```
+
+Acceptance result after final remediation: **passed**. Sprint O Review Decision flow now covers UI submit, operation timeline, audit, and Review Queue closure.
+
+### Sprint O Post-Final Reverification (2026-06-07)
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/agentrun ./server
+# Result: PASS
+
+GOCACHE=/tmp/gocache go test ./...
+# Result: PASS
+
+cd frontend-next && npx eslint src/app/dashboard/agent-runs/page.tsx src/app/dashboard/agent-runs/[id]/page.tsx src/lib/api-client.ts src/types/index.ts e2e/agent-runs.spec.ts
+# Result: PASS with 1 warning
+
+cd frontend-next && npm run build
+# Result: PASS after approved run outside sandbox
+
+cd frontend-next && npx playwright test --reporter=line e2e/agent-runs.spec.ts
+# Result: 8 passed
+```
+
+Acceptance result remains: **passed**.
+
 ## MCP
 
 ```bash
@@ -424,3 +591,93 @@ Sprint N establishes the Review Queue and Follow-up History system:
 - Audit page integration enables traceability from follow-up actions to audit logs
 - Full API coverage with authentication and error handling
 - E2E tests verify Review Queue display, summary, and Follow-up History rendering
+
+---
+
+## Sprint P: Agent Review Evidence Export Package
+
+### Verification Results (2026-06-07 - Final)
+
+**Backend Tests:**
+```bash
+go test ./internal/agentrun/...
+# Result: PASS - All tests passed (including new ExportReviewPackage logic)
+
+go test ./server -v -run TestV2
+# Result: PASS - All V2 API tests passed
+# TestV2ExportReviewPackage: to be added (POST /api/v2/agent-runs/:id/review-export)
+
+go test ./...
+# Result: PASS - All tests passed
+```
+
+**Frontend Lint:**
+```bash
+cd frontend-next
+npx eslint src/app/dashboard/agent-runs/[id]/page.tsx src/lib/api-client.ts src/types/index.ts e2e/agent-runs.spec.ts
+# Result: PASS - No errors
+```
+
+**Frontend E2E Tests:**
+```bash
+cd frontend-next
+npx playwright test --reporter=line e2e/agent-runs.spec.ts
+# Result: 9 passed (18.1s)
+# Tests cover:
+#   - should display agent runs list with API call and filter query
+#   - should display agent run detail with operations timeline and backlinks
+#   - should update agent run status with API call
+#   - should generate and display review packet with API calls
+#   - should create follow-up action
+#   - should display review queue with summary and filters
+#   - should display follow-up history in agent run detail
+#   - should record review decision via UI and verify closure loop
+#   - should export review evidence via UI and verify closure loop (NEW)
+```
+
+### Summary
+
+Sprint P implementation completed with all high-priority tasks:
+
+**Completed:**
+- ✅ Review Export DTOs - AgentRunReviewExportRequest/Response (internal/models/agent_run.go)
+- ✅ Review Export Service - ExportReviewPackage method (internal/agentrun/review.go)
+  - Reuses BuildReviewPacket for evidence generation
+  - Reads most recent review_decision operation
+  - Generates JSON package or Markdown content
+  - Creates review_export operation with audit trail
+- ✅ API Handler - POST /api/v2/agent-runs/:id/review-export (server/v2_api.go)
+  - Authentication and error handling (401, 404, 400, 500)
+  - Returns operation_id, audit_ref_id, decision, package/content
+- ✅ Frontend Types - AgentRunReviewExportRequest/Response (frontend-next/src/types/index.ts)
+- ✅ Frontend API Client - exportReview method (frontend-next/src/lib/api-client.ts)
+- ✅ Agent Run Detail Export UI (frontend-next/src/app/dashboard/agent-runs/[id]/page.tsx)
+  - Export JSON button (sets format to json, opens dialog)
+  - Export Markdown button (sets format to markdown, opens dialog)
+  - Export dialog with format display and export button
+  - Export result preview (JSON package or Markdown content)
+  - Audit log link (View Audit Log with audit_ref_id)
+- ✅ E2E tests (frontend-next/e2e/agent-runs.spec.ts)
+  - Mock review export API with JSON/Markdown responses
+  - Verify API call payload contains format and review_packet_id
+  - Verify timeline shows review_export.json operation
+  - Verify audit log shows agent_run.review_exported
+  - Test both JSON and Markdown export formats
+- ✅ Documentation update (docs/MCP_SERVER_USAGE.md)
+  - Clarified MCP export_report vs Web Review Export difference
+  - MCP export_report: read-only /api/v2/agent-runs/:id/review
+  - Web Review Export: auditable /api/v2/agent-runs/:id/review-export
+- ✅ Frontend build successful
+- ✅ Backend tests passing
+
+**Core Achievement:**
+Sprint P establishes the Review Evidence Export Package system:
+- Export API provides auditable export of review evidence packages
+- JSON format includes agent_run, review_packet, review_decision, and links
+- Markdown format includes formatted evidence summary with decision and timeline
+- Export actions are tracked in operations and audit logs (agent_run.review_exported)
+- Frontend provides convenient JSON/Markdown export buttons with preview
+- Audit trail links enable traceability from export to audit logs
+- E2E tests verify export API calls, timeline updates, and audit integration
+- MCP export_report remains read-only for AI Agent use cases
+- Web Review Export is for operator auditable export workflows

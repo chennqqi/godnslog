@@ -37,6 +37,10 @@ import type {
   ReviewQueueFilters,
   AgentRunReviewQueueResponse,
   AgentRunFollowupHistoryItem,
+  AgentRunReviewDecisionRequest,
+  AgentRunReviewDecisionResponse,
+  AgentRunReviewExportRequest,
+  AgentRunReviewExportResponse,
 } from '@/types'
 
 interface UnknownItemListResponse {
@@ -185,6 +189,10 @@ export const agentRunApi = {
     api.post<{ data: AgentRun }>(`/agent-runs/${id}/operations`, data),
   createFollowup: (id: string, data: AgentRunFollowupRequest) =>
     api.post<{ data: AgentRunFollowupResponse }>(`/agent-runs/${id}/followups`, data),
+  createReviewDecision: (id: string, data: AgentRunReviewDecisionRequest) =>
+    api.post<{ data: AgentRunReviewDecisionResponse }>(`/agent-runs/${id}/review-decision`, data),
+  exportReview: (id: string, data: AgentRunReviewExportRequest) =>
+    api.post<{ data: AgentRunReviewExportResponse }>(`/agent-runs/${id}/review-export`, data),
   listReviewQueue: (params?: ReviewQueueFilters) =>
     api.get<AgentRunReviewQueueResponse>('/agent-runs/review-queue', params),
   listFollowupHistory: (id: string) =>

@@ -483,3 +483,206 @@ func TestCreateFollowupActionValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestRecordReviewDecisionAccepted(t *testing.T) {
+	engine := setupTestEngine(t)
+	defer engine.Close()
+
+	authService := auth.NewService(engine)
+	service := NewService(engine, authService)
+
+	created, err := service.CreateAgentRun(&models.AgentRunCreateRequest{
+		AgentID:    "agent-1",
+		OperatorID: "operator-1",
+		CaseID:     "case-1",
+		PayloadID:  "payload-1",
+		Target:     "https://target.example",
+		Title:      "Review target",
+	}, "1")
+	if err != nil {
+		t.Fatalf("create agent run: %v", err)
+	}
+
+	resp, err := service.RecordReviewDecision(created.ID, &models.AgentRunReviewDecisionRequest{
+		Decision:       "accepted",
+		Reason:         "Evidence reviewed and accepted",
+		ReviewPacketID: created.ID,
+	}, "1")
+	if err != nil {
+		t.Fatalf("record review decision: %v", err)
+	}
+
+	if resp.AgentRunID != created.ID {
+		t.Fatalf("unexpected agent_run_id %s", resp.AgentRunID)
+	}
+	if resp.Decision != "accepted" {
+		t.Fatalf("unexpected decision %s", resp.Decision)
+	}
+
+	// Verify operation was written
+	var op models.AgentOperation
+	has, err := engine.ID(resp.OperationID).Get(&op)
+	if err != nil || !has {
+		t.Fatalf("expected operation row, has=%v err=%v", has, err)
+	}
+	if op.Action != "review_decision.accepted" {
+		t.Fatalf("unexpected operation action %s", op.Action)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(op.Result), &result); err != nil {
+		t.Fatalf("parse operation result: %v", err)
+	}
+	if result["decision"] != "accepted" {
+		t.Fatalf("operation result missing decision")
+	}
+
+	// Verify audit log was written
+	var auditLog models.AuditLog
+	has, err = engine.Where("action = ? AND resource_type = ?", "agent_run.review_decision_recorded", "agent_run").Get(&auditLog)
+	if err != nil || !has {
+		t.Fatalf("expected review decision audit, has=%v err=%v", has, err)
+	}
+	if auditLog.Details["decision"] != "accepted" {
+		t.Fatalf("audit missing decision")
+	}
+}
+
+func TestRecordReviewDecisionFalsePositive(t *testing.T) {
+	engine := setupTestEngine(t)
+	defer engine.Close()
+
+	authService := auth.NewService(engine)
+	service := NewService(engine, authService)
+
+	created, err := service.CreateAgentRun(&models.AgentRunCreateRequest{
+		AgentID:    "agent-1",
+		OperatorID: "operator-1",
+		CaseID:     "case-1",
+		PayloadID:  "payload-1",
+		Target:     "https://target.example",
+		Title:      "Review target",
+	}, "1")
+	if err != nil {
+		t.Fatalf("create agent run: %v", err)
+	}
+
+	resp, err := service.RecordReviewDecision(created.ID, &models.AgentRunReviewDecisionRequest{
+		Decision: "false_positive",
+		Reason:   "Confirmed as false positive",
+	}, "1")
+	if err != nil {
+		t.Fatalf("record review decision: %v", err)
+	}
+
+	if resp.Decision != "false_positive" {
+		t.Fatalf("unexpected decision %s", resp.Decision)
+	}
+
+	// Verify operation was written
+	var op models.AgentOperation
+	has, err := engine.ID(resp.OperationID).Get(&op)
+	if err != nil || !has {
+		t.Fatalf("expected operation row, has=%v err=%v", has, err)
+	}
+	if op.Action != "review_decision.false_positive" {
+		t.Fatalf("unexpected operation action %s", op.Action)
+	}
+}
+
+func TestRecordReviewDecisionInvalidDecision(t *testing.T) {
+	engine := setupTestEngine(t)
+	defer engine.Close()
+
+	authService := auth.NewService(engine)
+	service := NewService(engine, authService)
+
+	created, err := service.CreateAgentRun(&models.AgentRunCreateRequest{
+		AgentID:    "agent-1",
+		OperatorID: "operator-1",
+		CaseID:     "case-1",
+		PayloadID:  "payload-1",
+		Target:     "https://target.example",
+		Title:      "Review target",
+	}, "1")
+	if err != nil {
+		t.Fatalf("create agent run: %v", err)
+	}
+
+	_, err = service.RecordReviewDecision(created.ID, &models.AgentRunReviewDecisionRequest{
+		Decision: "invalid_decision",
+		Reason:   "test",
+	}, "1")
+	if err == nil {
+		t.Fatal("expected error for invalid decision")
+	}
+}
+
+func TestRecordReviewDecisionReasonLength(t *testing.T) {
+	engine := setupTestEngine(t)
+	defer engine.Close()
+
+	authService := auth.NewService(engine)
+	service := NewService(engine, authService)
+
+	created, err := service.CreateAgentRun(&models.AgentRunCreateRequest{
+		AgentID:    "agent-1",
+		OperatorID: "operator-1",
+		CaseID:     "case-1",
+		PayloadID:  "payload-1",
+		Target:     "https://target.example",
+		Title:      "Review target",
+	}, "1")
+	if err != nil {
+		t.Fatalf("create agent run: %v", err)
+	}
+
+	_, err = service.RecordReviewDecision(created.ID, &models.AgentRunReviewDecisionRequest{
+		Decision: "accepted",
+		Reason:   string(make([]byte, 501)),
+	}, "1")
+	if err == nil {
+		t.Fatal("expected error for too long reason")
+	}
+}
+
+func TestRecordReviewDecisionAuditWritten(t *testing.T) {
+	engine := setupTestEngine(t)
+	defer engine.Close()
+
+	authService := auth.NewService(engine)
+	service := NewService(engine, authService)
+
+	created, err := service.CreateAgentRun(&models.AgentRunCreateRequest{
+		AgentID:    "agent-1",
+		OperatorID: "operator-1",
+		CaseID:     "case-1",
+		PayloadID:  "payload-1",
+		Target:     "https://target.example",
+		Title:      "Review target",
+	}, "1")
+	if err != nil {
+		t.Fatalf("create agent run: %v", err)
+	}
+
+	resp, err := service.RecordReviewDecision(created.ID, &models.AgentRunReviewDecisionRequest{
+		Decision: "accepted",
+		Reason:   "Test reason",
+	}, "1")
+	if err != nil {
+		t.Fatalf("record review decision: %v", err)
+	}
+
+	// Verify audit log
+	var auditLog models.AuditLog
+	has, err := engine.Where("action = ? AND resource_type = ? AND resource_id = ?", "agent_run.review_decision_recorded", "agent_run", created.ID).Get(&auditLog)
+	if err != nil || !has {
+		t.Fatalf("expected audit log, has=%v err=%v", has, err)
+	}
+	if auditLog.Details["decision"] != "accepted" {
+		t.Fatalf("audit missing decision")
+	}
+	if auditLog.Details["operation_id"] != resp.OperationID {
+		t.Fatalf("audit missing operation_id")
+	}
+}

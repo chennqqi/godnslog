@@ -2207,10 +2207,236 @@ func TestV2CreateAgentRunFollowup(t *testing.T) {
 			t.Fatalf("expected 400, got %d body=%s", w.Code, w.Body.String())
 		}
 	})
+}
 
-	t.Run("empty reason 400", func(t *testing.T) {
-		body := strings.NewReader(`{"action_type":"recheck_evidence","reason":""}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/v2/agent-runs/"+agentRunID+"/followups", body)
+func TestV2RecordReviewDecision(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &WebServerConfig{
+		Domain:     "test.example.com",
+		Driver:     "sqlite",
+		Dsn:        ":memory:",
+		AuthExpire: 3600,
+	}
+
+	store := cache.NewCache(300, 60)
+	server, err := NewWebServer(cfg, store)
+	if err != nil {
+		t.Fatalf("Failed to create web server: %v", err)
+	}
+
+	if err := server.initDatabase(); err != nil {
+		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Sync required tables
+	if err := server.orm.Sync2(new(v2models.AuditLog)); err != nil {
+		t.Fatalf("Failed to sync audit logs table: %v", err)
+	}
+	if err := server.orm.Sync2(new(v2models.Case)); err != nil {
+		t.Fatalf("Failed to sync cases table: %v", err)
+	}
+	if err := server.orm.Sync2(new(v2models.Payload)); err != nil {
+		t.Fatalf("Failed to sync payloads table: %v", err)
+	}
+	if err := server.orm.Sync2(new(v2models.AgentRun)); err != nil {
+		t.Fatalf("Failed to sync agent runs table: %v", err)
+	}
+	if err := server.orm.Sync2(new(v2models.AgentOperation)); err != nil {
+		t.Fatalf("Failed to sync agent operations table: %v", err)
+	}
+
+	r := gin.New()
+	server.registerV2API(r)
+
+	// Create test user
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	user := &models.TblUser{
+		Name:  "testuser",
+		Email: "testuser@test.com",
+		Pass:  string(hashedPassword),
+		Role:  0,
+		Lang:  "en-US",
+	}
+	if _, err := server.orm.Insert(user); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Login to get token
+	loginBody := `{"username":"testuser","password":"password"}`
+	loginHTTPReq := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(loginBody))
+	loginHTTPReq.Header.Set("Content-Type", "application/json")
+	loginW := httptest.NewRecorder()
+	r.ServeHTTP(loginW, loginHTTPReq)
+
+	var loginResp struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(loginW.Body.Bytes(), &loginResp); err != nil {
+		t.Fatalf("Failed to parse login response: %v, body=%s", err, loginW.Body.String())
+	}
+	if loginResp.Code != 0 {
+		t.Fatalf("Login failed: %s", loginResp.Message)
+	}
+	token := loginResp.Data.Token
+	userID := user.Id
+
+	// Extract seed from JWT token and set in cache
+	seedKey := fmt.Sprintf("%v.seed", userID)
+	userKey := fmt.Sprintf("%v.user", userID)
+	parts := strings.Split(token, ".")
+	if len(parts) == 3 {
+		payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err == nil {
+			var payload map[string]interface{}
+			if err := json.Unmarshal(payloadBytes, &payload); err == nil {
+				if seedStr, ok := payload["seed"].(string); ok {
+					store.Set(seedKey, seedStr, cache.NoExpiration)
+				}
+			}
+		}
+	}
+	store.Set(userKey, user, cache.NoExpiration)
+
+	// Create test case
+	caseID := "case-decision-1"
+	caseItem := &v2models.Case{
+		ID:        caseID,
+		Title:     "Test Case",
+		Status:    "active",
+		CreatedBy: fmt.Sprintf("%d", userID),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	if _, err := server.orm.Insert(caseItem); err != nil {
+		t.Fatalf("Failed to create test case: %v", err)
+	}
+
+	// Create test payload
+	payloadID := "payload-decision-1"
+	payload := &v2models.Payload{
+		ID:               payloadID,
+		CaseID:           caseID,
+		Token:            "test-token",
+		TemplateRendered: "http://{{.Token}}.example.com",
+		CreatedAt:        time.Now(),
+		UpdatedAt:        time.Now(),
+	}
+	if _, err := server.orm.Insert(payload); err != nil {
+		t.Fatalf("Failed to create test payload: %v", err)
+	}
+
+	agentRunID := "agent-run-decision-1"
+	agentRun := &v2models.AgentRun{
+		ID:         agentRunID,
+		AgentID:    "agent-1",
+		OperatorID: fmt.Sprintf("%d", userID),
+		CaseID:     caseID,
+		PayloadID:  payloadID,
+		Target:     "https://target.example",
+		Title:      "Decision target",
+		Status:     "completed",
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	if _, err := server.orm.Insert(agentRun); err != nil {
+		t.Fatalf("insert agent run: %v", err)
+	}
+
+	// Test successful review decision
+	body := strings.NewReader(`{"decision":"accepted","reason":"Evidence reviewed by operator","review_packet_id":"agent-run-decision-1"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/agent-runs/"+agentRunID+"/review-decision", body)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Code int `json:"code"`
+		Data struct {
+			AgentRunID  string `json:"agent_run_id"`
+			OperationID string `json:"operation_id"`
+			Decision    string `json:"decision"`
+			AuditRefID  string `json:"audit_ref_id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse response: %v", err)
+	}
+	if resp.Code != 0 {
+		t.Fatalf("expected code 0")
+	}
+	if resp.Data.OperationID == "" {
+		t.Fatalf("expected operation id")
+	}
+	if resp.Data.Decision != "accepted" {
+		t.Fatalf("expected decision accepted, got %s", resp.Data.Decision)
+	}
+	if strings.Contains(w.Body.String(), "Authorization") || strings.Contains(w.Body.String(), "secret") {
+		t.Fatalf("response leaks sensitive data")
+	}
+
+	// Verify operation was created
+	var operation v2models.AgentOperation
+	_, err = server.orm.Where("agent_run_i_d = ?", agentRunID).Desc("created_at").Get(&operation)
+	if err != nil {
+		t.Fatalf("failed to query operation: %v", err)
+	}
+	if operation.Action != "review_decision.accepted" {
+		t.Errorf("expected action review_decision.accepted, got %s", operation.Action)
+	}
+
+	// Verify audit log was created
+	var audit v2models.AuditLog
+	_, err = server.orm.Where("resource_type = ? AND resource_id = ? AND action = ?", "agent_run", agentRunID, "agent_run.review_decision_recorded").Desc("timestamp").Get(&audit)
+	if err != nil {
+		t.Fatalf("failed to query audit log: %v", err)
+	}
+	if audit.Action != "agent_run.review_decision_recorded" {
+		t.Errorf("expected action agent_run.review_decision_recorded, got %s", audit.Action)
+	}
+
+	// Test error cases
+	t.Run("unauthenticated 401", func(t *testing.T) {
+		body := strings.NewReader(`{"decision":"accepted","reason":"test reason"}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/agent-runs/"+agentRunID+"/review-decision", body)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("expected 401, got %d body=%s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("unknown agent run 404", func(t *testing.T) {
+		body := strings.NewReader(`{"decision":"accepted","reason":"test reason"}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/agent-runs/unknown-run/review-decision", body)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d body=%s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("invalid decision 400", func(t *testing.T) {
+		body := strings.NewReader(`{"decision":"invalid_decision","reason":"test reason"}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/agent-runs/"+agentRunID+"/review-decision", body)
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
@@ -2221,10 +2447,10 @@ func TestV2CreateAgentRunFollowup(t *testing.T) {
 		}
 	})
 
-	t.Run("too long reason 400", func(t *testing.T) {
-		longReason := string(make([]byte, 501))
-		body := strings.NewReader(fmt.Sprintf(`{"action_type":"recheck_evidence","reason":"%s"}`, longReason))
-		req := httptest.NewRequest(http.MethodPost, "/api/v2/agent-runs/"+agentRunID+"/followups", body)
+	t.Run("reason too long 400", func(t *testing.T) {
+		longReason := strings.Repeat("a", 501)
+		body := strings.NewReader(fmt.Sprintf(`{"decision":"accepted","reason":"%s"}`, longReason))
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/agent-runs/"+agentRunID+"/review-decision", body)
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()

@@ -192,6 +192,9 @@ type AgentRunReviewQueueItem struct {
 	LastFollowupAction string     `json:"last_followup_action,omitempty"`
 	LastReviewedAt     *time.Time `json:"last_reviewed_at,omitempty"`
 	LastFollowupAt     *time.Time `json:"last_followup_at,omitempty"`
+	LastReviewDecision string     `json:"last_review_decision,omitempty"`
+	LastDecisionReason string     `json:"last_decision_reason,omitempty"`
+	LastDecisionAt     *time.Time `json:"last_decision_at,omitempty"`
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
 	DetailURL          string     `json:"detail_url"`
@@ -226,4 +229,43 @@ type AgentRunFollowupHistoryItem struct {
 	RiskLevel      string    `json:"risk_level"`
 	AuditRefID     string    `json:"audit_ref_id,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
+}
+
+// AgentRunReviewDecisionRequest represents a request to record a review decision
+type AgentRunReviewDecisionRequest struct {
+	Decision       string `json:"decision" binding:"required"`
+	Reason         string `json:"reason,omitempty"`
+	ReviewPacketID string `json:"review_packet_id,omitempty"`
+	EvidenceID     string `json:"evidence_id,omitempty"`
+}
+
+// AgentRunReviewDecisionResponse represents the response for recording a review decision
+type AgentRunReviewDecisionResponse struct {
+	AgentRunID     string                 `json:"agent_run_id"`
+	OperationID    string                 `json:"operation_id"`
+	Decision       string                 `json:"decision"`
+	ReviewPacketID string                 `json:"review_packet_id,omitempty"`
+	AuditRefID     string                 `json:"audit_ref_id,omitempty"`
+	Operation      *AgentOperation        `json:"operation,omitempty"`
+	Audit          map[string]interface{} `json:"audit,omitempty"`
+}
+
+// AgentRunReviewExportRequest represents a request to export review evidence package
+type AgentRunReviewExportRequest struct {
+	Format         string `json:"format" binding:"required"`
+	ReviewPacketID string `json:"review_packet_id,omitempty"`
+	IncludeAudit   bool   `json:"include_audit,omitempty"`
+}
+
+// AgentRunReviewExportResponse represents the response for exporting review evidence package
+type AgentRunReviewExportResponse struct {
+	AgentRunID     string                 `json:"agent_run_id"`
+	Format         string                 `json:"format"`
+	OperationID    string                 `json:"operation_id"`
+	AuditRefID     string                 `json:"audit_ref_id,omitempty"`
+	ReviewPacketID string                 `json:"review_packet_id,omitempty"`
+	Decision       string                 `json:"decision,omitempty"`
+	Content        string                 `json:"content,omitempty"`
+	Package        map[string]interface{} `json:"package,omitempty"`
+	GeneratedAt    time.Time              `json:"generated_at"`
 }

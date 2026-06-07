@@ -158,6 +158,10 @@ godnslog-mcp-server
 - 当提供 `agent_run_id` 时，优先调用 `/api/v2/agent-runs/:id/review` 生成 Review Packet
 - 当不提供 `agent_run_id` 时，调用 `/api/v2/evidence/generate` 生成证据报告（兼容路径）
 - 至少需要提供 `case_id` 或 `payload_id`（当不提供 `agent_run_id` 时）
+- MCP `export_report` 与 Web UI 的 Review Export 功能不同：
+  - MCP `export_report`：调用 `/api/v2/agent-runs/:id/review` 生成 Review Packet（只读）
+  - Web Review Export：调用 `/api/v2/agent-runs/:id/review-export` 生成可审计的导出包（写入 operation 和 audit）
+- MCP `export_report` 适用于 AI Agent 获取证据摘要，Web Review Export 适用于操作员导出复核证据包
 
 **示例（Agent Run Review）**：
 ```json

@@ -597,3 +597,399 @@ func TestListReviewQueue_FilterByStatus(t *testing.T) {
 		t.Errorf("Expected agent-run-1, got %s", result.Items[0].ID)
 	}
 }
+
+func TestListReviewQueue_ReviewDecisionAccepted(t *testing.T) {
+	engine, service := setupReviewQueueTest(t)
+	defer engine.Close()
+
+	// Create a case and payload
+	case1 := &models.Case{
+		ID:        "case-1",
+		Title:     "Test Case",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	_, err := engine.Insert(case1)
+	if err != nil {
+		t.Fatalf("Failed to insert case: %v", err)
+	}
+
+	payload1 := &models.Payload{
+		ID:         "payload-1",
+		CaseID:     "case-1",
+		Token:      "test-token",
+		TemplateID: "ssrf-basic",
+		CreatedBy:  "user-1",
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	_, err = engine.Insert(payload1)
+	if err != nil {
+		t.Fatalf("Failed to insert payload: %v", err)
+	}
+
+	// Create an agent run
+	agentRun := &models.AgentRun{
+		ID:         "agent-run-1",
+		AgentID:    "agent-1",
+		OperatorID: "user-1",
+		CaseID:     "case-1",
+		PayloadID:  "payload-1",
+		Target:     "example.com",
+		Title:      "Test Agent Run",
+		Status:     models.AgentRunStatusCompleted,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	_, err = engine.Insert(agentRun)
+	if err != nil {
+		t.Fatalf("Failed to insert agent run: %v", err)
+	}
+
+	// Add review_decision.accepted operation
+	operation := &models.AgentOperation{
+		ID:         "op-decision-1",
+		AgentRunID: "agent-run-1",
+		AgentID:    "agent-1",
+		Action:     "review_decision.accepted",
+		RiskLevel:  "low",
+		Request:    "{}",
+		Result:     `{"decision":"accepted","reason":"Evidence reviewed"}`,
+		StartedAt:  time.Now(),
+		CreatedAt:  time.Now(),
+	}
+	_, err = engine.Insert(operation)
+	if err != nil {
+		t.Fatalf("Failed to insert operation: %v", err)
+	}
+
+	// Test ListReviewQueue
+	filters := ReviewQueueFilters{
+		Page:     1,
+		PageSize: 20,
+	}
+
+	result, err := service.ListReviewQueue(filters)
+	if err != nil {
+		t.Fatalf("ListReviewQueue failed: %v", err)
+	}
+
+	if len(result.Items) != 1 {
+		t.Fatalf("Expected 1 item, got %d", len(result.Items))
+	}
+
+	item := result.Items[0]
+	if item.ReviewState != "reviewed" {
+		t.Errorf("Expected review_state reviewed, got %s", item.ReviewState)
+	}
+
+	if item.LastReviewDecision != "accepted" {
+		t.Errorf("Expected LastReviewDecision accepted, got %s", item.LastReviewDecision)
+	}
+
+	if result.Summary.Reviewed != 1 {
+		t.Errorf("Expected Reviewed count 1, got %d", result.Summary.Reviewed)
+	}
+}
+
+func TestListReviewQueue_ReviewDecisionFalsePositive(t *testing.T) {
+	engine, service := setupReviewQueueTest(t)
+	defer engine.Close()
+
+	// Create a case and payload
+	case1 := &models.Case{
+		ID:        "case-1",
+		Title:     "Test Case",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	_, err := engine.Insert(case1)
+	if err != nil {
+		t.Fatalf("Failed to insert case: %v", err)
+	}
+
+	payload1 := &models.Payload{
+		ID:         "payload-1",
+		CaseID:     "case-1",
+		Token:      "test-token",
+		TemplateID: "ssrf-basic",
+		CreatedBy:  "user-1",
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	_, err = engine.Insert(payload1)
+	if err != nil {
+		t.Fatalf("Failed to insert payload: %v", err)
+	}
+
+	// Create an agent run
+	agentRun := &models.AgentRun{
+		ID:         "agent-run-1",
+		AgentID:    "agent-1",
+		OperatorID: "user-1",
+		CaseID:     "case-1",
+		PayloadID:  "payload-1",
+		Target:     "example.com",
+		Title:      "Test Agent Run",
+		Status:     models.AgentRunStatusCompleted,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	_, err = engine.Insert(agentRun)
+	if err != nil {
+		t.Fatalf("Failed to insert agent run: %v", err)
+	}
+
+	// Add review_decision.false_positive operation
+	operation := &models.AgentOperation{
+		ID:         "op-decision-1",
+		AgentRunID: "agent-run-1",
+		AgentID:    "agent-1",
+		Action:     "review_decision.false_positive",
+		RiskLevel:  "low",
+		Request:    "{}",
+		Result:     `{"decision":"false_positive","reason":"False alarm"}`,
+		StartedAt:  time.Now(),
+		CreatedAt:  time.Now(),
+	}
+	_, err = engine.Insert(operation)
+	if err != nil {
+		t.Fatalf("Failed to insert operation: %v", err)
+	}
+
+	// Test ListReviewQueue
+	filters := ReviewQueueFilters{
+		Page:     1,
+		PageSize: 20,
+	}
+
+	result, err := service.ListReviewQueue(filters)
+	if err != nil {
+		t.Fatalf("ListReviewQueue failed: %v", err)
+	}
+
+	if len(result.Items) != 1 {
+		t.Fatalf("Expected 1 item, got %d", len(result.Items))
+	}
+
+	item := result.Items[0]
+	if item.ReviewState != "reviewed" {
+		t.Errorf("Expected review_state reviewed, got %s", item.ReviewState)
+	}
+
+	if item.LastReviewDecision != "false_positive" {
+		t.Errorf("Expected LastReviewDecision false_positive, got %s", item.LastReviewDecision)
+	}
+
+	if result.Summary.Reviewed != 1 {
+		t.Errorf("Expected Reviewed count 1, got %d", result.Summary.Reviewed)
+	}
+}
+
+func TestListReviewQueue_ReviewDecisionNeedsManualFollowup(t *testing.T) {
+	engine, service := setupReviewQueueTest(t)
+	defer engine.Close()
+
+	// Create a case and payload
+	case1 := &models.Case{
+		ID:        "case-1",
+		Title:     "Test Case",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	_, err := engine.Insert(case1)
+	if err != nil {
+		t.Fatalf("Failed to insert case: %v", err)
+	}
+
+	payload1 := &models.Payload{
+		ID:         "payload-1",
+		CaseID:     "case-1",
+		Token:      "test-token",
+		TemplateID: "ssrf-basic",
+		CreatedBy:  "user-1",
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	_, err = engine.Insert(payload1)
+	if err != nil {
+		t.Fatalf("Failed to insert payload: %v", err)
+	}
+
+	// Create an agent run
+	agentRun := &models.AgentRun{
+		ID:         "agent-run-1",
+		AgentID:    "agent-1",
+		OperatorID: "user-1",
+		CaseID:     "case-1",
+		PayloadID:  "payload-1",
+		Target:     "example.com",
+		Title:      "Test Agent Run",
+		Status:     models.AgentRunStatusCompleted,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	_, err = engine.Insert(agentRun)
+	if err != nil {
+		t.Fatalf("Failed to insert agent run: %v", err)
+	}
+
+	// Add review_decision.needs_manual_followup operation
+	operation := &models.AgentOperation{
+		ID:         "op-decision-1",
+		AgentRunID: "agent-run-1",
+		AgentID:    "agent-1",
+		Action:     "review_decision.needs_manual_followup",
+		RiskLevel:  "medium",
+		Request:    "{}",
+		Result:     `{"decision":"needs_manual_followup","reason":"Needs investigation"}`,
+		StartedAt:  time.Now(),
+		CreatedAt:  time.Now(),
+	}
+	_, err = engine.Insert(operation)
+	if err != nil {
+		t.Fatalf("Failed to insert operation: %v", err)
+	}
+
+	// Test ListReviewQueue
+	filters := ReviewQueueFilters{
+		Page:     1,
+		PageSize: 20,
+	}
+
+	result, err := service.ListReviewQueue(filters)
+	if err != nil {
+		t.Fatalf("ListReviewQueue failed: %v", err)
+	}
+
+	if len(result.Items) != 1 {
+		t.Fatalf("Expected 1 item, got %d", len(result.Items))
+	}
+
+	item := result.Items[0]
+	if item.ReviewState != "needs_attention" {
+		t.Errorf("Expected review_state needs_attention, got %s", item.ReviewState)
+	}
+
+	if item.LastReviewDecision != "needs_manual_followup" {
+		t.Errorf("Expected LastReviewDecision needs_manual_followup, got %s", item.LastReviewDecision)
+	}
+
+	if result.Summary.NeedsAttention != 1 {
+		t.Errorf("Expected NeedsAttention count 1, got %d", result.Summary.NeedsAttention)
+	}
+}
+
+func TestListReviewQueue_ReviewDecisionOverridesFollowup(t *testing.T) {
+	engine, service := setupReviewQueueTest(t)
+	defer engine.Close()
+
+	// Create a case and payload
+	case1 := &models.Case{
+		ID:        "case-1",
+		Title:     "Test Case",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	_, err := engine.Insert(case1)
+	if err != nil {
+		t.Fatalf("Failed to insert case: %v", err)
+	}
+
+	payload1 := &models.Payload{
+		ID:         "payload-1",
+		CaseID:     "case-1",
+		Token:      "test-token",
+		TemplateID: "ssrf-basic",
+		CreatedBy:  "user-1",
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	_, err = engine.Insert(payload1)
+	if err != nil {
+		t.Fatalf("Failed to insert payload: %v", err)
+	}
+
+	// Create an agent run
+	agentRun := &models.AgentRun{
+		ID:         "agent-run-1",
+		AgentID:    "agent-1",
+		OperatorID: "user-1",
+		CaseID:     "case-1",
+		PayloadID:  "payload-1",
+		Target:     "example.com",
+		Title:      "Test Agent Run",
+		Status:     models.AgentRunStatusCompleted,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	_, err = engine.Insert(agentRun)
+	if err != nil {
+		t.Fatalf("Failed to insert agent run: %v", err)
+	}
+
+	now := time.Now()
+
+	// Add followup operation first
+	followupOp := &models.AgentOperation{
+		ID:         "op-followup-1",
+		AgentRunID: "agent-run-1",
+		AgentID:    "agent-1",
+		Action:     "followup.recheck_evidence",
+		RiskLevel:  "low",
+		Request:    "{}",
+		Result:     `{"action_type":"recheck_evidence","reason":"Initial followup"}`,
+		StartedAt:  now.Add(-1 * time.Hour),
+		CreatedAt:  now.Add(-1 * time.Hour),
+	}
+	_, err = engine.Insert(followupOp)
+	if err != nil {
+		t.Fatalf("Failed to insert followup operation: %v", err)
+	}
+
+	// Add review_decision.accepted operation later (should override)
+	decisionOp := &models.AgentOperation{
+		ID:         "op-decision-1",
+		AgentRunID: "agent-run-1",
+		AgentID:    "agent-1",
+		Action:     "review_decision.accepted",
+		RiskLevel:  "low",
+		Request:    "{}",
+		Result:     `{"decision":"accepted","reason":"Final decision"}`,
+		StartedAt:  now,
+		CreatedAt:  now,
+	}
+	_, err = engine.Insert(decisionOp)
+	if err != nil {
+		t.Fatalf("Failed to insert decision operation: %v", err)
+	}
+
+	// Test ListReviewQueue
+	filters := ReviewQueueFilters{
+		Page:     1,
+		PageSize: 20,
+	}
+
+	result, err := service.ListReviewQueue(filters)
+	if err != nil {
+		t.Fatalf("ListReviewQueue failed: %v", err)
+	}
+
+	if len(result.Items) != 1 {
+		t.Fatalf("Expected 1 item, got %d", len(result.Items))
+	}
+
+	item := result.Items[0]
+	// Review decision should override followup state
+	if item.ReviewState != "reviewed" {
+		t.Errorf("Expected review_state reviewed (decision overrides followup), got %s", item.ReviewState)
+	}
+
+	if item.LastReviewDecision != "accepted" {
+		t.Errorf("Expected LastReviewDecision accepted, got %s", item.LastReviewDecision)
+	}
+
+	if result.Summary.Reviewed != 1 {
+		t.Errorf("Expected Reviewed count 1, got %d", result.Summary.Reviewed)
+	}
+}

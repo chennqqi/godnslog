@@ -404,6 +404,115 @@ func (s *Service) CreateFollowupAction(agentRunID string, req *models.AgentRunFo
 	}, nil
 }
 
+// RecordReviewDecision records a review decision for an agent run
+func (s *Service) RecordReviewDecision(agentRunID string, req *models.AgentRunReviewDecisionRequest, userID string) (*models.AgentRunReviewDecisionResponse, error) {
+	// Validate decision
+	validDecisions := map[string]bool{
+		"accepted":              true,
+		"false_positive":        true,
+		"needs_manual_followup": true,
+		"insufficient_evidence": true,
+	}
+	if !validDecisions[req.Decision] {
+		return nil, errors.New("invalid decision: must be one of accepted, false_positive, needs_manual_followup, insufficient_evidence")
+	}
+
+	// Validate reason length
+	if len(req.Reason) > 500 {
+		return nil, errors.New("reason too long: maximum 500 characters")
+	}
+
+	// Get agent run
+	var agentRun models.AgentRun
+	has, err := s.engine.ID(agentRunID).Get(&agentRun)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get agent run: %w", err)
+	}
+	if !has {
+		return nil, errors.New("agent run not found")
+	}
+
+	// Validate review_packet_id if provided
+	if req.ReviewPacketID != "" && req.ReviewPacketID != agentRunID {
+		return nil, errors.New("review_packet_id must match the current agent run")
+	}
+
+	now := time.Now()
+
+	// Build operation result
+	result := map[string]interface{}{
+		"decision":         req.Decision,
+		"reason":           req.Reason,
+		"review_packet_id": req.ReviewPacketID,
+		"evidence_id":      req.EvidenceID,
+		"audit_action":     "agent_run.review_decision_recorded",
+	}
+
+	// Create operation
+	opReq := &models.AgentOperationCreateRequest{
+		Action:    "review_decision." + req.Decision,
+		RiskLevel: "low",
+		Request: map[string]interface{}{
+			"decision":         req.Decision,
+			"reason":           req.Reason,
+			"review_packet_id": req.ReviewPacketID,
+			"evidence_id":      req.EvidenceID,
+		},
+		Result: result,
+	}
+
+	if err := s.AppendAgentOperation(agentRunID, opReq, userID); err != nil {
+		return nil, fmt.Errorf("failed to append review decision operation: %w", err)
+	}
+
+	// Get the created operation
+	var operation models.AgentOperation
+	has, err = s.engine.Where("agent_run_i_d = ? AND action = ?", agentRunID, "review_decision."+req.Decision).OrderBy("created_at DESC").Limit(1).Get(&operation)
+	if err != nil || !has {
+		return nil, fmt.Errorf("failed to retrieve created operation: has=%v err=%v", has, err)
+	}
+
+	// Create audit log
+	userIDPtr := &userID
+	resourceIDPtr := &agentRunID
+	auditLog := &models.AuditLog{
+		ID:           generateID(),
+		UserID:       userIDPtr,
+		Action:       "agent_run.review_decision_recorded",
+		ResourceType: "agent_run",
+		ResourceID:   resourceIDPtr,
+		Details: models.AuditDetails{
+			"decision":         req.Decision,
+			"reason":           req.Reason,
+			"review_packet_id": req.ReviewPacketID,
+			"operation_id":     operation.ID,
+			"case_id":          agentRun.CaseID,
+			"payload_id":       agentRun.PayloadID,
+		},
+		Timestamp: now,
+	}
+	if err := s.authService.CreateAuditLog(auditLog); err != nil {
+		return nil, fmt.Errorf("failed to create review decision audit log: %w", err)
+	}
+
+	return &models.AgentRunReviewDecisionResponse{
+		AgentRunID:     agentRunID,
+		OperationID:    operation.ID,
+		Decision:       req.Decision,
+		ReviewPacketID: req.ReviewPacketID,
+		AuditRefID:     auditLog.ID,
+		Operation:      &operation,
+		Audit: map[string]interface{}{
+			"id":            auditLog.ID,
+			"action":        auditLog.Action,
+			"resource_type": auditLog.ResourceType,
+			"resource_id":   auditLog.ResourceID,
+			"details":       auditLog.Details,
+			"timestamp":     auditLog.Timestamp,
+		},
+	}, nil
+}
+
 // isValidAgentRunStatusTransition validates if a status transition is allowed
 func isValidAgentRunStatusTransition(from, to models.AgentRunStatus) bool {
 	validTransitions := map[models.AgentRunStatus][]models.AgentRunStatus{

@@ -375,6 +375,7 @@ export interface AgentRunDetail extends AgentRun {
   interaction_count: number
   last_interaction_at?: string
   operations: AgentOperation[]
+  review_packet?: AgentRunReviewPacket
   case_url: string
   payload_url: string
   interactions_url: string
@@ -477,6 +478,24 @@ export interface AgentRunFollowupResponse {
   created_at: string
 }
 
+export interface AgentRunReviewExportRequest {
+  format: 'json' | 'markdown'
+  review_packet_id?: string
+  include_audit?: boolean
+}
+
+export interface AgentRunReviewExportResponse {
+  agent_run_id: string
+  format: string
+  operation_id: string
+  audit_ref_id?: string
+  review_packet_id?: string
+  decision?: string
+  content?: string
+  package?: Record<string, unknown>
+  generated_at: string
+}
+
 // Review Queue types
 export type ReviewState = 'not_reviewed' | 'reviewed' | 'followup_created' | 'needs_attention'
 export type EvidenceStrength = 'none' | 'low' | 'medium' | 'high'
@@ -498,6 +517,9 @@ export interface AgentRunReviewQueueItem {
   last_followup_action?: string
   last_followup_at?: string
   last_reviewed_at?: string
+  last_review_decision?: string
+  last_decision_reason?: string
+  last_decision_at?: string
   needs_attention: boolean
   created_at: string
   updated_at: string
@@ -543,5 +565,25 @@ export interface AgentRunFollowupHistoryItem {
   review_packet_id?: string
   audit_ref_id?: string
   created_at: string
+}
+
+// Review Decision types
+export type ReviewDecisionType = 'accepted' | 'false_positive' | 'needs_manual_followup' | 'insufficient_evidence'
+
+export interface AgentRunReviewDecisionRequest {
+  decision: ReviewDecisionType
+  reason?: string
+  review_packet_id?: string
+  evidence_id?: string
+}
+
+export interface AgentRunReviewDecisionResponse {
+  agent_run_id: string
+  operation_id: string
+  decision: ReviewDecisionType
+  review_packet_id?: string
+  audit_ref_id?: string
+  operation?: AgentOperation
+  audit?: Record<string, unknown>
 }
 

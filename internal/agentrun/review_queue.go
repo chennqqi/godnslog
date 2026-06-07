@@ -182,6 +182,43 @@ func (s *Service) buildReviewQueueItem(run *models.AgentRun) (*models.AgentRunRe
 		item.LastFollowupAt = &followupOps[0].CreatedAt
 	}
 
+	// Filter for this agent run's review decision operations
+	var reviewDecisionOps []models.AgentOperation
+	for _, op := range allOps {
+		if op.AgentRunID == run.ID && len(op.Action) > 16 && op.Action[:16] == "review_decision." {
+			reviewDecisionOps = append(reviewDecisionOps, op)
+		}
+	}
+
+	// Sort by created_at descending
+	sort.Slice(reviewDecisionOps, func(i, j int) bool {
+		return reviewDecisionOps[i].CreatedAt.After(reviewDecisionOps[j].CreatedAt)
+	})
+
+	if len(reviewDecisionOps) > 0 {
+		latestDecision := reviewDecisionOps[0]
+		decisionType := latestDecision.Action[16:] // Remove "review_decision." prefix
+
+		// Parse decision from result
+		decision := decisionType
+		reason := ""
+		if latestDecision.Result != "" {
+			var resultData map[string]interface{}
+			if err := json.Unmarshal([]byte(latestDecision.Result), &resultData); err == nil {
+				if d, ok := resultData["decision"].(string); ok {
+					decision = d
+				}
+				if r, ok := resultData["reason"].(string); ok {
+					reason = r
+				}
+			}
+		}
+
+		item.LastReviewDecision = decision
+		item.LastDecisionReason = reason
+		item.LastDecisionAt = &latestDecision.CreatedAt
+	}
+
 	// Get review state and evidence strength
 	reviewState, evidenceStrength, lastReviewedAt, err := s.deriveReviewState(run, followupOps)
 	if err != nil {
@@ -261,6 +298,52 @@ func (s *Service) ListFollowupHistory(agentRunID string) ([]models.AgentRunFollo
 
 // deriveReviewState derives the review state from existing data
 func (s *Service) deriveReviewState(run *models.AgentRun, followupOps []models.AgentOperation) (string, string, *time.Time, error) {
+	// Get all operations to check for review decisions
+	var allOps []models.AgentOperation
+	err := s.engine.Find(&allOps)
+	if err != nil {
+		allOps = []models.AgentOperation{}
+	}
+
+	// Check for review decision operations (highest priority)
+	var reviewDecisionOps []models.AgentOperation
+	for _, op := range allOps {
+		if op.AgentRunID == run.ID && len(op.Action) > 16 && op.Action[:16] == "review_decision." {
+			reviewDecisionOps = append(reviewDecisionOps, op)
+		}
+	}
+
+	if len(reviewDecisionOps) > 0 {
+		// Sort by created_at descending to get the most recent decision
+		sort.Slice(reviewDecisionOps, func(i, j int) bool {
+			return reviewDecisionOps[i].CreatedAt.After(reviewDecisionOps[j].CreatedAt)
+		})
+
+		latestDecision := reviewDecisionOps[0]
+		decisionType := latestDecision.Action[16:] // Remove "review_decision." prefix
+
+		// Parse decision from result
+		decision := decisionType
+		if latestDecision.Result != "" {
+			var resultData map[string]interface{}
+			if err := json.Unmarshal([]byte(latestDecision.Result), &resultData); err == nil {
+				if d, ok := resultData["decision"].(string); ok {
+					decision = d
+				}
+			}
+		}
+
+		// accepted or false_positive closes needs_attention
+		if decision == "accepted" || decision == "false_positive" {
+			return "reviewed", "high", &latestDecision.CreatedAt, nil
+		}
+
+		// needs_manual_followup or insufficient_evidence keeps or enters needs_attention
+		if decision == "needs_manual_followup" || decision == "insufficient_evidence" {
+			return "needs_attention", "medium", &latestDecision.CreatedAt, nil
+		}
+	}
+
 	// Check for follow-up operations
 	if len(followupOps) > 0 {
 		// Check if latest follow-up is recheck_evidence
@@ -273,7 +356,7 @@ func (s *Service) deriveReviewState(run *models.AgentRun, followupOps []models.A
 
 	// Check for review_generated audit
 	var allAudits []models.AuditLog
-	err := s.engine.Find(&allAudits)
+	err = s.engine.Find(&allAudits)
 	if err != nil {
 		allAudits = []models.AuditLog{}
 	}
@@ -298,12 +381,6 @@ func (s *Service) deriveReviewState(run *models.AgentRun, followupOps []models.A
 	}
 
 	// Check for review export operation
-	var allOps []models.AgentOperation
-	err = s.engine.Find(&allOps)
-	if err != nil {
-		allOps = []models.AgentOperation{}
-	}
-
 	for _, op := range allOps {
 		if op.AgentRunID == run.ID && op.Action == "review.export" {
 			return "reviewed", "medium", &op.CreatedAt, nil

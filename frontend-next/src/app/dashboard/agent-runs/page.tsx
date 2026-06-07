@@ -339,6 +339,14 @@ export default function AgentRunsPage() {
                       <div className="text-sm text-muted-foreground">
                         {item.interaction_count} interactions | {item.followup_count} followups
                       </div>
+                      {item.last_review_decision && (
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-medium">Decision:</span> {item.last_review_decision}
+                          {item.last_decision_reason && (
+                            <span className="ml-2">({item.last_decision_reason.substring(0, 30)}{item.last_decision_reason.length > 30 ? '...' : ''})</span>
+                          )}
+                        </div>
+                      )}
                       {item.needs_attention && (
                         <Badge variant="destructive">Needs Attention</Badge>
                       )}

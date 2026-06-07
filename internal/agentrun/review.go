@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/chennqqi/godnslog/internal/auth"
@@ -309,6 +310,243 @@ func (s *ReviewService) generateMarkdownContent(packet *AgentRunReviewPacket) st
 
 	md += fmt.Sprintf("\n---\n\n")
 	md += fmt.Sprintf("Generated at: %s\n", packet.GeneratedAt.Format(time.RFC3339))
+
+	return md
+}
+
+// ExportReviewPackage exports a review evidence package for an agent run
+func (s *ReviewService) ExportReviewPackage(agentRunID string, req *models.AgentRunReviewExportRequest, userID string) (*models.AgentRunReviewExportResponse, error) {
+	// Validate format
+	if req.Format != "json" && req.Format != "markdown" {
+		return nil, errors.New("invalid format: must be json or markdown")
+	}
+
+	// Get agent run
+	agentRun, err := s.agentRunService.GetAgentRunByID(agentRunID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get agent run: %w", err)
+	}
+	if agentRun == nil {
+		return nil, ErrAgentRunNotFound
+	}
+
+	// Validate review_packet_id if provided
+	if req.ReviewPacketID != "" && req.ReviewPacketID != agentRunID {
+		return nil, errors.New("review_packet_id must match the current agent run")
+	}
+
+	// Build review packet
+	packet, err := s.BuildReviewPacket(agentRunID, req.Format, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to build review packet: %w", err)
+	}
+
+	// Get most recent review decision operation
+	var recentDecisionOp models.AgentOperation
+	has, err := s.engine.Where("agent_run_i_d = ? AND action LIKE ?", agentRunID, "review_decision.%").
+		OrderBy("created_at DESC").Limit(1).Get(&recentDecisionOp)
+	var decision string
+	if err == nil && has {
+		// Extract decision from action name
+		parts := strings.Split(recentDecisionOp.Action, ".")
+		if len(parts) == 2 {
+			decision = parts[1]
+		}
+	}
+
+	now := time.Now()
+
+	// Build export package
+	var exportPackage map[string]interface{}
+	var content string
+
+	if req.Format == "json" {
+		exportPackage = map[string]interface{}{
+			"agent_run": map[string]interface{}{
+				"id":         packet.AgentRun.ID,
+				"agent_id":   packet.AgentRun.AgentID,
+				"case_id":    packet.AgentRun.CaseID,
+				"payload_id": packet.AgentRun.PayloadID,
+				"target":     packet.Target,
+				"status":     packet.AgentRun.Status,
+			},
+			"review_packet": map[string]interface{}{
+				"id": packet.ID,
+				"evidence_strength": func() string {
+					if packet.Evidence != nil {
+						return string(packet.Evidence.EvidenceStrength)
+					}
+					return "none"
+				}(),
+				"confidence": func() int {
+					if packet.Evidence != nil {
+						return packet.Evidence.Confidence
+					}
+					return 0
+				}(),
+				"interaction_count": packet.InteractionSummary.Total,
+				"unique_sources":    packet.InteractionSummary.UniqueSources,
+			},
+			"review_decision": func() map[string]interface{} {
+				if decision != "" {
+					resultMap := make(map[string]interface{})
+					json.Unmarshal([]byte(recentDecisionOp.Result), &resultMap)
+					return map[string]interface{}{
+						"decision":     decision,
+						"reason":       resultMap["reason"],
+						"operation_id": recentDecisionOp.ID,
+						"audit_ref_id": resultMap["audit_ref_id"],
+					}
+				}
+				return nil
+			}(),
+			"links": map[string]interface{}{
+				"case_url":     packet.AgentRun.CaseURL,
+				"payload_url":  packet.AgentRun.PayloadURL,
+				"evidence_url": packet.AgentRun.EvidenceURL,
+				"audit_url": func() string {
+					if req.IncludeAudit {
+						return fmt.Sprintf("/dashboard/audit?resource_type=agent_run&resource_id=%s", agentRunID)
+					}
+					return ""
+				}(),
+			},
+		}
+	} else {
+		content = s.generateExportMarkdownContent(packet, decision, recentDecisionOp)
+	}
+
+	// Create review_export operation
+	result := map[string]interface{}{
+		"format":           req.Format,
+		"agent_run_id":     agentRunID,
+		"review_packet_id": req.ReviewPacketID,
+		"decision":         decision,
+		"audit_action":     "agent_run.review_exported",
+		"exported_at":      now,
+	}
+
+	opReq := &models.AgentOperationCreateRequest{
+		Action:    "review_export." + req.Format,
+		RiskLevel: "low",
+		Request: map[string]interface{}{
+			"format":           req.Format,
+			"review_packet_id": req.ReviewPacketID,
+			"include_audit":    req.IncludeAudit,
+		},
+		Result: result,
+	}
+
+	if err := s.agentRunService.AppendAgentOperation(agentRunID, opReq, userID); err != nil {
+		return nil, fmt.Errorf("failed to append export operation: %w", err)
+	}
+
+	// Get the created operation
+	var operation models.AgentOperation
+	has, err = s.engine.Where("agent_run_i_d = ? AND action = ?", agentRunID, "review_export."+req.Format).
+		OrderBy("created_at DESC").Limit(1).Get(&operation)
+	if err != nil || !has {
+		return nil, fmt.Errorf("failed to retrieve created operation: has=%v err=%v", has, err)
+	}
+
+	// Create audit log
+	userIDPtr := &userID
+	resourceIDPtr := &agentRunID
+	auditLog := &models.AuditLog{
+		ID:           generateID(),
+		UserID:       userIDPtr,
+		Action:       "agent_run.review_exported",
+		ResourceType: "agent_run",
+		ResourceID:   resourceIDPtr,
+		Details: models.AuditDetails{
+			"format":           req.Format,
+			"review_packet_id": req.ReviewPacketID,
+			"decision":         decision,
+			"operation_id":     operation.ID,
+		},
+		Timestamp: now,
+	}
+	if err := s.authService.CreateAuditLog(auditLog); err != nil {
+		return nil, fmt.Errorf("failed to create export audit log: %w", err)
+	}
+
+	return &models.AgentRunReviewExportResponse{
+		AgentRunID:     agentRunID,
+		Format:         req.Format,
+		OperationID:    operation.ID,
+		AuditRefID:     auditLog.ID,
+		ReviewPacketID: req.ReviewPacketID,
+		Decision:       decision,
+		Content:        content,
+		Package:        exportPackage,
+		GeneratedAt:    now,
+	}, nil
+}
+
+// generateExportMarkdownContent generates markdown content for export package
+func (s *ReviewService) generateExportMarkdownContent(packet *AgentRunReviewPacket, decision string, decisionOp models.AgentOperation) string {
+	md := fmt.Sprintf("# Agent Run Review Evidence Package\n\n")
+
+	md += fmt.Sprintf("## Agent Run\n\n")
+	md += fmt.Sprintf("- **ID**: %s\n", packet.AgentRun.ID)
+	md += fmt.Sprintf("- **Title**: %s\n", packet.AgentRun.Title)
+	md += fmt.Sprintf("- **Status**: %s\n", packet.AgentRun.Status)
+	md += fmt.Sprintf("- **Target**: %s\n", packet.Target)
+	if packet.CaseID != "" {
+		md += fmt.Sprintf("- **Case ID**: %s\n", packet.CaseID)
+	}
+	if packet.PayloadID != "" {
+		md += fmt.Sprintf("- **Payload ID**: %s\n", packet.PayloadID)
+	}
+
+	md += fmt.Sprintf("\n## Evidence Summary\n\n")
+	md += fmt.Sprintf("- **Total Interactions**: %d\n", packet.InteractionSummary.Total)
+	md += fmt.Sprintf("- **DNS Count**: %d\n", packet.InteractionSummary.DNSCount)
+	md += fmt.Sprintf("- **HTTP Count**: %d\n", packet.InteractionSummary.HTTPCount)
+	md += fmt.Sprintf("- **Unique Sources**: %d\n", packet.InteractionSummary.UniqueSources)
+	if packet.Evidence != nil {
+		md += fmt.Sprintf("- **Evidence Strength**: %s\n", packet.Evidence.EvidenceStrength)
+		md += fmt.Sprintf("- **Confidence**: %d%%\n", packet.Evidence.Confidence)
+	}
+
+	if decision != "" {
+		md += fmt.Sprintf("\n## Review Decision\n\n")
+		md += fmt.Sprintf("- **Decision**: %s\n", decision)
+		resultMap := make(map[string]interface{})
+		json.Unmarshal([]byte(decisionOp.Result), &resultMap)
+		if reason, ok := resultMap["reason"].(string); ok && reason != "" {
+			md += fmt.Sprintf("- **Reason**: %s\n", reason)
+		}
+		md += fmt.Sprintf("- **Operation ID**: %s\n", decisionOp.ID)
+		if auditRefID, ok := resultMap["audit_ref_id"].(string); ok && auditRefID != "" {
+			md += fmt.Sprintf("- **Audit Ref ID**: %s\n", auditRefID)
+		}
+	}
+
+	md += fmt.Sprintf("\n## Timeline References\n\n")
+	for _, op := range packet.AgentRun.Operations {
+		md += fmt.Sprintf("- **%s**: %s\n", op.StartedAt.Format(time.RFC3339), op.Action)
+	}
+
+	md += fmt.Sprintf("\n## Audit References\n\n")
+	for _, ref := range packet.AuditRefs {
+		md += fmt.Sprintf("- **%s**: %s (%s)\n", ref.Timestamp.Format(time.RFC3339), ref.Action, ref.ResourceType)
+	}
+
+	md += fmt.Sprintf("\n## Links\n\n")
+	if packet.AgentRun.CaseURL != "" {
+		md += fmt.Sprintf("- **Case**: %s\n", packet.AgentRun.CaseURL)
+	}
+	if packet.AgentRun.PayloadURL != "" {
+		md += fmt.Sprintf("- **Payload**: %s\n", packet.AgentRun.PayloadURL)
+	}
+	if packet.AgentRun.EvidenceURL != "" {
+		md += fmt.Sprintf("- **Evidence**: %s\n", packet.AgentRun.EvidenceURL)
+	}
+	md += fmt.Sprintf("- **Audit**: /dashboard/audit?resource_type=agent_run&resource_id=%s\n", packet.AgentRun.ID)
+
+	md += fmt.Sprintf("\n---\n\n")
+	md += fmt.Sprintf("Generated at: %s\n", time.Now().Format(time.RFC3339))
 
 	return md
 }

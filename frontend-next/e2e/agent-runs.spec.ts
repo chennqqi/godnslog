@@ -831,4 +831,460 @@ test.describe('Agent Runs', () => {
     // The action should be visible in the Action column
     await expect(page.getByText('agent_run.followup_created')).toBeVisible()
   })
+
+  test('should record review decision via UI and verify closure loop', async ({ page }) => {
+    let reviewDecisionCalled = false
+    let capturedBody = ''
+    let agentRunCallCount = 0
+
+    // Mock review decision API
+    await page.route('**/api/v2/agent-runs/agent-run-1/review-decision', route => {
+      reviewDecisionCalled = true
+      capturedBody = route.request().postData() || ''
+      route.fulfill({
+        json: {
+          code: 0,
+          data: {
+            agent_run_id: 'agent-run-1',
+            operation_id: 'op-decision-1',
+            decision: 'accepted',
+            review_packet_id: 'review-packet-1',
+            audit_ref_id: 'audit-decision-1',
+          },
+        },
+      })
+    })
+
+    // Mock agent run detail API with review packet (override global mock)
+    await page.route('**/api/v2/agent-runs/agent-run-1', route => {
+      if (route.request().method() === 'GET') {
+        agentRunCallCount++
+        if (agentRunCallCount === 1) {
+          // Initial call - with review packet
+          route.fulfill({
+            json: {
+              code: 0,
+              data: {
+                data: {
+                  ...mockAgentRun,
+                  review_packet: {
+                    id: 'review-packet-1',
+                    agent_run_id: 'agent-run-1',
+                    generated_at: '2026-05-24T00:00:00Z',
+                    format: 'json',
+                    interaction_summary: {
+                      total: 5,
+                      dns_count: 3,
+                      http_count: 2,
+                      unique_sources: 3,
+                    },
+                  },
+                },
+              },
+            },
+          })
+        } else {
+          // Post-decision call - with new operation
+          route.fulfill({
+            json: {
+              code: 0,
+              data: {
+                data: {
+                  ...mockAgentRun,
+                  operations: [
+                    ...(mockAgentRun.operations || []),
+                    {
+                      id: 'op-decision-1',
+                      agent_run_id: 'agent-run-1',
+                      agent_id: 'agent-123',
+                      action: 'review_decision.accepted',
+                      risk_level: 'low',
+                      request: '{}',
+                      result: '{"decision":"accepted","reason":"Test review decision","review_packet_id":"review-packet-1","audit_ref_id":"audit-decision-1"}',
+                      started_at: '2026-05-24T00:00:00Z',
+                      created_at: '2026-05-24T00:00:00Z',
+                    },
+                  ],
+                  review_packet: {
+                    id: 'review-packet-1',
+                    agent_run_id: 'agent-run-1',
+                    generated_at: '2026-05-24T00:00:00Z',
+                    format: 'json',
+                    interaction_summary: {
+                      total: 5,
+                      dns_count: 3,
+                      http_count: 2,
+                      unique_sources: 3,
+                    },
+                  },
+                },
+              },
+            },
+          })
+        }
+      }
+    })
+
+    // Mock audit logs API
+    await page.route('**/api/v2/audit/logs**', route => {
+      route.fulfill({
+        json: {
+          code: 0,
+          data: {
+            items: [
+              {
+                id: 'audit-decision-1',
+                action: 'agent_run.review_decision_recorded',
+                resource_type: 'agent_run',
+                resource_id: 'agent-run-1',
+                timestamp: '2026-05-24T00:00:00Z',
+              },
+            ],
+            total: 1,
+            page: 1,
+            page_size: 20,
+            total_pages: 1,
+          },
+        },
+      })
+    })
+
+    // Mock review queue API - return post-decision state (reviewed)
+    // Use more specific pattern to override global mock
+    await page.route('**/api/v2/agent-runs/review-queue?*', route => {
+      route.fulfill({
+        json: {
+          code: 0,
+          data: {
+            items: [
+              {
+                id: 'agent-run-1',
+                agent_id: 'agent-123',
+                operator_id: 'operator-1',
+                case_id: 'case-1',
+                payload_id: 'payload-1',
+                target: 'http://example.com',
+                title: 'Test Agent Run',
+                status: 'completed',
+                review_state: 'reviewed',
+                last_review_decision: 'accepted',
+                last_review_decision_at: '2026-05-24T00:00:00Z',
+                evidence_strength: 'high',
+                interaction_count: 5,
+                operation_count: 2,
+                followup_count: 0,
+                needs_attention: false,
+                created_at: '2026-05-24T00:00:00Z',
+                updated_at: '2026-05-24T00:00:00Z',
+                case_url: '/dashboard/cases/case-1',
+                payload_url: '/dashboard/payloads/payload-1',
+                evidence_url: '/dashboard/evidence?payload_id=payload-1',
+              },
+            ],
+            total: 1,
+            page: 1,
+            page_size: 20,
+            total_pages: 1,
+            summary: {
+              total: 1,
+              not_reviewed: 0,
+              reviewed: 1,
+              needs_attention: 0,
+              followup_created: 1,
+            },
+          },
+        },
+      })
+    })
+
+    // Navigate to agent run detail page
+    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.waitForLoadState('networkidle')
+
+    // Verify review decision button is visible
+    const reviewButton = page.getByText('记录 Review Decision')
+    await expect(reviewButton).toBeVisible({ timeout: 5000 })
+
+    // Click button to open dialog
+    await reviewButton.click()
+
+    // Wait for dialog to be visible
+    await page.waitForSelector('[role="dialog"]', { state: 'visible' })
+
+    // Click SelectTrigger to open dropdown
+    const dialog = page.locator('[role="dialog"]')
+    await dialog.getByRole('combobox').click()
+
+    // Select decision type - click on the SelectContent which is outside dialog
+    await page.locator('[role="listbox"]').getByText('Accepted').click()
+
+    // Enter reason
+    await dialog.getByRole('textbox').fill('Test review decision')
+
+    // Submit
+    await dialog.getByRole('button', { name: '记录' }).click()
+    await page.waitForLoadState('networkidle')
+
+    // Verify API was called
+    expect(reviewDecisionCalled).toBe(true)
+    expect(capturedBody).toContain('accepted')
+    expect(capturedBody).toContain('Test review decision')
+    expect(capturedBody).toContain('review-packet-1')
+
+    // Verify: timeline shows review_decision.accepted
+    await expect(page.getByText('review_decision.accepted')).toBeVisible()
+
+    // Verify: audit ref link is displayed
+    await expect(page.getByRole('link', { name: 'View Audit Log (audit-decision-1)' })).toBeVisible()
+
+    // Navigate to audit page
+    await page.goto('/dashboard/audit?resource_type=agent_run&resource_id=agent-run-1')
+    await page.waitForLoadState('networkidle')
+
+    // Verify: audit log shows review_decision_recorded
+    await expect(page.getByText('agent_run.review_decision_recorded')).toBeVisible()
+
+    // Navigate to review queue
+    await page.goto('/dashboard/agent-runs')
+    await page.waitForLoadState('networkidle')
+
+    // Switch to Review Queue tab
+    await page.getByRole('tab', { name: 'Review Queue' }).click()
+    await page.waitForLoadState('networkidle')
+
+    // Verify: review queue summary shows updated counts
+    const summarySection = page.locator('text=Review Queue Summary').locator('..').locator('..')
+    await expect(summarySection.getByText('Total')).toBeVisible()
+    await expect(summarySection.getByText('Not Reviewed')).toBeVisible()
+    await expect(summarySection.getByText('Reviewed', { exact: true })).toBeVisible()
+
+    // Verify summary values: reviewed=1, not_reviewed=0
+    // The UI displays values before labels (e.g., "1Reviewed")
+    const summaryText = await summarySection.textContent()
+    expect(summaryText).toMatch(/1.*Reviewed/)
+    expect(summaryText).toMatch(/0.*Not Reviewed/)
+
+    // Verify: review queue item shows accepted decision
+    await expect(page.getByText('Test Agent Run')).toBeVisible()
+    await expect(page.getByText('Decision: accepted')).toBeVisible()
+  })
+
+  test('should export review evidence via UI and verify closure loop', async ({ page }) => {
+    let exportCalled = false
+    let capturedBody = ''
+    let agentRunCallCount = 0
+
+    // Mock review export API
+    await page.route('**/api/v2/agent-runs/agent-run-1/review-export', route => {
+      exportCalled = true
+      capturedBody = route.request().postData() || ''
+      route.fulfill({
+        json: {
+          code: 0,
+          data: {
+            agent_run_id: 'agent-run-1',
+            format: 'json',
+            operation_id: 'op-export-1',
+            audit_ref_id: 'audit-export-1',
+            review_packet_id: 'review-packet-1',
+            decision: 'accepted',
+            package: {
+              agent_run: {
+                id: 'agent-run-1',
+                agent_id: 'agent-123',
+                case_id: 'case-1',
+                payload_id: 'payload-1',
+                target: 'https://target.example',
+                status: 'completed',
+              },
+              review_packet: {
+                id: 'review-packet-1',
+                evidence_strength: 'high',
+                confidence: 85,
+                interaction_count: 5,
+                unique_sources: 2,
+              },
+              review_decision: {
+                decision: 'accepted',
+                reason: 'Test review decision',
+                operation_id: 'op-decision-1',
+                audit_ref_id: 'audit-decision-1',
+              },
+              links: {
+                case_url: '/dashboard/cases/case-1',
+                payload_url: '/dashboard/payloads/payload-1',
+                evidence_url: '/dashboard/evidence?payload_id=payload-1',
+                audit_url: '/dashboard/audit?resource_type=agent_run&resource_id=agent-run-1',
+              },
+            },
+            generated_at: '2026-06-07T00:00:00Z',
+          },
+        },
+      })
+    })
+
+    // Mock agent run detail API with counter to simulate post-export state
+    await page.route('**/api/v2/agent-runs/agent-run-1', route => {
+      if (route.request().method() === 'GET') {
+        agentRunCallCount++
+        if (agentRunCallCount === 1) {
+          route.fulfill({
+            json: {
+              code: 0,
+              data: {
+                data: {
+                  ...mockAgentRun,
+                  review_packet: {
+                    id: 'review-packet-1',
+                    agent_run_id: 'agent-run-1',
+                    generated_at: '2026-05-24T00:00:00Z',
+                    format: 'json',
+                    interaction_summary: {
+                      total: 5,
+                      dns_count: 3,
+                      http_count: 2,
+                      unique_sources: 3,
+                    },
+                  },
+                },
+              },
+            },
+          })
+        } else {
+          route.fulfill({
+            json: {
+              code: 0,
+              data: {
+                data: {
+                  ...mockAgentRun,
+                  operations: [
+                    ...(mockAgentRun.operations || []),
+                    {
+                      id: 'op-export-1',
+                      agent_run_id: 'agent-run-1',
+                      agent_id: 'agent-123',
+                      action: 'review_export.json',
+                      risk_level: 'low',
+                      request: '{"format":"json","review_packet_id":"review-packet-1","include_audit":true}',
+                      result: '{"format":"json","agent_run_id":"agent-run-1","review_packet_id":"review-packet-1","decision":"accepted","audit_action":"agent_run.review_exported","exported_at":"2026-06-07T00:00:00Z"}',
+                      started_at: '2026-06-07T00:00:00Z',
+                      created_at: '2026-06-07T00:00:00Z',
+                    },
+                  ],
+                  review_packet: {
+                    id: 'review-packet-1',
+                    agent_run_id: 'agent-run-1',
+                    generated_at: '2026-05-24T00:00:00Z',
+                    format: 'json',
+                    interaction_summary: {
+                      total: 5,
+                      dns_count: 3,
+                      http_count: 2,
+                      unique_sources: 3,
+                    },
+                  },
+                },
+              },
+            },
+          })
+        }
+      }
+    })
+
+    // Mock audit logs API
+    await page.route('**/api/v2/audit/logs**', route => {
+      route.fulfill({
+        json: {
+          code: 0,
+          data: {
+            items: [
+              {
+                id: 'audit-export-1',
+                action: 'agent_run.review_exported',
+                resource_type: 'agent_run',
+                resource_id: 'agent-run-1',
+                timestamp: '2026-06-07T00:00:00Z',
+              },
+            ],
+            total: 1,
+            page: 1,
+            page_size: 20,
+            total_pages: 1,
+          },
+        },
+      })
+    })
+
+    // Navigate to agent run detail page
+    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.waitForLoadState('networkidle')
+
+    // Click Export JSON button
+    const exportJsonButton = page.getByText('Export JSON')
+    await expect(exportJsonButton).toBeVisible({ timeout: 5000 })
+    await exportJsonButton.click()
+    await page.waitForSelector('[role="dialog"]', { state: 'visible' })
+
+    // Click export button in dialog
+    const dialog = page.locator('[role="dialog"]')
+    await dialog.getByRole('button', { name: '导出' }).click()
+    await page.waitForLoadState('networkidle')
+
+    // Verify API was called
+    expect(exportCalled).toBe(true)
+    expect(capturedBody).toContain('json')
+    expect(capturedBody).toContain('review-packet-1')
+
+    // Close dialog
+    await dialog.getByRole('button', { name: '取消' }).click()
+    await page.waitForSelector('[role="dialog"]', { state: 'hidden' })
+
+    // Verify timeline shows review_export.json
+    await expect(page.getByText('review_export.json')).toBeVisible()
+
+    // Navigate to audit page
+    await page.goto('/dashboard/audit?resource_type=agent_run&resource_id=agent-run-1')
+    await page.waitForLoadState('networkidle')
+
+    // Verify audit log shows review_exported
+    await expect(page.getByText('agent_run.review_exported')).toBeVisible()
+
+    // Navigate back to agent run detail
+    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.waitForLoadState('networkidle')
+
+    // Test Markdown export
+    let markdownExportCalled = false
+    await page.route('**/api/v2/agent-runs/agent-run-1/review-export', route => {
+      markdownExportCalled = true
+      route.fulfill({
+        json: {
+          code: 0,
+          data: {
+            agent_run_id: 'agent-run-1',
+            format: 'markdown',
+            operation_id: 'op-export-2',
+            audit_ref_id: 'audit-export-2',
+            review_packet_id: 'review-packet-1',
+            decision: 'accepted',
+            content: '# Agent Run Review Evidence Package\n\n## Agent Run\n\n- **ID**: agent-run-1\n- **Title**: Test Agent Run\n\n## Evidence Summary\n\n- **Total Interactions**: 5\n\n## Review Decision\n\n- **Decision**: accepted\n\n## Timeline References\n\n## Audit References\n\n## Links\n\n',
+            generated_at: '2026-06-07T00:00:00Z',
+          },
+        },
+      })
+    })
+
+    // Click Export Markdown button
+    const exportMarkdownButton = page.getByText('Export Markdown')
+    await expect(exportMarkdownButton).toBeVisible()
+    await exportMarkdownButton.click()
+    await page.waitForSelector('[role="dialog"]', { state: 'visible' })
+
+    // Click export button in dialog
+    await dialog.getByRole('button', { name: '导出' }).click()
+    await page.waitForLoadState('networkidle')
+
+    // Verify markdown export API was called
+    expect(markdownExportCalled).toBe(true)
+  })
 })
