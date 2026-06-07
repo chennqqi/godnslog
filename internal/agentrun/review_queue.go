@@ -147,9 +147,9 @@ func (s *Service) buildReviewQueueItem(run *models.AgentRun) (*models.AgentRunRe
 	}
 	item.InteractionCount = int(interactionCount)
 
-	// Get operation count
+	// Get operation count for this agent run
 	var opCount int64
-	opCount, err = s.engine.Table("agent_operations").Count()
+	opCount, err = s.engine.Table("agent_operations").Where("agent_run_id = ?", run.ID).Count()
 	if err != nil {
 		opCount = 0
 	}
@@ -243,7 +243,7 @@ func (s *Service) ListFollowupHistory(agentRunID string) ([]models.AgentRunFollo
 			}
 
 			// Link audit ref
-			if auditID, ok := auditRefMap["followup_created"]; ok {
+			if auditID, ok := auditRefMap["agent_run.followup_created"]; ok {
 				item.AuditRefID = auditID
 			}
 
@@ -279,7 +279,7 @@ func (s *Service) deriveReviewState(run *models.AgentRun, followupOps []models.A
 	}
 
 	for _, audit := range allAudits {
-		if audit.ResourceType == "agent_run" && audit.ResourceID != nil && *audit.ResourceID == run.ID && audit.Action == "review_generated" {
+		if audit.ResourceType == "agent_run" && audit.ResourceID != nil && *audit.ResourceID == run.ID && audit.Action == "agent_run.review_generated" {
 			// Extract evidence strength from audit details
 			evidenceStrength := "medium"
 			if audit.Details != nil {

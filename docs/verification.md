@@ -342,7 +342,7 @@ Sprint K implements Agent API Key Permission Gate and MCP Safety Controls:
 
 ---
 
-## Sprint L: Review Queue & Follow-up History
+## Sprint N: Review Queue & Follow-up History
 
 ### Verification Results (2026-06-07 - Final)
 
@@ -383,7 +383,7 @@ npx playwright test --reporter=line e2e/agent-runs.spec.ts
 
 ### Summary
 
-Sprint L implementation completed with all high-priority tasks:
+Sprint N implementation completed with all high-priority tasks:
 
 **Completed:**
 - ✅ Review Queue Service - ListReviewQueue with filters (internal/agentrun/service.go)
@@ -416,7 +416,7 @@ Sprint L implementation completed with all high-priority tasks:
 - ✅ Backend tests passing
 
 **Core Achievement:**
-Sprint L establishes the Review Queue and Follow-up History system:
+Sprint N establishes the Review Queue and Follow-up History system:
 - Review Queue provides a centralized view of Agent Runs requiring review
 - Follow-up History tracks all follow-up actions with audit trail links
 - Filters allow efficient navigation by review state, evidence strength, and other criteria

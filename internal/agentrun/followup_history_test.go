@@ -178,7 +178,7 @@ func TestListFollowupHistory_WithFollowup(t *testing.T) {
 		ID:           "audit-1",
 		ResourceType: "agent_run",
 		ResourceID:   &runID,
-		Action:       "followup_created",
+		Action:       "agent_run.followup_created",
 		UserID:       &userID,
 		Timestamp:    time.Now(),
 		CreatedAt:    time.Now(),

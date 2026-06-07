@@ -44,7 +44,7 @@ func (self *WebServer) initDatabase() error {
 	orm.SetTZDatabase(time.Local)
 	orm.SetTZLocation(time.Local)
 
-	err := orm.Sync(&models.TblDns{},
+	err := orm.Sync2(&models.TblDns{},
 		&models.TblHttp{},
 		&models.TblUser{},
 		&models.TblResolve{},
@@ -53,7 +53,8 @@ func (self *WebServer) initDatabase() error {
 		&models.TblInteraction{},
 		&models.TblAPIKey{},
 		&v2models.Interaction{},
-		&v2models.Workflow{})
+		&v2models.Workflow{},
+		&v2models.AuditLog{})
 	if err != nil {
 		logrus.Errorf("[webui.go::initDatabase] orm.Sync: %v", err)
 		return err

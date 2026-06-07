@@ -3053,6 +3053,7 @@ func (self *WebServer) v2ListAuditLogs(c *gin.Context) {
 	userID := c.Query("user_id")
 	action := c.Query("action")
 	resourceType := c.Query("resource_type")
+	resourceID := c.Query("resource_id")
 
 	// Parse time range
 	var startTime, endTime *time.Time
@@ -3079,7 +3080,7 @@ func (self *WebServer) v2ListAuditLogs(c *gin.Context) {
 	// For now, allow all authenticated users to see all logs
 
 	authService := auth.NewService(self.orm)
-	resp, err := authService.ListAuditLogs(userID, action, resourceType, startTime, endTime, page, pageSize)
+	resp, err := authService.ListAuditLogs(userID, action, resourceType, resourceID, startTime, endTime, page, pageSize)
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2ListAuditLogs] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{

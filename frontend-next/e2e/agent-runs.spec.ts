@@ -436,30 +436,52 @@ test.describe('Agent Runs', () => {
   test('should create follow-up action', async ({ page }) => {
     // Mock followup API
     await page.route('**/api/v2/agent-runs/agent-run-1/followups', async route => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          code: 0,
-          message: 'success',
-          data: {
-            agent_run_id: 'agent-run-1',
-            operation_id: 'op-followup-1',
-            action_type: 'recheck_evidence',
-            reason: 'Evidence needs second review',
-            review_packet_id: 'agent-run-1',
-            operation: {
-              id: 'op-followup-1',
+      if (route.request().method() === 'POST') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: 0,
+            message: 'success',
+            data: {
               agent_run_id: 'agent-run-1',
-              action: 'followup.recheck_evidence',
-              risk_level: 'low',
-              started_at: new Date().toISOString(),
+              operation_id: 'op-followup-1',
+              action_type: 'recheck_evidence',
+              reason: 'Evidence needs second review',
+              review_packet_id: 'agent-run-1',
+              operation: {
+                id: 'op-followup-1',
+                agent_run_id: 'agent-run-1',
+                action: 'followup.recheck_evidence',
+                risk_level: 'low',
+                started_at: new Date().toISOString(),
+                created_at: new Date().toISOString(),
+              },
               created_at: new Date().toISOString(),
             },
-            created_at: new Date().toISOString(),
+          }),
+        })
+      } else {
+        // GET request for followup history
+        await route.fulfill({
+          json: {
+            code: 0,
+            data: {
+              data: [
+                {
+                  operation_id: 'op-followup-1',
+                  action_type: 'recheck_evidence',
+                  risk_level: 'low',
+                  reason: 'Evidence needs second review',
+                  review_packet_id: 'agent-run-1',
+                  audit_ref_id: 'audit-123',
+                  created_at: new Date().toISOString(),
+                },
+              ],
+            },
           },
-        }),
-      })
+        })
+      }
     })
 
     // Track if followup was created to modify subsequent agent run detail responses
@@ -561,17 +583,32 @@ test.describe('Agent Runs', () => {
     // Verify dialog is closed
     await expect(page.getByRole('heading', { name: '创建 Follow-up Action' })).not.toBeVisible()
 
-    // Reload the page to trigger agent run refresh
-    await page.reload()
+    // Wait for both agent run detail and followup history to refresh
+    const agentRunRefreshPromise = page.waitForRequest(request =>
+      request.url().includes('/agent-runs/agent-run-1') && request.method() === 'GET'
+    )
+    const followupHistoryRefreshPromise = page.waitForRequest(request =>
+      request.url().includes('/agent-runs/agent-run-1/followups') && request.method() === 'GET'
+    )
+
+    await Promise.all([
+      agentRunRefreshPromise,
+      followupHistoryRefreshPromise,
+    ])
     await page.waitForLoadState('networkidle')
 
     // Verify followup operation appears in timeline
     await expect(page.getByText('followup.recheck_evidence')).toBeVisible()
+
+    // Verify followup history section is refreshed and shows the new followup
+    await expect(page.getByText('Follow-up History (1)')).toBeVisible()
+    await expect(page.getByText('recheck_evidence', { exact: true })).toBeVisible()
+    await expect(page.getByText('Evidence needs second review')).toBeVisible()
   })
 
   test('should display review queue with summary and filters', async ({ page }) => {
     // Mock review queue API
-    await page.route('**/api/v2/agent-runs/review-queue', route => {
+    await page.route('**/api/v2/agent-runs/review-queue**', route => {
       const url = new URL(route.request().url())
       const reviewState = url.searchParams.get('review_state')
       const evidenceStrength = url.searchParams.get('evidence_strength')
@@ -599,11 +636,45 @@ test.describe('Agent Runs', () => {
       }
 
       let items = [mockReviewQueueItem]
-      if (reviewState && reviewState !== 'not_reviewed') {
+      let summary = {
+        total: 1,
+        not_reviewed: 1,
+        reviewed: 0,
+        followup_created: 0,
+        needs_attention: 0,
+      }
+
+      if (reviewState === 'needs_attention') {
+        // Return different summary for needs_attention filter
+        summary = {
+          total: 1,
+          not_reviewed: 0,
+          reviewed: 0,
+          followup_created: 0,
+          needs_attention: 1,
+        }
+        mockReviewQueueItem.review_state = 'needs_attention'
+        mockReviewQueueItem.needs_attention = true
+        items = [mockReviewQueueItem]
+      } else if (reviewState && reviewState !== 'not_reviewed') {
         items = []
+        summary = {
+          total: 0,
+          not_reviewed: 0,
+          reviewed: 0,
+          followup_created: 0,
+          needs_attention: 0,
+        }
       }
       if (evidenceStrength && evidenceStrength !== 'high') {
         items = []
+        summary = {
+          total: 0,
+          not_reviewed: 0,
+          reviewed: 0,
+          followup_created: 0,
+          needs_attention: 0,
+        }
       }
 
       route.fulfill({
@@ -611,13 +682,7 @@ test.describe('Agent Runs', () => {
           code: 0,
           data: {
             items: items,
-            summary: {
-              total: 1,
-              not_reviewed: 1,
-              reviewed: 0,
-              followup_created: 0,
-              needs_attention: 0,
-            },
+            summary: summary,
             total: items.length,
             page: 1,
             page_size: 20,
@@ -634,20 +699,78 @@ test.describe('Agent Runs', () => {
     await page.getByRole('tab', { name: 'Review Queue' }).click()
     await page.waitForLoadState('networkidle')
 
-    // Check summary is displayed
+    // Check summary is displayed with specific context to avoid ambiguity
     await expect(page.getByText('Review Queue Summary')).toBeVisible()
-    await expect(page.getByText('Total')).toBeVisible()
-    await expect(page.getByText('1')).toBeVisible()
-    await expect(page.getByText('Not Reviewed')).toBeVisible()
-    await expect(page.getByText('Reviewed', { exact: true })).toBeVisible()
+    const summarySection = page.locator('text=Review Queue Summary').locator('..').locator('..')
+    await expect(summarySection.getByText('Total')).toBeVisible()
+    await expect(summarySection.getByText('Not Reviewed')).toBeVisible()
+    await expect(summarySection.getByText('Reviewed', { exact: true })).toBeVisible()
 
     // Check review queue item is displayed
     await expect(page.getByText('Test Agent Run')).toBeVisible()
+
+    // Switch to needs_attention filter and verify API request
+    const reviewQueueRequestPromise = page.waitForRequest(request =>
+      request.url().includes('/api/v2/agent-runs/review-queue') &&
+      request.url().includes('review_state=needs_attention')
+    )
+    
+    // Click on the review state dropdown
+    await page.getByText('All States').click()
+    await page.getByRole('option', { name: 'Needs Attention' }).click()
+    
+    await reviewQueueRequestPromise
+    await page.waitForLoadState('networkidle')
+
+    // Verify summary changed to reflect needs_attention filter
+    // The mock returns summary with needs_attention=1, not_reviewed=0 when review_state=needs_attention
+    await expect(summarySection.getByText('Needs Attention')).toBeVisible()
+    
+    // Assert specific summary values: needs_attention=1, not_reviewed=0
+    // Check the summary text content contains the expected values
+    const summaryText = await summarySection.textContent()
+    expect(summaryText).toContain('Needs Attention')
+    // The mock returns needs_attention=1, not_reviewed=0 for needs_attention filter
+    // The UI displays values before labels (e.g., "1Needs Attention")
+    expect(summaryText).toMatch(/1.*Needs Attention/)
+    expect(summaryText).toMatch(/0.*Not Reviewed/)
   })
 
   test('should display follow-up history in agent run detail', async ({ page }) => {
+    // Mock audit logs API globally before any navigation
+    await page.route('**/api/v2/audit/logs**', route => {
+      route.fulfill({
+        json: {
+          code: 0,
+          data: {
+            items: [
+              {
+                id: 'audit-123',
+                action: 'agent_run.followup_created',
+                resource_type: 'agent_run',
+                resource_id: 'agent-run-1',
+                timestamp: '2026-05-24T00:00:00Z',
+              },
+            ],
+            total: 1,
+            page: 1,
+            page_size: 20,
+            total_pages: 1,
+          },
+        },
+      })
+    })
+
+    // Listen for console errors to catch network errors
+    const consoleErrors: string[] = []
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        consoleErrors.push(msg.text())
+      }
+    })
+
     // Mock followup history API
-    await page.route('**/api/v2/agent-runs/agent-run-1/followups', route => {
+    await page.route('**/api/v2/agent-runs/agent-run-1/followups**', route => {
       route.fulfill({
         json: {
           code: 0,
@@ -680,12 +803,32 @@ test.describe('Agent Runs', () => {
     await expect(page.getByText('agent-run-1', { exact: true })).toBeVisible()
     await expect(page.getByText('Audit Ref:')).toBeVisible()
 
-    // Check audit link
+    // Check audit link exists with correct query parameters
     const auditLink = page.getByRole('link', { name: 'audit-123' })
     await expect(auditLink).toBeVisible()
     const auditHref = await auditLink.getAttribute('href')
     expect(auditHref).toContain('/dashboard/audit')
     expect(auditHref).toContain('resource_type=agent_run')
     expect(auditHref).toContain('resource_id=agent-run-1')
+
+    // Click audit link and wait for audit logs API request
+    const auditRequestPromise = page.waitForRequest(request =>
+      request.url().includes('/api/v2/audit/logs') &&
+      request.url().includes('resource_type=agent_run') &&
+      request.url().includes('resource_id=agent-run-1')
+    )
+    await auditLink.click()
+    await auditRequestPromise
+    await page.waitForLoadState('networkidle')
+
+    // Verify we are on the audit page
+    await expect(page).toHaveURL(/\/dashboard\/audit/)
+    
+    // Verify that no network error occurred
+    expect(consoleErrors.some(error => error.includes('Network Error'))).toBe(false)
+    
+    // Verify audit page displays the expected audit log entry
+    // The action should be visible in the Action column
+    await expect(page.getByText('agent_run.followup_created')).toBeVisible()
   })
 })

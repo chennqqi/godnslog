@@ -71,11 +71,6 @@ func TestV2ListAuditLogs(t *testing.T) {
 		t.Fatalf("Failed to initialize database: %v", err)
 	}
 
-	// Sync audit logs table
-	if err := server.orm.Sync2(new(v2models.AuditLog)); err != nil {
-		t.Fatalf("Failed to sync audit logs table: %v", err)
-	}
-
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
 	if err != nil {
 		t.Fatalf("Failed to hash password: %v", err)
@@ -94,13 +89,11 @@ func TestV2ListAuditLogs(t *testing.T) {
 
 	// Create a test audit log
 	userIDStr := fmt.Sprintf("%d", user.Id)
-	resourceID := "case-123"
 	auditLog := &v2models.AuditLog{
 		ID:           v2models.GenerateID(),
 		UserID:       &userIDStr,
 		Action:       "create_case",
 		ResourceType: "case",
-		ResourceID:   &resourceID,
 		Parameters:   `{"title":"test case"}`,
 		Result:       "success",
 		IPAddress:    "127.0.0.1",
@@ -109,6 +102,29 @@ func TestV2ListAuditLogs(t *testing.T) {
 	}
 	if _, err := server.orm.Insert(auditLog); err != nil {
 		t.Fatalf("Failed to create test audit log: %v", err)
+	}
+
+	// Create another audit log with different resource_id using direct SQL
+	// This ensures the resource_id column is correctly populated
+	resourceID1 := "case-123"
+	resourceID2 := "case-456"
+
+	// Insert audit log with resource_id=case-123
+	_, err = server.orm.Exec(`
+		INSERT INTO audit_logs (id, user_id, action, resource_type, resource_id, parameters, result, ip_address, user_agent, is_agent, timestamp, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, datetime('now'), datetime('now'))
+	`, v2models.GenerateID(), userIDStr, "create_case", "case", resourceID1, `{"title":"test case 123"}`, "success", "127.0.0.1", "test-agent")
+	if err != nil {
+		t.Fatalf("Failed to create audit log with resource_id=case-123: %v", err)
+	}
+
+	// Insert audit log with resource_id=case-456
+	_, err = server.orm.Exec(`
+		INSERT INTO audit_logs (id, user_id, action, resource_type, resource_id, parameters, result, ip_address, user_agent, is_agent, timestamp, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, datetime('now'), datetime('now'))
+	`, v2models.GenerateID(), userIDStr, "create_case", "case", resourceID2, `{"title":"test case 456"}`, "success", "127.0.0.1", "test-agent")
+	if err != nil {
+		t.Fatalf("Failed to create audit log with resource_id=case-456: %v", err)
 	}
 
 	r := gin.New()
@@ -219,13 +235,94 @@ func TestV2ListAuditLogs(t *testing.T) {
 		t.Fatalf("Expected status 200 for resource_type filter, got %d: %s", auditW3.Code, auditW3.Body.String())
 	}
 
-	// Test unauthenticated access
-	auditReq4 := httptest.NewRequest("GET", "/api/v2/audit/logs", nil)
+	// Test filtering by resource_id=case-123 should return only case-123, not case-456
+	// Use API call to verify the filter works correctly
+	auditReq4 := httptest.NewRequest("GET", "/api/v2/audit/logs?resource_id=case-123", nil)
+	auditReq4.Header.Set("Access-Token", token)
 	auditW4 := httptest.NewRecorder()
 	r.ServeHTTP(auditW4, auditReq4)
 
-	if auditW4.Code != http.StatusUnauthorized {
-		t.Errorf("Expected status 401 for unauthenticated request, got %d", auditW4.Code)
+	if auditW4.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 for resource_id=case-123 filter, got %d: %s", auditW4.Code, auditW4.Body.String())
+	}
+
+	var response4 map[string]interface{}
+	if err := json.Unmarshal(auditW4.Body.Bytes(), &response4); err != nil {
+		t.Fatalf("Failed to unmarshal resource_id=case-123 filter response: %v", err)
+	}
+	data4, ok := response4["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map for resource_id=case-123 filter")
+	}
+	items4, ok := data4["items"].([]interface{})
+	if !ok {
+		t.Fatal("Expected items to be an array for resource_id=case-123 filter")
+	}
+	// Should return at least 1 item (the one with resource_id=case-123)
+	if len(items4) < 1 {
+		t.Errorf("Expected at least 1 item for resource_id=case-123 filter, got %d", len(items4))
+	}
+	// Verify all returned items have resource_id=case-123
+	for _, item := range items4 {
+		itemMap := item.(map[string]interface{})
+		resourceID, ok := itemMap["resource_id"].(string)
+		if !ok || resourceID != "case-123" {
+			t.Errorf("Expected all items to have resource_id=case-123, got %v", itemMap["resource_id"])
+		}
+	}
+
+	// Test filtering by resource_id=case-456 should return only case-456, not case-123
+	auditReq5 := httptest.NewRequest("GET", "/api/v2/audit/logs?resource_id=case-456", nil)
+	auditReq5.Header.Set("Access-Token", token)
+	auditW5 := httptest.NewRecorder()
+	r.ServeHTTP(auditW5, auditReq5)
+
+	if auditW5.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 for resource_id=case-456 filter, got %d: %s", auditW5.Code, auditW5.Body.String())
+	}
+
+	var response5 map[string]interface{}
+	if err := json.Unmarshal(auditW5.Body.Bytes(), &response5); err != nil {
+		t.Fatalf("Failed to unmarshal resource_id=case-456 filter response: %v", err)
+	}
+	data5, ok := response5["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map for resource_id=case-456 filter")
+	}
+	items5, ok := data5["items"].([]interface{})
+	if !ok {
+		t.Fatal("Expected items to be an array for resource_id=case-456 filter")
+	}
+	// Should return at least 1 item (the one with resource_id=case-456)
+	if len(items5) < 1 {
+		t.Errorf("Expected at least 1 item for resource_id=case-456 filter, got %d", len(items5))
+	}
+	// Verify all returned items have resource_id=case-456
+	for _, item := range items5 {
+		itemMap := item.(map[string]interface{})
+		resourceID, ok := itemMap["resource_id"].(string)
+		if !ok || resourceID != "case-456" {
+			t.Errorf("Expected all items to have resource_id=case-456, got %v", itemMap["resource_id"])
+		}
+	}
+
+	// Verify that resource_id=case-123 does not return case-456
+	// Get all items from case-123 filter and check none have resource_id=case-456
+	for _, item := range items4 {
+		itemMap := item.(map[string]interface{})
+		resourceID, _ := itemMap["resource_id"].(string)
+		if resourceID == "case-456" {
+			t.Errorf("resource_id=case-123 filter should not return case-456 records")
+		}
+	}
+
+	// Test unauthenticated access
+	auditReq6 := httptest.NewRequest("GET", "/api/v2/audit/logs", nil)
+	auditW6 := httptest.NewRecorder()
+	r.ServeHTTP(auditW6, auditReq6)
+
+	if auditW6.Code != http.StatusUnauthorized {
+		t.Errorf("Expected status 401 for unauthenticated request, got %d", auditW6.Code)
 	}
 }
 

@@ -25,6 +25,8 @@ type Service struct {
 
 // NewService creates a new auth service
 func NewService(engine *xorm.Engine) *Service {
+	// Ensure audit logs table exists with correct schema
+	SyncSchema(engine)
 	return &Service{engine: engine}
 }
 
@@ -240,7 +242,7 @@ func (s *Service) CreateAuditLog(log *models.AuditLog) error {
 }
 
 // ListAuditLogs retrieves audit logs with filtering
-func (s *Service) ListAuditLogs(userID, action, resourceType string, startTime, endTime *time.Time, page, pageSize int) (*models.AuditLogListResponse, error) {
+func (s *Service) ListAuditLogs(userID, action, resourceType, resourceID string, startTime, endTime *time.Time, page, pageSize int) (*models.AuditLogListResponse, error) {
 	var logs []models.AuditLog
 	session := s.engine.NewSession()
 	defer session.Close()
@@ -253,6 +255,9 @@ func (s *Service) ListAuditLogs(userID, action, resourceType string, startTime, 
 	}
 	if resourceType != "" {
 		session = session.Where("resource_type = ?", resourceType)
+	}
+	if resourceID != "" {
+		session = session.Where("resource_id = ?", resourceID)
 	}
 	if startTime != nil {
 		session = session.Where("timestamp >= ?", startTime)
@@ -267,7 +272,28 @@ func (s *Service) ListAuditLogs(userID, action, resourceType string, startTime, 
 	}
 
 	offset := (page - 1) * pageSize
-	if err := session.Desc("timestamp").Limit(pageSize, offset).Find(&logs); err != nil {
+	// Re-apply WHERE conditions for Find to ensure they are not lost
+	findSession := s.engine.NewSession()
+	defer findSession.Close()
+	if userID != "" {
+		findSession = findSession.Where("user_id = ?", userID)
+	}
+	if action != "" {
+		findSession = findSession.Where("action = ?", action)
+	}
+	if resourceType != "" {
+		findSession = findSession.Where("resource_type = ?", resourceType)
+	}
+	if resourceID != "" {
+		findSession = findSession.Where("resource_id = ?", resourceID)
+	}
+	if startTime != nil {
+		findSession = findSession.Where("timestamp >= ?", startTime)
+	}
+	if endTime != nil {
+		findSession = findSession.Where("timestamp <= ?", endTime)
+	}
+	if err := findSession.Desc("timestamp").Limit(pageSize, offset).Find(&logs); err != nil {
 		return nil, err
 	}
 
