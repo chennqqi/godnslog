@@ -1081,12 +1081,13 @@ test.describe('Agent Runs', () => {
       route.fulfill({
         json: {
           code: 0,
+          message: 'success',
           data: {
             agent_run_id: 'agent-run-1',
             format: 'json',
             operation_id: 'op-export-1',
             audit_ref_id: 'audit-export-1',
-            review_packet_id: 'review-packet-1',
+            review_packet_id: 'agent-run-1',
             decision: 'accepted',
             package: {
               agent_run: {
@@ -1098,7 +1099,7 @@ test.describe('Agent Runs', () => {
                 status: 'completed',
               },
               review_packet: {
-                id: 'review-packet-1',
+                id: 'agent-run-1',
                 evidence_strength: 'high',
                 confidence: 85,
                 interaction_count: 5,
@@ -1233,7 +1234,7 @@ test.describe('Agent Runs', () => {
     // Verify API was called
     expect(exportCalled).toBe(true)
     expect(capturedBody).toContain('json')
-    expect(capturedBody).toContain('review-packet-1')
+    expect(capturedBody).toContain('agent-run-1')
 
     // Close dialog
     await dialog.getByRole('button', { name: '取消' }).click()
@@ -1255,23 +1256,79 @@ test.describe('Agent Runs', () => {
 
     // Test Markdown export
     let markdownExportCalled = false
+    // Unregister existing route handler and register new one for markdown
+    await page.unroute('**/api/v2/agent-runs/agent-run-1/review-export')
     await page.route('**/api/v2/agent-runs/agent-run-1/review-export', route => {
-      markdownExportCalled = true
-      route.fulfill({
-        json: {
-          code: 0,
-          data: {
-            agent_run_id: 'agent-run-1',
-            format: 'markdown',
-            operation_id: 'op-export-2',
-            audit_ref_id: 'audit-export-2',
-            review_packet_id: 'review-packet-1',
-            decision: 'accepted',
-            content: '# Agent Run Review Evidence Package\n\n## Agent Run\n\n- **ID**: agent-run-1\n- **Title**: Test Agent Run\n\n## Evidence Summary\n\n- **Total Interactions**: 5\n\n## Review Decision\n\n- **Decision**: accepted\n\n## Timeline References\n\n## Audit References\n\n## Links\n\n',
-            generated_at: '2026-06-07T00:00:00Z',
+      const body = route.request().postData() || ''
+      if (body.includes('markdown')) {
+        markdownExportCalled = true
+        route.fulfill({
+          json: {
+            code: 0,
+            message: 'success',
+            data: {
+              data: {
+                agent_run_id: 'agent-run-1',
+                format: 'markdown',
+                operation_id: 'op-export-2',
+                audit_ref_id: 'audit-export-2',
+                review_packet_id: 'agent-run-1',
+                decision: 'accepted',
+                content: '# Agent Run Review Evidence Package\n\n## Agent Run\n\n- **ID**: agent-run-1\n- **Title**: Test Agent Run\n\n## Evidence Summary\n\n- **Total Interactions**: 5\n\n## Review Decision\n\n- **Decision**: accepted\n\n## Timeline References\n\n## Audit References\n\n## Links\n\n',
+                generated_at: '2026-06-07T00:00:00Z',
+              },
+            },
           },
-        },
-      })
+        })
+      } else {
+        // Default to JSON response for other requests
+        route.fulfill({
+          json: {
+            code: 0,
+            message: 'success',
+            data: {
+              data: {
+                agent_run_id: 'agent-run-1',
+                format: 'json',
+                operation_id: 'op-export-1',
+                audit_ref_id: 'audit-export-1',
+                review_packet_id: 'agent-run-1',
+                decision: 'accepted',
+                package: {
+                  agent_run: {
+                    id: 'agent-run-1',
+                    agent_id: 'agent-123',
+                    case_id: 'case-1',
+                    payload_id: 'payload-1',
+                    target: 'https://target.example',
+                    status: 'completed',
+                  },
+                  review_packet: {
+                    id: 'agent-run-1',
+                    evidence_strength: 'high',
+                    confidence: 85,
+                    interaction_count: 5,
+                    unique_sources: 2,
+                  },
+                  review_decision: {
+                    decision: 'accepted',
+                    reason: 'Test review decision',
+                    operation_id: 'op-decision-1',
+                    audit_ref_id: 'audit-decision-1',
+                  },
+                  links: {
+                    case_url: '/dashboard/cases/case-1',
+                    payload_url: '/dashboard/payloads/payload-1',
+                    evidence_url: '/dashboard/evidence?payload_id=payload-1',
+                    audit_url: '/dashboard/audit?resource_type=agent_run&resource_id=agent-run-1',
+                  },
+                },
+                generated_at: '2026-06-07T00:00:00Z',
+              },
+            },
+          },
+        })
+      }
     })
 
     // Click Export Markdown button
@@ -1280,11 +1337,24 @@ test.describe('Agent Runs', () => {
     await exportMarkdownButton.click()
     await page.waitForSelector('[role="dialog"]', { state: 'visible' })
 
+    // Re-locate dialog for markdown export
+    const mdDialog = page.locator('[role="dialog"]')
+
     // Click export button in dialog
-    await dialog.getByRole('button', { name: '导出' }).click()
+    await mdDialog.getByRole('button', { name: '导出' }).click()
     await page.waitForLoadState('networkidle')
 
     // Verify markdown export API was called
     expect(markdownExportCalled).toBe(true)
+
+    // Wait for export result to appear in dialog
+    await expect(mdDialog.getByText('Export Result')).toBeVisible({ timeout: 10000 })
+
+    // Verify markdown content in pre element
+    const preElement = mdDialog.locator('pre')
+    await expect(preElement).toBeVisible()
+    await expect(preElement).toContainText('# Agent Run Review Evidence Package')
+    await expect(preElement).toContainText('## Agent Run')
+    await expect(preElement).toContainText('## Evidence Summary')
   })
 })

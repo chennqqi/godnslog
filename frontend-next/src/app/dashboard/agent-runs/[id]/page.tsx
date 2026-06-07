@@ -177,11 +177,12 @@ export default function AgentRunDetailPage() {
     try {
       const response = await agentRunApi.exportReview(agentRun.id, {
         format: exportFormat,
-        review_packet_id: reviewPacket?.id,
+        review_packet_id: agentRun.id,
         include_audit: true,
       })
       if (response.data) {
         setExportResult(response.data.data)
+        // Immediately refresh agent run to update timeline
         const agentRunResponse = await agentRunApi.get(agentRun.id)
         if (agentRunResponse.data) {
           setAgentRun(agentRunResponse.data.data)
@@ -439,7 +440,7 @@ export default function AgentRunDetailPage() {
                                 </div>
                               )
                             }
-                          } catch (e) {
+                          } catch {
                             // Ignore parse errors
                           }
                           return null
