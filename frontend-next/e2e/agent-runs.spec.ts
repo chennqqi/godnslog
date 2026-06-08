@@ -125,6 +125,9 @@ test.describe('Agent Runs', () => {
       }
     })
 
+    // Mock delivery history API (empty by default) - will be overridden in specific tests
+    // Note: This is a default mock that can be unroute'd in specific tests
+
     // Mock agent run operations API
     await page.route('**/api/v2/agent-runs/agent-run-1/operations**', route => {
       if (route.request().method() === 'POST') {
@@ -1684,6 +1687,220 @@ test.describe('Agent Runs', () => {
     // Close delivery dialog
     await deliveryDialog.getByRole('button', { name: '取消' }).click()
     await page.waitForSelector('[role="dialog"]', { state: 'hidden' })
+  })
+
+  test('should display delivery history with happy path loop', async ({ page }) => {
+    // Mock agent run detail API to include review packet
+    await page.route('**/api/v2/agent-runs/agent-run-1', route => {
+      route.fulfill({
+        json: {
+          code: 0,
+          message: 'success',
+          data: {
+            data: {
+              id: 'agent-run-1',
+              agent_id: 'agent-123',
+              case_id: 'case-1',
+              payload_id: 'payload-1',
+              target: 'https://target.example',
+              title: 'Test Agent Run',
+              status: 'completed',
+              created_at: '2026-06-07T00:00:00Z',
+              operations: [],
+              review_packet: {
+                id: 'agent-run-1',
+                evidence_strength: 'high',
+                confidence: 85,
+                interaction_count: 5,
+                unique_sources: 2,
+                interaction_summary: {
+                  total: 5,
+                  dns_count: 2,
+                  http_count: 3,
+                  unique_sources: 2,
+                },
+              },
+            },
+          },
+        },
+      })
+    })
+
+    // Mock delivery history with delivered item
+    await page.route('**/api/v2/agent-runs/agent-run-1/review-deliveries', route => {
+      route.fulfill({
+        json: {
+          code: 0,
+          message: 'success',
+          data: {
+            data: {
+              agent_run_id: 'agent-run-1',
+              summary: { total: 1, delivered: 1, failed: 0, timeout: 0 },
+              items: [
+                {
+                  delivery_id: 'delivery-123',
+                  delivery_operation_id: 'op-delivery-1',
+                  export_operation_id: 'export-123',
+                  audit_ref_id: 'audit-delivery-1',
+                  format: 'markdown',
+                  result: 'delivered',
+                  destination_host: 'hooks.example.com',
+                  status_code: 200,
+                  header_names: ['X-Custom-Header'],
+                  created_at: '2026-06-07T00:00:00Z',
+                  delivered_at: '2026-06-07T00:00:01Z',
+                },
+              ],
+            },
+          },
+        },
+      })
+    })
+
+    // Navigate to agent run detail page
+    await page.goto('/dashboard/agent-runs/agent-run-1')
+
+    // Wait for page to load
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForTimeout(2000)
+
+    // Wait for delivery history section to load
+    await expect(page.getByText('Delivery History')).toBeVisible({ timeout: 10000 })
+
+    // Verify delivery history displays correctly
+    await expect(page.getByText('hooks.example.com')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('delivered', { exact: true })).toBeVisible()
+    await expect(page.getByText('Total: 1')).toBeVisible()
+    await expect(page.getByText('Delivered: 1')).toBeVisible()
+    await expect(page.getByText('Status Code')).toBeVisible()
+    await expect(page.getByText('200')).toBeVisible()
+    await expect(page.getByText('Headers')).toBeVisible()
+    await expect(page.getByText('X-Custom-Header')).toBeVisible()
+    await expect(page.getByText('Operation ID')).toBeVisible()
+    await expect(page.getByText('op-delivery-1')).toBeVisible()
+    await expect(page.getByText('Audit Ref')).toBeVisible()
+    await expect(page.getByText('audit-delivery-1')).toBeVisible()
+
+    // Verify no full webhook URL or header values are visible
+    const pageContent = await page.content()
+    expect(pageContent).not.toContain('https://hooks.example.com/review')
+    expect(pageContent).not.toContain('test-value')
+  })
+
+  test('should display failed and timeout delivery history', async ({ page }) => {
+    // Unroute global delivery history API mock to use test-specific mock
+    await page.unroute('**/api/v2/agent-runs/agent-run-1/review-deliveries')
+
+    // Mock agent run detail API
+    await page.route('**/api/v2/agent-runs/agent-run-1', route => {
+      route.fulfill({
+        json: {
+          code: 0,
+          message: 'success',
+          data: {
+            data: {
+              id: 'agent-run-1',
+              agent_id: 'agent-123',
+              case_id: 'case-1',
+              payload_id: 'payload-1',
+              target: 'https://target.example',
+              title: 'Test Agent Run',
+              status: 'completed',
+              created_at: '2026-06-07T00:00:00Z',
+              operations: [],
+              review_packet: {
+                id: 'agent-run-1',
+                evidence_strength: 'high',
+                confidence: 85,
+                interaction_count: 5,
+                unique_sources: 2,
+                interaction_summary: {
+                  total: 5,
+                  dns_count: 2,
+                  http_count: 3,
+                  unique_sources: 2,
+                },
+              },
+            },
+          },
+        },
+      })
+    })
+
+    // Mock delivery history with failed and timeout items
+    await page.route('**/api/v2/agent-runs/agent-run-1/review-deliveries', route => {
+      route.fulfill({
+        json: {
+          code: 0,
+          message: 'success',
+          data: {
+            data: {
+              agent_run_id: 'agent-run-1',
+              summary: { total: 3, delivered: 1, failed: 1, timeout: 1 },
+              items: [
+                {
+                  delivery_id: 'delivery-123',
+                  delivery_operation_id: 'op-delivery-1',
+                  format: 'markdown',
+                  result: 'delivered',
+                  destination_host: 'hooks.example.com',
+                  status_code: 200,
+                  created_at: '2026-06-07T00:00:00Z',
+                  delivered_at: '2026-06-07T00:00:01Z',
+                },
+                {
+                  delivery_id: 'delivery-456',
+                  delivery_operation_id: 'op-delivery-2',
+                  format: 'json',
+                  result: 'failed',
+                  destination_host: 'hooks.example.com',
+                  status_code: 500,
+                  error_summary: 'internal server error',
+                  created_at: '2026-06-07T00:00:02Z',
+                },
+                {
+                  delivery_id: 'delivery-789',
+                  delivery_operation_id: 'op-delivery-3',
+                  format: 'markdown',
+                  result: 'timeout',
+                  destination_host: 'hooks.example.com',
+                  error_summary: 'request timed out',
+                  created_at: '2026-06-07T00:00:03Z',
+                },
+              ],
+            },
+          },
+        },
+      })
+    })
+
+    // Navigate to agent run detail page
+    await page.goto('/dashboard/agent-runs/agent-run-1')
+
+    // Wait for page to load
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForTimeout(1000)
+
+    // Wait for delivery history section to load
+    await expect(page.getByText('Delivery History')).toBeVisible({ timeout: 10000 })
+
+    // Verify summary counts
+    await expect(page.getByText('Total: 3')).toBeVisible()
+    await expect(page.getByText('Delivered: 1')).toBeVisible()
+    await expect(page.getByText('Failed: 1')).toBeVisible()
+    await expect(page.getByText('Timeout: 1')).toBeVisible()
+
+    // Verify failed item
+    await expect(page.getByText('failed', { exact: true })).toBeVisible()
+    await expect(page.getByText('500')).toBeVisible()
+    await expect(page.getByText('internal server error')).toBeVisible()
+
+    // Verify timeout item
+    await expect(page.getByText('timeout', { exact: true })).toBeVisible()
+    await expect(page.getByText('request timed out')).toBeVisible()
+
+    // Verify no retry button exists
+    await expect(page.getByRole('button', { name: /retry/i })).not.toBeVisible()
   })
 
   test('should fail delivery for blocked URLs', async ({ page }) => {

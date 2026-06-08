@@ -16,6 +16,291 @@ import (
 	"xorm.io/xorm"
 )
 
+// TestListReviewDeliveries tests the ListReviewDeliveries function
+func TestListReviewDeliveries(t *testing.T) {
+	// Setup in-memory database
+	engine, err := xorm.NewEngine("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to create engine: %v", err)
+	}
+	defer engine.Close()
+
+	// Sync tables
+	if err := engine.Sync2(new(models.AgentRun)); err != nil {
+		t.Fatalf("Failed to sync agent_runs table: %v", err)
+	}
+	if err := engine.Sync2(new(models.AgentOperation)); err != nil {
+		t.Fatalf("Failed to sync agent_operations table: %v", err)
+	}
+	if err := engine.Sync2(new(models.AuditLog)); err != nil {
+		t.Fatalf("Failed to sync audit_logs table: %v", err)
+	}
+
+	// Create services
+	authService := auth.NewService(engine)
+	agentRunService := NewService(engine, authService)
+	interactionService := interaction.NewService(engine)
+	evidenceService := interaction.NewEvidenceService(interactionService)
+	reviewService := NewReviewService(engine, agentRunService, authService, evidenceService, interactionService)
+
+	// Create test agent run
+	startedAt := time.Now()
+	agentRun := &models.AgentRun{
+		ID:         "agent-run-1",
+		AgentID:    "agent-123",
+		OperatorID: "user-1",
+		Status:     "completed",
+		StartedAt:  &startedAt,
+	}
+	if _, err := engine.Insert(agentRun); err != nil {
+		t.Fatalf("Failed to create agent run: %v", err)
+	}
+
+	// Test non-existent agent run
+	t.Run("Non-existent agent run", func(t *testing.T) {
+		_, err := reviewService.ListReviewDeliveries("non-existent")
+		if err == nil {
+			t.Error("Expected error for non-existent agent run")
+		}
+		if !strings.Contains(err.Error(), "not found") {
+			t.Errorf("Expected not found error, got: %v", err)
+		}
+	})
+
+	// Test empty delivery history
+	t.Run("Empty delivery history", func(t *testing.T) {
+		resp, err := reviewService.ListReviewDeliveries("agent-run-1")
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if resp.AgentRunID != "agent-run-1" {
+			t.Error("AgentRunID mismatch")
+		}
+		if resp.Summary.Total != 0 {
+			t.Error("Expected total to be 0")
+		}
+		if len(resp.Items) != 0 {
+			t.Error("Expected no items")
+		}
+	})
+
+	// Create a delivered operation
+	deliveredRequest := map[string]interface{}{
+		"format":           "markdown",
+		"destination_host": "hooks.example.com",
+		"header_names":     []string{"X-Custom-Header"},
+	}
+	deliveredRequestJSON, _ := json.Marshal(deliveredRequest)
+	deliveredResult := map[string]interface{}{
+		"delivery_id":         "delivery-123",
+		"export_operation_id": "export-123",
+		"status_code":         200,
+		"result":              "delivered",
+		"delivered_at":        time.Now().Format(time.RFC3339),
+	}
+	deliveredResultJSON, _ := json.Marshal(deliveredResult)
+	deliveredOp := &models.AgentOperation{
+		ID:         "op-delivery-1",
+		AgentRunID: "agent-run-1",
+		AgentID:    "agent-123",
+		Action:     "review_delivery.webhook",
+		Request:    string(deliveredRequestJSON),
+		Result:     string(deliveredResultJSON),
+		StartedAt:  time.Now(),
+	}
+	if _, err := engine.Insert(deliveredOp); err != nil {
+		t.Fatalf("Failed to create delivered operation: %v", err)
+	}
+
+	// Create audit log for delivered
+	userID := "user-1"
+	agentRunID := agentRun.ID
+	auditLog := &models.AuditLog{
+		ID:           "audit-delivery-1",
+		UserID:       &userID,
+		Action:       "agent_run.review_delivered",
+		ResourceType: "agent_run",
+		ResourceID:   &agentRunID,
+		Details: models.AuditDetails{
+			"delivery_operation_id": "op-delivery-1",
+		},
+		Timestamp: time.Now(),
+	}
+	if _, err := engine.Insert(auditLog); err != nil {
+		t.Fatalf("Failed to create audit log: %v", err)
+	}
+
+	// Test delivered item
+	t.Run("Delivered item", func(t *testing.T) {
+		resp, err := reviewService.ListReviewDeliveries("agent-run-1")
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if resp.Summary.Total != 1 {
+			t.Errorf("Expected total 1, got %d", resp.Summary.Total)
+		}
+		if resp.Summary.Delivered != 1 {
+			t.Errorf("Expected delivered 1, got %d", resp.Summary.Delivered)
+		}
+		if len(resp.Items) != 1 {
+			t.Fatalf("Expected 1 item, got %d", len(resp.Items))
+		}
+		item := resp.Items[0]
+		if item.DeliveryOperationID != "op-delivery-1" {
+			t.Error("DeliveryOperationID mismatch")
+		}
+		if item.DeliveryID != "delivery-123" {
+			t.Error("DeliveryID mismatch")
+		}
+		if item.ExportOperationID != "export-123" {
+			t.Error("ExportOperationID mismatch")
+		}
+		if item.Format != "markdown" {
+			t.Error("Format mismatch")
+		}
+		if item.Result != "delivered" {
+			t.Error("Result mismatch")
+		}
+		if item.DestinationHost != "hooks.example.com" {
+			t.Error("DestinationHost mismatch")
+		}
+		if item.StatusCode != 200 {
+			t.Error("StatusCode mismatch")
+		}
+		if len(item.HeaderNames) != 1 || item.HeaderNames[0] != "X-Custom-Header" {
+			t.Error("HeaderNames mismatch")
+		}
+		if item.AuditRefID != "audit-delivery-1" {
+			t.Error("AuditRefID mismatch")
+		}
+		// Verify no full webhook URL or header values in response
+		responseJSON, _ := json.Marshal(resp)
+		responseStr := string(responseJSON)
+		if strings.Contains(responseStr, "https://") || strings.Contains(responseStr, "http://") {
+			t.Error("Response should not contain full webhook URL")
+		}
+		if strings.Contains(responseStr, "test-value") {
+			t.Error("Response should not contain header values")
+		}
+	})
+
+	// Create a failed operation
+	failedRequest := map[string]interface{}{
+		"format":           "json",
+		"destination_host": "hooks.example.com",
+	}
+	failedRequestJSON, _ := json.Marshal(failedRequest)
+	failedResult := map[string]interface{}{
+		"delivery_id": "delivery-456",
+		"status_code": 500,
+		"result":      "failed",
+		"error":       "internal server error",
+	}
+	failedResultJSON, _ := json.Marshal(failedResult)
+	failedOp := &models.AgentOperation{
+		ID:         "op-delivery-2",
+		AgentRunID: "agent-run-1",
+		AgentID:    "agent-123",
+		Action:     "review_delivery.webhook",
+		Request:    string(failedRequestJSON),
+		Result:     string(failedResultJSON),
+		StartedAt:  time.Now(),
+	}
+	if _, err := engine.Insert(failedOp); err != nil {
+		t.Fatalf("Failed to create failed operation: %v", err)
+	}
+
+	// Test failed item
+	t.Run("Failed item", func(t *testing.T) {
+		resp, err := reviewService.ListReviewDeliveries("agent-run-1")
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if resp.Summary.Total != 2 {
+			t.Errorf("Expected total 2, got %d", resp.Summary.Total)
+		}
+		if resp.Summary.Failed != 1 {
+			t.Errorf("Expected failed 1, got %d", resp.Summary.Failed)
+		}
+		// Find failed item
+		var failedItem *models.AgentRunReviewDeliveryHistoryItem
+		for _, item := range resp.Items {
+			if item.DeliveryID == "delivery-456" {
+				failedItem = &item
+				break
+			}
+		}
+		if failedItem == nil {
+			t.Fatal("Failed item not found")
+		}
+		if failedItem.Result != "failed" {
+			t.Error("Result should be failed")
+		}
+		if failedItem.StatusCode != 500 {
+			t.Error("StatusCode should be 500")
+		}
+		if failedItem.ErrorSummary != "internal server error" {
+			t.Error("ErrorSummary mismatch")
+		}
+	})
+
+	// Create a timeout operation (real Sprint Q pattern: result="failed" with timeout error)
+	timeoutRequest := map[string]interface{}{
+		"format":           "markdown",
+		"destination_host": "hooks.example.com",
+	}
+	timeoutRequestJSON, _ := json.Marshal(timeoutRequest)
+	timeoutResult := map[string]interface{}{
+		"delivery_id": "delivery-789",
+		"result":      "failed",
+		"error":       "request timed out",
+	}
+	timeoutResultJSON, _ := json.Marshal(timeoutResult)
+	timeoutOp := &models.AgentOperation{
+		ID:         "op-delivery-3",
+		AgentRunID: "agent-run-1",
+		AgentID:    "agent-123",
+		Action:     "review_delivery.webhook",
+		Request:    string(timeoutRequestJSON),
+		Result:     string(timeoutResultJSON),
+		StartedAt:  time.Now(),
+	}
+	if _, err := engine.Insert(timeoutOp); err != nil {
+		t.Fatalf("Failed to create timeout operation: %v", err)
+	}
+
+	// Test timeout item
+	t.Run("Timeout item", func(t *testing.T) {
+		resp, err := reviewService.ListReviewDeliveries("agent-run-1")
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if resp.Summary.Total != 3 {
+			t.Errorf("Expected total 3, got %d", resp.Summary.Total)
+		}
+		if resp.Summary.Timeout != 1 {
+			t.Errorf("Expected timeout 1, got %d", resp.Summary.Timeout)
+		}
+		// Find timeout item
+		var timeoutItem *models.AgentRunReviewDeliveryHistoryItem
+		for _, item := range resp.Items {
+			if item.DeliveryID == "delivery-789" {
+				timeoutItem = &item
+				break
+			}
+		}
+		if timeoutItem == nil {
+			t.Fatal("Timeout item not found")
+		}
+		if timeoutItem.Result != "timeout" {
+			t.Error("Result should be timeout")
+		}
+		if timeoutItem.ErrorSummary != "request timed out" {
+			t.Error("ErrorSummary mismatch")
+		}
+	})
+}
+
 // TestBuildReviewPacket tests the BuildReviewPacket function
 func TestBuildReviewPacket(t *testing.T) {
 	// Setup in-memory database

@@ -200,6 +200,7 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			agentRuns.POST("/:id/review-decision", self.v2RecordReviewDecision)
 			agentRuns.POST("/:id/review-export", self.v2ExportReviewPackage)
 			agentRuns.POST("/:id/review-delivery", self.v2DeliverReviewPackage)
+			agentRuns.GET("/:id/review-deliveries", self.v2ListReviewDeliveries)
 			agentRuns.GET("/review-queue", self.v2ListReviewQueue)
 			agentRuns.GET("/:id/followups", self.v2ListFollowupHistory)
 		}
@@ -3679,6 +3680,30 @@ func (self *WebServer) v2DeliverReviewPackage(c *gin.Context) {
 		}
 		logrus.Errorf("[v2_api.go::v2DeliverReviewPackage] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to deliver review package"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": resp})
+}
+
+// v2ListReviewDeliveries lists the delivery history for an agent run
+func (self *WebServer) v2ListReviewDeliveries(c *gin.Context) {
+	id := c.Param("id")
+
+	authService := auth.NewService(self.orm)
+	agentRunService := agentrun.NewService(self.orm, authService)
+	interactionService := interaction.NewService(self.orm)
+	evidenceService := interaction.NewEvidenceService(interactionService)
+	reviewService := agentrun.NewReviewService(self.orm, agentRunService, authService, evidenceService, interactionService)
+
+	resp, err := reviewService.ListReviewDeliveries(id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "Agent run not found"})
+			return
+		}
+		logrus.Errorf("[v2_api.go::v2ListReviewDeliveries] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to list delivery history"})
 		return
 	}
 

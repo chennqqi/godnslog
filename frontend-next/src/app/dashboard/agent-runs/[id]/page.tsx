@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { agentRunApi } from '@/lib/api-client'
-import type { AgentRunDetail, AgentRunStatus, AgentRunReviewPacket, AgentRunFollowupActionType, AgentRunFollowupHistoryItem, ReviewDecisionType, AgentRunReviewExportResponse, AgentRunReviewDeliveryResponse } from '@/types'
+import type { AgentRunDetail, AgentRunStatus, AgentRunReviewPacket, AgentRunFollowupActionType, AgentRunFollowupHistoryItem, ReviewDecisionType, AgentRunReviewExportResponse, AgentRunReviewDeliveryResponse, AgentRunReviewDeliveryHistoryResponse } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -45,6 +45,8 @@ export default function AgentRunDetailPage() {
   const [delivering, setDelivering] = useState(false)
   const [deliveryResult, setDeliveryResult] = useState<AgentRunReviewDeliveryResponse | null>(null)
   const [deliveryError, setDeliveryError] = useState('')
+  const [deliveryHistory, setDeliveryHistory] = useState<AgentRunReviewDeliveryHistoryResponse | null>(null)
+  const [loadingDeliveryHistory, setLoadingDeliveryHistory] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -85,8 +87,25 @@ export default function AgentRunDetailPage() {
       }
     }
 
+    const loadDeliveryHistory = async () => {
+      setLoadingDeliveryHistory(true)
+      try {
+        const response = await agentRunApi.listReviewDeliveries(params.id as string)
+        if (response.data) {
+          setDeliveryHistory(response.data.data)
+        }
+      } catch (error: unknown) {
+        // Don't fail the whole page if delivery history fails to load
+        console.error('Failed to load delivery history:', error)
+        setDeliveryHistory(null)
+      } finally {
+        setLoadingDeliveryHistory(false)
+      }
+    }
+
     loadAgentRun()
     loadFollowupHistory()
+    loadDeliveryHistory()
   }, [router, params.id])
 
   const handleUpdateStatus = async (newStatus: AgentRunStatus) => {
@@ -231,6 +250,11 @@ export default function AgentRunDetailPage() {
         const agentRunResponse = await agentRunApi.get(agentRun.id)
         if (agentRunResponse.data) {
           setAgentRun(agentRunResponse.data.data)
+        }
+        // Refresh delivery history
+        const deliveryHistoryResponse = await agentRunApi.listReviewDeliveries(agentRun.id)
+        if (deliveryHistoryResponse.data) {
+          setDeliveryHistory(deliveryHistoryResponse.data.data)
         }
       }
     } catch (error: unknown) {
@@ -571,6 +595,101 @@ export default function AgentRunDetailPage() {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Delivery History */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Delivery History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingDeliveryHistory ? (
+              <p className="text-muted-foreground">加载中...</p>
+            ) : !deliveryHistory || !deliveryHistory.items || deliveryHistory.items.length === 0 ? (
+              <p className="text-muted-foreground">暂无 Delivery 记录</p>
+            ) : (
+              <div className="space-y-4">
+                {/* Summary */}
+                <div className="flex gap-4 flex-wrap">
+                  <Badge variant="outline">Total: {deliveryHistory.summary.total}</Badge>
+                  <Badge className="bg-green-500">Delivered: {deliveryHistory.summary.delivered}</Badge>
+                  <Badge className="bg-red-500">Failed: {deliveryHistory.summary.failed}</Badge>
+                  <Badge className="bg-yellow-500">Timeout: {deliveryHistory.summary.timeout}</Badge>
+                </div>
+
+                {/* History Items */}
+                <div className="space-y-3">
+                  {deliveryHistory.items.map((item) => (
+                    <div key={item.delivery_operation_id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold">
+                          {item.destination_host}
+                        </h4>
+                        <Badge className={
+                          item.result === 'delivered' ? 'bg-green-500' :
+                          item.result === 'failed' ? 'bg-red-500' :
+                          'bg-yellow-500'
+                        }>
+                          {item.result}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <p className="font-medium">Format:</p>
+                          <p className="text-muted-foreground">{item.format}</p>
+                        </div>
+                        {item.status_code && (
+                          <div>
+                            <p className="font-medium">Status Code:</p>
+                            <p className="text-muted-foreground">{item.status_code}</p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium">Created:</p>
+                          <p className="text-muted-foreground">{new Date(item.created_at).toLocaleString()}</p>
+                        </div>
+                        {item.delivered_at && (
+                          <div>
+                            <p className="font-medium">Delivered:</p>
+                            <p className="text-muted-foreground">{new Date(item.delivered_at).toLocaleString()}</p>
+                          </div>
+                        )}
+                      </div>
+                      {item.header_names && item.header_names.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-sm font-medium">Headers:</p>
+                          <p className="text-sm text-muted-foreground">{item.header_names.join(', ')}</p>
+                        </div>
+                      )}
+                      {item.error_summary && (
+                        <div className="mt-2">
+                          <p className="text-sm font-medium">Error:</p>
+                          <p className="text-sm text-muted-foreground">{item.error_summary}</p>
+                        </div>
+                      )}
+                      <div className="mt-2 flex gap-4 text-sm">
+                        <div>
+                          <p className="font-medium">Operation ID:</p>
+                          <p className="text-muted-foreground">{item.delivery_operation_id}</p>
+                        </div>
+                        {item.audit_ref_id && (
+                          <div>
+                            <p className="font-medium">Audit Ref:</p>
+                            <a
+                              href={`/dashboard/audit?resource_type=agent_run&resource_id=${agentRun.id}`}
+                              className="text-blue-500 hover:underline"
+                            >
+                              {item.audit_ref_id}
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </CardContent>

@@ -30,6 +30,7 @@ import type {
   AgentRunUpdateStatusRequest,
   AgentRunReviewDeliveryRequest,
   AgentRunReviewDeliveryResponse,
+  AgentRunReviewDeliveryHistoryResponse,
   AgentRunListRequest,
   AgentRunListResponse,
   AgentOperationCreateRequest,
@@ -197,6 +198,8 @@ export const agentRunApi = {
     api.post<{ data: AgentRunReviewExportResponse }>(`/agent-runs/${id}/review-export`, data),
   deliverReview: (id: string, data: AgentRunReviewDeliveryRequest) =>
     api.post<{ data: AgentRunReviewDeliveryResponse }>(`/agent-runs/${id}/review-delivery`, data),
+  listReviewDeliveries: (id: string) =>
+    api.get<{ data: AgentRunReviewDeliveryHistoryResponse }>(`/agent-runs/${id}/review-deliveries`),
   listReviewQueue: (params?: ReviewQueueFilters) =>
     api.get<AgentRunReviewQueueResponse>('/agent-runs/review-queue', params),
   listFollowupHistory: (id: string) =>

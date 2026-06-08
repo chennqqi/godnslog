@@ -858,3 +858,136 @@ func (s *ReviewService) createDeliveryFailure(agentRunID string, req *models.Age
 
 	return nil, fmt.Errorf("delivery failed: %w", deliveryError)
 }
+
+// ListReviewDeliveries returns the delivery history for an agent run
+func (s *ReviewService) ListReviewDeliveries(agentRunID string) (*models.AgentRunReviewDeliveryHistoryResponse, error) {
+	// Validate the Agent Run exists
+	var agentRun models.AgentRun
+	has, err := s.engine.ID(agentRunID).Get(&agentRun)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query agent run: %w", err)
+	}
+	if !has {
+		return nil, ErrAgentRunNotFound
+	}
+
+	// Query review_delivery.webhook operations
+	var operations []models.AgentOperation
+	err = s.engine.Where("agent_run_i_d = ? AND action = ?", agentRunID, "review_delivery.webhook").
+		OrderBy("created_at DESC").
+		Find(&operations)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query delivery operations: %w", err)
+	}
+
+	// Build history items
+	items := make([]models.AgentRunReviewDeliveryHistoryItem, 0, len(operations))
+	summary := models.AgentRunReviewDeliverySummary{
+		Total:     len(operations),
+		Delivered: 0,
+		Failed:    0,
+		Timeout:   0,
+	}
+
+	for _, op := range operations {
+		item := models.AgentRunReviewDeliveryHistoryItem{
+			DeliveryOperationID: op.ID,
+			CreatedAt:           op.StartedAt,
+		}
+
+		// Parse operation request
+		var request map[string]interface{}
+		if op.Request != "" {
+			if err := json.Unmarshal([]byte(op.Request), &request); err == nil {
+				if format, ok := request["format"].(string); ok {
+					item.Format = format
+				}
+				if destHost, ok := request["destination_host"].(string); ok {
+					item.DestinationHost = destHost
+				}
+				if headerNames, ok := request["header_names"].([]interface{}); ok {
+					names := make([]string, 0, len(headerNames))
+					for _, h := range headerNames {
+						if name, ok := h.(string); ok {
+							names = append(names, name)
+						}
+					}
+					item.HeaderNames = names
+				}
+			}
+		}
+
+		// Parse operation result
+		var result map[string]interface{}
+		if op.Result != "" {
+			if err := json.Unmarshal([]byte(op.Result), &result); err == nil {
+				if deliveryID, ok := result["delivery_id"].(string); ok {
+					item.DeliveryID = deliveryID
+				}
+				if exportOpID, ok := result["export_operation_id"].(string); ok {
+					item.ExportOperationID = exportOpID
+				}
+				if statusCode, ok := result["status_code"].(float64); ok {
+					item.StatusCode = int(statusCode)
+				}
+				if res, ok := result["result"].(string); ok {
+					item.Result = res
+				}
+				if errorSummary, ok := result["error"].(string); ok {
+					item.ErrorSummary = errorSummary
+				}
+				if deliveredAtStr, ok := result["delivered_at"].(string); ok {
+					if deliveredAt, err := time.Parse(time.RFC3339, deliveredAtStr); err == nil {
+						item.DeliveredAt = deliveredAt
+					}
+				}
+			}
+		}
+
+		// Derive result from error summary if result is failed
+		// Real timeout operations save result="failed" with timeout error message
+		if item.Result == "failed" && item.ErrorSummary != "" {
+			if strings.Contains(strings.ToLower(item.ErrorSummary), "timeout") || strings.Contains(strings.ToLower(item.ErrorSummary), "timed out") {
+				item.Result = "timeout"
+			}
+		}
+
+		// Derive result from error summary if not set
+		if item.Result == "" && item.ErrorSummary != "" {
+			if strings.Contains(strings.ToLower(item.ErrorSummary), "timeout") || strings.Contains(strings.ToLower(item.ErrorSummary), "timed out") {
+				item.Result = "timeout"
+			} else {
+				item.Result = "failed"
+			}
+		}
+
+		// Resolve audit_ref_id by matching audit details
+		var auditLog models.AuditLog
+		has, err := s.engine.Where("action = ? AND details LIKE ?", "agent_run.review_delivered", "%"+op.ID+"%").
+			Or("action = ? AND details LIKE ?", "agent_run.review_delivery_failed", "%"+op.ID+"%").
+			OrderBy("timestamp DESC").
+			Limit(1).
+			Get(&auditLog)
+		if err == nil && has && auditLog.ID != "" {
+			item.AuditRefID = auditLog.ID
+		}
+
+		// Update summary counts
+		switch item.Result {
+		case "delivered":
+			summary.Delivered++
+		case "failed":
+			summary.Failed++
+		case "timeout":
+			summary.Timeout++
+		}
+
+		items = append(items, item)
+	}
+
+	return &models.AgentRunReviewDeliveryHistoryResponse{
+		AgentRunID: agentRunID,
+		Summary:    summary,
+		Items:      items,
+	}, nil
+}

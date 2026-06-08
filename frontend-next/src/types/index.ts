@@ -517,6 +517,34 @@ export interface AgentRunReviewDeliveryResponse {
   delivered_at: string
 }
 
+export interface AgentRunReviewDeliveryHistoryResponse {
+  agent_run_id: string
+  summary: AgentRunReviewDeliverySummary
+  items: AgentRunReviewDeliveryHistoryItem[]
+}
+
+export interface AgentRunReviewDeliverySummary {
+  total: number
+  delivered: number
+  failed: number
+  timeout: number
+}
+
+export interface AgentRunReviewDeliveryHistoryItem {
+  delivery_id?: string
+  delivery_operation_id: string
+  export_operation_id?: string
+  audit_ref_id?: string
+  format: string
+  result: string
+  destination_host: string
+  status_code?: number
+  header_names?: string[]
+  error_summary?: string
+  created_at: string
+  delivered_at?: string
+}
+
 // Review Queue types
 export type ReviewState = 'not_reviewed' | 'reviewed' | 'followup_created' | 'needs_attention'
 export type EvidenceStrength = 'none' | 'low' | 'medium' | 'high'

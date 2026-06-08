@@ -292,3 +292,34 @@ type AgentRunReviewDeliveryResponse struct {
 	Result            string    `json:"result"`
 	DeliveredAt       time.Time `json:"delivered_at"`
 }
+
+// AgentRunReviewDeliveryHistoryResponse represents the response for listing review delivery history
+type AgentRunReviewDeliveryHistoryResponse struct {
+	AgentRunID string                              `json:"agent_run_id"`
+	Summary    AgentRunReviewDeliverySummary       `json:"summary"`
+	Items      []AgentRunReviewDeliveryHistoryItem `json:"items"`
+}
+
+// AgentRunReviewDeliverySummary represents the summary of delivery attempts
+type AgentRunReviewDeliverySummary struct {
+	Total     int `json:"total"`
+	Delivered int `json:"delivered"`
+	Failed    int `json:"failed"`
+	Timeout   int `json:"timeout"`
+}
+
+// AgentRunReviewDeliveryHistoryItem represents a single delivery attempt in history
+type AgentRunReviewDeliveryHistoryItem struct {
+	DeliveryID          string    `json:"delivery_id,omitempty"`
+	DeliveryOperationID string    `json:"delivery_operation_id"`
+	ExportOperationID   string    `json:"export_operation_id,omitempty"`
+	AuditRefID          string    `json:"audit_ref_id,omitempty"`
+	Format              string    `json:"format"`
+	Result              string    `json:"result"`
+	DestinationHost     string    `json:"destination_host"`
+	StatusCode          int       `json:"status_code,omitempty"`
+	HeaderNames         []string  `json:"header_names,omitempty"`
+	ErrorSummary        string    `json:"error_summary,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
+	DeliveredAt         time.Time `json:"delivered_at,omitempty"`
+}
