@@ -1726,8 +1726,59 @@ test.describe('Agent Runs', () => {
       })
     })
 
-    // Mock delivery history with delivered item
+    // Mock delivery history with counter to simulate refresh after delivery
+    let deliveryHistoryCallCount = 0
     await page.route('**/api/v2/agent-runs/agent-run-1/review-deliveries', route => {
+      deliveryHistoryCallCount++
+      if (deliveryHistoryCallCount === 1) {
+        // First call: empty history
+        route.fulfill({
+          json: {
+            code: 0,
+            message: 'success',
+            data: {
+              data: {
+                agent_run_id: 'agent-run-1',
+                summary: { total: 0, delivered: 0, failed: 0, timeout: 0 },
+                items: [],
+              },
+            },
+          },
+        })
+      } else {
+        // Second call: with delivered item (after delivery)
+        route.fulfill({
+          json: {
+            code: 0,
+            message: 'success',
+            data: {
+              data: {
+                agent_run_id: 'agent-run-1',
+                summary: { total: 1, delivered: 1, failed: 0, timeout: 0 },
+                items: [
+                  {
+                    delivery_id: 'delivery-123',
+                    delivery_operation_id: 'op-delivery-1',
+                    export_operation_id: 'export-123',
+                    audit_ref_id: 'audit-delivery-1',
+                    format: 'markdown',
+                    result: 'delivered',
+                    destination_host: 'hooks.example.com',
+                    status_code: 200,
+                    header_names: ['X-Custom-Header'],
+                    created_at: '2026-06-07T00:00:00Z',
+                    delivered_at: '2026-06-07T00:00:01Z',
+                  },
+                ],
+              },
+            },
+          },
+        })
+      }
+    })
+
+    // Mock delivery API to return success
+    await page.route('**/api/v2/agent-runs/agent-run-1/review-delivery', route => {
       route.fulfill({
         json: {
           code: 0,
@@ -1735,23 +1786,41 @@ test.describe('Agent Runs', () => {
           data: {
             data: {
               agent_run_id: 'agent-run-1',
-              summary: { total: 1, delivered: 1, failed: 0, timeout: 0 },
-              items: [
-                {
-                  delivery_id: 'delivery-123',
-                  delivery_operation_id: 'op-delivery-1',
-                  export_operation_id: 'export-123',
-                  audit_ref_id: 'audit-delivery-1',
-                  format: 'markdown',
-                  result: 'delivered',
-                  destination_host: 'hooks.example.com',
-                  status_code: 200,
-                  header_names: ['X-Custom-Header'],
-                  created_at: '2026-06-07T00:00:00Z',
-                  delivered_at: '2026-06-07T00:00:01Z',
-                },
-              ],
+              format: 'markdown',
+              delivery_id: 'delivery-123',
+              delivery_operation_id: 'op-delivery-1',
+              export_operation_id: 'export-123',
+              audit_ref_id: 'audit-delivery-1',
+              destination_host: 'hooks.example.com',
+              status_code: 200,
+              result: 'delivered',
+              delivered_at: '2026-06-07T00:00:01Z',
             },
+          },
+        },
+      })
+    })
+
+    // Mock audit logs API
+    await page.route('**/api/v2/audit/logs**', route => {
+      route.fulfill({
+        json: {
+          code: 0,
+          message: 'success',
+          data: {
+            items: [
+              {
+                id: 'audit-delivery-1',
+                action: 'agent_run.review_delivered',
+                resource_type: 'agent_run',
+                resource_id: 'agent-run-1',
+                timestamp: '2026-06-07T00:00:00Z',
+              },
+            ],
+            total: 1,
+            page: 1,
+            page_size: 20,
+            total_pages: 1,
           },
         },
       })
@@ -1766,8 +1835,27 @@ test.describe('Agent Runs', () => {
 
     // Wait for delivery history section to load
     await expect(page.getByText('Delivery History')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('暂无 Delivery 记录')).toBeVisible()
 
-    // Verify delivery history displays correctly
+    // Open delivery dialog
+    await page.getByRole('button', { name: 'Deliver to Webhook' }).click()
+    const deliveryDialog = page.getByRole('dialog')
+    await expect(deliveryDialog).toBeVisible()
+
+    // Fill in delivery form with a valid external URL
+    await deliveryDialog.getByLabel('Webhook URL').fill('https://hooks.example.com/review')
+
+    // Submit delivery
+    await deliveryDialog.getByRole('button', { name: '发送' }).click()
+
+    // Wait for delivery receipt to appear
+    await expect(deliveryDialog.getByText('Delivery Receipt')).toBeVisible({ timeout: 10000 })
+
+    // Close delivery dialog
+    await deliveryDialog.getByRole('button', { name: '取消' }).click()
+    await page.waitForSelector('[role="dialog"]', { state: 'hidden' })
+
+    // Wait for delivery history to refresh (second call should return delivered item)
     await expect(page.getByText('hooks.example.com')).toBeVisible({ timeout: 10000 })
     await expect(page.getByText('delivered', { exact: true })).toBeVisible()
     await expect(page.getByText('Total: 1')).toBeVisible()
@@ -1785,6 +1873,17 @@ test.describe('Agent Runs', () => {
     const pageContent = await page.content()
     expect(pageContent).not.toContain('https://hooks.example.com/review')
     expect(pageContent).not.toContain('test-value')
+
+    // Click audit link to navigate to audit page
+    const auditLink = page.getByRole('link', { name: 'audit-delivery-1' })
+    await expect(auditLink).toBeVisible()
+    await auditLink.click()
+
+    // Wait for audit page to load
+    await page.waitForLoadState('networkidle')
+
+    // Verify audit log shows agent_run.review_delivered
+    await expect(page.getByText('agent_run.review_delivered')).toBeVisible()
   })
 
   test('should display failed and timeout delivery history', async ({ page }) => {

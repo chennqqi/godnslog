@@ -733,10 +733,10 @@ cd frontend-next && npm run build
 ```bash
 cd frontend-next && npx playwright test --reporter=line e2e/agent-runs.spec.ts
 ```
-- ✅ 12 passed
-- ⚠️ 2 skipped (delivery history E2E tests blocked by URL validation/route mock conflict)
-  - should display delivery history with happy path loop
+- ✅ 14 passed
+  - should display delivery history with happy path loop (proves full loop: empty history → deliver → history refresh → audit navigation)
   - should display failed and timeout delivery history
+  - should reject localhost webhook URL
 - Note: Backend timeout derivation logic fixed to match Sprint Q pattern (result="failed" with timeout error → derived as timeout)
 
 ### Summary
