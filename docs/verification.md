@@ -794,3 +794,71 @@ Sprint R establishes the Review Delivery History system:
 - E2E tests verify export API calls, timeline updates, and audit integration
 - MCP export_report remains read-only for AI Agent use cases
 - Web Review Export is for operator auditable export workflows
+
+---
+
+## Sprint S: Package Integrity (2026-06-08)
+
+**Goal:** Add deterministic integrity manifest and SHA-256 content hash to Agent Run Review Evidence export and delivery flows.
+
+**Verification Commands:**
+```bash
+GOCACHE=/tmp/gocache go test ./internal/agentrun ./server
+```
+Result: ok github.com/chennqqi/godnslog/internal/agentrun (cached)
+
+```bash
+GOCACHE=/tmp/gocache go test ./...
+```
+Result: All tests passed
+
+```bash
+cd frontend-next && npx eslint src/app/dashboard/agent-runs/page.tsx src/app/dashboard/agent-runs/[id]/page.tsx src/lib/api-client.ts src/types/index.ts e2e/agent-runs.spec.ts
+```
+Result: No errors
+
+```bash
+cd frontend-next && npm run build
+```
+Result: Build successful
+
+```bash
+cd frontend-next && npx playwright test --reporter=line e2e/agent-runs.spec.ts
+```
+Result: 14 passed (28.8s)
+
+**Implementation Summary:**
+- ✅ Backend manifest model and hash fields (internal/models/agent_run.go)
+  - Added AgentRunReviewPackageManifest struct
+  - Extended AgentRunReviewExportResponse with manifest and package_hash
+  - Extended AgentRunReviewDeliveryResponse with package_hash
+  - Extended AgentRunReviewDeliveryHistoryItem with package_hash
+- ✅ Deterministic hash helper and unit tests (internal/models/utils.go, utils_test.go)
+  - ComputeDeterministicHash function for SHA-256 of canonical JSON
+  - Unit tests verifying deterministic behavior
+- ✅ Export response / operation / audit with package_hash (internal/agentrun/review.go)
+  - ExportReviewPackage computes hash for JSON format
+  - Creates manifest with schema_version, agent_run_id, format, package_hash, hash_algorithm, generated_at, refs
+  - Includes hash in operation result and audit details
+- ✅ Delivery webhook payload / response / operation / audit with package_hash (internal/agentrun/review.go)
+  - DeliverReviewPackage includes package_hash in webhook payload
+  - createDeliverySuccess retrieves hash from export operation, includes in delivery operation and audit
+  - createDeliveryFailure includes hash in failed delivery operation and audit
+- ✅ Delivery history item with package_hash (internal/agentrun/review.go)
+  - ListReviewDeliveries parses package_hash from operation result
+- ✅ Go tests for export/delivery/history hash consistency (internal/agentrun/review_test.go)
+  - TestExportPackageHash verifies export hash, manifest, operation, audit consistency
+  - TestDeliveryPackageHash verifies delivery hash matches export hash
+  - TestDeliveryHistoryPackageHash verifies history includes hash
+- ✅ Frontend types and Agent Run Detail UI hash display
+  - Updated TypeScript types in frontend-next/src/types/index.ts
+  - Added hash display (first 12 chars, click-to-copy) in Export Result, Delivery Receipt, Delivery History
+
+**Core Achievement:**
+Sprint S establishes package integrity for Agent Run Review Evidence:
+- Deterministic SHA-256 hash computed from canonical JSON representation of export package
+- Hash consistently recorded across export response, delivery webhook payload, operations, audit logs, and delivery history
+- Manifest provides structured metadata (schema_version, agent_run_id, format, hash_algorithm, generated_at, refs)
+- Frontend displays shortened hash (12 characters) with click-to-copy functionality
+- Hash consistency verified through Go unit tests
+- No sensitive information (webhook URLs, headers, API keys) included in hash computation or manifest

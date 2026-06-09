@@ -958,3 +958,458 @@ func TestDeliverReviewPackage(t *testing.T) {
 		}
 	})
 }
+
+// TestExportPackageHash tests that export package includes package_hash and manifest
+func TestExportPackageHash(t *testing.T) {
+	// Setup in-memory database
+	engine, err := xorm.NewEngine("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to create engine: %v", err)
+	}
+	defer engine.Close()
+
+	// Sync tables
+	if err := engine.Sync2(new(models.AgentRun)); err != nil {
+		t.Fatalf("Failed to sync agent_runs table: %v", err)
+	}
+	if err := engine.Sync2(new(models.AgentOperation)); err != nil {
+		t.Fatalf("Failed to sync agent_operations table: %v", err)
+	}
+	if err := engine.Sync2(new(models.Interaction)); err != nil {
+		t.Fatalf("Failed to sync interactions table: %v", err)
+	}
+	if err := engine.Sync2(new(models.AuditLog)); err != nil {
+		t.Fatalf("Failed to sync audit_logs table: %v", err)
+	}
+
+	// Create services
+	authService := auth.NewService(engine)
+	agentRunService := NewService(engine, authService)
+	interactionService := interaction.NewService(engine)
+	evidenceService := interaction.NewEvidenceService(interactionService)
+	reviewService := NewReviewService(engine, agentRunService, authService, evidenceService, interactionService)
+
+	// Create test agent run
+	agentRun := &models.AgentRun{
+		ID:         "agent-run-1",
+		AgentID:    "agent-1",
+		OperatorID: "user-1",
+		CaseID:     "case-1",
+		PayloadID:  "payload-1",
+		Target:     "https://example.com",
+		Title:      "Test Agent Run",
+		Status:     models.AgentRunStatusCompleted,
+		StartedAt:  func() *time.Time { t := time.Now(); return &t }(),
+		EndedAt:    func() *time.Time { t := time.Now(); return &t }(),
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	if _, err := engine.Insert(agentRun); err != nil {
+		t.Fatalf("Failed to insert agent run: %v", err)
+	}
+
+	// Test JSON export with package_hash
+	t.Run("JSON export includes package_hash and manifest", func(t *testing.T) {
+		req := &models.AgentRunReviewExportRequest{
+			Format:       "json",
+			IncludeAudit: false,
+		}
+		resp, err := reviewService.ExportReviewPackage("agent-run-1", req, "user-1")
+		if err != nil {
+			t.Fatalf("Failed to export review package: %v", err)
+		}
+
+		// Verify package_hash is present
+		if resp.PackageHash == "" {
+			t.Error("Expected package_hash to be set in export response")
+		}
+
+		// Verify package_hash is 64 characters (SHA-256 hex)
+		if len(resp.PackageHash) != 64 {
+			t.Errorf("Expected package_hash to be 64 characters, got %d", len(resp.PackageHash))
+		}
+
+		// Verify manifest is present
+		if resp.Manifest == nil {
+			t.Error("Expected manifest to be set in export response")
+		} else {
+			// Verify manifest fields
+			if resp.Manifest.SchemaVersion != "review-package-manifest/v1" {
+				t.Errorf("Expected schema_version 'review-package-manifest/v1', got '%s'", resp.Manifest.SchemaVersion)
+			}
+			if resp.Manifest.AgentRunID != "agent-run-1" {
+				t.Errorf("Expected agent_run_id 'agent-run-1', got '%s'", resp.Manifest.AgentRunID)
+			}
+			if resp.Manifest.Format != "json" {
+				t.Errorf("Expected format 'json', got '%s'", resp.Manifest.Format)
+			}
+			if resp.Manifest.HashAlgorithm != "sha256" {
+				t.Errorf("Expected hash_algorithm 'sha256', got '%s'", resp.Manifest.HashAlgorithm)
+			}
+			if resp.Manifest.PackageHash != resp.PackageHash {
+				t.Error("Manifest package_hash should match response package_hash")
+			}
+			if resp.Manifest.Refs["operation_id"] == "" {
+				t.Error("Expected manifest refs to contain operation_id")
+			}
+			if resp.Manifest.Refs["audit_ref_id"] == "" {
+				t.Error("Expected manifest refs to contain audit_ref_id")
+			}
+		}
+
+		// Verify operation result contains package_hash
+		var operation models.AgentOperation
+		has, err := engine.Where("action = ?", "review_export.json").Get(&operation)
+		if err != nil || !has {
+			t.Fatal("Expected export operation to be created")
+		}
+		var opResult map[string]interface{}
+		if err := json.Unmarshal([]byte(operation.Result), &opResult); err != nil {
+			t.Fatalf("Failed to unmarshal operation result: %v", err)
+		}
+		if opResult["package_hash"] == nil {
+			t.Error("Expected operation result to contain package_hash")
+		}
+		if opResult["package_hash"].(string) != resp.PackageHash {
+			t.Error("Operation result package_hash should match response package_hash")
+		}
+
+		// Verify audit details contain package_hash
+		var auditLog models.AuditLog
+		has, err = engine.Where("action = ?", "agent_run.review_exported").Get(&auditLog)
+		if err != nil || !has {
+			t.Fatal("Expected export audit log to be created")
+		}
+		if auditLog.Details["package_hash"] == nil {
+			t.Error("Expected audit details to contain package_hash")
+		}
+		if auditLog.Details["package_hash"].(string) != resp.PackageHash {
+			t.Error("Audit package_hash should match response package_hash")
+		}
+	})
+
+	// Test Markdown export - package_hash should be empty for non-JSON
+	t.Run("Markdown export has no package_hash", func(t *testing.T) {
+		req := &models.AgentRunReviewExportRequest{
+			Format:       "markdown",
+			IncludeAudit: false,
+		}
+		resp, err := reviewService.ExportReviewPackage("agent-run-1", req, "user-1")
+		if err != nil {
+			t.Fatalf("Failed to export review package: %v", err)
+		}
+
+		// Markdown format should not have package_hash or manifest
+		if resp.PackageHash != "" {
+			t.Error("Expected package_hash to be empty for markdown format")
+		}
+		if resp.Manifest != nil {
+			t.Error("Expected manifest to be nil for markdown format")
+		}
+	})
+}
+
+// TestDeliveryPackageHash tests that delivery includes package_hash from export
+func TestDeliveryPackageHash(t *testing.T) {
+	// Setup in-memory database
+	engine, err := xorm.NewEngine("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to create engine: %v", err)
+	}
+	defer engine.Close()
+
+	// Sync tables
+	if err := engine.Sync2(new(models.AgentRun)); err != nil {
+		t.Fatalf("Failed to sync agent_runs table: %v", err)
+	}
+	if err := engine.Sync2(new(models.AgentOperation)); err != nil {
+		t.Fatalf("Failed to sync agent_operations table: %v", err)
+	}
+	if err := engine.Sync2(new(models.Interaction)); err != nil {
+		t.Fatalf("Failed to sync interactions table: %v", err)
+	}
+	if err := engine.Sync2(new(models.AuditLog)); err != nil {
+		t.Fatalf("Failed to sync audit_logs table: %v", err)
+	}
+
+	// Create services
+	authService := auth.NewService(engine)
+	agentRunService := NewService(engine, authService)
+	interactionService := interaction.NewService(engine)
+	evidenceService := interaction.NewEvidenceService(interactionService)
+	reviewService := NewReviewService(engine, agentRunService, authService, evidenceService, interactionService)
+
+	// Create test agent run
+	agentRun := &models.AgentRun{
+		ID:         "agent-run-1",
+		AgentID:    "agent-1",
+		OperatorID: "user-1",
+		CaseID:     "case-1",
+		PayloadID:  "payload-1",
+		Target:     "https://example.com",
+		Title:      "Test Agent Run",
+		Status:     models.AgentRunStatusCompleted,
+		StartedAt:  func() *time.Time { t := time.Now(); return &t }(),
+		EndedAt:    func() *time.Time { t := time.Now(); return &t }(),
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	if _, err := engine.Insert(agentRun); err != nil {
+		t.Fatalf("Failed to insert agent run: %v", err)
+	}
+
+	// Test successful delivery with package_hash
+	t.Run("Successful delivery includes package_hash", func(t *testing.T) {
+		// First export to get package_hash
+		exportReq := &models.AgentRunReviewExportRequest{
+			Format: "json",
+		}
+		exportResp, err := reviewService.ExportReviewPackage("agent-run-1", exportReq, "user-1")
+		if err != nil {
+			t.Fatalf("Failed to export review package: %v", err)
+		}
+		exportPackageHash := exportResp.PackageHash
+		if exportPackageHash == "" {
+			t.Fatal("Expected export package_hash to be set")
+		}
+
+		// Create mock webhook server
+		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Verify webhook payload contains package_hash
+			var payload map[string]interface{}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				t.Errorf("Failed to decode webhook payload: %v", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			if payload["package_hash"] == nil {
+				t.Error("Expected webhook payload to contain package_hash")
+			}
+			if payload["package_hash"].(string) != exportPackageHash {
+				t.Error("Webhook payload package_hash should match export package_hash")
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"status":"received"}`))
+		}))
+		defer server.Close()
+
+		// Inject custom URL validator and HTTP client
+		reviewService.urlValidator = func(url string) error {
+			if url == server.URL {
+				return nil
+			}
+			return ValidateWebhookURL(url)
+		}
+		reviewService.httpClient = &http.Client{
+			Timeout: 5 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
+
+		// Deliver the package
+		deliveryReq := &models.AgentRunReviewDeliveryRequest{
+			Format:     "json",
+			WebhookURL: server.URL,
+		}
+		deliveryResp, err := reviewService.DeliverReviewPackage("agent-run-1", deliveryReq, "user-1")
+		if err != nil {
+			t.Fatalf("Failed to deliver review package: %v", err)
+		}
+
+		// Verify delivery response contains package_hash
+		if deliveryResp.PackageHash != exportPackageHash {
+			t.Error("Delivery response package_hash should match export package_hash")
+		}
+
+		// Verify delivery operation result contains package_hash
+		var deliveryOp models.AgentOperation
+		has, err := engine.Where("action = ?", "review_delivery.webhook").OrderBy("created_at DESC").Limit(1).Get(&deliveryOp)
+		if err != nil || !has {
+			t.Fatal("Expected delivery operation to be created")
+		}
+		var deliveryOpResult map[string]interface{}
+		if err := json.Unmarshal([]byte(deliveryOp.Result), &deliveryOpResult); err != nil {
+			t.Fatalf("Failed to unmarshal delivery operation result: %v", err)
+		}
+		if deliveryOpResult["package_hash"] == nil {
+			t.Error("Expected delivery operation result to contain package_hash")
+		}
+		if deliveryOpResult["package_hash"].(string) != exportPackageHash {
+			t.Error("Delivery operation result package_hash should match export package_hash")
+		}
+
+		// Verify delivery audit details contain package_hash
+		var deliveryAudit models.AuditLog
+		has, err = engine.Where("action = ?", "agent_run.review_delivered").Get(&deliveryAudit)
+		if err != nil || !has {
+			t.Fatal("Expected delivery audit log to be created")
+		}
+		if deliveryAudit.Details["package_hash"] == nil {
+			t.Error("Expected delivery audit details to contain package_hash")
+		}
+		if deliveryAudit.Details["package_hash"].(string) != exportPackageHash {
+			t.Error("Delivery audit package_hash should match export package_hash")
+		}
+	})
+
+	// Test failed delivery with package_hash
+	t.Run("Failed delivery includes package_hash", func(t *testing.T) {
+		// Create mock webhook server that returns 500
+		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{"error":"internal error"}`))
+		}))
+		defer server.Close()
+
+		// Inject custom URL validator and HTTP client
+		reviewService.urlValidator = func(url string) error {
+			if url == server.URL {
+				return nil
+			}
+			return ValidateWebhookURL(url)
+		}
+		reviewService.httpClient = &http.Client{
+			Timeout: 5 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
+
+		// Get export package_hash
+		exportReq := &models.AgentRunReviewExportRequest{
+			Format: "json",
+		}
+		exportResp, err := reviewService.ExportReviewPackage("agent-run-1", exportReq, "user-1")
+		if err != nil {
+			t.Fatalf("Failed to export review package: %v", err)
+		}
+		exportPackageHash := exportResp.PackageHash
+
+		// Deliver the package (should fail)
+		deliveryReq := &models.AgentRunReviewDeliveryRequest{
+			Format:     "json",
+			WebhookURL: server.URL,
+		}
+		_, err = reviewService.DeliverReviewPackage("agent-run-1", deliveryReq, "user-1")
+		if err == nil {
+			t.Error("Expected delivery to fail")
+		}
+
+		// Verify failed delivery operation result contains package_hash
+		var deliveryOp models.AgentOperation
+		has, err := engine.Where("action = ?", "review_delivery.webhook").OrderBy("created_at DESC").Limit(1).Get(&deliveryOp)
+		if err != nil || !has {
+			t.Fatal("Expected delivery operation to be created")
+		}
+		var deliveryOpResult map[string]interface{}
+		if err := json.Unmarshal([]byte(deliveryOp.Result), &deliveryOpResult); err != nil {
+			t.Fatalf("Failed to unmarshal delivery operation result: %v", err)
+		}
+		if deliveryOpResult["package_hash"] == nil {
+			t.Error("Expected failed delivery operation result to contain package_hash")
+		}
+		if deliveryOpResult["package_hash"].(string) != exportPackageHash {
+			t.Error("Failed delivery operation result package_hash should match export package_hash")
+		}
+
+		// Verify failed delivery audit details contain package_hash
+		var deliveryAudit models.AuditLog
+		has, err = engine.Where("action = ?", "agent_run.review_delivery_failed").Get(&deliveryAudit)
+		if err != nil || !has {
+			t.Fatal("Expected delivery failure audit log to be created")
+		}
+		if deliveryAudit.Details["package_hash"] == nil {
+			t.Error("Expected failed delivery audit details to contain package_hash")
+		}
+		if deliveryAudit.Details["package_hash"].(string) != exportPackageHash {
+			t.Error("Failed delivery audit package_hash should match export package_hash")
+		}
+	})
+}
+
+// TestDeliveryHistoryPackageHash tests that delivery history includes package_hash
+func TestDeliveryHistoryPackageHash(t *testing.T) {
+	// Setup in-memory database
+	engine, err := xorm.NewEngine("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to create engine: %v", err)
+	}
+	defer engine.Close()
+
+	// Sync tables
+	if err := engine.Sync2(new(models.AgentRun)); err != nil {
+		t.Fatalf("Failed to sync agent_runs table: %v", err)
+	}
+	if err := engine.Sync2(new(models.AgentOperation)); err != nil {
+		t.Fatalf("Failed to sync agent_operations table: %v", err)
+	}
+	if err := engine.Sync2(new(models.AuditLog)); err != nil {
+		t.Fatalf("Failed to sync audit_logs table: %v", err)
+	}
+
+	// Create services
+	authService := auth.NewService(engine)
+	agentRunService := NewService(engine, authService)
+	interactionService := interaction.NewService(engine)
+	evidenceService := interaction.NewEvidenceService(interactionService)
+	reviewService := NewReviewService(engine, agentRunService, authService, evidenceService, interactionService)
+
+	// Create test agent run
+	agentRun := &models.AgentRun{
+		ID:         "agent-run-1",
+		AgentID:    "agent-1",
+		OperatorID: "user-1",
+		Status:     "completed",
+	}
+	if _, err := engine.Insert(agentRun); err != nil {
+		t.Fatalf("Failed to create agent run: %v", err)
+	}
+
+	// Create delivery operation with package_hash
+	deliveryRequest := map[string]interface{}{
+		"format":           "json",
+		"destination_host": "hooks.example.com",
+	}
+	deliveryRequestJSON, _ := json.Marshal(deliveryRequest)
+	deliveryResult := map[string]interface{}{
+		"delivery_id":         "delivery-123",
+		"export_operation_id": "export-123",
+		"status_code":         200,
+		"result":              "delivered",
+		"package_hash":        "abc123def4567890123456789012345678901234567890123456789012345678",
+	}
+	deliveryResultJSON, _ := json.Marshal(deliveryResult)
+	deliveryOp := &models.AgentOperation{
+		ID:         "op-delivery-1",
+		AgentRunID: "agent-run-1",
+		AgentID:    "agent-123",
+		Action:     "review_delivery.webhook",
+		Request:    string(deliveryRequestJSON),
+		Result:     string(deliveryResultJSON),
+		StartedAt:  time.Now(),
+	}
+	if _, err := engine.Insert(deliveryOp); err != nil {
+		t.Fatalf("Failed to create delivered operation: %v", err)
+	}
+
+	// Test delivery history includes package_hash
+	t.Run("Delivery history includes package_hash", func(t *testing.T) {
+		resp, err := reviewService.ListReviewDeliveries("agent-run-1")
+		if err != nil {
+			t.Fatalf("Failed to list deliveries: %v", err)
+		}
+
+		if len(resp.Items) != 1 {
+			t.Fatalf("Expected 1 delivery item, got %d", len(resp.Items))
+		}
+
+		item := resp.Items[0]
+		if item.PackageHash == "" {
+			t.Error("Expected delivery history item to contain package_hash")
+		}
+		if item.PackageHash != "abc123def4567890123456789012345678901234567890123456789012345678" {
+			t.Error("Delivery history item package_hash should match operation result")
+		}
+	})
+}

@@ -422,6 +422,32 @@ func (s *ReviewService) ExportReviewPackage(agentRunID string, req *models.Agent
 		content = s.generateExportMarkdownContent(packet, decision, recentDecisionOp)
 	}
 
+	// Compute package hash for JSON format
+	var packageHash string
+	var manifest *models.AgentRunReviewPackageManifest
+	if req.Format == "json" && exportPackage != nil {
+		hash, err := models.ComputeDeterministicHash(exportPackage)
+		if err != nil {
+			return nil, fmt.Errorf("failed to compute package hash: %w", err)
+		}
+		packageHash = hash
+
+		// Build manifest
+		manifest = &models.AgentRunReviewPackageManifest{
+			SchemaVersion:  "review-package-manifest/v1",
+			AgentRunID:     agentRunID,
+			ReviewPacketID: req.ReviewPacketID,
+			Format:         req.Format,
+			PackageHash:    packageHash,
+			HashAlgorithm:  "sha256",
+			GeneratedAt:    now,
+			Refs: map[string]string{
+				"operation_id": "", // Will be filled after operation creation
+				"audit_ref_id": "", // Will be filled after audit creation
+			},
+		}
+	}
+
 	// Create review_export operation
 	result := map[string]interface{}{
 		"format":           req.Format,
@@ -430,6 +456,7 @@ func (s *ReviewService) ExportReviewPackage(agentRunID string, req *models.Agent
 		"decision":         decision,
 		"audit_action":     "agent_run.review_exported",
 		"exported_at":      now,
+		"package_hash":     packageHash,
 	}
 
 	opReq := &models.AgentOperationCreateRequest{
@@ -469,11 +496,18 @@ func (s *ReviewService) ExportReviewPackage(agentRunID string, req *models.Agent
 			"review_packet_id": req.ReviewPacketID,
 			"decision":         decision,
 			"operation_id":     operation.ID,
+			"package_hash":     packageHash,
 		},
 		Timestamp: now,
 	}
 	if err := s.authService.CreateAuditLog(auditLog); err != nil {
 		return nil, fmt.Errorf("failed to create export audit log: %w", err)
+	}
+
+	// Update manifest refs
+	if manifest != nil {
+		manifest.Refs["operation_id"] = operation.ID
+		manifest.Refs["audit_ref_id"] = auditLog.ID
 	}
 
 	return &models.AgentRunReviewExportResponse{
@@ -485,6 +519,8 @@ func (s *ReviewService) ExportReviewPackage(agentRunID string, req *models.Agent
 		Decision:       decision,
 		Content:        content,
 		Package:        exportPackage,
+		Manifest:       manifest,
+		PackageHash:    packageHash,
 		GeneratedAt:    now,
 	}, nil
 }
@@ -635,6 +671,7 @@ func (s *ReviewService) DeliverReviewPackage(agentRunID string, req *models.Agen
 			"delivery_operation_id": pendingOperationID,
 			"audit_ref_id":          exportResp.AuditRefID,
 		},
+		"package_hash": exportResp.PackageHash,
 	}
 
 	// For JSON format, include the package in the payload
@@ -744,9 +781,26 @@ func (s *ReviewService) createPendingDeliveryOperation(agentRunID string, req *m
 func (s *ReviewService) createDeliverySuccess(agentRunID string, req *models.AgentRunReviewDeliveryRequest, deliveryID, destinationHost, exportOperationID string, statusCode int, userID string) (*models.AgentRunReviewDeliveryResponse, error) {
 	now := time.Now()
 
+	// Get the export response to retrieve package_hash
+	var exportOperation models.AgentOperation
+	has, err := s.engine.ID(exportOperationID).Get(&exportOperation)
+	if err != nil || !has {
+		return nil, fmt.Errorf("failed to retrieve export operation: has=%v err=%v", has, err)
+	}
+
+	var packageHash string
+	var exportResult map[string]interface{}
+	if exportOperation.Result != "" {
+		if err := json.Unmarshal([]byte(exportOperation.Result), &exportResult); err == nil {
+			if hash, ok := exportResult["package_hash"].(string); ok {
+				packageHash = hash
+			}
+		}
+	}
+
 	// Get the pending delivery operation
 	var operation models.AgentOperation
-	has, err := s.engine.Where("agent_run_i_d = ? AND action = ?", agentRunID, "review_delivery.webhook").
+	has, err = s.engine.Where("agent_run_i_d = ? AND action = ?", agentRunID, "review_delivery.webhook").
 		OrderBy("created_at DESC").Limit(1).Get(&operation)
 	if err != nil || !has {
 		return nil, fmt.Errorf("failed to retrieve pending operation: has=%v err=%v", has, err)
@@ -759,6 +813,7 @@ func (s *ReviewService) createDeliverySuccess(agentRunID string, req *models.Age
 		"delivery_id":         deliveryID,
 		"export_operation_id": exportOperationID,
 		"audit_action":        "agent_run.review_delivered",
+		"package_hash":        packageHash,
 	}
 	resultJSON, err := json.Marshal(resultMap)
 	if err != nil {
@@ -785,6 +840,7 @@ func (s *ReviewService) createDeliverySuccess(agentRunID string, req *models.Age
 			"export_operation_id":   exportOperationID,
 			"destination_host":      destinationHost,
 			"status_code":           statusCode,
+			"package_hash":          packageHash,
 		},
 		Timestamp: now,
 	}
@@ -803,6 +859,7 @@ func (s *ReviewService) createDeliverySuccess(agentRunID string, req *models.Age
 		StatusCode:        statusCode,
 		Result:            "delivered",
 		DeliveredAt:       now,
+		PackageHash:       packageHash,
 	}, nil
 }
 
@@ -810,9 +867,26 @@ func (s *ReviewService) createDeliverySuccess(agentRunID string, req *models.Age
 func (s *ReviewService) createDeliveryFailure(agentRunID string, req *models.AgentRunReviewDeliveryRequest, deliveryID, destinationHost, exportOperationID string, deliveryError error, userID string) (*models.AgentRunReviewDeliveryResponse, error) {
 	now := time.Now()
 
+	// Get the export response to retrieve package_hash
+	var exportOperation models.AgentOperation
+	has, err := s.engine.ID(exportOperationID).Get(&exportOperation)
+	if err != nil || !has {
+		return nil, fmt.Errorf("failed to retrieve export operation: has=%v err=%v", has, err)
+	}
+
+	var packageHash string
+	var exportResult map[string]interface{}
+	if exportOperation.Result != "" {
+		if err := json.Unmarshal([]byte(exportOperation.Result), &exportResult); err == nil {
+			if hash, ok := exportResult["package_hash"].(string); ok {
+				packageHash = hash
+			}
+		}
+	}
+
 	// Get the pending delivery operation
 	var operation models.AgentOperation
-	has, err := s.engine.Where("agent_run_i_d = ? AND action = ?", agentRunID, "review_delivery.webhook").
+	has, err = s.engine.Where("agent_run_i_d = ? AND action = ?", agentRunID, "review_delivery.webhook").
 		OrderBy("created_at DESC").Limit(1).Get(&operation)
 	if err != nil || !has {
 		return nil, fmt.Errorf("failed to retrieve pending operation: has=%v err=%v", has, err)
@@ -820,10 +894,11 @@ func (s *ReviewService) createDeliveryFailure(agentRunID string, req *models.Age
 
 	// Update operation result to failed
 	resultMap := map[string]interface{}{
-		"result":      "failed",
-		"status_code": 0,
-		"error":       deliveryError.Error(),
-		"delivery_id": deliveryID,
+		"result":       "failed",
+		"status_code":  0,
+		"error":        deliveryError.Error(),
+		"delivery_id":  deliveryID,
+		"package_hash": packageHash,
 	}
 	resultJSON, err := json.Marshal(resultMap)
 	if err != nil {
@@ -849,6 +924,7 @@ func (s *ReviewService) createDeliveryFailure(agentRunID string, req *models.Age
 			"delivery_operation_id": operation.ID,
 			"destination_host":      destinationHost,
 			"error":                 deliveryError.Error(),
+			"package_hash":          packageHash,
 		},
 		Timestamp: now,
 	}
@@ -940,6 +1016,9 @@ func (s *ReviewService) ListReviewDeliveries(agentRunID string) (*models.AgentRu
 					if deliveredAt, err := time.Parse(time.RFC3339, deliveredAtStr); err == nil {
 						item.DeliveredAt = deliveredAt
 					}
+				}
+				if packageHash, ok := result["package_hash"].(string); ok {
+					item.PackageHash = packageHash
 				}
 			}
 		}

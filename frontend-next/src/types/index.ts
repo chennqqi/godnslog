@@ -484,6 +484,17 @@ export interface AgentRunReviewExportRequest {
   include_audit?: boolean
 }
 
+export interface AgentRunReviewPackageManifest {
+  schema_version: string
+  agent_run_id: string
+  review_packet_id?: string
+  format: string
+  package_hash: string
+  hash_algorithm: string
+  generated_at: string
+  refs?: Record<string, string>
+}
+
 export interface AgentRunReviewExportResponse {
   agent_run_id: string
   format: string
@@ -493,6 +504,8 @@ export interface AgentRunReviewExportResponse {
   decision?: string
   content?: string
   package?: Record<string, unknown>
+  manifest?: AgentRunReviewPackageManifest
+  package_hash?: string
   generated_at: string
 }
 
@@ -515,6 +528,7 @@ export interface AgentRunReviewDeliveryResponse {
   status_code: number
   result: string
   delivered_at: string
+  package_hash?: string
 }
 
 export interface AgentRunReviewDeliveryHistoryResponse {
@@ -543,6 +557,7 @@ export interface AgentRunReviewDeliveryHistoryItem {
   error_summary?: string
   created_at: string
   delivered_at?: string
+  package_hash?: string
 }
 
 // Review Queue types

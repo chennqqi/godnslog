@@ -257,17 +257,31 @@ type AgentRunReviewExportRequest struct {
 	IncludeAudit   bool   `json:"include_audit,omitempty"`
 }
 
+// AgentRunReviewPackageManifest represents the integrity manifest for a review evidence package
+type AgentRunReviewPackageManifest struct {
+	SchemaVersion  string            `json:"schema_version"`
+	AgentRunID     string            `json:"agent_run_id"`
+	ReviewPacketID string            `json:"review_packet_id,omitempty"`
+	Format         string            `json:"format"`
+	PackageHash    string            `json:"package_hash"`
+	HashAlgorithm  string            `json:"hash_algorithm"`
+	GeneratedAt    time.Time         `json:"generated_at"`
+	Refs           map[string]string `json:"refs,omitempty"`
+}
+
 // AgentRunReviewExportResponse represents the response for exporting review evidence package
 type AgentRunReviewExportResponse struct {
-	AgentRunID     string                 `json:"agent_run_id"`
-	Format         string                 `json:"format"`
-	OperationID    string                 `json:"operation_id"`
-	AuditRefID     string                 `json:"audit_ref_id,omitempty"`
-	ReviewPacketID string                 `json:"review_packet_id,omitempty"`
-	Decision       string                 `json:"decision,omitempty"`
-	Content        string                 `json:"content,omitempty"`
-	Package        map[string]interface{} `json:"package,omitempty"`
-	GeneratedAt    time.Time              `json:"generated_at"`
+	AgentRunID     string                         `json:"agent_run_id"`
+	Format         string                         `json:"format"`
+	OperationID    string                         `json:"operation_id"`
+	AuditRefID     string                         `json:"audit_ref_id,omitempty"`
+	ReviewPacketID string                         `json:"review_packet_id,omitempty"`
+	Decision       string                         `json:"decision,omitempty"`
+	Content        string                         `json:"content,omitempty"`
+	Package        map[string]interface{}         `json:"package,omitempty"`
+	Manifest       *AgentRunReviewPackageManifest `json:"manifest,omitempty"`
+	PackageHash    string                         `json:"package_hash,omitempty"`
+	GeneratedAt    time.Time                      `json:"generated_at"`
 }
 
 // AgentRunReviewDeliveryRequest represents a request to deliver review evidence package to webhook
@@ -291,6 +305,7 @@ type AgentRunReviewDeliveryResponse struct {
 	StatusCode        int       `json:"status_code"`
 	Result            string    `json:"result"`
 	DeliveredAt       time.Time `json:"delivered_at"`
+	PackageHash       string    `json:"package_hash,omitempty"`
 }
 
 // AgentRunReviewDeliveryHistoryResponse represents the response for listing review delivery history
@@ -322,4 +337,5 @@ type AgentRunReviewDeliveryHistoryItem struct {
 	ErrorSummary        string    `json:"error_summary,omitempty"`
 	CreatedAt           time.Time `json:"created_at"`
 	DeliveredAt         time.Time `json:"delivered_at,omitempty"`
+	PackageHash         string    `json:"package_hash,omitempty"`
 }

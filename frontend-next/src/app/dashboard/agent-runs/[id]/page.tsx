@@ -675,6 +675,16 @@ export default function AgentRunDetailPage() {
                           <p className="font-medium">Operation ID:</p>
                           <p className="text-muted-foreground">{item.delivery_operation_id}</p>
                         </div>
+                        {item.package_hash && (
+                          <div>
+                            <p className="font-medium">Package Hash:</p>
+                            <code className="bg-muted px-2 py-1 rounded text-xs cursor-pointer hover:bg-muted/80" 
+                                  onClick={() => navigator.clipboard.writeText(item.package_hash || '')}
+                                  title="Click to copy full hash">
+                              {item.package_hash.substring(0, 12)}...
+                            </code>
+                          </div>
+                        )}
                         {item.audit_ref_id && (
                           <div>
                             <p className="font-medium">Audit Ref:</p>
@@ -882,6 +892,16 @@ export default function AgentRunDetailPage() {
                         {exportResult && (
                           <div className="mt-4">
                             <Label>Export Result</Label>
+                            {exportResult.package_hash && (
+                              <div className="mt-2 flex items-center gap-2 text-sm">
+                                <span className="font-medium">Package Hash:</span>
+                                <code className="bg-muted px-2 py-1 rounded text-xs cursor-pointer hover:bg-muted/80" 
+                                      onClick={() => navigator.clipboard.writeText(exportResult.package_hash || '')}
+                                      title="Click to copy full hash">
+                                  {exportResult.package_hash.substring(0, 12)}...
+                                </code>
+                              </div>
+                            )}
                             <ScrollArea className="h-[400px] w-full rounded-md border p-4">
                               <pre className="text-xs whitespace-pre-wrap">
                                 {exportFormat === 'json' ? JSON.stringify(exportResult.package, null, 2) : exportResult.content}
@@ -1000,6 +1020,16 @@ export default function AgentRunDetailPage() {
                         {deliveryResult && (
                           <div className="mt-4 border rounded-md p-4">
                             <Label>Delivery Receipt</Label>
+                            {deliveryResult.package_hash && (
+                              <div className="mt-2 flex items-center gap-2 text-sm">
+                                <span className="font-medium">Package Hash:</span>
+                                <code className="bg-muted px-2 py-1 rounded text-xs cursor-pointer hover:bg-muted/80" 
+                                      onClick={() => navigator.clipboard.writeText(deliveryResult.package_hash || '')}
+                                      title="Click to copy full hash">
+                                  {deliveryResult.package_hash.substring(0, 12)}...
+                                </code>
+                              </div>
+                            )}
                             <div className="mt-2 space-y-2 text-sm">
                               <div><strong>Delivery ID:</strong> {deliveryResult.delivery_id}</div>
                               <div><strong>Format:</strong> {deliveryResult.format}</div>
