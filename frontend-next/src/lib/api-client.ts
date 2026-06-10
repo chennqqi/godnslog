@@ -44,6 +44,7 @@ import type {
   AgentRunReviewDecisionResponse,
   AgentRunReviewExportRequest,
   AgentRunReviewExportResponse,
+  AgentRunReviewPackageTraceResponse,
 } from '@/types'
 
 interface UnknownItemListResponse {
@@ -204,4 +205,6 @@ export const agentRunApi = {
     api.get<AgentRunReviewQueueResponse>('/agent-runs/review-queue', params),
   listFollowupHistory: (id: string) =>
     api.get<{ data: AgentRunFollowupHistoryItem[] }>(`/agent-runs/${id}/followups`),
+  traceReviewPackage: (packageHash: string) =>
+    api.get<{ data: AgentRunReviewPackageTraceResponse }>('/agent-runs/review-package-trace', { package_hash: packageHash }),
 }

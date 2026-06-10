@@ -2,12 +2,15 @@ package agentrun
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -19,6 +22,23 @@ import (
 
 // ErrAgentRunNotFound is returned when an agent run is not found
 var ErrAgentRunNotFound = errors.New("agent run not found")
+
+// ErrInvalidPackageHash is returned when a package hash is invalid
+var ErrInvalidPackageHash = errors.New("invalid package hash: must be 64-character hex string")
+
+// packageHashRegex validates SHA-256 hex strings (64 hex characters)
+var packageHashRegex = regexp.MustCompile(`^[a-fA-F0-9]{64}$`)
+
+// ValidatePackageHash validates that a string is a valid 64-character hex string (SHA-256 hash)
+func ValidatePackageHash(packageHash string) error {
+	if packageHash == "" {
+		return ErrInvalidPackageHash
+	}
+	if !packageHashRegex.MatchString(packageHash) {
+		return ErrInvalidPackageHash
+	}
+	return nil
+}
 
 // ReviewService provides agent run review packet generation services
 type ReviewService struct {
@@ -422,7 +442,7 @@ func (s *ReviewService) ExportReviewPackage(agentRunID string, req *models.Agent
 		content = s.generateExportMarkdownContent(packet, decision, recentDecisionOp)
 	}
 
-	// Compute package hash for JSON format
+	// Compute package hash for both JSON and Markdown formats
 	var packageHash string
 	var manifest *models.AgentRunReviewPackageManifest
 	if req.Format == "json" && exportPackage != nil {
@@ -433,6 +453,25 @@ func (s *ReviewService) ExportReviewPackage(agentRunID string, req *models.Agent
 		packageHash = hash
 
 		// Build manifest
+		manifest = &models.AgentRunReviewPackageManifest{
+			SchemaVersion:  "review-package-manifest/v1",
+			AgentRunID:     agentRunID,
+			ReviewPacketID: req.ReviewPacketID,
+			Format:         req.Format,
+			PackageHash:    packageHash,
+			HashAlgorithm:  "sha256",
+			GeneratedAt:    now,
+			Refs: map[string]string{
+				"operation_id": "", // Will be filled after operation creation
+				"audit_ref_id": "", // Will be filled after audit creation
+			},
+		}
+	} else if req.Format == "markdown" && content != "" {
+		// Compute hash of exact Markdown content bytes
+		hash := sha256.Sum256([]byte(content))
+		packageHash = hex.EncodeToString(hash[:])
+
+		// Build manifest for Markdown
 		manifest = &models.AgentRunReviewPackageManifest{
 			SchemaVersion:  "review-package-manifest/v1",
 			AgentRunID:     agentRunID,
@@ -670,6 +709,7 @@ func (s *ReviewService) DeliverReviewPackage(agentRunID string, req *models.Agen
 			"export_operation_id":   exportResp.OperationID,
 			"delivery_operation_id": pendingOperationID,
 			"audit_ref_id":          exportResp.AuditRefID,
+			"package_hash":          exportResp.PackageHash,
 		},
 		"package_hash": exportResp.PackageHash,
 	}
@@ -1069,4 +1109,250 @@ func (s *ReviewService) ListReviewDeliveries(agentRunID string) (*models.AgentRu
 		Summary:    summary,
 		Items:      items,
 	}, nil
+}
+
+// TraceReviewPackageByHash traces a review package by its hash
+func (s *ReviewService) TraceReviewPackageByHash(packageHash string) (*models.AgentRunReviewPackageTraceResponse, error) {
+	response := &models.AgentRunReviewPackageTraceResponse{
+		PackageHash: packageHash,
+		Summary: models.AgentRunReviewPackageTraceSummary{
+			AgentRunCount: 0,
+			ExportCount:   0,
+			DeliveryCount: 0,
+			AuditCount:    0,
+			Delivered:     0,
+			Failed:        0,
+			Timeout:       0,
+		},
+		AgentRuns:  make([]models.AgentRunReviewPackageTraceRun, 0),
+		Exports:    make([]models.AgentRunReviewPackageTraceExport, 0),
+		Deliveries: make([]models.AgentRunReviewPackageTraceDelivery, 0),
+		Audits:     make([]models.AgentRunReviewPackageTraceAudit, 0),
+	}
+
+	// Track seen operation IDs and audit IDs for deduplication
+	seenOperationIDs := make(map[string]bool)
+	seenAuditIDs := make(map[string]bool)
+	seenAgentRunIDs := make(map[string]bool)
+
+	// Query AgentOperations with package_hash in result
+	var operations []models.AgentOperation
+	err := s.engine.Where("result LIKE ?", "%"+packageHash+"%").
+		Find(&operations)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query operations with package_hash: %w", err)
+	}
+
+	for _, op := range operations {
+		if seenOperationIDs[op.ID] {
+			continue
+		}
+		seenOperationIDs[op.ID] = true
+
+		// Parse result to verify package_hash is actually present
+		var result map[string]interface{}
+		if op.Result != "" {
+			if err := json.Unmarshal([]byte(op.Result), &result); err == nil {
+				if hash, ok := result["package_hash"].(string); ok && hash == packageHash {
+					// This operation actually contains the package_hash
+					switch op.Action {
+					case "review_export.json", "review_export.markdown":
+						response.Summary.ExportCount++
+						response.Exports = append(response.Exports, s.buildTraceExportFromOperation(op, result))
+					case "review_delivery.webhook":
+						response.Summary.DeliveryCount++
+						delivery := s.buildTraceDeliveryFromOperation(op, result)
+						response.Deliveries = append(response.Deliveries, delivery)
+						// Update summary counts based on result
+						if delivery.Result == "delivered" {
+							response.Summary.Delivered++
+						} else if delivery.Result == "failed" {
+							response.Summary.Failed++
+						} else if delivery.Result == "timeout" {
+							response.Summary.Timeout++
+						}
+					}
+
+					// Track Agent Run
+					if !seenAgentRunIDs[op.AgentRunID] {
+						seenAgentRunIDs[op.AgentRunID] = true
+						response.Summary.AgentRunCount++
+						agentRunRef := s.buildTraceRunFromAgentRunID(op.AgentRunID)
+						if agentRunRef != nil {
+							response.AgentRuns = append(response.AgentRuns, *agentRunRef)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Query AuditLogs with package_hash in details
+	var auditLogs []models.AuditLog
+	err = s.engine.Where("details LIKE ?", "%"+packageHash+"%").
+		Find(&auditLogs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query audit logs with package_hash: %w", err)
+	}
+
+	for _, audit := range auditLogs {
+		if seenAuditIDs[audit.ID] {
+			continue
+		}
+		seenAuditIDs[audit.ID] = true
+
+		// Verify package_hash is actually in details
+		if hash, ok := audit.Details["package_hash"].(string); ok && hash == packageHash {
+			response.Summary.AuditCount++
+			response.Audits = append(response.Audits, s.buildTraceAuditFromAuditLog(audit))
+
+			// Track Agent Run if resource_type is agent_run
+			if audit.ResourceType == "agent_run" && audit.ResourceID != nil && !seenAgentRunIDs[*audit.ResourceID] {
+				seenAgentRunIDs[*audit.ResourceID] = true
+				response.Summary.AgentRunCount++
+				agentRunRef := s.buildTraceRunFromAgentRunID(*audit.ResourceID)
+				if agentRunRef != nil {
+					response.AgentRuns = append(response.AgentRuns, *agentRunRef)
+				}
+			}
+		}
+	}
+
+	return response, nil
+}
+
+// buildTraceExportFromOperation builds a trace export from an operation
+func (s *ReviewService) buildTraceExportFromOperation(op models.AgentOperation, result map[string]interface{}) models.AgentRunReviewPackageTraceExport {
+	export := models.AgentRunReviewPackageTraceExport{
+		AgentRunID:  op.AgentRunID,
+		OperationID: op.ID,
+		Format:      op.Action, // "review_export.json" or "review_export.markdown"
+		CreatedAt:   op.StartedAt,
+	}
+
+	// Extract audit_ref_id from result
+	if auditRefID, ok := result["audit_ref_id"].(string); ok {
+		export.AuditRefID = auditRefID
+	}
+
+	// Extract review_packet_id from result
+	if reviewPacketID, ok := result["review_packet_id"].(string); ok {
+		export.ReviewPacketID = reviewPacketID
+	}
+
+	// Format field should be "json" or "markdown"
+	if op.Action == "review_export.json" {
+		export.Format = "json"
+	} else if op.Action == "review_export.markdown" {
+		export.Format = "markdown"
+	}
+
+	return export
+}
+
+// buildTraceDeliveryFromOperation builds a trace delivery from an operation
+func (s *ReviewService) buildTraceDeliveryFromOperation(op models.AgentOperation, result map[string]interface{}) models.AgentRunReviewPackageTraceDelivery {
+	delivery := models.AgentRunReviewPackageTraceDelivery{
+		AgentRunID:          op.AgentRunID,
+		DeliveryOperationID: op.ID,
+		Format:              "json", // Default format, can be extracted from result if needed
+		Result:              "unknown",
+		CreatedAt:           op.StartedAt,
+	}
+
+	// Extract result field
+	if res, ok := result["result"].(string); ok {
+		delivery.Result = res
+	}
+
+	// Extract delivery_id
+	if deliveryID, ok := result["delivery_id"].(string); ok {
+		delivery.DeliveryID = deliveryID
+	}
+
+	// Extract export_operation_id
+	if exportOpID, ok := result["export_operation_id"].(string); ok {
+		delivery.ExportOperationID = exportOpID
+	}
+
+	// Extract audit_ref_id
+	if auditRefID, ok := result["audit_ref_id"].(string); ok {
+		delivery.AuditRefID = auditRefID
+	}
+
+	// Extract destination_host from request
+	var request map[string]interface{}
+	if op.Request != "" {
+		if err := json.Unmarshal([]byte(op.Request), &request); err == nil {
+			if webhookURL, ok := request["webhook_url"].(string); ok {
+				// Extract host from URL for sanitization
+				if u, err := url.Parse(webhookURL); err == nil {
+					delivery.DestinationHost = u.Hostname()
+				}
+			}
+		}
+	}
+
+	// Extract status_code
+	if statusCode, ok := result["status_code"].(float64); ok {
+		delivery.StatusCode = int(statusCode)
+	}
+
+	// Extract error summary
+	if err, ok := result["error"].(string); ok {
+		delivery.ErrorSummary = err
+	}
+
+	// Extract delivered_at
+	if deliveredAt, ok := result["delivered_at"].(string); ok {
+		if t, err := time.Parse(time.RFC3339, deliveredAt); err == nil {
+			delivery.DeliveredAt = t
+		}
+	}
+
+	return delivery
+}
+
+// buildTraceAuditFromAuditLog builds a trace audit from an audit log
+func (s *ReviewService) buildTraceAuditFromAuditLog(audit models.AuditLog) models.AgentRunReviewPackageTraceAudit {
+	auditRef := models.AgentRunReviewPackageTraceAudit{
+		AuditRefID:   audit.ID,
+		Action:       audit.Action,
+		ResourceType: audit.ResourceType,
+		Timestamp:    audit.Timestamp,
+	}
+
+	if audit.ResourceID != nil {
+		auditRef.ResourceID = *audit.ResourceID
+	}
+
+	if audit.ResourceType == "agent_run" && audit.ResourceID != nil {
+		auditRef.AgentRunID = *audit.ResourceID
+	}
+
+	// Build URL for audit filtered view
+	if audit.ResourceType != "" && audit.ResourceID != nil {
+		auditRef.URL = fmt.Sprintf("/dashboard/audit?resource_type=%s&resource_id=%s", audit.ResourceType, *audit.ResourceID)
+	}
+
+	return auditRef
+}
+
+// buildTraceRunFromAgentRunID builds a trace run from an agent run ID
+func (s *ReviewService) buildTraceRunFromAgentRunID(agentRunID string) *models.AgentRunReviewPackageTraceRun {
+	var agentRun models.AgentRun
+	has, err := s.engine.ID(agentRunID).Get(&agentRun)
+	if err != nil || !has {
+		return nil
+	}
+
+	return &models.AgentRunReviewPackageTraceRun{
+		AgentRunID: agentRun.ID,
+		Title:      agentRun.Title,
+		Status:     string(agentRun.Status),
+		CaseID:     agentRun.CaseID,
+		PayloadID:  agentRun.PayloadID,
+		Target:     agentRun.Target,
+		URL:        fmt.Sprintf("/dashboard/agent-runs/%s", agentRun.ID),
+	}
 }

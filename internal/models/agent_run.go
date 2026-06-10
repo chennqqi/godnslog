@@ -339,3 +339,72 @@ type AgentRunReviewDeliveryHistoryItem struct {
 	DeliveredAt         time.Time `json:"delivered_at,omitempty"`
 	PackageHash         string    `json:"package_hash,omitempty"`
 }
+
+// AgentRunReviewPackageTraceResponse represents the response for tracing a review package by hash
+type AgentRunReviewPackageTraceResponse struct {
+	PackageHash string                               `json:"package_hash"`
+	Summary     AgentRunReviewPackageTraceSummary    `json:"summary"`
+	AgentRuns   []AgentRunReviewPackageTraceRun      `json:"agent_runs"`
+	Exports     []AgentRunReviewPackageTraceExport   `json:"exports"`
+	Deliveries  []AgentRunReviewPackageTraceDelivery `json:"deliveries"`
+	Audits      []AgentRunReviewPackageTraceAudit    `json:"audits"`
+}
+
+// AgentRunReviewPackageTraceSummary represents the summary of package trace results
+type AgentRunReviewPackageTraceSummary struct {
+	AgentRunCount int `json:"agent_run_count"`
+	ExportCount   int `json:"export_count"`
+	DeliveryCount int `json:"delivery_count"`
+	AuditCount    int `json:"audit_count"`
+	Delivered     int `json:"delivered"`
+	Failed        int `json:"failed"`
+	Timeout       int `json:"timeout"`
+}
+
+// AgentRunReviewPackageTraceRun represents an Agent Run reference in package trace
+type AgentRunReviewPackageTraceRun struct {
+	AgentRunID string `json:"agent_run_id"`
+	Title      string `json:"title,omitempty"`
+	Status     string `json:"status,omitempty"`
+	CaseID     string `json:"case_id,omitempty"`
+	PayloadID  string `json:"payload_id,omitempty"`
+	Target     string `json:"target,omitempty"`
+	URL        string `json:"url,omitempty"`
+}
+
+// AgentRunReviewPackageTraceExport represents an export reference in package trace
+type AgentRunReviewPackageTraceExport struct {
+	AgentRunID     string    `json:"agent_run_id"`
+	OperationID    string    `json:"operation_id"`
+	AuditRefID     string    `json:"audit_ref_id,omitempty"`
+	ReviewPacketID string    `json:"review_packet_id,omitempty"`
+	Format         string    `json:"format"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+// AgentRunReviewPackageTraceDelivery represents a delivery reference in package trace
+type AgentRunReviewPackageTraceDelivery struct {
+	AgentRunID          string    `json:"agent_run_id"`
+	DeliveryID          string    `json:"delivery_id,omitempty"`
+	DeliveryOperationID string    `json:"delivery_operation_id"`
+	ExportOperationID   string    `json:"export_operation_id,omitempty"`
+	AuditRefID          string    `json:"audit_ref_id,omitempty"`
+	Format              string    `json:"format"`
+	Result              string    `json:"result"`
+	DestinationHost     string    `json:"destination_host,omitempty"`
+	StatusCode          int       `json:"status_code,omitempty"`
+	ErrorSummary        string    `json:"error_summary,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
+	DeliveredAt         time.Time `json:"delivered_at,omitempty"`
+}
+
+// AgentRunReviewPackageTraceAudit represents an audit reference in package trace
+type AgentRunReviewPackageTraceAudit struct {
+	AuditRefID   string    `json:"audit_ref_id"`
+	AgentRunID   string    `json:"agent_run_id,omitempty"`
+	Action       string    `json:"action"`
+	ResourceType string    `json:"resource_type"`
+	ResourceID   string    `json:"resource_id,omitempty"`
+	Timestamp    time.Time `json:"timestamp"`
+	URL          string    `json:"url,omitempty"`
+}

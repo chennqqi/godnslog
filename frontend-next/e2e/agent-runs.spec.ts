@@ -1076,6 +1076,7 @@ test.describe('Agent Runs', () => {
     let exportCalled = false
     let capturedBody = ''
     let agentRunCallCount = 0
+    const stableHash = 'abc123def4567890123456789012345678901234567890123456789012345678'
 
     // Mock review export API
     await page.route('**/api/v2/agent-runs/agent-run-1/review-export', route => {
@@ -1086,42 +1087,57 @@ test.describe('Agent Runs', () => {
           code: 0,
           message: 'success',
           data: {
-            agent_run_id: 'agent-run-1',
-            format: 'json',
-            operation_id: 'op-export-1',
-            audit_ref_id: 'audit-export-1',
-            review_packet_id: 'agent-run-1',
-            decision: 'accepted',
-            package: {
-              agent_run: {
-                id: 'agent-run-1',
-                agent_id: 'agent-123',
-                case_id: 'case-1',
-                payload_id: 'payload-1',
-                target: 'https://target.example',
-                status: 'completed',
+            data: {
+              agent_run_id: 'agent-run-1',
+              format: 'json',
+              operation_id: 'op-export-1',
+              audit_ref_id: 'audit-export-1',
+              review_packet_id: 'agent-run-1',
+              decision: 'accepted',
+              package_hash: stableHash,
+              manifest: {
+                schema_version: 'review-package-manifest/v1',
+                agent_run_id: 'agent-run-1',
+                format: 'json',
+                package_hash: stableHash,
+                hash_algorithm: 'sha256',
+                generated_at: '2026-06-07T00:00:00Z',
+                refs: {
+                  operation_id: 'op-export-1',
+                  audit_ref_id: 'audit-export-1',
+                },
               },
-              review_packet: {
-                id: 'agent-run-1',
-                evidence_strength: 'high',
-                confidence: 85,
-                interaction_count: 5,
-                unique_sources: 2,
+              package: {
+                agent_run: {
+                  id: 'agent-run-1',
+                  agent_id: 'agent-123',
+                  case_id: 'case-1',
+                  payload_id: 'payload-1',
+                  target: 'https://target.example',
+                  status: 'completed',
+                },
+                review_packet: {
+                  id: 'agent-run-1',
+                  evidence_strength: 'high',
+                  confidence: 85,
+                  interaction_count: 5,
+                  unique_sources: 2,
+                },
+                review_decision: {
+                  decision: 'accepted',
+                  reason: 'Test review decision',
+                  operation_id: 'op-decision-1',
+                  audit_ref_id: 'audit-decision-1',
+                },
+                links: {
+                  case_url: '/dashboard/cases/case-1',
+                  payload_url: '/dashboard/payloads/payload-1',
+                  evidence_url: '/dashboard/evidence?payload_id=payload-1',
+                  audit_url: '/dashboard/audit?resource_type=agent_run&resource_id=agent-run-1',
+                },
               },
-              review_decision: {
-                decision: 'accepted',
-                reason: 'Test review decision',
-                operation_id: 'op-decision-1',
-                audit_ref_id: 'audit-decision-1',
-              },
-              links: {
-                case_url: '/dashboard/cases/case-1',
-                payload_url: '/dashboard/payloads/payload-1',
-                evidence_url: '/dashboard/evidence?payload_id=payload-1',
-                audit_url: '/dashboard/audit?resource_type=agent_run&resource_id=agent-run-1',
-              },
+              generated_at: '2026-06-07T00:00:00Z',
             },
-            generated_at: '2026-06-07T00:00:00Z',
           },
         },
       })
@@ -1200,6 +1216,7 @@ test.describe('Agent Runs', () => {
       route.fulfill({
         json: {
           code: 0,
+          message: 'success',
           data: {
             items: [
               {
@@ -1208,6 +1225,10 @@ test.describe('Agent Runs', () => {
                 resource_type: 'agent_run',
                 resource_id: 'agent-run-1',
                 timestamp: '2026-06-07T00:00:00Z',
+                result: 'success',
+                details: {
+                  package_hash: stableHash,
+                },
               },
             ],
             total: 1,
@@ -1239,6 +1260,13 @@ test.describe('Agent Runs', () => {
     expect(capturedBody).toContain('json')
     expect(capturedBody).toContain('agent-run-1')
 
+    // Wait for Export Result to appear
+    await expect(dialog.getByText('Export Result')).toBeVisible({ timeout: 10000 })
+
+    // Verify Export Result displays Package Hash
+    await expect(dialog.getByText('Package Hash:')).toBeVisible()
+    await expect(dialog.getByText(stableHash.substring(0, 12) + '...')).toBeVisible()
+
     // Close dialog
     await dialog.getByRole('button', { name: '取消' }).click()
     await page.waitForSelector('[role="dialog"]', { state: 'hidden' })
@@ -1252,6 +1280,10 @@ test.describe('Agent Runs', () => {
 
     // Verify audit log shows review_exported
     await expect(page.getByText('agent_run.review_exported')).toBeVisible()
+
+    // Verify Package Hash is displayed in audit details
+    await expect(page.getByText('Package Hash:')).toBeVisible()
+    await expect(page.getByText(stableHash.substring(0, 12) + '...')).toBeVisible()
 
     // Navigate back to agent run detail
     await page.goto('/dashboard/agent-runs/agent-run-1')
@@ -1277,6 +1309,19 @@ test.describe('Agent Runs', () => {
                 audit_ref_id: 'audit-export-2',
                 review_packet_id: 'agent-run-1',
                 decision: 'accepted',
+                package_hash: stableHash,
+                manifest: {
+                  schema_version: 'review-package-manifest/v1',
+                  agent_run_id: 'agent-run-1',
+                  format: 'markdown',
+                  package_hash: stableHash,
+                  hash_algorithm: 'sha256',
+                  generated_at: '2026-06-07T00:00:00Z',
+                  refs: {
+                    operation_id: 'op-export-2',
+                    audit_ref_id: 'audit-export-2',
+                  },
+                },
                 content: '# Agent Run Review Evidence Package\n\n## Agent Run\n\n- **ID**: agent-run-1\n- **Title**: Test Agent Run\n\n## Evidence Summary\n\n- **Total Interactions**: 5\n\n## Review Decision\n\n- **Decision**: accepted\n\n## Timeline References\n\n## Audit References\n\n## Links\n\n',
                 generated_at: '2026-06-07T00:00:00Z',
               },
@@ -1297,6 +1342,19 @@ test.describe('Agent Runs', () => {
                 audit_ref_id: 'audit-export-1',
                 review_packet_id: 'agent-run-1',
                 decision: 'accepted',
+                package_hash: stableHash,
+                manifest: {
+                  schema_version: 'review-package-manifest/v1',
+                  agent_run_id: 'agent-run-1',
+                  format: 'json',
+                  package_hash: stableHash,
+                  hash_algorithm: 'sha256',
+                  generated_at: '2026-06-07T00:00:00Z',
+                  refs: {
+                    operation_id: 'op-export-1',
+                    audit_ref_id: 'audit-export-1',
+                  },
+                },
                 package: {
                   agent_run: {
                     id: 'agent-run-1',
@@ -1353,6 +1411,10 @@ test.describe('Agent Runs', () => {
     // Wait for export result to appear in dialog
     await expect(mdDialog.getByText('Export Result')).toBeVisible({ timeout: 10000 })
 
+    // Verify Markdown Export Result displays Package Hash
+    await expect(mdDialog.getByText('Package Hash:')).toBeVisible()
+    await expect(mdDialog.getByText(stableHash.substring(0, 12) + '...')).toBeVisible()
+
     // Verify markdown content in pre element
     const preElement = mdDialog.locator('pre')
     await expect(preElement).toBeVisible()
@@ -1362,6 +1424,8 @@ test.describe('Agent Runs', () => {
   })
 
   test('should deliver review evidence to webhook successfully', async ({ page }) => {
+    const stableHash = 'abc123def4567890123456789012345678901234567890123456789012345678'
+
     // Mock audit API at the very beginning - use broader pattern
     await page.route('**/audit/logs**', route => {
       route.fulfill({
@@ -1446,6 +1510,7 @@ test.describe('Agent Runs', () => {
               status_code: 200,
               result: 'delivered',
               delivered_at: '2026-06-07T00:00:00Z',
+              package_hash: stableHash,
             },
           },
         },
@@ -1486,6 +1551,10 @@ test.describe('Agent Runs', () => {
 
     // Wait for delivery receipt to appear
     await expect(deliveryDialog.getByText('Delivery Receipt')).toBeVisible({ timeout: 10000 })
+
+    // Verify Delivery Receipt displays Package Hash
+    await expect(deliveryDialog.getByText('Package Hash')).toBeVisible()
+    await expect(deliveryDialog.getByText(stableHash.substring(0, 12) + '...')).toBeVisible()
 
     // Verify delivery receipt content
     await expect(deliveryDialog.getByText('delivery-123')).toBeVisible()
@@ -1728,6 +1797,7 @@ test.describe('Agent Runs', () => {
 
     // Mock delivery history with counter to simulate refresh after delivery
     let deliveryHistoryCallCount = 0
+    const stableHash = 'abc123def4567890123456789012345678901234567890123456789012345678'
     await page.route('**/api/v2/agent-runs/agent-run-1/review-deliveries', route => {
       deliveryHistoryCallCount++
       if (deliveryHistoryCallCount === 1) {
@@ -1768,6 +1838,7 @@ test.describe('Agent Runs', () => {
                     header_names: ['X-Custom-Header'],
                     created_at: '2026-06-07T00:00:00Z',
                     delivered_at: '2026-06-07T00:00:01Z',
+                    package_hash: stableHash,
                   },
                 ],
               },
@@ -1795,6 +1866,7 @@ test.describe('Agent Runs', () => {
               status_code: 200,
               result: 'delivered',
               delivered_at: '2026-06-07T00:00:01Z',
+              package_hash: stableHash,
             },
           },
         },
@@ -1869,6 +1941,10 @@ test.describe('Agent Runs', () => {
     await expect(page.getByText('Audit Ref')).toBeVisible()
     await expect(page.getByText('audit-delivery-1')).toBeVisible()
 
+    // Verify Package Hash is displayed in delivered delivery history
+    await expect(page.getByText('Package Hash')).toBeVisible()
+    await expect(page.getByText(stableHash.substring(0, 12) + '...')).toBeVisible()
+
     // Verify no full webhook URL or header values are visible
     const pageContent = await page.content()
     expect(pageContent).not.toContain('https://hooks.example.com/review')
@@ -1927,6 +2003,7 @@ test.describe('Agent Runs', () => {
     })
 
     // Mock delivery history with failed and timeout items
+    const stableHash = 'abc123def4567890123456789012345678901234567890123456789012345678'
     await page.route('**/api/v2/agent-runs/agent-run-1/review-deliveries', route => {
       route.fulfill({
         json: {
@@ -1946,6 +2023,7 @@ test.describe('Agent Runs', () => {
                   status_code: 200,
                   created_at: '2026-06-07T00:00:00Z',
                   delivered_at: '2026-06-07T00:00:01Z',
+                  package_hash: stableHash,
                 },
                 {
                   delivery_id: 'delivery-456',
@@ -1956,6 +2034,7 @@ test.describe('Agent Runs', () => {
                   status_code: 500,
                   error_summary: 'internal server error',
                   created_at: '2026-06-07T00:00:02Z',
+                  package_hash: stableHash,
                 },
                 {
                   delivery_id: 'delivery-789',
@@ -1965,6 +2044,7 @@ test.describe('Agent Runs', () => {
                   destination_host: 'hooks.example.com',
                   error_summary: 'request timed out',
                   created_at: '2026-06-07T00:00:03Z',
+                  package_hash: stableHash,
                 },
               ],
             },
@@ -1982,6 +2062,10 @@ test.describe('Agent Runs', () => {
 
     // Wait for delivery history section to load
     await expect(page.getByText('Delivery History')).toBeVisible({ timeout: 10000 })
+
+    // Verify Package Hash is displayed in delivery history (use first to avoid strict mode violation)
+    await expect(page.getByText('Package Hash:').first()).toBeVisible()
+    await expect(page.getByText(stableHash.substring(0, 12) + '...').first()).toBeVisible()
 
     // Verify summary counts
     await expect(page.getByText('Total: 3')).toBeVisible()

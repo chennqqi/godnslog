@@ -201,6 +201,7 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			agentRuns.POST("/:id/review-export", self.v2ExportReviewPackage)
 			agentRuns.POST("/:id/review-delivery", self.v2DeliverReviewPackage)
 			agentRuns.GET("/:id/review-deliveries", self.v2ListReviewDeliveries)
+			agentRuns.GET("/review-package-trace", self.v2TraceReviewPackage)
 			agentRuns.GET("/review-queue", self.v2ListReviewQueue)
 			agentRuns.GET("/:id/followups", self.v2ListFollowupHistory)
 		}
@@ -3704,6 +3705,38 @@ func (self *WebServer) v2ListReviewDeliveries(c *gin.Context) {
 		}
 		logrus.Errorf("[v2_api.go::v2ListReviewDeliveries] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to list delivery history"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": resp})
+}
+
+// v2TraceReviewPackage traces a review package by its hash
+func (self *WebServer) v2TraceReviewPackage(c *gin.Context) {
+	packageHash := c.Query("package_hash")
+
+	// Validate package_hash parameter
+	if packageHash == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "package_hash is required"})
+		return
+	}
+
+	// Validate package_hash format
+	if err := agentrun.ValidatePackageHash(packageHash); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid package_hash: must be 64-character hex string"})
+		return
+	}
+
+	authService := auth.NewService(self.orm)
+	agentRunService := agentrun.NewService(self.orm, authService)
+	interactionService := interaction.NewService(self.orm)
+	evidenceService := interaction.NewEvidenceService(interactionService)
+	reviewService := agentrun.NewReviewService(self.orm, agentRunService, authService, evidenceService, interactionService)
+
+	resp, err := reviewService.TraceReviewPackageByHash(packageHash)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2TraceReviewPackage] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to trace package"})
 		return
 	}
 

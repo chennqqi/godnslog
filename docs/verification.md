@@ -862,3 +862,53 @@ Sprint S establishes package integrity for Agent Run Review Evidence:
 - Frontend displays shortened hash (12 characters) with click-to-copy functionality
 - Hash consistency verified through Go unit tests
 - No sensitive information (webhook URLs, headers, API keys) included in hash computation or manifest
+
+### Sprint S Final Reverification (2026-06-10)
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/agentrun ./server
+# Result: PASS
+
+GOCACHE=/tmp/gocache go test ./...
+# Result: PASS
+
+cd frontend-next && npx eslint src/app/dashboard/agent-runs/page.tsx src/app/dashboard/agent-runs/[id]/page.tsx src/app/dashboard/audit/audit-page-content.tsx src/lib/api-client.ts src/types/index.ts e2e/agent-runs.spec.ts
+# Result: PASS
+
+cd frontend-next && npm run build
+# Result: PASS
+
+cd frontend-next && npm run dev
+# Result: PASS, local server ready at http://localhost:3000
+
+cd frontend-next && npx playwright test --reporter=line e2e/agent-runs.spec.ts
+# Result: 14 passed
+```
+
+Acceptance result after final reverification: **passed**. Sprint S now verifies the package hash lifecycle through JSON/Markdown export, delivery receipt, delivery history, failed/timeout delivery history, and audit details. E2E assertions cover `Package Hash` display and the stable compact hash prefix across the closure loop.
+
+## Sprint T: Package Hash Trace Lookup Acceptance Verification (2026-06-10)
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/agentrun ./server
+# Result: FAIL
+# server/v2_api_test.go does not compile:
+# - undefined setupTestServer
+# - undefined generateTestToken
+# - wrong models package references for AgentRun, AgentOperation, AuditLog, AuditDetails
+
+cd frontend-next && npx eslint src/app/dashboard/agent-runs/page.tsx src/app/dashboard/agent-runs/[id]/page.tsx src/app/dashboard/audit/audit-page-content.tsx src/lib/api-client.ts src/types/index.ts e2e/agent-runs.spec.ts e2e/audit.spec.ts
+# Result: PASS
+
+cd frontend-next && npm run build
+# Result: PASS
+
+cd frontend-next && npm run dev
+# Result: PASS, local server ready at http://localhost:3000
+
+cd frontend-next && npx playwright test --reporter=line e2e/agent-runs.spec.ts e2e/audit.spec.ts
+# Result: FAIL - 14 passed, 16 failed
+# All audit.spec.ts tests fail in beforeEach while waiting for /dashboard after real login.
+```
+
+Acceptance result: **not passed**. Sprint T currently has a non-compiling server test suite and failing Audit E2E coverage. The new audit E2E spec uses a real login flow instead of the project's existing mocked-auth pattern, so it does not prove the package hash trace workflow.

@@ -16,6 +16,75 @@ import (
 	"xorm.io/xorm"
 )
 
+// TestValidatePackageHash tests the ValidatePackageHash function
+func TestValidatePackageHash(t *testing.T) {
+	tests := []struct {
+		name        string
+		packageHash string
+		wantErr     error
+	}{
+		{
+			name:        "valid 64-char hex string",
+			packageHash: "abc123def4567890123456789012345678901234567890123456789012345678",
+			wantErr:     nil,
+		},
+		{
+			name:        "valid 64-char hex string uppercase",
+			packageHash: "ABC123DEF4567890123456789012345678901234567890123456789012345678",
+			wantErr:     nil,
+		},
+		{
+			name:        "valid 64-char hex string mixed case",
+			packageHash: "AbC123DeF4567890123456789012345678901234567890123456789012345678",
+			wantErr:     nil,
+		},
+		{
+			name:        "empty string",
+			packageHash: "",
+			wantErr:     ErrInvalidPackageHash,
+		},
+		{
+			name:        "too short",
+			packageHash: "abc123",
+			wantErr:     ErrInvalidPackageHash,
+		},
+		{
+			name:        "too long",
+			packageHash: "abc123def4567890123456789012345678901234567890123456789012345678extra",
+			wantErr:     ErrInvalidPackageHash,
+		},
+		{
+			name:        "contains non-hex characters",
+			packageHash: "abc123def456789012345678901234567890123456789012345678901234567g",
+			wantErr:     ErrInvalidPackageHash,
+		},
+		{
+			name:        "contains spaces",
+			packageHash: "abc123def456789012345678901234567890123456789012345678901234567 ",
+			wantErr:     ErrInvalidPackageHash,
+		},
+		{
+			name:        "63 characters",
+			packageHash: "abc123def456789012345678901234567890123456789012345678901234567",
+			wantErr:     ErrInvalidPackageHash,
+		},
+		{
+			name:        "65 characters",
+			packageHash: "abc123def45678901234567890123456789012345678901234567890123456789",
+			wantErr:     ErrInvalidPackageHash,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidatePackageHash(tt.packageHash)
+			if err != tt.wantErr {
+				t.Errorf("ValidatePackageHash() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 // TestListReviewDeliveries tests the ListReviewDeliveries function
 func TestListReviewDeliveries(t *testing.T) {
 	// Setup in-memory database
@@ -1088,8 +1157,8 @@ func TestExportPackageHash(t *testing.T) {
 		}
 	})
 
-	// Test Markdown export - package_hash should be empty for non-JSON
-	t.Run("Markdown export has no package_hash", func(t *testing.T) {
+	// Test Markdown export - package_hash should be computed from Markdown content
+	t.Run("Markdown export has package_hash", func(t *testing.T) {
 		req := &models.AgentRunReviewExportRequest{
 			Format:       "markdown",
 			IncludeAudit: false,
@@ -1099,12 +1168,26 @@ func TestExportPackageHash(t *testing.T) {
 			t.Fatalf("Failed to export review package: %v", err)
 		}
 
-		// Markdown format should not have package_hash or manifest
-		if resp.PackageHash != "" {
-			t.Error("Expected package_hash to be empty for markdown format")
+		// Markdown format should have package_hash and manifest
+		if resp.PackageHash == "" {
+			t.Error("Expected package_hash to be non-empty for markdown format")
+		}
+		if len(resp.PackageHash) != 64 {
+			t.Errorf("Expected package_hash to be 64 characters, got %d", len(resp.PackageHash))
+		}
+		if resp.Manifest == nil {
+			t.Error("Expected manifest to be non-nil for markdown format")
 		}
 		if resp.Manifest != nil {
-			t.Error("Expected manifest to be nil for markdown format")
+			if resp.Manifest.Format != "markdown" {
+				t.Errorf("Expected manifest format to be markdown, got %s", resp.Manifest.Format)
+			}
+			if resp.Manifest.PackageHash != resp.PackageHash {
+				t.Error("Expected manifest package_hash to match response package_hash")
+			}
+			if resp.Manifest.HashAlgorithm != "sha256" {
+				t.Errorf("Expected hash_algorithm to be sha256, got %s", resp.Manifest.HashAlgorithm)
+			}
 		}
 	})
 }

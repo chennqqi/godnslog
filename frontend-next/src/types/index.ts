@@ -292,6 +292,70 @@ export interface AuditLogListResponse {
   total_pages: number
 }
 
+// Package Trace types
+export interface AgentRunReviewPackageTraceResponse {
+  package_hash: string
+  summary: AgentRunReviewPackageTraceSummary
+  agent_runs: AgentRunReviewPackageTraceRun[]
+  exports: AgentRunReviewPackageTraceExport[]
+  deliveries: AgentRunReviewPackageTraceDelivery[]
+  audits: AgentRunReviewPackageTraceAudit[]
+}
+
+export interface AgentRunReviewPackageTraceSummary {
+  agent_run_count: number
+  export_count: number
+  delivery_count: number
+  audit_count: number
+  delivered: number
+  failed: number
+  timeout: number
+}
+
+export interface AgentRunReviewPackageTraceRun {
+  agent_run_id: string
+  title?: string
+  status?: string
+  case_id?: string
+  payload_id?: string
+  target?: string
+  url?: string
+}
+
+export interface AgentRunReviewPackageTraceExport {
+  agent_run_id: string
+  operation_id: string
+  audit_ref_id?: string
+  review_packet_id?: string
+  format: string
+  created_at: string
+}
+
+export interface AgentRunReviewPackageTraceDelivery {
+  agent_run_id: string
+  delivery_id?: string
+  delivery_operation_id: string
+  export_operation_id?: string
+  audit_ref_id?: string
+  format: string
+  result: string
+  destination_host?: string
+  status_code?: number
+  error_summary?: string
+  created_at: string
+  delivered_at?: string
+}
+
+export interface AgentRunReviewPackageTraceAudit {
+  audit_ref_id: string
+  agent_run_id?: string
+  action: string
+  resource_type: string
+  resource_id?: string
+  timestamp: string
+  url?: string
+}
+
 // Scanner Run types
 export interface ScannerRun {
   id: string

@@ -3042,3 +3042,661 @@ func TestV2ListFollowupHistory(t *testing.T) {
 		}
 	})
 }
+
+// TestV2TraceReviewPackage tests the package trace API
+func TestV2TraceReviewPackage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &WebServerConfig{
+		Domain:     "test.example.com",
+		Driver:     "sqlite",
+		Dsn:        ":memory:",
+		AuthExpire: 3600,
+	}
+
+	store := cache.NewCache(300, 60)
+	server, err := NewWebServer(cfg, store)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	if err := server.initDatabase(); err != nil {
+		t.Fatalf("Failed to initialize database: %v", err)
+	}
+	defer server.orm.Close()
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	user := &models.TblUser{
+		Name:  "testuser",
+		Email: "testuser@test.com",
+		Pass:  string(hashedPassword),
+		Role:  0,
+		Lang:  "en-US",
+	}
+	if _, err := server.orm.Insert(user); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Create router and register routes
+	r := gin.New()
+	server.registerV2API(r)
+
+	// Login to get token
+	loginReq := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(`{"username":"testuser","password":"password"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginW := httptest.NewRecorder()
+	r.ServeHTTP(loginW, loginReq)
+
+	if loginW.Code != http.StatusOK {
+		t.Fatalf("Login failed: %d - %s", loginW.Code, loginW.Body.String())
+	}
+
+	var loginResp struct {
+		Code int    `json:"code"`
+		Data struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(loginW.Body.Bytes(), &loginResp); err != nil {
+		t.Fatalf("Failed to unmarshal login response: %v", err)
+	}
+	token := loginResp.Data.Token
+
+	// Create test agent run
+	agentRunID := "agent-run-trace-1"
+	agentRun := &v2models.AgentRun{
+		ID:         agentRunID,
+		AgentID:    "agent-123",
+		OperatorID: "testuser",
+		Title:      "Test Agent Run for Trace",
+		Status:     v2models.AgentRunStatusCompleted,
+		StartedAt:  &[]time.Time{time.Now()}[0],
+		EndedAt:    &[]time.Time{time.Now()}[0],
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	if _, err := server.orm.Insert(agentRun); err != nil {
+		t.Fatalf("insert agent run: %v", err)
+	}
+
+	// Create export operation with package_hash
+	exportOpID := "op-export-trace-1"
+	exportResult := map[string]interface{}{
+		"package_hash":     "abc123def4567890123456789012345678901234567890123456789012345678",
+		"audit_ref_id":     "audit-export-trace-1",
+		"review_packet_id": "packet-1",
+	}
+	exportResultJSON, _ := json.Marshal(exportResult)
+	exportOp := &v2models.AgentOperation{
+		ID:         exportOpID,
+		AgentRunID: agentRunID,
+		AgentID:    "agent-123",
+		Action:     "review_export.json",
+		Result:     string(exportResultJSON),
+		StartedAt:  time.Now(),
+		CreatedAt:  time.Now(),
+	}
+	if _, err := server.orm.Insert(exportOp); err != nil {
+		t.Fatalf("insert export operation: %v", err)
+	}
+
+	// Create delivery operation with package_hash
+	deliveryOpID := "op-delivery-trace-1"
+	deliveryRequest := map[string]interface{}{
+		"webhook_url": "https://hooks.example.com/webhook",
+		"headers": map[string]string{
+			"Authorization": "Bearer secret-token",
+			"X-API-Key":     "api-key-123",
+		},
+	}
+	deliveryRequestJSON, _ := json.Marshal(deliveryRequest)
+	deliveryResult := map[string]interface{}{
+		"package_hash":        "abc123def4567890123456789012345678901234567890123456789012345678",
+		"result":              "delivered",
+		"status_code":         200,
+		"delivery_id":         "delivery-1",
+		"export_operation_id": exportOpID,
+		"audit_ref_id":        "audit-delivery-trace-1",
+		"delivered_at":        time.Now().Format(time.RFC3339),
+	}
+	deliveryResultJSON, _ := json.Marshal(deliveryResult)
+	deliveryOp := &v2models.AgentOperation{
+		ID:         deliveryOpID,
+		AgentRunID: agentRunID,
+		AgentID:    "agent-123",
+		Action:     "review_delivery.webhook",
+		Request:    string(deliveryRequestJSON),
+		Result:     string(deliveryResultJSON),
+		StartedAt:  time.Now(),
+		CreatedAt:  time.Now(),
+	}
+	if _, err := server.orm.Insert(deliveryOp); err != nil {
+		t.Fatalf("insert delivery operation: %v", err)
+	}
+
+	// Create audit log with package_hash
+	userIDStr := fmt.Sprintf("%d", user.Id)
+	auditDetailsJSON, _ := json.Marshal(map[string]string{"package_hash": "abc123def4567890123456789012345678901234567890123456789012345678"})
+	auditLog := &v2models.AuditLog{
+		ID:           "audit-export-trace-1",
+		UserID:       &userIDStr,
+		Action:       "agent_run.review_exported",
+		ResourceType: "agent_run",
+		ResourceID:   &agentRunID,
+		Result:       "success",
+		Details:      v2models.AuditDetails(auditDetailsJSON),
+		Timestamp:    time.Now(),
+		CreatedAt:    time.Now(),
+	}
+	if _, err := server.orm.Insert(auditLog); err != nil {
+		t.Fatalf("insert audit log: %v", err)
+	}
+
+	validHash := "abc123def4567890123456789012345678901234567890123456789012345678"
+
+	// Test unauthenticated
+	t.Run("unauthenticated", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/v2/agent-runs/review-package-trace?package_hash="+validHash, nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("Expected 401, got %d", w.Code)
+		}
+	})
+
+	// Test missing package_hash parameter
+	t.Run("missing package_hash", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/v2/agent-runs/review-package-trace", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", w.Code)
+		}
+
+		var resp struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		if resp.Message != "package_hash is required" {
+			t.Errorf("Expected 'package_hash is required', got '%s'", resp.Message)
+		}
+	})
+
+	// Test invalid package_hash format
+	t.Run("invalid package_hash format", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/v2/agent-runs/review-package-trace?package_hash=invalid", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", w.Code)
+		}
+
+		var resp struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		if !strings.Contains(resp.Message, "invalid package_hash") {
+			t.Errorf("Expected 'invalid package_hash' in message, got '%s'", resp.Message)
+		}
+	})
+
+	// Test empty result (no matching records)
+	t.Run("empty result", func(t *testing.T) {
+		emptyHash := "0000000000000000000000000000000000000000000000000000000000000000"
+		req := httptest.NewRequest("GET", "/api/v2/agent-runs/review-package-trace?package_hash="+emptyHash, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d", w.Code)
+		}
+
+		var resp struct {
+			Code int                                                      `json:"code"`
+			Data v2models.AgentRunReviewPackageTraceResponse `json:"data"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		if resp.Code != 0 {
+			t.Errorf("Expected code 0, got %d", resp.Code)
+		}
+
+		// Verify empty summary
+		if resp.Data.Summary.AgentRunCount != 0 {
+			t.Errorf("Expected agent_run_count 0, got %d", resp.Data.Summary.AgentRunCount)
+		}
+		if resp.Data.Summary.ExportCount != 0 {
+			t.Errorf("Expected export_count 0, got %d", resp.Data.Summary.ExportCount)
+		}
+		if len(resp.Data.AgentRuns) != 0 {
+			t.Errorf("Expected empty agent_runs, got %d", len(resp.Data.AgentRuns))
+		}
+	})
+
+	// Test successful trace with export, delivery, and audit
+	t.Run("successful trace", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/v2/agent-runs/review-package-trace?package_hash="+validHash, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d: %s", w.Code, w.Body.String())
+		}
+
+		var resp struct {
+			Code int                                                      `json:"code"`
+			Data v2models.AgentRunReviewPackageTraceResponse `json:"data"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		if resp.Code != 0 {
+			t.Errorf("Expected code 0, got %d", resp.Code)
+		}
+
+		// Verify package_hash in response
+		if resp.Data.PackageHash != validHash {
+			t.Errorf("Expected package_hash %s, got %s", validHash, resp.Data.PackageHash)
+		}
+
+		// Verify summary counts
+		if resp.Data.Summary.AgentRunCount != 1 {
+			t.Errorf("Expected agent_run_count 1, got %d", resp.Data.Summary.AgentRunCount)
+		}
+		if resp.Data.Summary.ExportCount != 1 {
+			t.Errorf("Expected export_count 1, got %d", resp.Data.Summary.ExportCount)
+		}
+		if resp.Data.Summary.DeliveryCount != 1 {
+			t.Errorf("Expected delivery_count 1, got %d", resp.Data.Summary.DeliveryCount)
+		}
+		if resp.Data.Summary.AuditCount != 1 {
+			t.Errorf("Expected audit_count 1, got %d", resp.Data.Summary.AuditCount)
+		}
+		if resp.Data.Summary.Delivered != 1 {
+			t.Errorf("Expected delivered 1, got %d", resp.Data.Summary.Delivered)
+		}
+
+		// Verify export trace
+		if len(resp.Data.Exports) != 1 {
+			t.Errorf("Expected 1 export, got %d", len(resp.Data.Exports))
+		}
+		export := resp.Data.Exports[0]
+		if export.AgentRunID != agentRunID {
+			t.Errorf("Expected agent_run_id %s, got %s", agentRunID, export.AgentRunID)
+		}
+		if export.OperationID != exportOpID {
+			t.Errorf("Expected operation_id %s, got %s", exportOpID, export.OperationID)
+		}
+
+		// Verify delivery trace
+		if len(resp.Data.Deliveries) != 1 {
+			t.Errorf("Expected 1 delivery, got %d", len(resp.Data.Deliveries))
+		}
+		delivery := resp.Data.Deliveries[0]
+		if delivery.AgentRunID != agentRunID {
+			t.Errorf("Expected agent_run_id %s, got %s", agentRunID, delivery.AgentRunID)
+		}
+		if delivery.Result != "delivered" {
+			t.Errorf("Expected result delivered, got %s", delivery.Result)
+		}
+
+		// Verify sanitization - webhook URL should not be exposed
+		if delivery.DestinationHost == "https://hooks.example.com/webhook" {
+			t.Errorf("Webhook URL should be sanitized, but got full URL")
+		}
+		if delivery.StatusCode == 200 {
+			// Status code is allowed as it's not sensitive
+		}
+
+		// Verify audit trace
+		if len(resp.Data.Audits) != 1 {
+			t.Errorf("Expected 1 audit, got %d", len(resp.Data.Audits))
+		}
+		audit := resp.Data.Audits[0]
+		if audit.Action != "agent_run.review_exported" {
+			t.Errorf("Expected action agent_run.review_exported, got %s", audit.Action)
+		}
+	})
+
+	// Test route order - ensure review-package-trace is not captured by /:id
+	t.Run("route order", func(t *testing.T) {
+		// Test that a request to review-package-trace doesn't get captured by /:id
+		req := httptest.NewRequest("GET", "/api/v2/agent-runs/review-package-trace?package_hash="+validHash, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200 for trace endpoint, got %d", w.Code)
+		}
+
+		var resp struct {
+			Code int `json:"code"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		if resp.Code != 0 {
+			t.Errorf("Expected code 0 for trace endpoint, got %d", resp.Code)
+		}
+	})
+}
+
+	agentRun := &v2models.AgentRun{
+		ID:         agentRunID,
+		AgentID:    "agent-123",
+		OperatorID: "testuser",
+		Title:      "Test Agent Run for Trace",
+		Status:     v2models.AgentRunStatusCompleted,
+		StartedAt:  &[]time.Time{time.Now()}[0],
+		EndedAt:    &[]time.Time{time.Now()}[0],
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	if _, err := server.orm.Insert(agentRun); err != nil {
+		t.Fatalf("insert agent run: %v", err)
+	}
+
+	// Create export operation with package_hash
+	exportOpID := "op-export-trace-1"
+	exportResult := map[string]interface{}{
+		"package_hash":     "abc123def4567890123456789012345678901234567890123456789012345678",
+		"audit_ref_id":     "audit-export-trace-1",
+		"review_packet_id": "packet-1",
+	}
+	exportResultJSON, _ := json.Marshal(exportResult)
+	exportOp := &v2models.AgentOperation{
+		ID:         exportOpID,
+		AgentRunID: agentRunID,
+		AgentID:    "agent-123",
+		Action:     "review_export.json",
+		Result:     string(exportResultJSON),
+		StartedAt:  time.Now(),
+		CreatedAt:  time.Now(),
+	}
+	if _, err := server.orm.Insert(exportOp); err != nil {
+		t.Fatalf("insert export operation: %v", err)
+	}
+
+	// Create delivery operation with package_hash
+	deliveryOpID := "op-delivery-trace-1"
+	deliveryRequest := map[string]interface{}{
+		"webhook_url": "https://hooks.example.com/webhook",
+		"headers": map[string]string{
+			"Authorization": "Bearer secret-token",
+			"X-API-Key":     "api-key-123",
+		},
+	}
+	deliveryRequestJSON, _ := json.Marshal(deliveryRequest)
+	deliveryResult := map[string]interface{}{
+		"package_hash":        "abc123def4567890123456789012345678901234567890123456789012345678",
+		"result":              "delivered",
+		"status_code":         200,
+		"delivery_id":         "delivery-1",
+		"export_operation_id": exportOpID,
+		"audit_ref_id":        "audit-delivery-trace-1",
+		"delivered_at":        time.Now().Format(time.RFC3339),
+	}
+	deliveryResultJSON, _ := json.Marshal(deliveryResult)
+	deliveryOp := &v2models.AgentOperation{
+		ID:         deliveryOpID,
+		AgentRunID: agentRunID,
+		AgentID:    "agent-123",
+		Action:     "review_delivery.webhook",
+		Request:    string(deliveryRequestJSON),
+		Result:     string(deliveryResultJSON),
+		StartedAt:  time.Now(),
+		CreatedAt:  time.Now(),
+	}
+	if _, err := server.orm.Insert(deliveryOp); err != nil {
+		t.Fatalf("insert delivery operation: %v", err)
+	}
+
+	// Create audit log with package_hash
+	userIDStr := fmt.Sprintf("%d", user.Id)
+	auditLog := &v2models.AuditLog{
+		ID:           "audit-export-trace-1",
+		UserID:       &userIDStr,
+		Action:       "agent_run.review_exported",
+		ResourceType: "agent_run",
+		ResourceID:   &agentRunID,
+		Result:       "success",
+		Details:      v2models.AuditDetails(`{"package_hash":"abc123def4567890123456789012345678901234567890123456789012345678"}`),
+		Timestamp:    time.Now(),
+		CreatedAt:    time.Now(),
+	}
+	if _, err := server.orm.Insert(auditLog); err != nil {
+		t.Fatalf("insert audit log: %v", err)
+	}
+
+	validHash := "abc123def4567890123456789012345678901234567890123456789012345678"
+
+	// Test unauthenticated
+	t.Run("unauthenticated", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/v2/agent-runs/review-package-trace?package_hash="+validHash, nil)
+		w := httptest.NewRecorder()
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("Expected 401, got %d", w.Code)
+		}
+	})
+
+	// Test missing package_hash parameter
+	t.Run("missing package_hash", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/v2/agent-runs/review-package-trace", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", w.Code)
+		}
+
+		var resp struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		if resp.Message != "package_hash is required" {
+			t.Errorf("Expected 'package_hash is required', got '%s'", resp.Message)
+		}
+	})
+
+	// Test invalid package_hash format
+	t.Run("invalid package_hash format", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/v2/agent-runs/review-package-trace?package_hash=invalid", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", w.Code)
+		}
+
+		var resp struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		if !strings.Contains(resp.Message, "invalid package_hash") {
+			t.Errorf("Expected 'invalid package_hash' in message, got '%s'", resp.Message)
+		}
+	})
+
+	// Test empty result (no matching records)
+	t.Run("empty result", func(t *testing.T) {
+		emptyHash := "0000000000000000000000000000000000000000000000000000000000000000"
+		req := httptest.NewRequest("GET", "/api/v2/agent-runs/review-package-trace?package_hash="+emptyHash, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d", w.Code)
+		}
+
+		var resp struct {
+			Code int                                         `json:"code"`
+			Data v2models.AgentRunReviewPackageTraceResponse `json:"data"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		if resp.Code != 0 {
+			t.Errorf("Expected code 0, got %d", resp.Code)
+		}
+
+		// Verify empty summary
+		if resp.Data.Summary.AgentRunCount != 0 {
+			t.Errorf("Expected agent_run_count 0, got %d", resp.Data.Summary.AgentRunCount)
+		}
+		if resp.Data.Summary.ExportCount != 0 {
+			t.Errorf("Expected export_count 0, got %d", resp.Data.Summary.ExportCount)
+		}
+		if len(resp.Data.AgentRuns) != 0 {
+			t.Errorf("Expected empty agent_runs, got %d", len(resp.Data.AgentRuns))
+		}
+	})
+
+	// Test successful trace with export, delivery, and audit
+	t.Run("successful trace", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/v2/agent-runs/review-package-trace?package_hash="+validHash, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d: %s", w.Code, w.Body.String())
+		}
+
+		var resp struct {
+			Code int                                         `json:"code"`
+			Data v2models.AgentRunReviewPackageTraceResponse `json:"data"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		if resp.Code != 0 {
+			t.Errorf("Expected code 0, got %d", resp.Code)
+		}
+
+		// Verify package_hash in response
+		if resp.Data.PackageHash != validHash {
+			t.Errorf("Expected package_hash %s, got %s", validHash, resp.Data.PackageHash)
+		}
+
+		// Verify summary counts
+		if resp.Data.Summary.AgentRunCount != 1 {
+			t.Errorf("Expected agent_run_count 1, got %d", resp.Data.Summary.AgentRunCount)
+		}
+		if resp.Data.Summary.ExportCount != 1 {
+			t.Errorf("Expected export_count 1, got %d", resp.Data.Summary.ExportCount)
+		}
+		if resp.Data.Summary.DeliveryCount != 1 {
+			t.Errorf("Expected delivery_count 1, got %d", resp.Data.Summary.DeliveryCount)
+		}
+		if resp.Data.Summary.AuditCount != 1 {
+			t.Errorf("Expected audit_count 1, got %d", resp.Data.Summary.AuditCount)
+		}
+		if resp.Data.Summary.Delivered != 1 {
+			t.Errorf("Expected delivered 1, got %d", resp.Data.Summary.Delivered)
+		}
+
+		// Verify export trace
+		if len(resp.Data.Exports) != 1 {
+			t.Errorf("Expected 1 export, got %d", len(resp.Data.Exports))
+		}
+		export := resp.Data.Exports[0]
+		if export.AgentRunID != agentRunID {
+			t.Errorf("Expected agent_run_id %s, got %s", agentRunID, export.AgentRunID)
+		}
+		if export.OperationID != exportOpID {
+			t.Errorf("Expected operation_id %s, got %s", exportOpID, export.OperationID)
+		}
+
+		// Verify delivery trace
+		if len(resp.Data.Deliveries) != 1 {
+			t.Errorf("Expected 1 delivery, got %d", len(resp.Data.Deliveries))
+		}
+		delivery := resp.Data.Deliveries[0]
+		if delivery.AgentRunID != agentRunID {
+			t.Errorf("Expected agent_run_id %s, got %s", agentRunID, delivery.AgentRunID)
+		}
+		if delivery.Result != "delivered" {
+			t.Errorf("Expected result delivered, got %s", delivery.Result)
+		}
+
+		// Verify sanitization - webhook URL should not be exposed
+		if delivery.DestinationHost == "https://hooks.example.com/webhook" {
+			t.Errorf("Webhook URL should be sanitized, but got full URL")
+		}
+		if delivery.StatusCode == 200 {
+			// Status code is allowed as it's not sensitive
+		}
+
+		// Verify audit trace
+		if len(resp.Data.Audits) != 1 {
+			t.Errorf("Expected 1 audit, got %d", len(resp.Data.Audits))
+		}
+		audit := resp.Data.Audits[0]
+		if audit.Action != "agent_run.review_exported" {
+			t.Errorf("Expected action agent_run.review_exported, got %s", audit.Action)
+		}
+	})
+
+	// Test route order - ensure review-package-trace is not captured by /:id
+	t.Run("route order", func(t *testing.T) {
+		// Test that a request to review-package-trace doesn't get captured by /:id
+		req := httptest.NewRequest("GET", "/api/v2/agent-runs/review-package-trace?package_hash="+validHash, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200 for trace endpoint, got %d", w.Code)
+		}
+
+		var resp struct {
+			Code int `json:"code"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		if resp.Code != 0 {
+			t.Errorf("Expected code 0 for trace endpoint, got %d", resp.Code)
+		}
+	})
+}

@@ -12,8 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { auditApi } from '@/lib/api-client'
-import type { AuditLog } from '@/types'
+import { auditApi, agentRunApi } from '@/lib/api-client'
+import type { AuditLog, AgentRunReviewPackageTraceResponse } from '@/types'
 
 /** Colour mapping for audit result badges */
 const RESULT_STYLES: Record<string, string> = {
@@ -73,6 +73,13 @@ export default function AuditPageContent() {
   const [page] = useState(1)
   const [total, setTotal] = useState(0)
 
+  // Package hash trace state
+  const [packageHashInput, setPackageHashInput] = useState('')
+  const [traceResult, setTraceResult] = useState<AgentRunReviewPackageTraceResponse | null>(null)
+  const [traceLoading, setTraceLoading] = useState(false)
+  const [traceError, setTraceError] = useState('')
+  const [showTrace, setShowTrace] = useState(false)
+
   // Initialize filters from URL params
   useEffect(() => {
     const resourceType = searchParams.get('resource_type')
@@ -129,6 +136,38 @@ export default function AuditPageContent() {
     if (categoryFilter !== FILTER_ALL && actionCategory(e.action) !== categoryFilter) return false
     return true
   })
+
+  const handleTracePackage = async () => {
+    if (!packageHashInput.trim()) {
+      setTraceError('Package hash is required')
+      return
+    }
+    // Basic validation: 64 hex characters
+    const hashRegex = /^[a-fA-F0-9]{64}$/
+    if (!hashRegex.test(packageHashInput)) {
+      setTraceError('Invalid package hash: must be 64-character hex string')
+      return
+    }
+
+    setTraceLoading(true)
+    setTraceError('')
+    setTraceResult(null)
+    try {
+      const resp = await agentRunApi.traceReviewPackage(packageHashInput.trim())
+      if (resp.code === 0 && resp.data) {
+        setTraceResult(resp.data.data)
+        setShowTrace(true)
+      } else {
+        setTraceError(resp.message || 'Failed to trace package')
+      }
+    } catch (err: unknown) {
+      console.error('Failed to trace package:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      setTraceError('Failed to trace package: ' + errorMessage)
+    } finally {
+      setTraceLoading(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -214,6 +253,156 @@ export default function AuditPageContent() {
         </CardContent>
       </Card>
 
+      {/* Package Hash Trace */}
+      <Card className="dark:bg-gray-800 dark:border-gray-700">
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            Package Hash Trace
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4">
+          <div className="flex gap-3">
+            <Input
+              placeholder="Paste 64-character package hash..."
+              className="flex-1 font-mono text-xs"
+              value={packageHashInput}
+              onChange={(e) => setPackageHashInput(e.target.value)}
+            />
+            <Button onClick={handleTracePackage} disabled={traceLoading}>
+              {traceLoading ? 'Tracing...' : 'Trace'}
+            </Button>
+            {showTrace && (
+              <Button variant="ghost" onClick={() => setShowTrace(false)}>
+                Hide
+              </Button>
+            )}
+          </div>
+          {traceError && (
+            <p className="text-sm text-red-600 dark:text-red-400 mt-2">{traceError}</p>
+          )}
+          {showTrace && traceResult && (
+            <div className="mt-4 space-y-4">
+              {/* Summary */}
+              <div className="grid grid-cols-4 gap-4 text-center">
+                <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{traceResult.summary.agent_run_count}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Agent Runs</div>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{traceResult.summary.export_count}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Exports</div>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{traceResult.summary.delivery_count}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Deliveries</div>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{traceResult.summary.audit_count}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Audits</div>
+                </div>
+              </div>
+              {/* Delivery Status */}
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded">
+                  <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400">{traceResult.summary.delivered}</div>
+                  <div className="text-xs text-emerald-600 dark:text-emerald-500">Delivered</div>
+                </div>
+                <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded">
+                  <div className="text-xl font-bold text-red-700 dark:text-red-400">{traceResult.summary.failed}</div>
+                  <div className="text-xs text-red-600 dark:text-red-500">Failed</div>
+                </div>
+                <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded">
+                  <div className="text-xl font-bold text-amber-700 dark:text-amber-400">{traceResult.summary.timeout}</div>
+                  <div className="text-xs text-amber-600 dark:text-amber-500">Timeout</div>
+                </div>
+              </div>
+              {/* Agent Runs */}
+              {traceResult.agent_runs.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Agent Runs</h4>
+                  <div className="space-y-2">
+                    {traceResult.agent_runs.map((run) => (
+                      <div key={run.agent_run_id} className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{run.title || run.agent_run_id}</span>
+                          <span className={`px-2 py-0.5 rounded ${run.status === 'completed' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>
+                            {run.status || 'Unknown'}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-gray-500 dark:text-gray-400">
+                          {run.case_id && <span>Case: {run.case_id}</span>}
+                          {run.payload_id && <span className="ml-2">Payload: {run.payload_id}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Exports */}
+              {traceResult.exports.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Exports</h4>
+                  <div className="space-y-2">
+                    {traceResult.exports.map((exp) => (
+                      <div key={exp.operation_id} className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono">{exp.format}</span>
+                          <span className="text-gray-500 dark:text-gray-400">{new Date(exp.created_at).toLocaleString()}</span>
+                        </div>
+                        <div className="mt-1 text-gray-500 dark:text-gray-400">
+                          Operation ID: {exp.operation_id}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Deliveries */}
+              {traceResult.deliveries.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Deliveries</h4>
+                  <div className="space-y-2">
+                    {traceResult.deliveries.map((del) => (
+                      <div key={del.delivery_operation_id} className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className={`px-2 py-0.5 rounded ${del.result === 'delivered' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : del.result === 'failed' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>
+                            {del.result}
+                          </span>
+                          <span className="text-gray-500 dark:text-gray-400">{new Date(del.created_at).toLocaleString()}</span>
+                        </div>
+                        <div className="mt-1 text-gray-500 dark:text-gray-400">
+                          {del.destination_host && <span>Host: {del.destination_host}</span>}
+                          {del.status_code && <span className="ml-2">Status: {del.status_code}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Audits */}
+              {traceResult.audits.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Audit Records</h4>
+                  <div className="space-y-2">
+                    {traceResult.audits.map((audit) => (
+                      <div key={audit.audit_ref_id} className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{audit.action}</span>
+                          <span className="text-gray-500 dark:text-gray-400">{new Date(audit.timestamp).toLocaleString()}</span>
+                        </div>
+                        <div className="mt-1 text-gray-500 dark:text-gray-400">
+                          {audit.resource_type} {audit.resource_id && `/ ${audit.resource_id}`}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Error display */}
       {error && (
         <Card className="dark:bg-gray-800 dark:border-gray-700 border-red-200">
@@ -261,6 +450,7 @@ export default function AuditPageContent() {
               ) : (
                 filtered.map((entry) => {
                   const cat = actionCategory(entry.action)
+                  const packageHash = entry.details && typeof entry.details === 'object' && 'package_hash' in entry.details && typeof entry.details.package_hash === 'string' ? entry.details.package_hash as string : null
                   return (
                     <tr
                       key={entry.id}
@@ -290,6 +480,20 @@ export default function AuditPageContent() {
                       </td>
                       <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs truncate max-w-[12rem]" title={entry.error_message || entry.parameters}>
                         {entry.error_message || entry.parameters}
+                        {packageHash && (
+                          <div className="mt-1 flex items-center gap-1">
+                            <span className="font-medium text-gray-700 dark:text-gray-300">Package Hash:</span>
+                            <code className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-xs cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600"
+                                  onClick={() => {
+                                    setPackageHashInput(packageHash)
+                                    setShowTrace(true)
+                                    handleTracePackage()
+                                  }}
+                                  title="Click to trace this package hash">
+                              {packageHash.substring(0, 12)}...
+                            </code>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   )
