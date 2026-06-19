@@ -1133,3 +1133,155 @@ func TestPermissionDeniedAuditLog(t *testing.T) {
 		t.Fatalf("Expected action 'agent_permission.denied', got %v", auditLog["action"])
 	}
 }
+
+// TestGetEvidenceSummaryTool tests getEvidenceSummary tool success path
+func TestGetEvidenceSummaryTool(t *testing.T) {
+	server := newTestServer(func(r *http.Request) string {
+		if r.Method == http.MethodPost && r.URL.Path == "/api/v2/evidence/summary" {
+			return `{"code":0,"message":"success","data":{"scope":{"case_id":"case-1","source":"case"},"evidence":{"case_id":"case-1","evidence_strength":"medium","confidence":75,"interaction_count":4,"unique_sources":2},"scanner_runs":[],"package_hashes":[],"summary_hash":"abc123def456","next_actions":["Review the evidence strength."],"generated_at":"2026-06-19T14:00:00Z","metadata":{"base_url":"http://localhost:8080","scanner_run_count":0,"package_count":0}}}`
+		}
+		return ""
+	})
+
+	args := map[string]interface{}{
+		"case_id": "case-1",
+	}
+
+	result, err := server.getEvidenceSummary(nil, args)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	toolResult, ok := result.(ToolResult)
+	if !ok {
+		t.Fatal("Result should be ToolResult type")
+	}
+
+	if !toolResult.Success {
+		t.Fatalf("Expected success, got error: %s", toolResult.Error)
+	}
+
+	data, ok := toolResult.Data.(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map")
+	}
+
+	if data["scope"] == nil {
+		t.Error("Expected scope field")
+	}
+	if data["evidence"] == nil {
+		t.Error("Expected evidence field")
+	}
+	if data["summary_hash"] == nil {
+		t.Error("Expected summary_hash field")
+	}
+	if data["next_actions"] == nil {
+		t.Error("Expected next_actions field")
+	}
+}
+
+// TestGetEvidenceSummaryToolWithScannerRunID tests getEvidenceSummary with scanner_run_id
+func TestGetEvidenceSummaryToolWithScannerRunID(t *testing.T) {
+	server := newTestServer(func(r *http.Request) string {
+		if r.Method == http.MethodPost && r.URL.Path == "/api/v2/evidence/summary" {
+			return `{"code":0,"message":"success","data":{"scope":{"case_id":"case-1","payload_id":"payload-1","scanner_run_id":"sr-1","source":"scanner_run"},"evidence":{"case_id":"case-1","evidence_strength":"high","confidence":90,"interaction_count":10},"scanner_runs":[{"id":"sr-1"}],"package_hashes":["hash-abc"],"summary_hash":"def789ghi012","next_actions":["Review evidence."],"generated_at":"2026-06-19T14:00:00Z","metadata":{"scanner_run_count":1,"package_count":1}}}`
+		}
+		return ""
+	})
+
+	args := map[string]interface{}{
+		"scanner_run_id": "sr-1",
+	}
+
+	result, err := server.getEvidenceSummary(nil, args)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	toolResult, ok := result.(ToolResult)
+	if !ok {
+		t.Fatal("Result should be ToolResult type")
+	}
+
+	if !toolResult.Success {
+		t.Fatalf("Expected success, got error: %s", toolResult.Error)
+	}
+
+	data, ok := toolResult.Data.(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map")
+	}
+
+	scope, ok := data["scope"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected scope to be a map")
+	}
+	if scope["source"] != "scanner_run" {
+		t.Errorf("Expected source scanner_run, got %v", scope["source"])
+	}
+}
+
+// TestGetEvidenceSummaryToolMissingParams tests getEvidenceSummary without required params
+func TestGetEvidenceSummaryToolMissingParams(t *testing.T) {
+	server := newTestServer(func(r *http.Request) string {
+		return ""
+	})
+
+	args := map[string]interface{}{}
+
+	result, err := server.getEvidenceSummary(nil, args)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	toolResult, ok := result.(ToolResult)
+	if !ok {
+		t.Fatal("Result should be ToolResult type")
+	}
+
+	if toolResult.Success {
+		t.Fatal("Expected failure due to missing params")
+	}
+
+	if !strings.Contains(toolResult.Error, "case_id, payload_id, or scanner_run_id is required") {
+		t.Fatalf("Expected missing params error, got: %s", toolResult.Error)
+	}
+}
+
+// TestGetEvidenceSummaryToolPermissionDenied tests getEvidenceSummary without required scope
+func TestGetEvidenceSummaryToolPermissionDenied(t *testing.T) {
+	var auditLogPosted bool
+
+	server := newTestServer(func(r *http.Request) string {
+		if strings.Contains(r.URL.Path, "/api/v2/auth/info") {
+			return `{"code":0,"message":"success","data":{"user_id":"test-user","api_key_id":"key-1","api_key_prefix":"key_","scopes":["agent:read_interactions"],"is_agent":true,"risk_tolerance":"medium"}}`
+		}
+		if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/api/v2/audit/logs") {
+			auditLogPosted = true
+			return `{"code":0,"message":"success"}`
+		}
+		return ""
+	})
+
+	args := map[string]interface{}{
+		"case_id": "case-1",
+	}
+
+	result, err := server.getEvidenceSummary(nil, args)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	toolResult, ok := result.(ToolResult)
+	if !ok {
+		t.Fatal("Result should be ToolResult type")
+	}
+
+	if toolResult.Success {
+		t.Fatal("Expected permission denied, but tool succeeded")
+	}
+
+	if !auditLogPosted {
+		t.Fatal("Audit log should be posted when permission is denied")
+	}
+}

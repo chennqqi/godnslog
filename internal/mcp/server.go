@@ -175,6 +175,7 @@ func (s *Server) Run(ctx context.Context) error {
 		{Name: "wait_for_interaction", Description: "Wait for interaction", Execute: s.waitForInteraction},
 		{Name: "summarize_evidence", Description: "Summarize evidence", Execute: s.summarizeEvidence},
 		{Name: "export_report", Description: "Export report", Execute: s.exportReport},
+		{Name: "get_evidence_summary", Description: "Get a structured evidence summary bundle for a case, payload, or scanner run", Execute: s.getEvidenceSummary},
 		{Name: "revoke_token", Description: "Revoke API token", Execute: s.revokeToken},
 	}
 
@@ -739,6 +740,58 @@ func (s *Server) revokeToken(ctx context.Context, args map[string]interface{}) (
 	result, err := s.apiCall("DELETE", "/api/v2/apikeys/"+keyID, nil)
 	if err != nil {
 		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	return ToolResult{Success: true, Data: result}, nil
+}
+
+// getEvidenceSummary retrieves a structured evidence summary bundle for a case,
+// payload, or scanner run via POST /api/v2/evidence/summary.
+func (s *Server) getEvidenceSummary(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	if err := s.checkToolPermission(ctx, "get_evidence_summary"); err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	caseID, _ := args["case_id"].(string)
+	payloadID, _ := args["payload_id"].(string)
+	scannerRunID, _ := args["scanner_run_id"].(string)
+	agentRunID, _ := args["agent_run_id"].(string)
+
+	if len(caseID) == 0 && len(payloadID) == 0 && len(scannerRunID) == 0 {
+		return ToolResult{Success: false, Error: "case_id, payload_id, or scanner_run_id is required"}, nil
+	}
+
+	reqBody := map[string]interface{}{}
+	if caseID != "" {
+		reqBody["case_id"] = caseID
+	}
+	if payloadID != "" {
+		reqBody["payload_id"] = payloadID
+	}
+	if scannerRunID != "" {
+		reqBody["scanner_run_id"] = scannerRunID
+	}
+
+	result, err := s.apiCall("POST", "/api/v2/evidence/summary", reqBody)
+	if err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	if agentRunID != "" {
+		_, _ = s.apiCall("POST", fmt.Sprintf("/api/v2/agent-runs/%s/operations", agentRunID), map[string]interface{}{
+			"action":     "get_evidence_summary",
+			"risk_level": "low",
+			"request":    reqBody,
+			"result": map[string]interface{}{
+				"success": true,
+			},
+		})
+	}
+
+	if resp, ok := result.(map[string]interface{}); ok {
+		if data, ok := resp["data"].(map[string]interface{}); ok {
+			return ToolResult{Success: true, Data: data}, nil
+		}
 	}
 
 	return ToolResult{Success: true, Data: result}, nil

@@ -64,6 +64,11 @@ var ToolPermissions = map[string]ToolPermission{
 		RequiredScope: "agent:read_runs",
 		RiskLevel:     RiskLevelLow,
 	},
+	"get_evidence_summary": {
+		ToolName:      "get_evidence_summary",
+		RequiredScope: "agent:summarize_evidence",
+		RiskLevel:     RiskLevelLow,
+	},
 	"revoke_token": {
 		ToolName:      "revoke_token",
 		RequiredScope: "agent:revoke_token",

@@ -1152,3 +1152,31 @@ git diff --check
 ```
 
 Acceptance result: **passed**. Sprint X provides the read-only evidence summary API (`POST /api/v2/evidence/summary`) with full backend test coverage, frontend types and API client ready for future UI/MCP use, and no whitespace or build issues.
+
+## Sprint Y: Evidence Summary MCP Tool Verification (2026-06-19)
+
+### Focused Tests
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/mcp -v -run 'TestGetEvidenceSummary'
+# Result: PASS — 4 tests (success, scanner_run_id, missing params, permission denied)
+```
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/mcp -v -run 'TestToolPermissions'
+# Result: PASS — permission metadata aligned with agent policy catalog
+```
+
+### Full Verification
+
+```bash
+GOCACHE=/tmp/gocache go test ./...
+# Result: PASS — all packages ok
+```
+
+```bash
+git diff --check
+# Result: PASS
+```
+
+Acceptance result: **passed**. Sprint Y adds the `get_evidence_summary` MCP tool with permission metadata (scope: `agent:summarize_evidence`, risk: low), handler calling `POST /api/v2/evidence/summary`, optional `agent_run_id` operation logging, and 4 test cases covering success, scanner_run_id, missing params, and permission denied paths.

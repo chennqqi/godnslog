@@ -190,7 +190,35 @@ Sprint X 新增 `POST /api/v2/evidence/summary` 作为 Agent/CI 推荐的只读�
 }
 ```
 
-### 8. revoke_token
+### 8. get_evidence_summary
+
+获取结构化证据摘要包。调用 `POST /api/v2/evidence/summary`，返回包含 `scope`、`evidence`、`scanner_runs`、`package_hashes`、`summary_hash` 和 `next_actions` 的完整证据摘要。当 Agent 需要把 Scanner Hub package 与实际 OAST 回连证据合并消费时，优先使用此工具。
+
+**参数**：
+- `case_id` (string, optional)：Case ID
+- `payload_id` (string, optional)：Payload ID
+- `scanner_run_id` (string, optional)：Scanner Run ID
+- `agent_run_id` (string, optional)：Agent Run ID（用于操作日志记录）
+
+至少需要提供 `case_id`、`payload_id` 或 `scanner_run_id` 之一。
+
+**示例**：
+```json
+{
+  "case_id": "case-123"
+}
+```
+
+或
+
+```json
+{
+  "scanner_run_id": "sr-456",
+  "agent_run_id": "agent-run-789"
+}
+```
+
+### 9. revoke_token
 
 撤销 API Key。
 
@@ -236,6 +264,7 @@ GET /api/v2/agent-policy/scopes
 | list_interactions | agent:read_interactions | Low |
 | summarize_evidence | agent:summarize_evidence | Low |
 | export_report | agent:export_report | Low |
+| get_evidence_summary | agent:summarize_evidence | Low |
 | list_agent_runs | agent:read_runs | Low |
 | get_agent_run | agent:read_runs | Low |
 | revoke_token | agent:revoke_token | High |
@@ -244,7 +273,7 @@ GET /api/v2/agent-policy/scopes
 
 Agent API Key 支持三种风险容忍度级别：
 
-- **low**：仅允许低风险操作（list_interactions, wait_for_interaction, summarize_evidence, export_report, list_agent_runs, get_agent_run）
+- **low**：仅允许低风险操作（list_interactions, wait_for_interaction, summarize_evidence, get_evidence_summary, export_report, list_agent_runs, get_agent_run）
 - **medium**：允许低风险和中风险操作（包括 create_oast_probe）
 - **high**：允许所有操作（包括高风险的 revoke_token）
 
