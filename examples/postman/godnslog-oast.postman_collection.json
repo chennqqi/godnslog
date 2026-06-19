@@ -1,0 +1,281 @@
+{
+  "info": {
+    "name": "GODNSLOG OAST Integration",
+    "description": "Postman collection for GODNSLOG OAST payload generation and interaction polling. Configure GODNSLOG_API_URL and GODNSLOG_API_KEY as environment variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "GODNSLOG_API_URL",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "GODNSLOG_API_KEY",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "CASE_ID",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "PAYLOAD_TOKEN",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "X-API-Key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{GODNSLOG_API_KEY}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "1. Create Case",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.data && jsonData.data.id) {",
+              "  pm.environment.set('CASE_ID', jsonData.data.id);",
+              "  console.log('Case created: ' + jsonData.data.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Postman OAST Test\",\n  \"description\": \"OAST verification via Postman collection\",\n  \"target\": \"https://example.com\",\n  \"tags\": [\"postman\", \"api-test\"]\n}"
+        },
+        "url": {
+          "raw": "{{GODNSLOG_API_URL}}/api/v2/cases",
+          "host": ["{{GODNSLOG_API_URL}}"],
+          "path": ["api", "v2", "cases"]
+        }
+      }
+    },
+    {
+      "name": "2. Create Payload",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.data && jsonData.data.token) {",
+              "  pm.environment.set('PAYLOAD_TOKEN', jsonData.data.token);",
+              "  console.log('Payload token: ' + jsonData.data.token);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"case_id\": \"{{CASE_ID}}\",\n  \"template\": \"ssrf-url\",\n  \"expected_protocols\": [\"dns\", \"http\"],\n  \"tool\": \"postman\"\n}"
+        },
+        "url": {
+          "raw": "{{GODNSLOG_API_URL}}/api/v2/payloads",
+          "host": ["{{GODNSLOG_API_URL}}"],
+          "path": ["api", "v2", "payloads"]
+        }
+      }
+    },
+    {
+      "name": "3. Inject Payload (Manual Step)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "console.log('Payload token: ' + pm.environment.get('PAYLOAD_TOKEN'));",
+              "console.log('Inject this token into your target request as:');",
+              "console.log('  - URL parameter: ?callback={{PAYLOAD_TOKEN}}.oast.example.com');",
+              "console.log('  - Header: X-Callback: {{PAYLOAD_TOKEN}}.oast.example.com');",
+              "console.log('  - Body: {\"url\": \"http://{{PAYLOAD_TOKEN}}.oast.example.com\"}');"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://httpbin.org/get?callback={{PAYLOAD_TOKEN}}.oast.example.com",
+          "host": ["https://httpbin.org"],
+          "path": ["get"],
+          "query": [
+            {
+              "key": "callback",
+              "value": "{{PAYLOAD_TOKEN}}.oast.example.com"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "4. Poll Interactions",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.data && jsonData.data.items) {",
+              "  var count = jsonData.data.items.length;",
+              "  console.log('Interactions found: ' + count);",
+              "  if (count > 0) {",
+              "    pm.test('OAST interaction detected!', function () {",
+              "      pm.expect(count).to.be.above(0);",
+              "    });",
+              "    jsonData.data.items.forEach(function(item) {",
+              "      console.log('  - Type: ' + item.type + ', Source: ' + item.source_ip + ', Token: ' + item.token);",
+              "    });",
+              "  } else {",
+              "    console.log('No interactions yet. Wait and retry.');",
+              "  }",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{GODNSLOG_API_URL}}/api/v2/interactions?token={{PAYLOAD_TOKEN}}&page_size=10",
+          "host": ["{{GODNSLOG_API_URL}}"],
+          "path": ["api", "v2", "interactions"],
+          "query": [
+            {
+              "key": "token",
+              "value": "{{PAYLOAD_TOKEN}}"
+            },
+            {
+              "key": "page_size",
+              "value": "10"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "5. Generate Evidence Report",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.data) {",
+              "  console.log('Evidence report generated');",
+              "  console.log('Evidence strength: ' + (jsonData.data.evidence_strength || 'N/A'));",
+              "  console.log('Confidence: ' + (jsonData.data.confidence || 'N/A'));",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"case_id\": \"{{CASE_ID}}\",\n  \"format\": \"json\"\n}"
+        },
+        "url": {
+          "raw": "{{GODNSLOG_API_URL}}/api/v2/evidence/generate",
+          "host": ["{{GODNSLOG_API_URL}}"],
+          "path": ["api", "v2", "evidence", "generate"]
+        }
+      }
+    },
+    {
+      "name": "6. Get Evidence Summary",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.data) {",
+              "  console.log('Summary hash: ' + (jsonData.data.summary_hash || 'N/A'));",
+              "  if (jsonData.data.next_actions) {",
+              "    console.log('Next actions:');",
+              "    jsonData.data.next_actions.forEach(function(action) {",
+              "      console.log('  - ' + action);",
+              "    });",
+              "  }",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"case_id\": \"{{CASE_ID}}\"\n}"
+        },
+        "url": {
+          "raw": "{{GODNSLOG_API_URL}}/api/v2/evidence/summary",
+          "host": ["{{GODNSLOG_API_URL}}"],
+          "path": ["api", "v2", "evidence", "summary"]
+        }
+      }
+    }
+  ]
+}

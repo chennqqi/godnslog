@@ -1261,3 +1261,33 @@ git diff --check
 ```
 
 Acceptance result: **passed**. Sprint BB adds `list_agent_runs` and `get_agent_run` MCP tools with permission metadata (scope: `agent:read_runs`, risk: low), handlers calling `GET /api/v2/agent-runs` and `GET /api/v2/agent-runs/{id}`, and 4 test cases covering list success, get success, missing id, and permission denied paths.
+
+## Sprint CC: CI/CD Integration Examples Verification (2026-06-19)
+
+### Scope
+
+Add Postman/Apifox integration collection, GitHub Actions reusable workflow, and update CI/CD documentation.
+
+### Verification
+
+```bash
+GOCACHE=/tmp/gocache go test ./...
+# Result: PASS — all packages ok (no code changes, docs/examples only)
+```
+
+```bash
+git diff --check
+# Result: PASS
+```
+
+### Files Added
+
+- `examples/postman/godnslog-oast.postman_collection.json` — Complete Postman collection with 6 requests covering full OAST workflow
+- `examples/postman/README.md` — Postman/Apifox setup and usage guide
+- `examples/ci/github-actions-reusable.yml` — Reusable GitHub Actions workflow with inputs/secrets
+
+### Files Modified
+
+- `examples/ci/README.md` — Added Postman/Apifox section and reusable workflow documentation
+
+Acceptance result: **passed**. Sprint CC adds Postman/Apifox collection with automated scripts, GitHub Actions reusable workflow for cross-repository OAST scanning, and updated CI/CD documentation covering all supported platforms.

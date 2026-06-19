@@ -4,9 +4,10 @@ This directory contains CI/CD pipeline examples for integrating GODNSLOG OAST sc
 
 ## Supported Platforms
 
-- GitHub Actions
+- GitHub Actions (including reusable workflow)
 - GitLab CI/CD
 - Jenkins
+- Postman / Apifox (see `examples/postman/`)
 
 ## Prerequisites
 
@@ -45,6 +46,26 @@ The pipeline will fail if high-risk interactions are detected:
 - Cloud metadata access (169.254.169.254)
 - Internal network access
 - SSRF patterns
+
+### Reusable Workflow
+
+For teams that want to reuse the OAST scan across multiple repositories, use the reusable workflow:
+
+```yaml
+jobs:
+  oast:
+    uses: your-org/godnslog/.github/workflows/oast-scan-reusable.yml@main
+    with:
+      scan-target: https://your-target.com
+      nuclei-templates: oast-templates/
+      timeout: 10m
+      fail-on-critical: true
+    secrets:
+      GODNSLOG_API_URL: ${{ secrets.GODNSLOG_API_URL }}
+      GODNSLOG_API_KEY: ${{ secrets.GODNSLOG_API_KEY }}
+```
+
+Copy `github-actions-reusable.yml` to `.github/workflows/oast-scan-reusable.yml` in your GODNSLOG repository.
 
 ## GitLab CI/CD
 
@@ -125,6 +146,21 @@ godnslog payload create \
 4. **Noise Reduction**: Filter out known safe patterns
 5. **Report Review**: Always review generated reports manually
 6. **Pipeline Gates**: Use high-risk detection as quality gates
+
+## Postman / Apifox
+
+See `examples/postman/` for a complete Postman collection that covers the full OAST workflow:
+
+1. Create Case
+2. Create Payload
+3. Inject Payload (manual step)
+4. Poll Interactions
+5. Generate Evidence Report
+6. Get Evidence Summary
+
+The collection includes automated scripts for token extraction, interaction logging, and evidence assertion.
+
+Import `godnslog-oast.postman_collection.json` into Postman or Apifox, configure environment variables, and run.
 
 ## Troubleshooting
 
