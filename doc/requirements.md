@@ -448,3 +448,16 @@ GODNSLOG 2.0 所有计划阶段已全部完成，共计 35 个主要功能模块
 - 支持 case/payload/scanner_run 三种 scope 查询
 - 展示 evidence stats、scanner runs、package hashes、next actions、metadata
 - 侧边栏导航和页面标题映射更新
+
+## 2026-06-19 生产可用目标
+
+用户反馈当前代码远未达到生产可用标准，存在以下问题：
+1. 登录URL暴露敏感信息（username/password出现在URL中）
+2. 登录始终失败，无法成功
+3. 缺少完整的E2E测试
+4. UI未达到生产标准
+
+新目标：生产可用
+- 代码全部测试通过，测试覆盖率达到90%，包括完整的E2E测试
+- 产品UI设计符合生产标准，符合用户习惯，体验好，美观
+- 达成Roadmap2.0目标，1.0的godnslog核心功能依然完整，同时引入了符合当前时代的2.0版本

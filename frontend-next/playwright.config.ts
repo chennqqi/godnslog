@@ -25,6 +25,7 @@ export default defineConfig({
     env: {
       NODE_ENV: 'development',
       PORT: '3000',
+      GODNSLOG_API_URL: process.env.GODNSLOG_API_URL || 'http://localhost:8080',
     },
   },
 

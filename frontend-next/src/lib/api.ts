@@ -33,7 +33,7 @@ class ApiClient {
 
   constructor() {
     this.client = axios.create({
-      baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v2',
+      baseURL: process.env.NEXT_PUBLIC_API_URL || '/api/v2',
       timeout: 30000,
     })
 
