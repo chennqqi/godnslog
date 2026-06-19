@@ -142,3 +142,52 @@ func TestService_DeleteInteractions(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, retrieved)
 }
+
+// TestReplacePattern tests that replacePattern correctly replaces regex matches
+func TestReplacePattern(t *testing.T) {
+	tests := []struct {
+		input       string
+		pattern     string
+		replacement string
+		expected    string
+	}{
+		{"/users/123/posts/456", `/[0-9]+`, "/{id}", "/users/{id}/posts/{id}"},
+		{"/api/a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6/data", `/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}`, "/{uuid}", "/api/{uuid}/data"},
+		{"/hash/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6", `/[a-f0-9]{32,}`, "/{hash}", "/hash/{hash}"},
+		{"/no-match-here", `/[0-9]+`, "/{id}", "/no-match-here"},
+	}
+
+	for _, tt := range tests {
+		result := replacePattern(tt.input, tt.pattern, tt.replacement)
+		if result != tt.expected {
+			t.Errorf("replacePattern(%q, %q, %q) = %q, expected %q", tt.input, tt.pattern, tt.replacement, result, tt.expected)
+		}
+	}
+}
+
+// TestExtractPattern tests that extractPattern correctly normalizes paths
+func TestExtractPattern(t *testing.T) {
+	engine, err := MockEngine()
+	if err != nil {
+		t.Fatalf("Failed to create engine: %v", err)
+	}
+	defer engine.Close()
+
+	service := NewService(engine)
+
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"/users/123", "/users/{id}"},
+		{"/api/items/42/details", "/api/items/{id}/details"},
+		{"/static/path", "/static/path"},
+	}
+
+	for _, tt := range tests {
+		result := service.extractPattern(tt.input)
+		if result != tt.expected {
+			t.Errorf("extractPattern(%q) = %q, expected %q", tt.input, result, tt.expected)
+		}
+	}
+}

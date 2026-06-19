@@ -1349,3 +1349,41 @@ git diff --check
 - `examples/burp-suite/src/main/java/com/godnslog/burp/ContextMenuProvider.java` — Right-click context menu with 33 template options, payload insertion, and evidence export
 
 Acceptance result: **passed**. Sprint EE provides a complete Burp Suite extension prototype with Montoya API integration, REST API client, OAST tab UI, context menu with all 33 payload templates, evidence export, and evidence summary retrieval.
+
+## Sprint FF: Hit Clustering & Noise Compression Verification (2026-06-19)
+
+### Focused Tests
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/clustering -v
+# Result: PASS — 7 tests (basic clustering, noise by count, noise by pattern, dedup, truncation, cluster compression, default config)
+```
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/interaction -v -run 'TestReplacePattern|TestExtractPattern'
+# Result: PASS — 2 tests (regex replacePattern, path extractPattern)
+```
+
+### Full Verification
+
+```bash
+GOCACHE=/tmp/gocache go test ./...
+# Result: PASS — all packages ok
+```
+
+```bash
+git diff --check
+# Result: PASS
+```
+
+### Bug Fixes
+
+- Fixed `checkNoise` in `internal/clustering/cluster.go`: changed from exact string comparison to regex matching for noise patterns
+- Fixed `replacePattern` in `internal/interaction/clustering.go`: changed from no-op stub to actual regex replacement
+
+### Tests Added
+
+- `internal/clustering/clustering_test.go`: 7 tests covering basic clustering, noise detection by count threshold, noise detection by regex pattern, deduplication, raw data truncation, cluster compression, and default config validation
+- `internal/interaction/service_test.go`: 2 tests covering `replacePattern` regex replacement and `extractPattern` path normalization
+
+Acceptance result: **passed**. Sprint FF fixes two critical bugs in the clustering and noise compression system (regex-based noise pattern matching and actual regex-based path pattern extraction) and adds 9 comprehensive tests covering clustering, noise detection, compression, deduplication, and pattern extraction.
