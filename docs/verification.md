@@ -1291,3 +1291,32 @@ git diff --check
 - `examples/ci/README.md` — Added Postman/Apifox section and reusable workflow documentation
 
 Acceptance result: **passed**. Sprint CC adds Postman/Apifox collection with automated scripts, GitHub Actions reusable workflow for cross-repository OAST scanning, and updated CI/CD documentation covering all supported platforms.
+
+## Sprint DD: Payload Template Library Expansion Verification (2026-06-19)
+
+### Focused Tests
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/models -v -run 'TestPayload'
+# Result: PASS — 2 tests (template existence + metadata consistency)
+```
+
+### Full Verification
+
+```bash
+GOCACHE=/tmp/gocache go test ./...
+# Result: PASS — all packages ok
+```
+
+```bash
+git diff --check
+# Result: PASS
+```
+
+### Changes
+
+- Expanded `PayloadTemplates` map from 5 to 33 templates covering all Roadmap categories: SSRF (6), XXE/Injection (13), RCE (2), Client-side (3), API (2), DevOps (1), Network (4), SMTP (1), Auth (1)
+- Added `TemplateMetadata` struct and `PayloadTemplateMetadata` map with name, description, category, and risk for every template
+- Added `TestPayloadTemplateMetadataConsistency` test verifying bidirectional consistency between templates and metadata
+
+Acceptance result: **passed**. Sprint DD expands the payload template library from 5 to 33 templates covering all categories listed in Roadmap 2.0 (SSRF, XXE, RCE, Blind SQLi, SSTI, CORS/JSONP, SMTP injection, PDF/HTML rendering, Webhook, CI/CD, deserialization, LDAP, SMB, FTP, DNS rebinding, Log4j, YAML, JWT, and more), with full metadata consistency tests.

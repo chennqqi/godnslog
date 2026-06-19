@@ -120,6 +120,62 @@ func TestPayloadTemplates(t *testing.T) {
 			t.Errorf("PayloadTemplates should contain %s", tmpl)
 		}
 	}
+
+	// Verify expanded template set includes all categories
+	requiredTemplates := []string{
+		"ssrf-basic", "ssrf-redirect", "ssrf-cloud-metadata", "ssrf-aws-metadata",
+		"ssrf-gcp-metadata", "ssrf-azure-metadata",
+		"xxe-basic", "rfi-remote-file", "file-inclusion",
+		"blind-sqli", "blind-sqli-dns", "ssti-template", "template-injection",
+		"prototype-pollution", "host-header-injection", "log4j-jndi",
+		"yaml-deserialization", "deserialization", "ldap-injection",
+		"rce-basic", "rce-command",
+		"cors-jsonp", "pdf-html-rendering", "xss-reflected",
+		"webhook", "graphql-introspection",
+		"ci-cd-variable",
+		"dns-rebinding", "smb-relay", "ftp-exfil", "request-smuggling",
+		"smtp-injection",
+		"jwt-confusion",
+	}
+	for _, tmpl := range requiredTemplates {
+		if _, ok := PayloadTemplates[tmpl]; !ok {
+			t.Errorf("PayloadTemplates should contain %s", tmpl)
+		}
+	}
+}
+
+// TestPayloadTemplateMetadataConsistency verifies that every template has metadata
+// and every metadata entry has a corresponding template.
+func TestPayloadTemplateMetadataConsistency(t *testing.T) {
+	// Every template must have metadata
+	for tmplID := range PayloadTemplates {
+		if _, ok := PayloadTemplateMetadata[tmplID]; !ok {
+			t.Errorf("PayloadTemplateMetadata missing entry for template %s", tmplID)
+		}
+	}
+
+	// Every metadata entry must have a corresponding template
+	for metaID := range PayloadTemplateMetadata {
+		if _, ok := PayloadTemplates[metaID]; !ok {
+			t.Errorf("PayloadTemplates missing entry for metadata %s", metaID)
+		}
+	}
+
+	// Verify metadata fields are non-empty
+	for id, meta := range PayloadTemplateMetadata {
+		if meta.Name == "" {
+			t.Errorf("Template %s has empty Name in metadata", id)
+		}
+		if meta.Description == "" {
+			t.Errorf("Template %s has empty Description in metadata", id)
+		}
+		if meta.Category == "" {
+			t.Errorf("Template %s has empty Category in metadata", id)
+		}
+		if meta.Risk == "" {
+			t.Errorf("Template %s has empty Risk in metadata", id)
+		}
+	}
 }
 
 // TestGenerateToken tests token generation
