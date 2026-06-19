@@ -1425,3 +1425,32 @@ git diff --check
 - Added 2 MCP tool tests in `internal/mcp/server_test.go`
 
 Acceptance result: **passed**. Sprint GG delivers a structured AI evidence explanation plugin with rule-based analysis, finding extraction, risk assessment, remediation recommendations, and full MCP tool integration with permission controls.
+
+## Sprint HH: Data Retention & Archive Policy Verification (2026-06-19)
+
+### Focused Tests
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/retention -v
+# Result: PASS — 10 tests (policy model, archive model, job model, table names, create policy, validation, disabled policy, xorm retention, create archive, record table names)
+```
+
+### Full Verification
+
+```bash
+GOCACHE=/tmp/gocache go test ./...
+# Result: PASS — all packages ok
+```
+
+```bash
+git diff --check
+# Result: PASS
+```
+
+### Changes
+
+- Implemented `retainInteractions`, `retainCases`, and `retainPayloads` in `internal/retention/service.go`: replaced stub returns with actual xorm-based count and delete operations using cutoff dates
+- Added `InteractionRecord`, `CaseRecord`, and `PayloadRecord` lightweight table-mapping types for retention operations
+- Added `service_test.go` with mock store and xorm-based integration test verifying 5 old records deleted, 3 recent records retained
+
+Acceptance result: **passed**. Sprint HH implements the data retention and archive policy system with actual database operations for interaction, case, and payload retention, plus comprehensive tests including xorm-based integration testing.
