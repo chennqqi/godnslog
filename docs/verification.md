@@ -1180,3 +1180,33 @@ git diff --check
 ```
 
 Acceptance result: **passed**. Sprint Y adds the `get_evidence_summary` MCP tool with permission metadata (scope: `agent:summarize_evidence`, risk: low), handler calling `POST /api/v2/evidence/summary`, optional `agent_run_id` operation logging, and 4 test cases covering success, scanner_run_id, missing params, and permission denied paths.
+
+## Sprint Z: Evidence Summary UI Page Verification (2026-06-19)
+
+### Frontend Lint
+
+```bash
+cd frontend-next && npx eslint src/app/dashboard/evidence-summary/page.tsx src/components/app-shell/sidebar.tsx
+# Result: PASS — no errors
+```
+
+### Frontend Build
+
+```bash
+cd frontend-next && npm run build
+# Result: PASS — Compiled successfully, 23/23 static pages generated (includes /dashboard/evidence-summary)
+```
+
+### Backend Tests
+
+```bash
+GOCACHE=/tmp/gocache go test ./...
+# Result: PASS — all packages ok
+```
+
+```bash
+git diff --check
+# Result: PASS
+```
+
+Acceptance result: **passed**. Sprint Z adds the Evidence Summary UI page at `/dashboard/evidence-summary` with scope selection (case/payload/scanner_run), evidence stats display, scanner runs, package hashes, next actions, and metadata. Sidebar navigation and page title mapping updated.

@@ -442,3 +442,9 @@ GODNSLOG 2.0 所有计划阶段已全部完成，共计 35 个主要功能模块
 - 权限 scope: agent:summarize_evidence, risk: low
 - 支持 case_id/payload_id/scanner_run_id 输入，可选 agent_run_id 操作日志
 - 4 个测试覆盖 success/scanner_run_id/missing params/permission denied
+
+## 2026-06-19 Sprint Z: Evidence Summary UI Page
+- 前端添加 /dashboard/evidence-summary 页面
+- 支持 case/payload/scanner_run 三种 scope 查询
+- 展示 evidence stats、scanner runs、package hashes、next actions、metadata
+- 侧边栏导航和页面标题映射更新
