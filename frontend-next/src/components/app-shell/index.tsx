@@ -12,6 +12,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/payloads/new': 'Payloads / New Payload',
   '/dashboard/payloads': 'Payloads / Payload Studio',
   '/dashboard/interactions': 'Interactions / Timeline',
+  '/dashboard/evidence-summary': 'Evidence / Summary',
   '/dashboard/canary': 'Monitor / Canary Tokens',
   '/dashboard/rebinding': 'Monitor / Rebinding Lab',
   '/dashboard/workflow': 'Monitor / Workflow',

@@ -37,6 +37,12 @@ const FolderIcon = () => (
   </svg>
 )
 
+const ClipboardCheckIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+  </svg>
+)
+
 const BeakerIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v10.17l-3 5.83h12l-3-5.83V3M9 3h6M9 3H6M15 3h3" />
@@ -107,6 +113,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Cases', href: '/dashboard/cases', icon: <FolderIcon /> },
       { label: 'Payloads', href: '/dashboard/payloads', icon: <BeakerIcon /> },
       { label: 'Interactions', href: '/dashboard/interactions', icon: <TimelineIcon /> },
+      { label: 'Evidence Summary', href: '/dashboard/evidence-summary', icon: <ClipboardCheckIcon /> },
     ],
   },
   {
