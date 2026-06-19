@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/chennqqi/godnslog/internal/ai"
 )
 
 // Server implements the MCP server for GODNSLOG
@@ -176,6 +178,7 @@ func (s *Server) Run(ctx context.Context) error {
 		{Name: "summarize_evidence", Description: "Summarize evidence", Execute: s.summarizeEvidence},
 		{Name: "export_report", Description: "Export report", Execute: s.exportReport},
 		{Name: "get_evidence_summary", Description: "Get a structured evidence summary bundle for a case, payload, or scanner run", Execute: s.getEvidenceSummary},
+		{Name: "explain_evidence", Description: "Generate a detailed AI-powered evidence explanation with findings and remediation steps", Execute: s.explainEvidence},
 		{Name: "list_agent_runs", Description: "List agent runs with optional filtering", Execute: s.listAgentRuns},
 		{Name: "get_agent_run", Description: "Get detailed information about a specific agent run", Execute: s.getAgentRun},
 		{Name: "revoke_token", Description: "Revoke API token", Execute: s.revokeToken},
@@ -797,6 +800,66 @@ func (s *Server) getEvidenceSummary(ctx context.Context, args map[string]interfa
 	}
 
 	return ToolResult{Success: true, Data: result}, nil
+}
+
+// explainEvidence generates a detailed AI-powered evidence explanation.
+// It first retrieves the evidence summary, then uses the AI summary service
+// to produce structured findings, risk assessment, and remediation steps.
+func (s *Server) explainEvidence(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	if err := s.checkToolPermission(ctx, "explain_evidence"); err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	caseID, _ := args["case_id"].(string)
+	payloadID, _ := args["payload_id"].(string)
+	evidenceID, _ := args["evidence_id"].(string)
+
+	if len(caseID) == 0 && len(payloadID) == 0 {
+		return ToolResult{Success: false, Error: "case_id or payload_id is required"}, nil
+	}
+
+	// Fetch interactions for analysis
+	path := "/api/v2/interactions?page_size=100"
+	if caseID != "" {
+		path += "&case_id=" + caseID
+	}
+	if payloadID != "" {
+		path += "&payload_id=" + payloadID
+	}
+
+	result, err := s.apiCall("GET", path, nil)
+	if err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	// Extract interactions from response
+	var interactions []map[string]interface{}
+	if resp, ok := result.(map[string]interface{}); ok {
+		if data, ok := resp["data"].(map[string]interface{}); ok {
+			if items, ok := data["items"].([]interface{}); ok {
+				for _, item := range items {
+					if m, ok := item.(map[string]interface{}); ok {
+						interactions = append(interactions, m)
+					}
+				}
+			}
+		}
+	}
+
+	// Use AI summary service for rule-based analysis
+	summaryService := ai.NewSummaryService()
+	explainReq := &ai.ExplainEvidenceRequest{
+		CaseID:       caseID,
+		EvidenceID:   evidenceID,
+		Interactions: interactions,
+	}
+
+	explainResp, err := summaryService.ExplainEvidence(explainReq)
+	if err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	return ToolResult{Success: true, Data: explainResp}, nil
 }
 
 // listAgentRuns retrieves a list of agent runs with optional filtering.
