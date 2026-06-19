@@ -176,6 +176,8 @@ func (s *Server) Run(ctx context.Context) error {
 		{Name: "summarize_evidence", Description: "Summarize evidence", Execute: s.summarizeEvidence},
 		{Name: "export_report", Description: "Export report", Execute: s.exportReport},
 		{Name: "get_evidence_summary", Description: "Get a structured evidence summary bundle for a case, payload, or scanner run", Execute: s.getEvidenceSummary},
+		{Name: "list_agent_runs", Description: "List agent runs with optional filtering", Execute: s.listAgentRuns},
+		{Name: "get_agent_run", Description: "Get detailed information about a specific agent run", Execute: s.getAgentRun},
 		{Name: "revoke_token", Description: "Revoke API token", Execute: s.revokeToken},
 	}
 
@@ -786,6 +788,70 @@ func (s *Server) getEvidenceSummary(ctx context.Context, args map[string]interfa
 				"success": true,
 			},
 		})
+	}
+
+	if resp, ok := result.(map[string]interface{}); ok {
+		if data, ok := resp["data"].(map[string]interface{}); ok {
+			return ToolResult{Success: true, Data: data}, nil
+		}
+	}
+
+	return ToolResult{Success: true, Data: result}, nil
+}
+
+// listAgentRuns retrieves a list of agent runs with optional filtering.
+func (s *Server) listAgentRuns(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	if err := s.checkToolPermission(ctx, "list_agent_runs"); err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	path := "/api/v2/agent-runs"
+	queryParams := make([]string, 0)
+
+	if status, ok := args["status"].(string); ok && len(status) > 0 {
+		queryParams = append(queryParams, "status="+status)
+	}
+	if agentType, ok := args["agent_type"].(string); ok && len(agentType) > 0 {
+		queryParams = append(queryParams, "agent_type="+agentType)
+	}
+	if page, ok := args["page"].(float64); ok {
+		queryParams = append(queryParams, fmt.Sprintf("page=%d", int(page)))
+	}
+	if pageSize, ok := args["page_size"].(float64); ok {
+		queryParams = append(queryParams, fmt.Sprintf("page_size=%d", int(pageSize)))
+	}
+	if len(queryParams) > 0 {
+		path += "?" + strings.Join(queryParams, "&")
+	}
+
+	result, err := s.apiCall("GET", path, nil)
+	if err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	if resp, ok := result.(map[string]interface{}); ok {
+		if data, ok := resp["data"].(map[string]interface{}); ok {
+			return ToolResult{Success: true, Data: data}, nil
+		}
+	}
+
+	return ToolResult{Success: true, Data: result}, nil
+}
+
+// getAgentRun retrieves detailed information about a specific agent run.
+func (s *Server) getAgentRun(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	if err := s.checkToolPermission(ctx, "get_agent_run"); err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	runID, _ := args["id"].(string)
+	if len(runID) == 0 {
+		return ToolResult{Success: false, Error: "id is required"}, nil
+	}
+
+	result, err := s.apiCall("GET", fmt.Sprintf("/api/v2/agent-runs/%s", runID), nil)
+	if err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
 	}
 
 	if resp, ok := result.(map[string]interface{}); ok {

@@ -1233,3 +1233,31 @@ git diff --check
 ```
 
 Acceptance result: **passed**. Sprint AA syncs the OpenAPI spec with all missing v2 API endpoints from Sprints U-Y: evidence/generate, evidence/summary, agent-policy/scopes, scanner-hub/adapters, scanner-runs (CRUD + status), and all agent-runs endpoints (list, create, get, review, status, operations, followups, review-decision, review-export, review-delivery, review-deliveries, review-queue, review-package-trace). 20+ new schemas added.
+
+## Sprint BB: Agent Run MCP Tools Verification (2026-06-19)
+
+### Focused Tests
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/mcp -v -run 'TestListAgentRuns|TestGetAgentRun'
+# Result: PASS — 4 tests (list success, get success, missing id, permission denied)
+```
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/mcp -v -run 'TestToolPermissions'
+# Result: PASS — permission metadata aligned with agent policy catalog
+```
+
+### Full Verification
+
+```bash
+GOCACHE=/tmp/gocache go test ./...
+# Result: PASS — all packages ok
+```
+
+```bash
+git diff --check
+# Result: PASS
+```
+
+Acceptance result: **passed**. Sprint BB adds `list_agent_runs` and `get_agent_run` MCP tools with permission metadata (scope: `agent:read_runs`, risk: low), handlers calling `GET /api/v2/agent-runs` and `GET /api/v2/agent-runs/{id}`, and 4 test cases covering list success, get success, missing id, and permission denied paths.

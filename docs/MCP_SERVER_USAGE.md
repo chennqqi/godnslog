@@ -218,7 +218,38 @@ Sprint X 新增 `POST /api/v2/evidence/summary` 作为 Agent/CI 推荐的只读�
 }
 ```
 
-### 9. revoke_token
+### 9. list_agent_runs
+
+列出 Agent Run，支持按状态和类型过滤。调用 `GET /api/v2/agent-runs`。Agent 可用此工具查看自己的运行历史和状态。
+
+**参数**：
+- `status` (string, optional)：过滤状态（pending/running/completed/failed/reviewed）
+- `agent_type` (string, optional)：过滤 Agent 类型
+- `page` (integer, optional)：页码，默认 1
+- `page_size` (integer, optional)：每页条数，默认 20
+
+**示例**：
+```json
+{
+  "status": "running"
+}
+```
+
+### 10. get_agent_run
+
+获取指定 Agent Run 的详细信息，包括操作日志和 followup 历史。调用 `GET /api/v2/agent-runs/{id}`。
+
+**参数**：
+- `id` (string, required)：Agent Run ID
+
+**示例**：
+```json
+{
+  "id": "run-123"
+}
+```
+
+### 11. revoke_token
 
 撤销 API Key。
 
