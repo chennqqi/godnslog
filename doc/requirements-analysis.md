@@ -235,3 +235,21 @@
 分析：`v2ListUsers` 中 `OrderBy("created_at DESC")` 与 `models.TblUser`  schema 不一致（仅有 `Atime`/`Utime`），数据库无 `created_at` 列导致查询失败返回 code 5。2.0 部分页面为骨架或占位 API，需按 ROADMAP 逐项补齐。
 
 处理：用户列表改为 `Count` + `Desc("id")` 分页；`created_at` 输出优先 `Atime`、否则 `Utime`。
+
+## 2026-06-19 Sprint X 验收分析
+
+用户要求从 Sprint X 验收开始，逐 Sprint 做计划再实施。
+
+分析：
+- 仓库 HEAD 在 sprint T 提交（d3236ba），Sprint U/V/W/X 代码全部未提交（工作区有 27 个文件变更 + 2 个新目录）
+- Sprint X 验收文档标注 "Accepted pending full final verification"，verification.md 仅记录了 2 条聚焦测试命令
+- Sprint X 计划要求的全量验证（go test ./...、前端 lint/build、git diff --check）尚未执行
+- 需要先补全 Sprint X 全量验证，然后提交所有未提交改动
+- 提交后规划下一个 Sprint 候选
+
+执行策略：
+1. 运行 Sprint X 完整验证命令清单
+2. 修复验证中发现的问题（如有）
+3. 更新 verification.md 和 Sprint X acceptance 文档
+4. 提交所有未提交改动（Sprint U/V/W/X 合并提交或分 Sprint 提交）
+5. 规划 Sprint Y 候选目标

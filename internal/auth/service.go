@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/chennqqi/godnslog/internal/agentpolicy"
 	"github.com/chennqqi/godnslog/internal/models"
 	"xorm.io/xorm"
 )
@@ -81,6 +82,9 @@ func (s *Service) CreateAPIKey(req *models.APIKeyCreateRequest, userID string) (
 
 	// Validate agent scopes if this is an agent key
 	if req.IsAgent {
+		if len(req.Scopes) == 0 {
+			req.Scopes = agentpolicy.DefaultScopes()
+		}
 		if !models.ValidateAgentScopes(req.Scopes) {
 			return nil, errors.New("invalid agent scope")
 		}

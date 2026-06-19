@@ -144,6 +144,8 @@ godnslog-mcp-server
 }
 ```
 
+Sprint X 新增 `POST /api/v2/evidence/summary` 作为 Agent/CI 推荐的只读证据摘要 API。它可以接收 `case_id`、`payload_id` 或 `scanner_run_id`，返回标准化 `scope`、结构化 `evidence`、关联 `scanner_runs`、`package_hashes`、确定性 `summary_hash` 和 `next_actions`。当 Agent 需要把 Scanner Hub package 与实际 OAST 回连证据合并消费时，优先使用该 API。
+
 ### 7. export_report
 
 导出证据报告或 Agent Run Review Packet。
@@ -206,7 +208,20 @@ godnslog-mcp-server
 
 ### Agent API Key 权限控制
 
-Sprint K 引入了 Agent API Key 权限控制系统，为 MCP 工具提供细粒度的权限和风险控制。
+Sprint K 引入了 Agent API Key 权限控制系统，为 MCP 工具提供细粒度的权限和风险控制。Sprint V 将 Agent scope、风险等级、默认授权和 MCP 工具映射收敛到共享策略目录，并通过 `/api/v2/agent-policy/scopes` 提供给 API、MCP 和 Web UI 使用。
+
+#### Agent Policy API
+
+认证用户可以读取当前 Agent 策略目录：
+
+```http
+GET /api/v2/agent-policy/scopes
+```
+
+响应中的 `data` 包含：
+- `items`：每个 scope 的名称、风险等级、默认授权状态、高风险标记、关联 MCP 工具和描述。
+- `default_scopes`：新建 Agent API Key 未显式传入 scope 时采用的安全默认集合。
+- `high_risk_scopes`：必须由操作者显式勾选的高风险 scope。
 
 #### 权限 Scope
 
@@ -215,6 +230,8 @@ Sprint K 引入了 Agent API Key 权限控制系统，为 MCP 工具提供细粒
 | 工具 | 必需 Scope | 风险等级 |
 |------|-----------|---------|
 | create_oast_probe | agent:create_probe | Medium |
+| create_case | agent:create_probe | Medium |
+| create_payload | agent:create_probe | Medium |
 | wait_for_interaction | agent:wait_interaction | Low |
 | list_interactions | agent:read_interactions | Low |
 | summarize_evidence | agent:summarize_evidence | Low |
@@ -244,7 +261,10 @@ Agent API Key 支持三种风险容忍度级别：
 
 通过 Web UI 创建 Agent API Key 时：
 - 必须选择 Agent Key 类型
-- Scope 限制为 Agent-safe scopes
+- 未显式选择 scope 时，后端使用 `/api/v2/agent-policy/scopes` 中的 `default_scopes`
+- Scope 限制为共享策略目录中的 Agent scopes
+- Web UI 按默认 Agent 作用域和高风险作用域分组展示
+- 高风险 scope 默认不勾选，必须由操作者显式选择
 - 必须设置过期时间（默认 24 小时）
 - 必须设置风险容忍度（默认 medium）
 
@@ -274,6 +294,8 @@ MCP API Key 应该设置合理的过期时间（如 24 小时）。Agent API Key
 - revoke_token（撤销 API Key）
 - agent:delete_payload（删除 Payload）
 - agent:modify_config（修改配置）
+
+`agent:delete_payload` 和 `agent:modify_config` 当前只作为策略目录中的显式高风险能力保留，不代表已经开放对应的 Agent 破坏性工具实现。
 
 ## 使用示例
 

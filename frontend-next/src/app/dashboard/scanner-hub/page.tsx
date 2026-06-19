@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { caseApi, payloadApi, scannerRunApi } from '@/lib/api-client'
 import { createScannerRun, generateWebUrls, type ScannerRunInput } from '@/lib/scanner-hub'
-import type { Case, Payload, ScannerRun } from '@/types'
+import type { Case, Payload, ScannerAdapter, ScannerDeliveryMethod, ScannerKind, ScannerRun } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -26,6 +26,9 @@ export default function ScannerHubPage() {
   const [target, setTarget] = useState('')
   const [template, setTemplate] = useState<'ssrf-basic' | 'xxe-basic' | 'rce-callback'>('ssrf-basic')
   const [selectedPayload, setSelectedPayload] = useState<string>('')
+  const [adapters, setAdapters] = useState<ScannerAdapter[]>([])
+  const [selectedScanner, setSelectedScanner] = useState<ScannerKind>('nuclei')
+  const [selectedDeliveryMethod, setSelectedDeliveryMethod] = useState<ScannerDeliveryMethod>('nuclei-jsonl')
   const [payloads, setPayloads] = useState<Payload[]>([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
@@ -73,15 +76,34 @@ export default function ScannerHubPage() {
     }
   }, [])
 
+  const loadAdapters = useCallback(async () => {
+    try {
+      const response = await scannerRunApi.listAdapters()
+      if (response.data) {
+        const items = response.data.items || []
+        setAdapters(items)
+        const defaultAdapter = items.find(adapter => adapter.id === selectedScanner) || items[0]
+        if (defaultAdapter) {
+          setSelectedScanner(defaultAdapter.id)
+          setSelectedDeliveryMethod(defaultAdapter.default_method)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load scanner adapters:', error)
+      setError('加载Scanner适配器失败')
+    }
+  }, [selectedScanner])
+
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) {
       router.push('/login')
       return
     }
+    loadAdapters()
     loadCases()
     loadRecentScannerRuns()
-  }, [router, loadCases, loadRecentScannerRuns])
+  }, [router, loadAdapters, loadCases, loadRecentScannerRuns])
 
   useEffect(() => {
     if (selectedCase) {
@@ -105,7 +127,7 @@ export default function ScannerHubPage() {
       if (response.data && response.data.data) {
         const newPayload = response.data.data
         setSelectedPayload(newPayload.id)
-        setPayloads([...payloads, newPayload])
+        setPayloads(current => [...current.filter(payload => payload.id !== newPayload.id), newPayload])
       }
     } catch (error: unknown) {
       console.error('Failed to create payload:', error)
@@ -141,7 +163,7 @@ export default function ScannerHubPage() {
         baseUrl: window.location.origin
       }
 
-      const run = await createScannerRun(input, 'nuclei-jsonl')
+      const run = await createScannerRun(input, selectedScanner, selectedDeliveryMethod)
       setScannerRun(run)
       loadRecentScannerRuns()
     } catch (error: unknown) {
@@ -155,6 +177,17 @@ export default function ScannerHubPage() {
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text)
   }
+
+  const handleScannerChange = (scanner: ScannerKind) => {
+    const adapter = adapters.find(item => item.id === scanner)
+    setSelectedScanner(scanner)
+    if (adapter) {
+      setSelectedDeliveryMethod(adapter.default_method)
+    }
+  }
+
+  const selectedAdapter = adapters.find(adapter => adapter.id === selectedScanner)
+  const outputLabel = scannerRun ? getScannerOutputLabel(scannerRun.scanner) : 'Integration Package'
 
   const webUrls = scannerRun ? generateWebUrls({
     case_id: scannerRun.case_id,
@@ -174,7 +207,7 @@ export default function ScannerHubPage() {
     <div className="container mx-auto p-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Scanner Hub</h1>
-        <p className="text-muted-foreground">Nuclei 集成工作台</p>
+        <p className="text-muted-foreground">多工具 OAST 适配器工作台</p>
       </div>
 
       <div className="grid gap-6">
@@ -214,6 +247,58 @@ export default function ScannerHubPage() {
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Scanner Adapter Selection */}
+        <Card>
+          <CardHeader>
+            <CardTitle>选择 Scanner Adapter</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Select value={selectedScanner} onValueChange={(value: ScannerKind) => handleScannerChange(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="选择 Scanner" />
+              </SelectTrigger>
+              <SelectContent>
+                {adapters.map(adapter => (
+                  <SelectItem key={adapter.id} value={adapter.id}>
+                    {adapter.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedAdapter && (
+              <div className="rounded border p-3 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>{selectedAdapter.category}</Badge>
+                  <Badge variant="secondary">{selectedAdapter.maturity}</Badge>
+                  <span className="text-muted-foreground">{selectedAdapter.description}</span>
+                </div>
+                <div className="mt-3">
+                  <Select value={selectedDeliveryMethod} onValueChange={(value: ScannerDeliveryMethod) => setSelectedDeliveryMethod(value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择 Delivery Method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectedAdapter.supported_methods.map(method => (
+                        <SelectItem key={method} value={method}>
+                          {method}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            <div className="grid gap-2 md:grid-cols-4">
+              {adapters.map(adapter => (
+                <div key={adapter.id} className="rounded border p-3 text-xs">
+                  <div className="font-medium">{adapter.name}</div>
+                  <div className="text-muted-foreground">{adapter.default_method}</div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
@@ -337,7 +422,7 @@ export default function ScannerHubPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Nuclei Command</CardTitle>
+                <CardTitle>{outputLabel}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex gap-2">
@@ -348,6 +433,48 @@ export default function ScannerHubPage() {
                 </div>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Package Hash</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-2">
+                  <Input value={scannerRun.package_hash || ''} readOnly className="font-mono text-sm" />
+                  <Button onClick={() => handleCopy(scannerRun.package_hash || '')}>
+                    复制
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {scannerRun.package_manifest && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Package Manifest</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid gap-2 text-sm md:grid-cols-2">
+                    <div className="flex items-center gap-2">
+                      <Badge>Schema</Badge>
+                      <span>{scannerRun.package_manifest.schema_version}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge>Hash</Badge>
+                      <span>{scannerRun.package_manifest.hash_algorithm}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {scannerRun.package_manifest.files.map(file => (
+                      <div key={`${file.kind}-${file.name}`} className="rounded border p-3 text-sm">
+                        <div className="font-mono">{file.name}</div>
+                        <div className="text-muted-foreground">{file.kind} · {file.description}</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>
@@ -409,4 +536,25 @@ export default function ScannerHubPage() {
       </div>
     </div>
   )
+}
+
+function getScannerOutputLabel(scanner: ScannerKind): string {
+  switch (scanner) {
+    case 'nuclei':
+      return 'Nuclei Command'
+    case 'burp':
+      return 'Burp Suite Extension Package'
+    case 'yakit':
+      return 'Yakit/Yak Script Package'
+    case 'zap':
+      return 'ZAP Script Package'
+    case 'xray':
+    case 'rad':
+      return 'Webhook Bridge Package'
+    case 'postman':
+    case 'apifox':
+      return 'Environment Package'
+    default:
+      return 'Integration Package'
+  }
 }

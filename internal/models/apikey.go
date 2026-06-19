@@ -4,6 +4,8 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"time"
+
+	"github.com/chennqqi/godnslog/internal/agentpolicy"
 )
 
 // Scopes represents API key scopes
@@ -95,49 +97,16 @@ type APIKeyCreateRequest struct {
 
 // AgentScopes defines the allowed scopes for agent API keys (minimum privilege)
 // Sprint K scope naming convention
-var AgentScopes = []string{
-	"agent:create_probe",
-	"agent:wait_interaction",
-	"agent:read_interactions",
-	"agent:summarize_evidence",
-	"agent:export_report",
-	"agent:read_runs",
-}
+var AgentScopes = agentpolicy.DefaultScopes()
 
 // HighRiskAgentScopes defines high-risk scopes that require explicit authorization
-var HighRiskAgentScopes = []string{
-	"agent:revoke_token",
-	"agent:delete_payload",
-	"agent:modify_config",
-}
+var HighRiskAgentScopes = agentpolicy.HighRiskScopes()
 
 // ValidateAgentScopes validates that an agent key only has allowed scopes
 // Includes both AgentScopes (low/medium risk) and HighRiskAgentScopes (high risk)
 // High-risk scopes are allowed but should be controlled via risk_tolerance in MCP permission checks
 func ValidateAgentScopes(scopes []string) bool {
-	for _, scope := range scopes {
-		allowed := false
-		// Check in AgentScopes
-		for _, allowedScope := range AgentScopes {
-			if scope == allowedScope {
-				allowed = true
-				break
-			}
-		}
-		// Check in HighRiskAgentScopes
-		if !allowed {
-			for _, allowedScope := range HighRiskAgentScopes {
-				if scope == allowedScope {
-					allowed = true
-					break
-				}
-			}
-		}
-		if !allowed {
-			return false
-		}
-	}
-	return true
+	return agentpolicy.ValidateScopes(scopes)
 }
 
 // APIKeyListResponse represents the response for listing API keys

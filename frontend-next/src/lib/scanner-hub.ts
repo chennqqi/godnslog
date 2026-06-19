@@ -6,7 +6,7 @@
  */
 
 import { scannerRunApi } from './api-client'
-import type { ScannerRun, ScannerRunCreateRequest } from '@/types'
+import type { ScannerDeliveryMethod, ScannerKind, ScannerRun, ScannerRunCreateRequest } from '@/types'
 
 export interface ScannerRunInput {
   case_id: string
@@ -77,12 +77,13 @@ export function generateWebUrls(input: ScannerRunInput): {
  */
 export async function createScannerRun(
   input: ScannerRunInput,
-  deliveryMethod: 'nuclei-jsonl' | 'nuclei-var'
+  scanner: ScannerKind,
+  deliveryMethod: ScannerDeliveryMethod
 ): Promise<ScannerRun> {
   const req: ScannerRunCreateRequest = {
     case_id: input.case_id,
     payload_id: input.payload_id,
-    scanner: 'nuclei',
+    scanner,
     target: input.target,
     template: input.template,
     delivery_method: deliveryMethod,
@@ -92,5 +93,5 @@ export async function createScannerRun(
   if (!response || !response.data) {
     throw new Error('Failed to create scanner run: invalid response')
   }
-  return response.data.data
+  return response.data
 }

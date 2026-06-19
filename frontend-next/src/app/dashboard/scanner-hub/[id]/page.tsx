@@ -205,7 +205,7 @@ export default function ScannerRunDetailPage() {
         {/* Nuclei Command */}
         <Card>
           <CardHeader>
-            <CardTitle>Nuclei Command</CardTitle>
+            <CardTitle>Integration Package</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex gap-2">
@@ -216,6 +216,48 @@ export default function ScannerRunDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Package Hash</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2">
+              <Input value={scannerRun.package_hash || ''} readOnly className="font-mono text-sm" />
+              <Button onClick={() => handleCopy(scannerRun.package_hash || '')}>
+                复制
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {scannerRun.package_manifest && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Package Manifest</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid gap-2 text-sm md:grid-cols-2">
+                <div className="flex items-center gap-2">
+                  <Badge>Schema</Badge>
+                  <span>{scannerRun.package_manifest.schema_version}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge>Hash</Badge>
+                  <span>{scannerRun.package_manifest.hash_algorithm}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {scannerRun.package_manifest.files.map(file => (
+                  <div key={`${file.kind}-${file.name}`} className="rounded border p-3 text-sm">
+                    <div className="font-mono">{file.name}</div>
+                    <div className="text-muted-foreground">{file.kind} · {file.description}</div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* JSONL Record */}
         <Card>

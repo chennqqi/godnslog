@@ -2,9 +2,11 @@
 
 GODNSLOG exposes one integration contract for scanners and proxy tools.
 
-## Scanner Hub MVP Scope
+## Scanner Hub Scope
 
-Sprint H focuses on Nuclei JSONL / template variable integration as the MVP. This is the minimum viable closed-loop for scanner integration.
+Sprint H delivered the Nuclei JSONL / template variable MVP. Sprint U expands Scanner Hub into a multi-tool adapter package generator while keeping the same GODNSLOG evidence loop.
+
+Scanner Hub currently generates integration packages and persists Scanner Runs. It does **not** execute scanners, schedule scans, run plugin binaries, or provide bidirectional live scanner event streaming.
 
 ## Create Probe
 
@@ -91,13 +93,149 @@ After distributing probes via Nuclei:
    - API: `POST /api/v2/evidence/generate` with `{"payload_id": "<payload_id>", "format": "markdown"}`
    - Web: `/dashboard/evidence?payload_id=<payload_id>` (auto-generates)
 
-## Supported Tool Paths (Primary Only for MVP)
+## Adapter Catalog API
 
-- **Nuclei**: CLI wrapper and template variables (MVP - Primary)
-- Burp Suite: extension calls the REST API (Primary, Phase 2)
-- Yakit/Yak: Yak script calls REST API and polls token (Primary, Phase 2)
-- ZAP: script or add-on calls REST API and polls token (Secondary, Phase 2)
-- xray/rad: CLI or webhook bridge maps scanner events to Case and Payload (Secondary, Phase 2)
-- Postman/Apifox: environment variables and pre-request scripts (Secondary, Phase 2)
+GET `/api/v2/scanner-hub/adapters`
 
-**Note**: Sprint H only implements Nuclei MVP integration. Other tools are documented for future phases per `docs/official-support-boundary.md`.
+Returns the official Scanner Hub adapter catalog:
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "items": [
+      {
+        "id": "burp",
+        "name": "Burp Suite",
+        "category": "Native",
+        "maturity": "L4 Native Plugin Path",
+        "supported_methods": ["burp-extension"],
+        "default_method": "burp-extension",
+        "description": "Manual and semi-automated verification package for Burp Suite extension workflows."
+      }
+    ]
+  }
+}
+```
+
+## Supported Tool Paths
+
+| Tool | Supported Delivery Method | Current Support | Boundary |
+|------|---------------------------|-----------------|----------|
+| Nuclei | `nuclei-jsonl`, `nuclei-var` | Command + JSONL package generation | No scan execution |
+| Burp Suite | `burp-extension` | Extension package instructions with API/polling links | No compiled extension binary |
+| Yakit/Yak | `yakit-script` | Yak script package instructions | No embedded Yak runtime |
+| ZAP | `zap-script` | ZAP script package instructions | No add-on binary |
+| xray | `xray-webhook` | Webhook bridge package metadata | No scanner process control |
+| rad | `rad-webhook` | Webhook bridge package metadata | No crawler/scanner execution |
+| Postman | `postman-env` | Environment variable package | No collection upload |
+| Apifox | `apifox-env` | Environment variable package | No workspace sync |
+
+## Create Scanner Run
+
+POST `/api/v2/scanner-runs`
+
+Required fields:
+
+```json
+{
+  "case_id": "case-123",
+  "payload_id": "payload-456",
+  "scanner": "burp",
+  "target": "https://target.example",
+  "template": "ssrf-basic",
+  "delivery_method": "burp-extension"
+}
+```
+
+Supported compatibility matrix:
+
+```text
+nuclei  -> nuclei-jsonl, nuclei-var
+burp    -> burp-extension
+yakit   -> yakit-script
+zap     -> zap-script
+xray    -> xray-webhook
+rad     -> rad-webhook
+postman -> postman-env
+apifox  -> apifox-env
+```
+
+Invalid scanner names and invalid scanner/delivery combinations return 400.
+
+The response includes:
+
+- `scanner`
+- `delivery_method`
+- `command`
+- `jsonl`
+- `package_manifest`
+- `package_hash`
+- Case/Payload linkage
+- URLs back to Interactions and Evidence
+
+## Machine-Readable Package Manifest
+
+Sprint W adds a machine-readable integration package manifest to every Scanner Run. This is intended for AI Agent, CI, and scanner automation consumers that need to verify package contents without parsing human-facing command text.
+
+Every create/list/detail response includes:
+
+```json
+{
+  "package_hash": "0123456789abcdef...",
+  "package_manifest": {
+    "schema_version": "scanner-package.v1",
+    "scanner": "burp",
+    "delivery_method": "burp-extension",
+    "package_hash": "0123456789abcdef...",
+    "hash_algorithm": "sha256",
+    "files": [
+      {
+        "name": "README.md",
+        "kind": "instructions",
+        "description": "Operator and Agent instructions for distributing this GODNSLOG scanner package."
+      },
+      {
+        "name": "godnslog-package.jsonl",
+        "kind": "jsonl",
+        "description": "Single-line GODNSLOG scanner package record with payload, target, and callback URLs."
+      },
+      {
+        "name": "burp-extension-config.json",
+        "kind": "burp-extension-config",
+        "description": "Burp Suite extension configuration inputs and polling URLs."
+      }
+    ],
+    "interactions_url": "http://godnslog/api/v2/interactions?payload_id=payload-456",
+    "evidence_url": "http://godnslog/dashboard/evidence?payload_id=payload-456",
+    "next_actions": [
+      "Distribute the generated payload through the selected scanner adapter.",
+      "Poll interactions_url until the expected callback is observed.",
+      "Open evidence_url or call the Evidence API to produce the final proof chain."
+    ]
+  }
+}
+```
+
+The package hash is a deterministic SHA-256 hash over the generated command, JSONL package data, manifest file list, scanner, delivery method, target, template, and correlation URLs. The timestamp in the JSONL record is excluded from the hash input so equivalent package contents remain stable across repeated generation.
+
+The manifest does not imply scanner execution. It describes package files and next actions only; GODNSLOG still does not run Nuclei, Burp Suite, Yakit/Yak, ZAP, xray, rad, Postman, or Apifox.
+
+## Evidence Summary Lookup
+
+Sprint X adds a read-only evidence summary endpoint for scanner-driven review:
+
+```http
+POST /api/v2/evidence/summary
+```
+
+For Scanner Hub workflows, pass the Scanner Run ID:
+
+```json
+{
+  "scanner_run_id": "scanner-run-789"
+}
+```
+
+The response resolves the Scanner Run to Case/Payload scope, generates on-demand evidence from captured Interactions, includes related Scanner Run metadata, returns `package_hashes`, and provides a deterministic `summary_hash`. This is the preferred contract for AI Agent and CI review loops that need one structured evidence bundle.

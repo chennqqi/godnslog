@@ -9,12 +9,43 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/chennqqi/godnslog/internal/agentpolicy"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
+}
+
+func TestToolPermissionsUseAgentPolicyCatalog(t *testing.T) {
+	catalog := agentpolicy.ListScopes()
+	byScope := catalog.ByScope()
+
+	for toolName, permission := range ToolPermissions {
+		policy, ok := byScope[permission.RequiredScope]
+		if !ok {
+			t.Fatalf("tool %s uses scope %q that is missing from agent policy catalog", toolName, permission.RequiredScope)
+		}
+		if string(permission.RiskLevel) != policy.RiskLevel {
+			t.Fatalf("tool %s risk drift: permission=%s policy=%s", toolName, permission.RiskLevel, policy.RiskLevel)
+		}
+	}
+
+	for _, toolName := range []string{
+		"create_oast_probe",
+		"create_payload",
+		"list_interactions",
+		"wait_for_interaction",
+		"summarize_evidence",
+		"export_report",
+		"revoke_token",
+	} {
+		if _, ok := GetToolPermission(toolName); !ok {
+			t.Fatalf("registered MCP tool %s has no permission metadata", toolName)
+		}
+	}
 }
 
 func newTestServer(handler func(*http.Request) string) *Server {

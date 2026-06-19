@@ -137,14 +137,15 @@ export default function AuditPageContent() {
     return true
   })
 
-  const handleTracePackage = async () => {
-    if (!packageHashInput.trim()) {
+  const handleTracePackage = async (hashOverride?: string) => {
+    const hashToTrace = hashOverride || packageHashInput
+    if (!hashToTrace.trim()) {
       setTraceError('Package hash is required')
       return
     }
     // Basic validation: 64 hex characters
     const hashRegex = /^[a-fA-F0-9]{64}$/
-    if (!hashRegex.test(packageHashInput)) {
+    if (!hashRegex.test(hashToTrace)) {
       setTraceError('Invalid package hash: must be 64-character hex string')
       return
     }
@@ -152,10 +153,12 @@ export default function AuditPageContent() {
     setTraceLoading(true)
     setTraceError('')
     setTraceResult(null)
+    // Update input state to reflect the hash being traced
+    setPackageHashInput(hashToTrace)
     try {
-      const resp = await agentRunApi.traceReviewPackage(packageHashInput.trim())
+      const resp = await agentRunApi.traceReviewPackage(hashToTrace.trim())
       if (resp.code === 0 && resp.data) {
-        setTraceResult(resp.data.data)
+        setTraceResult(resp.data)
         setShowTrace(true)
       } else {
         setTraceError(resp.message || 'Failed to trace package')
@@ -268,7 +271,7 @@ export default function AuditPageContent() {
               value={packageHashInput}
               onChange={(e) => setPackageHashInput(e.target.value)}
             />
-            <Button onClick={handleTracePackage} disabled={traceLoading}>
+            <Button onClick={() => handleTracePackage()} disabled={traceLoading}>
               {traceLoading ? 'Tracing...' : 'Trace'}
             </Button>
             {showTrace && (
@@ -301,6 +304,14 @@ export default function AuditPageContent() {
                   <div className="text-xs text-gray-500 dark:text-gray-400">Audits</div>
                 </div>
               </div>
+              {traceResult.summary.agent_run_count === 0 &&
+                traceResult.summary.export_count === 0 &&
+                traceResult.summary.delivery_count === 0 &&
+                traceResult.summary.audit_count === 0 && (
+                  <div className="rounded border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400">
+                    No package trace records found for this hash.
+                  </div>
+                )}
               {/* Delivery Status */}
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div className="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded">
@@ -351,6 +362,7 @@ export default function AuditPageContent() {
                         </div>
                         <div className="mt-1 text-gray-500 dark:text-gray-400">
                           Operation ID: {exp.operation_id}
+                          {exp.audit_ref_id && <span className="ml-2">Audit Ref: {exp.audit_ref_id}</span>}
                         </div>
                       </div>
                     ))}
@@ -371,8 +383,10 @@ export default function AuditPageContent() {
                           <span className="text-gray-500 dark:text-gray-400">{new Date(del.created_at).toLocaleString()}</span>
                         </div>
                         <div className="mt-1 text-gray-500 dark:text-gray-400">
+                          <span>Operation ID: {del.delivery_operation_id}</span>
                           {del.destination_host && <span>Host: {del.destination_host}</span>}
                           {del.status_code && <span className="ml-2">Status: {del.status_code}</span>}
+                          {del.audit_ref_id && <span className="ml-2">Audit Ref: {del.audit_ref_id}</span>}
                         </div>
                       </div>
                     ))}
@@ -392,6 +406,7 @@ export default function AuditPageContent() {
                         </div>
                         <div className="mt-1 text-gray-500 dark:text-gray-400">
                           {audit.resource_type} {audit.resource_id && `/ ${audit.resource_id}`}
+                          <span className="ml-2">Audit Ref: {audit.audit_ref_id}</span>
                         </div>
                       </div>
                     ))}
@@ -485,9 +500,8 @@ export default function AuditPageContent() {
                             <span className="font-medium text-gray-700 dark:text-gray-300">Package Hash:</span>
                             <code className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-xs cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600"
                                   onClick={() => {
-                                    setPackageHashInput(packageHash)
                                     setShowTrace(true)
-                                    handleTracePackage()
+                                    handleTracePackage(packageHash)
                                   }}
                                   title="Click to trace this package hash">
                               {packageHash.substring(0, 12)}...

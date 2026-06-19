@@ -1,6 +1,8 @@
 package scannerhub
 
 import (
+	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +11,326 @@ import (
 	_ "modernc.org/sqlite"
 	"xorm.io/xorm"
 )
+
+func TestListScannerAdaptersIncludesPrimaryTools(t *testing.T) {
+	service := NewService(nil)
+	resp := service.ListAdapters()
+	if resp == nil {
+		t.Fatal("expected adapter list response, got nil")
+	}
+
+	byID := map[string]models.ScannerAdapter{}
+	for _, adapter := range resp.Items {
+		byID[adapter.ID] = adapter
+	}
+
+	required := []string{
+		models.ScannerNuclei,
+		models.ScannerBurp,
+		models.ScannerYakit,
+		models.ScannerZap,
+		models.ScannerXray,
+		models.ScannerRad,
+		models.ScannerPostman,
+		models.ScannerApifox,
+	}
+	for _, scanner := range required {
+		if _, ok := byID[scanner]; !ok {
+			t.Fatalf("expected adapter %s in catalog", scanner)
+		}
+	}
+
+	if got := byID[models.ScannerBurp].DefaultMethod; got != models.DeliveryMethodBurpExtension {
+		t.Fatalf("expected burp default method %s, got %s", models.DeliveryMethodBurpExtension, got)
+	}
+	if !containsString(byID[models.ScannerYakit].SupportedMethods, models.DeliveryMethodYakitScript) {
+		t.Fatalf("expected yakit supported methods to include %s", models.DeliveryMethodYakitScript)
+	}
+}
+
+func TestValidateScannerDeliveryPair(t *testing.T) {
+	tests := []struct {
+		name    string
+		scanner string
+		method  string
+		wantErr error
+	}{
+		{"nuclei jsonl", models.ScannerNuclei, models.DeliveryMethodNucleiJsonl, nil},
+		{"nuclei var", models.ScannerNuclei, models.DeliveryMethodNucleiVar, nil},
+		{"burp extension", models.ScannerBurp, models.DeliveryMethodBurpExtension, nil},
+		{"yakit script", models.ScannerYakit, models.DeliveryMethodYakitScript, nil},
+		{"zap script", models.ScannerZap, models.DeliveryMethodZapScript, nil},
+		{"xray webhook", models.ScannerXray, models.DeliveryMethodXrayWebhook, nil},
+		{"rad webhook", models.ScannerRad, models.DeliveryMethodRadWebhook, nil},
+		{"postman env", models.ScannerPostman, models.DeliveryMethodPostmanEnv, nil},
+		{"apifox env", models.ScannerApifox, models.DeliveryMethodApifoxEnv, nil},
+		{"unknown scanner", "unknown", models.DeliveryMethodNucleiJsonl, ErrInvalidScanner},
+		{"wrong pair", models.ScannerBurp, models.DeliveryMethodNucleiJsonl, ErrInvalidDelivery},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateScannerDelivery(tt.scanner, tt.method)
+			if tt.wantErr == nil {
+				if err != nil {
+					t.Fatalf("expected no error, got %v", err)
+				}
+				return
+			}
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("expected %v, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestGenerateScannerArtifactsForPrimaryAdapters(t *testing.T) {
+	service := NewService(nil)
+	payload := &models.Payload{
+		ID:               "payload-1",
+		CaseID:           "case-1",
+		Token:            "tok-abc123",
+		TemplateRendered: "http://tok-abc123.example.com/callback",
+	}
+
+	tests := []struct {
+		name     string
+		scanner  string
+		method   string
+		contains []string
+	}{
+		{
+			name:    "nuclei jsonl",
+			scanner: models.ScannerNuclei,
+			method:  models.DeliveryMethodNucleiJsonl,
+			contains: []string{
+				"nuclei",
+				"godnslog_payload=http://tok-abc123.example.com/callback",
+			},
+		},
+		{
+			name:    "burp extension",
+			scanner: models.ScannerBurp,
+			method:  models.DeliveryMethodBurpExtension,
+			contains: []string{
+				"Burp Suite Extension",
+				"/api/v2/payloads",
+				"/api/v2/interactions?payload_id=payload-1",
+			},
+		},
+		{
+			name:    "yakit script",
+			scanner: models.ScannerYakit,
+			method:  models.DeliveryMethodYakitScript,
+			contains: []string{
+				"yak",
+				"CreateHTTPFlow",
+				"http://tok-abc123.example.com/callback",
+			},
+		},
+		{
+			name:    "zap script",
+			scanner: models.ScannerZap,
+			method:  models.DeliveryMethodZapScript,
+			contains: []string{
+				"ZAP Script",
+				"zap.script",
+			},
+		},
+		{
+			name:    "xray webhook",
+			scanner: models.ScannerXray,
+			method:  models.DeliveryMethodXrayWebhook,
+			contains: []string{
+				"webhook",
+				"/api/v2/interactions?payload_id=payload-1",
+			},
+		},
+		{
+			name:    "rad webhook",
+			scanner: models.ScannerRad,
+			method:  models.DeliveryMethodRadWebhook,
+			contains: []string{
+				"webhook",
+				"/api/v2/interactions?payload_id=payload-1",
+			},
+		},
+		{
+			name:    "postman env",
+			scanner: models.ScannerPostman,
+			method:  models.DeliveryMethodPostmanEnv,
+			contains: []string{
+				"GODNSLOG_PAYLOAD",
+				"GODNSLOG_INTERACTIONS_URL",
+				"GODNSLOG_EVIDENCE_URL",
+			},
+		},
+		{
+			name:    "apifox env",
+			scanner: models.ScannerApifox,
+			method:  models.DeliveryMethodApifoxEnv,
+			contains: []string{
+				"GODNSLOG_PAYLOAD",
+				"GODNSLOG_INTERACTIONS_URL",
+				"GODNSLOG_EVIDENCE_URL",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &models.ScannerRunCreateRequest{
+				CaseID:         "case-1",
+				PayloadID:      "payload-1",
+				Scanner:        tt.scanner,
+				Target:         "https://target.example",
+				Template:       "ssrf-basic",
+				DeliveryMethod: tt.method,
+			}
+			command, jsonl, _, _, err := service.generateScannerArtifacts(req, payload, "http://godnslog.local")
+			if err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+			for _, expected := range tt.contains {
+				if !strings.Contains(command, expected) {
+					t.Fatalf("expected command to contain %q, got %s", expected, command)
+				}
+			}
+
+			var record map[string]interface{}
+			if err := json.Unmarshal([]byte(jsonl), &record); err != nil {
+				t.Fatalf("expected valid jsonl record, got %v", err)
+			}
+			expected := map[string]string{
+				"scanner":          tt.scanner,
+				"delivery_method":  tt.method,
+				"case_id":          "case-1",
+				"payload_id":       "payload-1",
+				"token":            "tok-abc123",
+				"target":           "https://target.example",
+				"template":         "ssrf-basic",
+				"rendered_payload": "http://tok-abc123.example.com/callback",
+			}
+			for field, value := range expected {
+				if record[field] != value {
+					t.Fatalf("expected %s=%q, got %#v", field, value, record[field])
+				}
+			}
+		})
+	}
+}
+
+func TestGenerateScannerPackageIncludesManifestAndHash(t *testing.T) {
+	service := NewService(nil)
+	payload := &models.Payload{
+		ID:               "payload-1",
+		CaseID:           "case-1",
+		Token:            "tok-abc123",
+		TemplateRendered: "http://tok-abc123.example.com/callback",
+	}
+	req := &models.ScannerRunCreateRequest{
+		CaseID:         "case-1",
+		PayloadID:      "payload-1",
+		Scanner:        models.ScannerBurp,
+		Target:         "https://target.example",
+		Template:       "ssrf-basic",
+		DeliveryMethod: models.DeliveryMethodBurpExtension,
+	}
+
+	command, jsonl, manifest, packageHash, err := service.generateScannerArtifacts(req, payload, "http://godnslog.local")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if command == "" || jsonl == "" {
+		t.Fatal("expected command and jsonl artifacts")
+	}
+	if packageHash == "" {
+		t.Fatal("expected package hash")
+	}
+	if len(packageHash) != 64 {
+		t.Fatalf("expected sha256 hex hash length 64, got %d", len(packageHash))
+	}
+	if manifest.SchemaVersion != "scanner-package.v1" {
+		t.Fatalf("expected schema version scanner-package.v1, got %q", manifest.SchemaVersion)
+	}
+	if manifest.Scanner != models.ScannerBurp {
+		t.Fatalf("expected scanner %q, got %q", models.ScannerBurp, manifest.Scanner)
+	}
+	if manifest.DeliveryMethod != models.DeliveryMethodBurpExtension {
+		t.Fatalf("expected delivery method %q, got %q", models.DeliveryMethodBurpExtension, manifest.DeliveryMethod)
+	}
+	if manifest.PackageHash != packageHash {
+		t.Fatalf("expected manifest hash %q, got %q", packageHash, manifest.PackageHash)
+	}
+	if manifest.HashAlgorithm != "sha256" {
+		t.Fatalf("expected sha256 hash algorithm, got %q", manifest.HashAlgorithm)
+	}
+	if len(manifest.Files) < 2 {
+		t.Fatalf("expected at least command/jsonl files, got %#v", manifest.Files)
+	}
+	if !scannerPackageManifestHasFile(manifest, "README.md") {
+		t.Fatalf("expected README.md in manifest files: %#v", manifest.Files)
+	}
+	if !scannerPackageManifestHasFile(manifest, "godnslog-package.jsonl") {
+		t.Fatalf("expected godnslog-package.jsonl in manifest files: %#v", manifest.Files)
+	}
+	if len(manifest.NextActions) == 0 {
+		t.Fatal("expected next actions for operator or agent automation")
+	}
+}
+
+func TestGenerateScannerPackageHashIsDeterministic(t *testing.T) {
+	service := NewService(nil)
+	payload := &models.Payload{
+		ID:               "payload-1",
+		CaseID:           "case-1",
+		Token:            "tok-abc123",
+		TemplateRendered: "http://tok-abc123.example.com/callback",
+	}
+	req := &models.ScannerRunCreateRequest{
+		CaseID:         "case-1",
+		PayloadID:      "payload-1",
+		Scanner:        models.ScannerYakit,
+		Target:         "https://target.example",
+		Template:       "ssrf-basic",
+		DeliveryMethod: models.DeliveryMethodYakitScript,
+	}
+
+	_, _, manifest1, packageHash1, err := service.generateScannerArtifacts(req, payload, "http://godnslog.local")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	_, _, manifest2, packageHash2, err := service.generateScannerArtifacts(req, payload, "http://godnslog.local")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if packageHash1 != packageHash2 {
+		t.Fatalf("expected deterministic hash, got %q and %q", packageHash1, packageHash2)
+	}
+	if manifest1.PackageHash != manifest2.PackageHash {
+		t.Fatalf("expected deterministic manifest hash, got %q and %q", manifest1.PackageHash, manifest2.PackageHash)
+	}
+}
+
+func containsString(values []string, value string) bool {
+	for _, item := range values {
+		if item == value {
+			return true
+		}
+	}
+	return false
+}
+
+func scannerPackageManifestHasFile(manifest models.ScannerPackageManifest, name string) bool {
+	for _, file := range manifest.Files {
+		if file.Name == name {
+			return true
+		}
+	}
+	return false
+}
 
 func setupTestEngine(t *testing.T) *xorm.Engine {
 	engine, err := xorm.NewEngine("sqlite", ":memory:")
@@ -139,6 +461,18 @@ func TestCreateScannerRun(t *testing.T) {
 	}
 	if !strings.Contains(scannerRun.Jsonl, "nuclei") {
 		t.Error("Expected JSONL to contain 'nuclei'")
+	}
+	if scannerRun.PackageHash == "" {
+		t.Fatal("Expected package hash to be generated")
+	}
+	if scannerRun.PackageManifest.SchemaVersion != "scanner-package.v1" {
+		t.Fatalf("Expected scanner-package.v1 manifest, got %q", scannerRun.PackageManifest.SchemaVersion)
+	}
+	if scannerRun.PackageManifest.PackageHash != scannerRun.PackageHash {
+		t.Fatalf("Expected manifest hash %q, got %q", scannerRun.PackageHash, scannerRun.PackageManifest.PackageHash)
+	}
+	if !scannerPackageManifestHasFile(scannerRun.PackageManifest, "godnslog-package.jsonl") {
+		t.Fatalf("Expected manifest to include godnslog-package.jsonl: %#v", scannerRun.PackageManifest.Files)
 	}
 
 	// Verify audit log was created for scanner_run.created

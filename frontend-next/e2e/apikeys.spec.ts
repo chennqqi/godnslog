@@ -23,6 +23,61 @@ test.describe('API Keys Page', () => {
     })
   })
 
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/api/v2/agent-policy/scopes', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          message: 'success',
+          data: {
+            items: [
+              {
+                scope: 'agent:create_probe',
+                name: 'Create OAST Probe',
+                risk_level: 'medium',
+                default_allowed: true,
+                high_risk: false,
+                tool_names: ['create_oast_probe'],
+                description: 'Create Case and Payload resources.',
+              },
+              {
+                scope: 'agent:wait_interaction',
+                name: 'Wait For Interaction',
+                risk_level: 'low',
+                default_allowed: true,
+                high_risk: false,
+                tool_names: ['wait_for_interaction'],
+                description: 'Poll for interactions.',
+              },
+              {
+                scope: 'agent:read_runs',
+                name: 'Read Agent Runs',
+                risk_level: 'low',
+                default_allowed: true,
+                high_risk: false,
+                tool_names: ['list_agent_runs'],
+                description: 'Read agent run status.',
+              },
+              {
+                scope: 'agent:revoke_token',
+                name: 'Revoke Token',
+                risk_level: 'high',
+                default_allowed: false,
+                high_risk: true,
+                tool_names: ['revoke_token'],
+                description: 'Revoke API tokens.',
+              },
+            ],
+            default_scopes: ['agent:create_probe', 'agent:wait_interaction', 'agent:read_runs'],
+            high_risk_scopes: ['agent:revoke_token'],
+          },
+        }),
+      })
+    })
+  })
+
   test('should display API keys list', async ({ page }) => {
     // Override the default mock for this specific test
     await page.route('**/api/v2/apikeys*', async (route) => {
@@ -140,6 +195,107 @@ test.describe('API Keys Page', () => {
     // Close the modal
     await page.locator('.fixed').locator('button:has-text("我已复制")').click();
   });
+
+  test('should load agent policy and group scopes by risk', async ({ page }) => {
+    let policyCalled = false
+    let createRequestBody: Record<string, unknown> | null = null
+
+    await page.route('**/api/v2/agent-policy/scopes', async route => {
+      policyCalled = true
+      await route.fulfill({
+        json: {
+          code: 0,
+          data: {
+            items: [
+              {
+                scope: 'agent:create_probe',
+                name: 'Create OAST Probe',
+                risk_level: 'medium',
+                default_allowed: true,
+                high_risk: false,
+                tool_names: ['create_oast_probe'],
+                description: 'Create Case and Payload resources.',
+              },
+              {
+                scope: 'agent:wait_interaction',
+                name: 'Wait For Interaction',
+                risk_level: 'low',
+                default_allowed: true,
+                high_risk: false,
+                tool_names: ['wait_for_interaction'],
+                description: 'Poll for interactions.',
+              },
+              {
+                scope: 'agent:revoke_token',
+                name: 'Revoke Token',
+                risk_level: 'high',
+                default_allowed: false,
+                high_risk: true,
+                tool_names: ['revoke_token'],
+                description: 'Revoke API tokens.',
+              },
+            ],
+            default_scopes: ['agent:create_probe', 'agent:wait_interaction'],
+            high_risk_scopes: ['agent:revoke_token'],
+          },
+        },
+      })
+    })
+
+    await page.route('**/api/v2/apikeys**', async route => {
+      if (route.request().method() === 'POST') {
+        createRequestBody = await route.request().postDataJSON()
+        return route.fulfill({
+          json: {
+            code: 0,
+            data: {
+              id: 'agent-key-risk',
+              key: 'gdl_' + 'z'.repeat(32),
+              key_prefix: 'gdl_risk',
+              name: 'Agent Risk Key',
+              scopes: createRequestBody?.scopes || [],
+              is_agent: true,
+              risk_tolerance: createRequestBody?.risk_tolerance || 'medium',
+              is_revoked: false,
+              created_at: '2024-01-01T00:00:00Z',
+              created_by: 'user1',
+            },
+          },
+        })
+      }
+      return route.fulfill({
+        json: {
+          code: 0,
+          data: { items: [], total: 0, page: 1, page_size: 20, total_pages: 0 },
+        },
+      })
+    })
+
+    await page.goto('/dashboard/apikeys')
+    await page.getByRole('button', { name: '创建 API Key' }).click()
+    await page.getByLabel('名称').fill('Agent Risk Key')
+    await page.getByLabel('Agent Key (AI Agent 专用)').check()
+
+    expect(policyCalled).toBe(true)
+    await expect(page.getByText('默认 Agent 作用域')).toBeVisible()
+    await expect(page.getByText('高风险作用域')).toBeVisible()
+    await expect(page.getByText('agent:revoke_token')).toBeVisible()
+    await expect(page.getByLabel('agent:create_probe')).toBeChecked()
+    await expect(page.getByLabel('agent:revoke_token')).not.toBeChecked()
+
+    await page.getByLabel('agent:revoke_token').check()
+    await page.getByLabel('风险容忍度').selectOption('high')
+    const createRequest = page.waitForRequest(request => {
+      return request.url().includes('/api/v2/apikeys') && request.method() === 'POST'
+    })
+    await page.locator('.fixed').getByRole('button', { name: '创建' }).click()
+    await createRequest
+
+    expect(createRequestBody?.is_agent).toBe(true)
+    expect(createRequestBody?.risk_tolerance).toBe('high')
+    expect(createRequestBody?.scopes).toContain('agent:create_probe')
+    expect(createRequestBody?.scopes).toContain('agent:revoke_token')
+  })
 
   test('should revoke API key', async ({ page }) => {
     // Set up mock BEFORE navigation - handle both GET and DELETE

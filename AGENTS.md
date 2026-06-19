@@ -54,9 +54,7 @@ Scanner Hub 不应只集成 Nuclei，还应规划和支持 Burp Suite、Yakit/Ya
 不要提交真实域名、API Token、生产数据库、生成凭据或敏感回连数据。默认管理员密码会在首次运行时输出，可通过 `resetpw` 修改。DNS、Callback、Rebinding、Workflow 出站请求、MCP APIKey 和 Agent 操作都应视为敏感能力，默认采用最小权限、过期时间、审计日志和高风险动作禁用策略。
 
 ## codex约定
-- sub agent总是使用GPT-5.4 Mini模型
 
 ## windsurf约定
-- sub agent总是使用GPT-5.4 Mini模型
 - 执行前端 E2E 时，禁止使用会触发 `Serving HTML report at http://localhost:9323. Press Ctrl+C to quit.` 的 Playwright 打开式报告流程。
 - Windsurf 运行 E2E 只允许使用一次性、非交互式命令并直接退出，例如 `npx playwright test --reporter=line`、`npx playwright test --reporter=list`，不得执行 `npx playwright show-report`，不得让测试进程因本地报告服务常驻阻塞。
