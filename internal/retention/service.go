@@ -126,33 +126,80 @@ func (s *Service) executeRetention(ctx context.Context, policy *RetentionPolicy)
 
 // retainInteractions retains interactions based on policy
 func (s *Service) retainInteractions(ctx context.Context, cutoffDate time.Time, maxRecords int) (processed, deleted int) {
-	// This is a simplified implementation
-	// In production, this would:
-	// 1. Query interactions older than cutoffDate
-	// 2. If maxRecords is set, keep only the most recent maxRecords
-	// 3. Delete old interactions
-	// 4. Optionally archive before deletion
+	xormStore, ok := s.store.(*XormStore)
+	if !ok {
+		return 0, 0
+	}
 
-	// For MVP, we just return placeholders
-	_ = cutoffDate
-	_ = maxRecords
-	return 0, 0
+	// Count interactions older than cutoff
+	count, err := xormStore.engine.Where("created_at < ?", cutoffDate).Count(new(InteractionRecord))
+	if err != nil {
+		return 0, 0
+	}
+	processed = int(count)
+
+	// Delete interactions older than cutoff
+	affected, err := xormStore.engine.Where("created_at < ?", cutoffDate).Delete(new(InteractionRecord))
+	if err != nil {
+		return processed, 0
+	}
+	deleted = int(affected)
+
+	// If maxRecords is set, delete oldest beyond the limit
+	if maxRecords > 0 {
+		totalCount, err := xormStore.engine.Count(new(InteractionRecord))
+		if err == nil && int(totalCount) > maxRecords {
+			excess := int(totalCount) - maxRecords
+			_, _ = xormStore.engine.Where("created_at < ?", cutoffDate).Limit(excess, 0).Delete(new(InteractionRecord))
+			deleted += excess
+		}
+	}
+
+	return processed, deleted
 }
 
 // retainCases retains cases based on policy
 func (s *Service) retainCases(ctx context.Context, cutoffDate time.Time, maxRecords int) (processed, deleted int) {
-	// Similar to retainInteractions
-	_ = cutoffDate
-	_ = maxRecords
-	return 0, 0
+	xormStore, ok := s.store.(*XormStore)
+	if !ok {
+		return 0, 0
+	}
+
+	count, err := xormStore.engine.Where("created_at < ?", cutoffDate).Count(new(CaseRecord))
+	if err != nil {
+		return 0, 0
+	}
+	processed = int(count)
+
+	affected, err := xormStore.engine.Where("created_at < ?", cutoffDate).Delete(new(CaseRecord))
+	if err != nil {
+		return processed, 0
+	}
+	deleted = int(affected)
+
+	return processed, deleted
 }
 
 // retainPayloads retains payloads based on policy
 func (s *Service) retainPayloads(ctx context.Context, cutoffDate time.Time, maxRecords int) (processed, deleted int) {
-	// Similar to retainInteractions
-	_ = cutoffDate
-	_ = maxRecords
-	return 0, 0
+	xormStore, ok := s.store.(*XormStore)
+	if !ok {
+		return 0, 0
+	}
+
+	count, err := xormStore.engine.Where("created_at < ?", cutoffDate).Count(new(PayloadRecord))
+	if err != nil {
+		return 0, 0
+	}
+	processed = int(count)
+
+	affected, err := xormStore.engine.Where("created_at < ?", cutoffDate).Delete(new(PayloadRecord))
+	if err != nil {
+		return processed, 0
+	}
+	deleted = int(affected)
+
+	return processed, deleted
 }
 
 // CreateArchive creates an archive of data
@@ -222,6 +269,39 @@ func generateJobID() string {
 // generateArchiveID generates a unique archive ID
 func generateArchiveID() string {
 	return fmt.Sprintf("archive-%d", time.Now().UnixNano())
+}
+
+// InteractionRecord is a lightweight record for retention operations on the interactions table.
+type InteractionRecord struct {
+	ID        string    `xorm:"'id' pk varchar(36)"`
+	CreatedAt time.Time `xorm:"'created_at' datetime"`
+}
+
+// TableName returns the table name for InteractionRecord
+func (InteractionRecord) TableName() string {
+	return "interactions"
+}
+
+// CaseRecord is a lightweight record for retention operations on the cases table.
+type CaseRecord struct {
+	ID        string    `xorm:"'id' pk varchar(36)"`
+	CreatedAt time.Time `xorm:"'created_at' datetime"`
+}
+
+// TableName returns the table name for CaseRecord
+func (CaseRecord) TableName() string {
+	return "cases"
+}
+
+// PayloadRecord is a lightweight record for retention operations on the payloads table.
+type PayloadRecord struct {
+	ID        string    `xorm:"'id' pk varchar(36)"`
+	CreatedAt time.Time `xorm:"'created_at' datetime"`
+}
+
+// TableName returns the table name for PayloadRecord
+func (PayloadRecord) TableName() string {
+	return "payloads"
 }
 
 // Store defines the storage interface for retention operations
