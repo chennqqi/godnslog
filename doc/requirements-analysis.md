@@ -253,3 +253,21 @@
 3. 更新 verification.md 和 Sprint X acceptance 文档
 4. 提交所有未提交改动（Sprint U/V/W/X 合并提交或分 Sprint 提交）
 5. 规划 Sprint Y 候选目标
+
+## 2026-06-19 Sprint Y 分析
+
+Sprint X 验收完成后，Evidence Summary API 已就绪但 MCP 工具缺失，Agent 无法通过 MCP 直接获取证据摘要。
+
+分析：
+- Sprint X 已提交 POST /api/v2/evidence/summary，但 MCP server 未注册对应工具
+- 需要添加 get_evidence_summary MCP 工具，复用现有 API
+- 权限应使用 agent:summarize_evidence scope（与 summarize_evidence 工具一致），risk: low
+- 需要支持 case_id/payload_id/scanner_run_id 三种输入
+- 可选 agent_run_id 用于操作日志记录
+
+执行策略：
+1. 在 permissions.go 添加 get_evidence_summary 权限条目
+2. 在 server.go 添加 getEvidenceSummary handler 并注册工具
+3. 添加 4 个测试：success、scanner_run_id、missing params、permission denied
+4. 更新 MCP_SERVER_USAGE.md、verification.md
+5. 创建 acceptance 文档并提交

@@ -436,3 +436,9 @@ GODNSLOG 2.0 所有计划阶段已全部完成，共计 35 个主要功能模块
 - Sprint T 已提交（HEAD d3236ba），Sprint U/V/W/X 代码均未提交
 - Sprint X 验收状态为 "Accepted pending full final verification"，需补全完整验证
 - 验证完成后提交所有未提交改动，然后规划下一个 Sprint
+
+## 2026-06-19 Sprint Y: Evidence Summary MCP Tool
+- 为 Sprint X 的 POST /api/v2/evidence/summary 添加 MCP 工具 get_evidence_summary
+- 权限 scope: agent:summarize_evidence, risk: low
+- 支持 case_id/payload_id/scanner_run_id 输入，可选 agent_run_id 操作日志
+- 4 个测试覆盖 success/scanner_run_id/missing params/permission denied
