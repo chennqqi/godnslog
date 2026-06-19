@@ -29,8 +29,8 @@ type EvidenceSummary struct {
 
 // Finding represents a security finding
 type Finding struct {
-	Type        string `json:"type"`        // ssrf, xxe, rce, etc.
-	Severity    string `json:"severity"`    // low, medium, high, critical
+	Type        string `json:"type"`     // ssrf, xxe, rce, etc.
+	Severity    string `json:"severity"` // low, medium, high, critical
 	Description string `json:"description"`
 	Evidence    string `json:"evidence"`
 }
@@ -39,7 +39,7 @@ type Finding struct {
 func (s *SummaryService) GenerateSummary(caseID, title string, interactions []interface{}) (*EvidenceSummary, error) {
 	// In production, this would call an AI API to analyze interactions
 	// For now, implement rule-based analysis
-	
+
 	summary := &EvidenceSummary{
 		CaseID:      caseID,
 		Title:       title,
@@ -48,9 +48,9 @@ func (s *SummaryService) GenerateSummary(caseID, title string, interactions []in
 		Findings:    s.extractFindings(interactions),
 		GeneratedAt: time.Now(),
 	}
-	
+
 	summary.Recommendations = s.generateRecommendations(summary.RiskLevel, summary.Findings)
-	
+
 	return summary, nil
 }
 
@@ -60,7 +60,7 @@ func (s *SummaryService) generateBasicSummary(interactions []interface{}) string
 	if count == 0 {
 		return "No interactions detected in this case."
 	}
-	
+
 	return fmt.Sprintf("Detected %d interaction(s) in this case. Analysis shows potential security testing activity.", count)
 }
 
@@ -68,11 +68,11 @@ func (s *SummaryService) generateBasicSummary(interactions []interface{}) string
 func (s *SummaryService) assessRiskLevel(interactions []interface{}) string {
 	// In production, this would analyze interaction patterns
 	// For now, use simple heuristics
-	
+
 	if len(interactions) == 0 {
 		return "low"
 	}
-	
+
 	// Check for high-risk indicators
 	for _, interaction := range interactions {
 		if m, ok := interaction.(map[string]interface{}); ok {
@@ -86,18 +86,18 @@ func (s *SummaryService) assessRiskLevel(interactions []interface{}) string {
 			}
 		}
 	}
-	
+
 	if len(interactions) > 10 {
 		return "high"
 	}
-	
+
 	return "medium"
 }
 
 // extractFindings extracts security findings from interactions
 func (s *SummaryService) extractFindings(interactions []interface{}) []Finding {
 	findings := []Finding{}
-	
+
 	for _, interaction := range interactions {
 		if m, ok := interaction.(map[string]interface{}); ok {
 			// Analyze interaction type
@@ -108,7 +108,7 @@ func (s *SummaryService) extractFindings(interactions []interface{}) []Finding {
 					Description: fmt.Sprintf("Detected %s interaction", type_),
 					Evidence:    fmt.Sprintf("%v", m),
 				}
-				
+
 				// Adjust severity based on patterns
 				if raw, ok := m["raw_data"].(string); ok {
 					lowerRaw := strings.ToLower(raw)
@@ -118,19 +118,19 @@ func (s *SummaryService) extractFindings(interactions []interface{}) []Finding {
 						finding.Description = "Potential cloud metadata access detected"
 					}
 				}
-				
+
 				findings = append(findings, finding)
 			}
 		}
 	}
-	
+
 	return findings
 }
 
 // generateRecommendations generates security recommendations
 func (s *SummaryService) generateRecommendations(riskLevel string, findings []Finding) []string {
 	recommendations := []string{}
-	
+
 	switch riskLevel {
 	case "critical":
 		recommendations = append(recommendations,
@@ -152,7 +152,7 @@ func (s *SummaryService) generateRecommendations(riskLevel string, findings []Fi
 			"No immediate action required",
 			"Continue monitoring")
 	}
-	
+
 	// Add specific recommendations based on findings
 	for _, finding := range findings {
 		if finding.Type == "ssrf" {
@@ -164,13 +164,102 @@ func (s *SummaryService) generateRecommendations(riskLevel string, findings []Fi
 				"Review XML parser configurations")
 		}
 	}
-	
+
 	return recommendations
 }
 
-// ExplainEvidence provides a detailed explanation of specific evidence
-func (s *SummaryService) ExplainEvidence(evidenceID string) (string, error) {
-	// In production, this would retrieve the evidence and use AI to explain it
-	// For now, return a placeholder
-	return fmt.Sprintf("Evidence %s explanation: This interaction indicates external connectivity from the target system.", evidenceID), nil
+// ExplainEvidenceResponse represents a structured explanation of evidence
+type ExplainEvidenceResponse struct {
+	EvidenceID  string            `json:"evidence_id"`
+	CaseID      string            `json:"case_id"`
+	Explanation string            `json:"explanation"`
+	RiskLevel   string            `json:"risk_level"`
+	Findings    []Finding         `json:"findings"`
+	Remediation []string          `json:"remediation"`
+	Metadata    map[string]string `json:"metadata"`
+	GeneratedAt time.Time         `json:"generated_at"`
+}
+
+// ExplainEvidenceRequest represents the input for evidence explanation
+type ExplainEvidenceRequest struct {
+	CaseID           string                   `json:"case_id"`
+	EvidenceID       string                   `json:"evidence_id"`
+	Interactions     []map[string]interface{} `json:"interactions"`
+	EvidenceStrength string                   `json:"evidence_strength"`
+	Confidence       int                      `json:"confidence"`
+}
+
+// ExplainEvidence provides a detailed, structured explanation of evidence
+// based on interaction data. Uses rule-based analysis to generate
+// human-readable explanations, findings, and remediation steps.
+func (s *SummaryService) ExplainEvidence(req *ExplainEvidenceRequest) (*ExplainEvidenceResponse, error) {
+	if req == nil {
+		return nil, fmt.Errorf("request is required")
+	}
+
+	interactions := make([]interface{}, len(req.Interactions))
+	for i, m := range req.Interactions {
+		interactions[i] = m
+	}
+
+	riskLevel := s.assessRiskLevel(interactions)
+	findings := s.extractFindings(interactions)
+	remediation := s.generateRecommendations(riskLevel, findings)
+	explanation := s.buildDetailedExplanation(req, riskLevel, findings)
+
+	resp := &ExplainEvidenceResponse{
+		EvidenceID:  req.EvidenceID,
+		CaseID:      req.CaseID,
+		Explanation: explanation,
+		RiskLevel:   riskLevel,
+		Findings:    findings,
+		Remediation: remediation,
+		Metadata: map[string]string{
+			"interaction_count": fmt.Sprintf("%d", len(req.Interactions)),
+			"evidence_strength": req.EvidenceStrength,
+			"confidence":        fmt.Sprintf("%d", req.Confidence),
+			"analysis_method":   "rule_based",
+		},
+		GeneratedAt: time.Now(),
+	}
+
+	return resp, nil
+}
+
+// buildDetailedExplanation constructs a human-readable explanation string
+func (s *SummaryService) buildDetailedExplanation(req *ExplainEvidenceRequest, riskLevel string, findings []Finding) string {
+	var parts []string
+
+	parts = append(parts, fmt.Sprintf("Evidence %s for case %s:", req.EvidenceID, req.CaseID))
+	parts = append(parts, fmt.Sprintf("Risk level: %s.", riskLevel))
+	parts = append(parts, fmt.Sprintf("Based on %d interaction(s) with %d finding(s).", len(req.Interactions), len(findings)))
+
+	if req.EvidenceStrength != "" {
+		parts = append(parts, fmt.Sprintf("Evidence strength: %s.", req.EvidenceStrength))
+	}
+	if req.Confidence > 0 {
+		parts = append(parts, fmt.Sprintf("Confidence score: %d%%.", req.Confidence))
+	}
+
+	// Summarize finding types
+	findingTypes := make(map[string]int)
+	for _, f := range findings {
+		findingTypes[f.Type]++
+	}
+	if len(findingTypes) > 0 {
+		var typeSummary []string
+		for t, c := range findingTypes {
+			typeSummary = append(typeSummary, fmt.Sprintf("%d %s", c, t))
+		}
+		parts = append(parts, fmt.Sprintf("Finding types: %s.", strings.Join(typeSummary, ", ")))
+	}
+
+	// Add critical findings detail
+	for _, f := range findings {
+		if f.Severity == "critical" {
+			parts = append(parts, fmt.Sprintf("CRITICAL: %s", f.Description))
+		}
+	}
+
+	return strings.Join(parts, " ")
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/chennqqi/godnslog/internal/agentpolicy"
+	"github.com/chennqqi/godnslog/internal/ai"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -1423,5 +1424,75 @@ func TestListAgentRunsToolPermissionDenied(t *testing.T) {
 
 	if !auditLogPosted {
 		t.Fatal("Audit log should be posted when permission is denied")
+	}
+}
+
+// TestExplainEvidenceTool tests explainEvidence tool success path
+func TestExplainEvidenceTool(t *testing.T) {
+	server := newTestServer(func(r *http.Request) string {
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/api/v2/interactions") {
+			return `{"code":0,"message":"success","data":{"items":[{"type":"http","raw_data":"GET /admin HTTP/1.1","source_ip":"10.0.0.1"},{"type":"dns","raw_data":"query token.example.com","source_ip":"10.0.0.2"}],"total":2,"page":1,"page_size":100}}`
+		}
+		return ""
+	})
+
+	args := map[string]interface{}{
+		"case_id": "case-1",
+	}
+
+	result, err := server.explainEvidence(nil, args)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	toolResult, ok := result.(ToolResult)
+	if !ok {
+		t.Fatal("Result should be ToolResult type")
+	}
+
+	if !toolResult.Success {
+		t.Fatalf("Expected success, got error: %s", toolResult.Error)
+	}
+
+	data, ok := toolResult.Data.(*ai.ExplainEvidenceResponse)
+	if !ok {
+		t.Fatal("Expected data to be *ExplainEvidenceResponse")
+	}
+
+	if data.CaseID != "case-1" {
+		t.Errorf("Expected case_id 'case-1', got '%s'", data.CaseID)
+	}
+	if len(data.Findings) != 2 {
+		t.Errorf("Expected 2 findings, got %d", len(data.Findings))
+	}
+	if data.Explanation == "" {
+		t.Error("Expected non-empty explanation")
+	}
+}
+
+// TestExplainEvidenceToolMissingParams tests explainEvidence without required params
+func TestExplainEvidenceToolMissingParams(t *testing.T) {
+	server := newTestServer(func(r *http.Request) string {
+		return ""
+	})
+
+	args := map[string]interface{}{}
+
+	result, err := server.explainEvidence(nil, args)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	toolResult, ok := result.(ToolResult)
+	if !ok {
+		t.Fatal("Result should be ToolResult type")
+	}
+
+	if toolResult.Success {
+		t.Fatal("Expected failure due to missing case_id or payload_id")
+	}
+
+	if !strings.Contains(toolResult.Error, "case_id or payload_id is required") {
+		t.Fatalf("Expected missing params error, got: %s", toolResult.Error)
 	}
 }

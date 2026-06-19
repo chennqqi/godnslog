@@ -1387,3 +1387,41 @@ git diff --check
 - `internal/interaction/service_test.go`: 2 tests covering `replacePattern` regex replacement and `extractPattern` path normalization
 
 Acceptance result: **passed**. Sprint FF fixes two critical bugs in the clustering and noise compression system (regex-based noise pattern matching and actual regex-based path pattern extraction) and adds 9 comprehensive tests covering clustering, noise detection, compression, deduplication, and pattern extraction.
+
+## Sprint GG: AI Evidence Explanation Plugin Verification (2026-06-19)
+
+### Focused Tests
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/ai -v
+# Result: PASS — 8 tests (summary, empty summary, risk critical, risk high, explain evidence, nil request, critical explanation, recommendations)
+```
+
+```bash
+GOCACHE=/tmp/gocache go test ./internal/mcp -v -run 'TestExplainEvidence'
+# Result: PASS — 2 tests (tool success path, missing params validation)
+```
+
+### Full Verification
+
+```bash
+GOCACHE=/tmp/gocache go test ./...
+# Result: PASS — all packages ok
+```
+
+```bash
+git diff --check
+# Result: PASS
+```
+
+### Changes
+
+- Enhanced `ExplainEvidence` in `internal/ai/summary.go`: replaced placeholder string return with structured `ExplainEvidenceResponse` containing explanation, risk level, findings, remediation, and metadata
+- Added `ExplainEvidenceRequest` struct for structured input
+- Added `buildDetailedExplanation` method for human-readable explanation generation
+- Registered `explain_evidence` MCP tool in `internal/mcp/server.go` with handler that fetches interactions and runs AI analysis
+- Added `explain_evidence` to `ToolPermissions` map in `internal/mcp/permissions.go` with `agent:summarize_evidence` scope
+- Added 8 AI summary tests in `internal/ai/summary_test.go`
+- Added 2 MCP tool tests in `internal/mcp/server_test.go`
+
+Acceptance result: **passed**. Sprint GG delivers a structured AI evidence explanation plugin with rule-based analysis, finding extraction, risk assessment, remediation recommendations, and full MCP tool integration with permission controls.
