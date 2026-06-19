@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/chennqqi/godnslog/cache"
+	"github.com/chennqqi/godnslog/internal/agentpolicy"
 	"github.com/chennqqi/godnslog/internal/agentrun"
 	"github.com/chennqqi/godnslog/internal/auth"
 	"github.com/chennqqi/godnslog/internal/canary"
+	"github.com/chennqqi/godnslog/internal/evidencehub"
 	"github.com/chennqqi/godnslog/internal/interaction"
 	"github.com/chennqqi/godnslog/internal/listener"
 	"github.com/chennqqi/godnslog/internal/notification"
@@ -84,6 +86,11 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			apikeys.DELETE("/:id", self.v2DeleteAPIKey)
 		}
 
+		agentPolicy := v2.Group("/agent-policy", self.authHandler)
+		{
+			agentPolicy.GET("/scopes", self.v2ListAgentPolicyScopes)
+		}
+
 		// Notifications
 		notifications := v2.Group("/notifications", self.authHandler)
 		{
@@ -124,6 +131,7 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		evidence := v2.Group("/evidence", self.authHandler)
 		{
 			evidence.POST("/generate", self.v2GenerateEvidence)
+			evidence.POST("/summary", self.v2SummarizeEvidence)
 			evidence.GET("/:id", self.v2GetEvidence)
 		}
 
@@ -179,6 +187,11 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		}
 
 		// Scanner Hub
+		scannerHub := v2.Group("/scanner-hub", self.authHandler)
+		{
+			scannerHub.GET("/adapters", self.v2ListScannerAdapters)
+		}
+
 		scannerRuns := v2.Group("/scanner-runs", self.authHandler)
 		{
 			scannerRuns.GET("", self.v2ListScannerRuns)
@@ -1770,6 +1783,15 @@ func (self *WebServer) v2UpdateAPIKey(c *gin.Context) {
 	})
 }
 
+// v2ListAgentPolicyScopes lists the shared Agent scope and risk catalog.
+func (self *WebServer) v2ListAgentPolicyScopes(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    agentpolicy.ListScopes(),
+	})
+}
+
 func generateAPIKey() string {
 	return "gdl_" + generateRandomString(32)
 }
@@ -2235,6 +2257,51 @@ func (self *WebServer) v2GetEvidence(c *gin.Context) {
 	c.JSON(http.StatusNotFound, gin.H{
 		"code":    404,
 		"message": "Evidence reports are generated on-demand. Use /evidence/generate endpoint to create evidence reports.",
+	})
+}
+
+// v2SummarizeEvidence returns an Agent-friendly evidence summary bundle.
+func (self *WebServer) v2SummarizeEvidence(c *gin.Context) {
+	var req evidencehub.SummaryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    1,
+			"message": "Invalid request body",
+		})
+		return
+	}
+
+	baseURL := fmt.Sprintf("http://%s", c.Request.Host)
+	service := evidencehub.NewService(self.orm)
+	resp, err := service.BuildSummary(&req, baseURL)
+	if err != nil {
+		status := http.StatusInternalServerError
+		code := 500
+		message := "Failed to summarize evidence"
+		if strings.Contains(err.Error(), "is required") {
+			status = http.StatusBadRequest
+			code = 1
+			message = err.Error()
+		} else if err == interaction.ErrEvidenceNotFound {
+			status = http.StatusNotFound
+			code = 404
+			message = "No evidence found for the specified case, payload, or scanner run"
+		} else if strings.Contains(err.Error(), "scanner run not found") {
+			status = http.StatusNotFound
+			code = 404
+			message = err.Error()
+		}
+		c.JSON(status, gin.H{
+			"code":    code,
+			"message": message,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    resp,
 	})
 }
 
@@ -3159,6 +3226,16 @@ func (self *WebServer) v2ListScannerRuns(c *gin.Context) {
 		"code":    0,
 		"message": "success",
 		"data":    resp,
+	})
+}
+
+// v2ListScannerAdapters lists supported Scanner Hub adapters.
+func (self *WebServer) v2ListScannerAdapters(c *gin.Context) {
+	scannerHubService := scannerhub.NewService(self.orm)
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    scannerHubService.ListAdapters(),
 	})
 }
 

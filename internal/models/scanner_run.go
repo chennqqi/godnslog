@@ -8,19 +8,47 @@ import (
 // ScannerRun represents a scanner distribution context for external scanners.
 // Aligned with docs/unified-terminology.md and Sprint I plan
 type ScannerRun struct {
-	ID             string    `json:"id" xorm:"pk varchar(36) notnull"`
-	CaseID         string    `json:"case_id" xorm:"varchar(36) notnull index"`
-	PayloadID      string    `json:"payload_id" xorm:"varchar(36) notnull index"`
-	Scanner        string    `json:"scanner" xorm:"varchar(32) notnull index"` // nuclei (Sprint I only supports nuclei)
-	Target         string    `json:"target" xorm:"varchar(512) notnull"`
-	Template       string    `json:"template" xorm:"varchar(64) notnull"`                        // ssrf-basic, xxe-basic, etc.
-	DeliveryMethod string    `json:"delivery_method" xorm:"varchar(32) notnull"`                 // nuclei-jsonl, nuclei-var
-	Command        string    `json:"command" xorm:"text"`                                        // Generated scanner command
-	Jsonl          string    `json:"jsonl" xorm:"text"`                                          // Generated JSONL record (single line)
-	Status         string    `json:"status" xorm:"varchar(32) notnull default('created') index"` // created, distributed, observed, evidenced
-	CreatedBy      string    `json:"created_by" xorm:"varchar(36) notnull"`
-	CreatedAt      time.Time `json:"created_at" xorm:"datetime created"`
-	UpdatedAt      time.Time `json:"updated_at" xorm:"datetime updated"`
+	ID              string                 `json:"id" xorm:"pk varchar(36) notnull"`
+	CaseID          string                 `json:"case_id" xorm:"varchar(36) notnull index"`
+	PayloadID       string                 `json:"payload_id" xorm:"varchar(36) notnull index"`
+	Scanner         string                 `json:"scanner" xorm:"varchar(32) notnull index"` // nuclei, burp, yakit, zap, xray, rad, postman, apifox
+	Target          string                 `json:"target" xorm:"varchar(512) notnull"`
+	Template        string                 `json:"template" xorm:"varchar(64) notnull"`                        // ssrf-basic, xxe-basic, etc.
+	DeliveryMethod  string                 `json:"delivery_method" xorm:"varchar(32) notnull"`                 // scanner adapter delivery method
+	Command         string                 `json:"command" xorm:"text"`                                        // Generated scanner command
+	Jsonl           string                 `json:"jsonl" xorm:"text"`                                          // Generated JSONL record (single line)
+	PackageManifest ScannerPackageManifest `json:"package_manifest" xorm:"json"`                               // Machine-readable integration package manifest
+	PackageHash     string                 `json:"package_hash" xorm:"varchar(64) index"`                      // SHA-256 hash of generated package contents
+	Status          string                 `json:"status" xorm:"varchar(32) notnull default('created') index"` // created, distributed, observed, evidenced
+	CreatedBy       string                 `json:"created_by" xorm:"varchar(36) notnull"`
+	CreatedAt       time.Time              `json:"created_at" xorm:"datetime created"`
+	UpdatedAt       time.Time              `json:"updated_at" xorm:"datetime updated"`
+}
+
+// ScannerPackageManifest describes the generated Scanner Hub package in a machine-readable form.
+type ScannerPackageManifest struct {
+	SchemaVersion   string               `json:"schema_version"`
+	Scanner         string               `json:"scanner"`
+	DeliveryMethod  string               `json:"delivery_method"`
+	PackageHash     string               `json:"package_hash"`
+	HashAlgorithm   string               `json:"hash_algorithm"`
+	Files           []ScannerPackageFile `json:"files"`
+	InteractionsURL string               `json:"interactions_url"`
+	EvidenceURL     string               `json:"evidence_url"`
+	NextActions     []string             `json:"next_actions"`
+}
+
+// ScannerPackageFile describes one generated package file or virtual artifact.
+type ScannerPackageFile struct {
+	Name        string `json:"name"`
+	Kind        string `json:"kind"`
+	Description string `json:"description"`
+}
+
+// MarshalJSON implements json.Marshaler interface for ScannerPackageManifest.
+func (m ScannerPackageManifest) MarshalJSON() ([]byte, error) {
+	type Alias ScannerPackageManifest
+	return json.Marshal(Alias(m))
 }
 
 // MarshalJSON implements json.Marshaler interface for ScannerRun
@@ -52,23 +80,53 @@ const (
 
 // Scanner constants
 const (
-	ScannerNuclei = "nuclei"
+	ScannerNuclei  = "nuclei"
+	ScannerBurp    = "burp"
+	ScannerYakit   = "yakit"
+	ScannerZap     = "zap"
+	ScannerXray    = "xray"
+	ScannerRad     = "rad"
+	ScannerPostman = "postman"
+	ScannerApifox  = "apifox"
 )
 
 // DeliveryMethod constants
 const (
-	DeliveryMethodNucleiJsonl = "nuclei-jsonl"
-	DeliveryMethodNucleiVar   = "nuclei-var"
+	DeliveryMethodNucleiJsonl   = "nuclei-jsonl"
+	DeliveryMethodNucleiVar     = "nuclei-var"
+	DeliveryMethodBurpExtension = "burp-extension"
+	DeliveryMethodYakitScript   = "yakit-script"
+	DeliveryMethodZapScript     = "zap-script"
+	DeliveryMethodXrayWebhook   = "xray-webhook"
+	DeliveryMethodRadWebhook    = "rad-webhook"
+	DeliveryMethodPostmanEnv    = "postman-env"
+	DeliveryMethodApifoxEnv     = "apifox-env"
 )
+
+// ScannerAdapter describes a supported Scanner Hub integration adapter.
+type ScannerAdapter struct {
+	ID               string   `json:"id"`
+	Name             string   `json:"name"`
+	Category         string   `json:"category"`
+	Maturity         string   `json:"maturity"`
+	SupportedMethods []string `json:"supported_methods"`
+	DefaultMethod    string   `json:"default_method"`
+	Description      string   `json:"description"`
+}
+
+// ScannerAdapterListResponse represents the official Scanner Hub adapter catalog.
+type ScannerAdapterListResponse struct {
+	Items []ScannerAdapter `json:"items"`
+}
 
 // ScannerRunCreateRequest represents the request to create a scanner run
 type ScannerRunCreateRequest struct {
 	CaseID         string `json:"case_id" binding:"required"`
 	PayloadID      string `json:"payload_id" binding:"required"`
-	Scanner        string `json:"scanner" binding:"required,oneof=nuclei"`
+	Scanner        string `json:"scanner" binding:"required,oneof=nuclei burp yakit zap xray rad postman apifox"`
 	Target         string `json:"target" binding:"required"`
 	Template       string `json:"template" binding:"required"`
-	DeliveryMethod string `json:"delivery_method" binding:"required,oneof=nuclei-jsonl nuclei-var"`
+	DeliveryMethod string `json:"delivery_method" binding:"required,oneof=nuclei-jsonl nuclei-var burp-extension yakit-script zap-script xray-webhook rad-webhook postman-env apifox-env"`
 }
 
 // ScannerRunUpdateStatusRequest represents the request to update scanner run status

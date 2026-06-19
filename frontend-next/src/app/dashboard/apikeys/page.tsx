@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { apiKeyApi } from '@/lib/api-client'
-import type { APIKey } from '@/types'
+import { agentPolicyApi, apiKeyApi } from '@/lib/api-client'
+import type { AgentScopeCatalog, AgentScopePolicy, APIKey } from '@/types'
 
 export default function APIKeysPage() {
   const router = useRouter()
@@ -22,6 +22,7 @@ export default function APIKeysPage() {
   const [editKeyEnabled, setEditKeyEnabled] = useState(true)
   const [createdKey, setCreatedKey] = useState<string | null>(null)
   const [showKeyModal, setShowKeyModal] = useState(false)
+  const [agentPolicy, setAgentPolicy] = useState<AgentScopeCatalog | null>(null)
 
   const loadAPIKeys = useCallback(async () => {
     try {
@@ -36,6 +37,17 @@ export default function APIKeysPage() {
     }
   }, [])
 
+  const loadAgentPolicy = useCallback(async () => {
+    try {
+      const response = await agentPolicyApi.listScopes()
+      if (response.data) {
+        setAgentPolicy(response.data)
+      }
+    } catch (error) {
+      console.error('Failed to load agent policy:', error)
+    }
+  }, [])
+
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) {
@@ -44,7 +56,8 @@ export default function APIKeysPage() {
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadAPIKeys()
-  }, [router, loadAPIKeys])
+    loadAgentPolicy()
+  }, [router, loadAPIKeys, loadAgentPolicy])
 
   const handleCreateKey = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -155,6 +168,20 @@ export default function APIKeysPage() {
     'agent:read_runs',
   ]
 
+  const fallbackAgentPolicies: AgentScopePolicy[] = agentScopes.map(scope => ({
+    scope,
+    name: scope,
+    risk_level: scope === 'agent:create_probe' ? 'medium' : 'low',
+    default_allowed: true,
+    high_risk: false,
+    tool_names: [],
+    description: '',
+  }))
+  const agentPolicies = agentPolicy?.items?.length ? agentPolicy.items : fallbackAgentPolicies
+  const defaultAgentScopes = agentPolicy?.default_scopes?.length ? agentPolicy.default_scopes : agentScopes
+  const standardAgentPolicies = agentPolicies.filter(policy => !policy.high_risk)
+  const highRiskAgentPolicies = agentPolicies.filter(policy => policy.high_risk)
+
   const riskToleranceOptions = ['low', 'medium', 'high']
   const expiresInOptions = [
     { value: '1', label: '1 小时' },
@@ -255,10 +282,11 @@ export default function APIKeysPage() {
             <h3 className="text-lg font-medium mb-4">创建 API Key</h3>
             <form onSubmit={handleCreateKey}>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="api-key-name" className="block text-sm font-medium text-gray-700 mb-1">
                   名称
                 </label>
                 <input
+                  id="api-key-name"
                   type="text"
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -272,13 +300,13 @@ export default function APIKeysPage() {
                 </label>
                 <label className="flex items-center">
                   <input
+                    id="api-key-agent-mode"
                     type="checkbox"
                     checked={newKeyIsAgent}
                     onChange={(e) => {
                       setNewKeyIsAgent(e.target.checked)
-                      // When switching to agent mode, reset scopes to agent-safe defaults
                       if (e.target.checked) {
-                        setNewKeyScopes(agentScopes)
+                        setNewKeyScopes(defaultAgentScopes)
                       } else {
                         setNewKeyScopes(['case:read', 'payload:read'])
                       }
@@ -293,26 +321,60 @@ export default function APIKeysPage() {
                   作用域
                 </label>
                 <div className="space-y-2 max-h-40 overflow-auto">
-                  {(newKeyIsAgent ? agentScopes : availableScopes).map((scope) => (
-                    <label key={scope} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={newKeyScopes.includes(scope)}
-                        onChange={() => toggleScope(scope, true)}
-                        className="mr-2"
-                      />
-                      <span className="text-sm text-gray-700">{scope}</span>
-                    </label>
-                  ))}
+                  {newKeyIsAgent ? (
+                    <>
+                      <div>
+                        <p className="mb-2 text-xs font-semibold text-gray-500">默认 Agent 作用域</p>
+                        <div className="space-y-2">
+                          {standardAgentPolicies.map(policy => (
+                            <AgentScopeCheckbox
+                              key={policy.scope}
+                              policy={policy}
+                              checked={newKeyScopes.includes(policy.scope)}
+                              onChange={() => toggleScope(policy.scope, true)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      {highRiskAgentPolicies.length > 0 && (
+                        <div className="mt-4 border-t border-red-100 pt-3">
+                          <p className="mb-2 text-xs font-semibold text-red-700">高风险作用域</p>
+                          <div className="space-y-2">
+                            {highRiskAgentPolicies.map(policy => (
+                              <AgentScopeCheckbox
+                                key={policy.scope}
+                                policy={policy}
+                                checked={newKeyScopes.includes(policy.scope)}
+                                onChange={() => toggleScope(policy.scope, true)}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    availableScopes.map((scope) => (
+                      <label key={scope} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={newKeyScopes.includes(scope)}
+                          onChange={() => toggleScope(scope, true)}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700">{scope}</span>
+                      </label>
+                    ))
+                  )}
                 </div>
               </div>
               {newKeyIsAgent && (
                 <>
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="api-key-risk-tolerance" className="block text-sm font-medium text-gray-700 mb-1">
                       风险容忍度
                     </label>
                     <select
+                      id="api-key-risk-tolerance"
                       value={newKeyRiskTolerance}
                       onChange={(e) => setNewKeyRiskTolerance(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -325,10 +387,11 @@ export default function APIKeysPage() {
                     </select>
                   </div>
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="api-key-expires-in" className="block text-sm font-medium text-gray-700 mb-1">
                       过期时间
                     </label>
                     <select
+                      id="api-key-expires-in"
                       value={newKeyExpiresIn}
                       onChange={(e) => setNewKeyExpiresIn(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -455,5 +518,32 @@ export default function APIKeysPage() {
         </div>
       )}
     </div>
+  )
+}
+
+function AgentScopeCheckbox({
+  policy,
+  checked,
+  onChange,
+}: {
+  policy: AgentScopePolicy
+  checked: boolean
+  onChange: () => void
+}) {
+  return (
+    <label className={`flex items-start gap-2 rounded border p-2 ${policy.high_risk ? 'border-red-200 bg-red-50' : 'border-gray-200'}`}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="mt-1"
+      />
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-gray-800">{policy.scope}</span>
+        <span className="block text-xs text-gray-500">
+          {policy.name} · {policy.risk_level}
+        </span>
+      </span>
+    </label>
   )
 }

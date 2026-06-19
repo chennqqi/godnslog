@@ -86,32 +86,57 @@ All Agent Run state changes are persisted to database:
 type AgentScope string
 
 const (
-    AgentScopeCreateProbe      AgentScope = "create_probe"      // Create OAST probes
-    AgentScopeWaitInteraction  AgentScope = "wait_interaction"  // Wait for interactions
-    AgentScopeExportEvidence   AgentScope = "export_evidence"   // Export evidence
-    AgentScopeDeletePayload    AgentScope = "delete_payload"    // Delete payloads
-    AgentScopeModifyConfig     AgentScope = "modify_config"     // Modify sensitive configuration
+    AgentScopeCreateProbe       AgentScope = "agent:create_probe"       // Create Case/Payload OAST probes
+    AgentScopeWaitInteraction   AgentScope = "agent:wait_interaction"   // Wait for interactions
+    AgentScopeReadInteractions  AgentScope = "agent:read_interactions"  // Read captured interactions
+    AgentScopeSummarizeEvidence AgentScope = "agent:summarize_evidence" // Summarize evidence
+    AgentScopeExportReport      AgentScope = "agent:export_report"      // Export evidence reports
+    AgentScopeReadRuns          AgentScope = "agent:read_runs"          // Read Agent Run history
+    AgentScopeRevokeToken       AgentScope = "agent:revoke_token"       // Revoke API keys
+    AgentScopeDeletePayload     AgentScope = "agent:delete_payload"     // Delete payloads
+    AgentScopeModifyConfig      AgentScope = "agent:modify_config"      // Modify sensitive configuration
 )
 ```
+
+Sprint V defines these scopes in a shared policy catalog (`internal/agentpolicy`) and exposes the same catalog through `GET /api/v2/agent-policy/scopes`. API Key creation, MCP permission checks, and the Web API Key UI must use this catalog as the canonical source.
 
 ### Scope Validation
 
 **Create Probe**:
-- Required scope: `create_probe`
+- Required scope: `agent:create_probe`
 - Risk level: Medium
 - Audit: Full (title, template, target, variables)
 - Default: Allowed
+- MCP tools: `create_oast_probe`, `create_case`, `create_payload`
 
 **Wait for Interaction**:
-- Required scope: `wait_interaction`
+- Required scope: `agent:wait_interaction`
 - Risk level: Low
 - Audit: Full (token, timeout, expected_count)
 - Default: Allowed
 
-**Export Evidence**:
-- Required scope: `export_evidence`
+**Read Interactions**:
+- Required scope: `agent:read_interactions`
+- Risk level: Low
+- Audit: Full (filters, pagination, case/payload references)
+- Default: Allowed
+
+**Summarize Evidence**:
+- Required scope: `agent:summarize_evidence`
+- Risk level: Low
+- Audit: Full (case_id, payload_id, interaction references)
+- Default: Allowed
+
+**Export Report**:
+- Required scope: `agent:export_report`
 - Risk level: Low
 - Audit: Full (probe_id, format, include_raw)
+- Default: Allowed
+
+**Read Agent Runs**:
+- Required scope: `agent:read_runs`
+- Risk level: Low
+- Audit: Full (agent_run_id, filters)
 - Default: Allowed
 
 **Delete Payload**:
@@ -190,15 +215,19 @@ Agent API keys have expiration:
 ### Default Agent Policy
 
 **Default Allowed**:
-- `create_probe`
-- `wait_interaction`
-- `export_evidence`
+- `agent:create_probe`
+- `agent:wait_interaction`
+- `agent:read_interactions`
+- `agent:summarize_evidence`
+- `agent:export_report`
+- `agent:read_runs`
 
 **Default Denied**:
-- `delete_payload`
-- `modify_config`
+- `agent:revoke_token`
+- `agent:delete_payload`
+- `agent:modify_config`
 
-Operators can override defaults by granting explicit scopes.
+Operators can override defaults by granting explicit scopes. Web UI must show default scopes separately from high-risk scopes, and high-risk scopes must remain unchecked unless explicitly selected by the operator.
 
 ## Audit Standards
 
@@ -420,6 +449,10 @@ Operators can view:
 - [x] Permission denied audit logging (Sprint K)
 - [x] Frontend API Keys page Agent Key support (Sprint K)
 - [x] E2E tests for Agent Key operations (Sprint K)
+- [x] Shared Agent policy catalog implemented (Sprint V)
+- [x] Agent policy endpoint `/api/v2/agent-policy/scopes` implemented (Sprint V)
+- [x] API Key defaults, MCP permission metadata, and Web UI scope grouping aligned to the shared catalog (Sprint V)
+- [x] High-risk Agent scopes explicitly separated in Web UI (Sprint V)
 
 ## Conclusion
 

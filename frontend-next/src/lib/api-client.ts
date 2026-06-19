@@ -16,14 +16,18 @@ import type {
   APIKeyCreateRequest,
   APIKeyUpdateRequest,
   APIKeyListResponse,
+  AgentScopeCatalog,
   EvidenceRequest,
   EvidenceResponse,
+  EvidenceSummaryRequest,
+  EvidenceSummaryResponse,
   AuditLogListResponse,
   ScannerRun,
   ScannerRunDetail,
   ScannerRunCreateRequest,
   ScannerRunUpdateStatusRequest,
   ScannerRunListResponse,
+  ScannerAdapterListResponse,
   AgentRun,
   AgentRunDetail,
   AgentRunCreateRequest,
@@ -112,10 +116,14 @@ export const interactionApi = {
 export const apiKeyApi = {
   list: (params?: { page?: number; page_size?: number }) =>
     api.get<APIKeyListResponse>('/apikeys', params),
-  create: (data: APIKeyCreateRequest) => api.post<{ data: APIKey }>('/apikeys', data),
-  get: (id: string) => api.get<{ data: APIKey }>(`/apikeys/${id}`),
-  update: (id: string, data: APIKeyUpdateRequest) => api.put<{ data: APIKey }>(`/apikeys/${id}`, data),
+  create: (data: APIKeyCreateRequest) => api.post<APIKey>('/apikeys', data),
+  get: (id: string) => api.get<APIKey>(`/apikeys/${id}`),
+  update: (id: string, data: APIKeyUpdateRequest) => api.put<APIKey>(`/apikeys/${id}`, data),
   delete: (id: string) => api.delete(`/apikeys/${id}`),
+}
+
+export const agentPolicyApi = {
+  listScopes: () => api.get<AgentScopeCatalog>('/agent-policy/scopes'),
 }
 
 // Users API
@@ -147,6 +155,7 @@ export const rulesApi = {
 // Evidence API
 export const evidenceApi = {
   generate: (data: EvidenceRequest) => api.post<EvidenceResponse>('/evidence/generate', data),
+  summary: (data: EvidenceSummaryRequest) => api.post<EvidenceSummaryResponse>('/evidence/summary', data),
 }
 
 // Audit API
@@ -165,6 +174,7 @@ export const auditApi = {
 
 // Scanner Run API
 export const scannerRunApi = {
+  listAdapters: () => api.get<ScannerAdapterListResponse>('/scanner-hub/adapters'),
   list: (params?: {
     case_id?: string
     payload_id?: string
@@ -174,7 +184,7 @@ export const scannerRunApi = {
     page_size?: number
   }) => api.get<ScannerRunListResponse>('/scanner-runs', params),
   get: (id: string) => api.get<{ data: ScannerRunDetail }>(`/scanner-runs/${id}`),
-  create: (data: ScannerRunCreateRequest) => api.post<{ data: ScannerRun }>('/scanner-runs', data),
+  create: (data: ScannerRunCreateRequest) => api.post<ScannerRun>('/scanner-runs', data),
   updateStatus: (id: string, data: ScannerRunUpdateStatusRequest) =>
     api.put<{ data: ScannerRun }>(`/scanner-runs/${id}/status`, data),
 }
@@ -206,5 +216,5 @@ export const agentRunApi = {
   listFollowupHistory: (id: string) =>
     api.get<{ data: AgentRunFollowupHistoryItem[] }>(`/agent-runs/${id}/followups`),
   traceReviewPackage: (packageHash: string) =>
-    api.get<{ data: AgentRunReviewPackageTraceResponse }>('/agent-runs/review-package-trace', { package_hash: packageHash }),
+    api.get<AgentRunReviewPackageTraceResponse>('/agent-runs/review-package-trace', { package_hash: packageHash }),
 }

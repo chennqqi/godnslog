@@ -26,7 +26,12 @@ var ToolPermissions = map[string]ToolPermission{
 	},
 	"create_case": {
 		ToolName:      "create_case",
-		RequiredScope: "case:create",
+		RequiredScope: "agent:create_probe",
+		RiskLevel:     RiskLevelMedium,
+	},
+	"create_payload": {
+		ToolName:      "create_payload",
+		RequiredScope: "agent:create_probe",
 		RiskLevel:     RiskLevelMedium,
 	},
 	"wait_for_interaction": {

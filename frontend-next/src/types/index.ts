@@ -197,6 +197,22 @@ export interface APIKeyListResponse {
   total_pages: number
 }
 
+export interface AgentScopePolicy {
+  scope: string
+  name: string
+  risk_level: 'low' | 'medium' | 'high' | 'critical'
+  default_allowed: boolean
+  high_risk: boolean
+  tool_names: string[]
+  description: string
+}
+
+export interface AgentScopeCatalog {
+  items: AgentScopePolicy[]
+  default_scopes: string[]
+  high_risk_scopes: string[]
+}
+
 // Settings types
 export interface Settings {
   dns_domain: string
@@ -261,6 +277,34 @@ export interface EvidenceResponse {
     interaction_count: number
     case_id?: string
     payload_id?: string
+  }
+}
+
+export interface EvidenceSummaryRequest {
+  case_id?: string
+  payload_id?: string
+  scanner_run_id?: string
+}
+
+export interface EvidenceSummaryScope {
+  case_id?: string
+  payload_id?: string
+  scanner_run_id?: string
+  source: string
+}
+
+export interface EvidenceSummaryResponse {
+  scope: EvidenceSummaryScope
+  evidence: Evidence
+  scanner_runs: ScannerRun[]
+  package_hashes: string[]
+  summary_hash: string
+  next_actions: string[]
+  generated_at: string
+  metadata: {
+    base_url?: string
+    scanner_run_count: number
+    package_count: number
   }
 }
 
@@ -357,20 +401,53 @@ export interface AgentRunReviewPackageTraceAudit {
 }
 
 // Scanner Run types
+export type ScannerKind = 'nuclei' | 'burp' | 'yakit' | 'zap' | 'xray' | 'rad' | 'postman' | 'apifox'
+
+export type ScannerDeliveryMethod =
+  | 'nuclei-jsonl'
+  | 'nuclei-var'
+  | 'burp-extension'
+  | 'yakit-script'
+  | 'zap-script'
+  | 'xray-webhook'
+  | 'rad-webhook'
+  | 'postman-env'
+  | 'apifox-env'
+
 export interface ScannerRun {
   id: string
   case_id: string
   payload_id: string
-  scanner: 'nuclei'
+  scanner: ScannerKind
   target: string
   template: 'ssrf-basic' | 'xxe-basic' | 'rce-callback'
-  delivery_method: 'nuclei-jsonl' | 'nuclei-var'
+  delivery_method: ScannerDeliveryMethod
   command: string
   jsonl: string
+  package_manifest: ScannerPackageManifest
+  package_hash: string
   status: 'created' | 'distributed' | 'observed' | 'evidenced'
   created_by: string
   created_at: string
   updated_at: string
+}
+
+export interface ScannerPackageManifest {
+  schema_version: string
+  scanner: ScannerKind
+  delivery_method: ScannerDeliveryMethod
+  package_hash: string
+  hash_algorithm: string
+  files: ScannerPackageFile[]
+  interactions_url: string
+  evidence_url: string
+  next_actions: string[]
+}
+
+export interface ScannerPackageFile {
+  name: string
+  kind: string
+  description: string
 }
 
 export interface ScannerRunDetail extends ScannerRun {
@@ -385,10 +462,24 @@ export interface ScannerRunDetail extends ScannerRun {
 export interface ScannerRunCreateRequest {
   case_id: string
   payload_id: string
-  scanner: 'nuclei'
+  scanner: ScannerKind
   target: string
   template: string
-  delivery_method: 'nuclei-jsonl' | 'nuclei-var'
+  delivery_method: ScannerDeliveryMethod
+}
+
+export interface ScannerAdapter {
+  id: ScannerKind
+  name: string
+  category: string
+  maturity: string
+  supported_methods: ScannerDeliveryMethod[]
+  default_method: ScannerDeliveryMethod
+  description: string
+}
+
+export interface ScannerAdapterListResponse {
+  items: ScannerAdapter[]
 }
 
 export interface ScannerRunUpdateStatusRequest {
@@ -714,4 +805,3 @@ export interface AgentRunReviewDecisionResponse {
   operation?: AgentOperation
   audit?: Record<string, unknown>
 }
-

@@ -31,22 +31,22 @@ type Service struct {
 
 // NewService creates a new scanner hub service
 func NewService(engine *xorm.Engine) *Service {
-	return &Service{
-		engine:      engine,
-		authService: auth.NewService(engine),
+	service := &Service{engine: engine}
+	if engine != nil {
+		service.authService = auth.NewService(engine)
 	}
+	return service
+}
+
+// ListAdapters returns the stable public Scanner Hub adapter catalog.
+func (s *Service) ListAdapters() *models.ScannerAdapterListResponse {
+	return &models.ScannerAdapterListResponse{Items: scannerAdapterCatalog()}
 }
 
 // CreateScannerRun creates a new scanner run
 func (s *Service) CreateScannerRun(req *models.ScannerRunCreateRequest, userID, baseURL string) (*models.ScannerRun, error) {
-	// Validate scanner
-	if req.Scanner != models.ScannerNuclei {
-		return nil, ErrInvalidScanner
-	}
-
-	// Validate delivery method
-	if req.DeliveryMethod != models.DeliveryMethodNucleiJsonl && req.DeliveryMethod != models.DeliveryMethodNucleiVar {
-		return nil, ErrInvalidDelivery
+	if err := validateScannerDelivery(req.Scanner, req.DeliveryMethod); err != nil {
+		return nil, err
 	}
 
 	// Validate case exists
@@ -74,26 +74,27 @@ func (s *Service) CreateScannerRun(req *models.ScannerRunCreateRequest, userID, 
 		return nil, ErrPayloadNotInCase
 	}
 
-	// Generate command and JSONL using Sprint H logic
-	command, jsonl, err := s.generateNucleiCommandAndJsonl(req, &payload, baseURL)
+	command, jsonl, packageManifest, packageHash, err := s.generateScannerArtifacts(req, &payload, baseURL)
 	if err != nil {
 		return nil, err
 	}
 
 	scannerRun := &models.ScannerRun{
-		ID:             models.GenerateID(),
-		CaseID:         req.CaseID,
-		PayloadID:      req.PayloadID,
-		Scanner:        req.Scanner,
-		Target:         req.Target,
-		Template:       req.Template,
-		DeliveryMethod: req.DeliveryMethod,
-		Command:        command,
-		Jsonl:          jsonl,
-		Status:         models.ScannerRunStatusCreated,
-		CreatedBy:      userID,
-		CreatedAt:      time.Now(),
-		UpdatedAt:      time.Now(),
+		ID:              models.GenerateID(),
+		CaseID:          req.CaseID,
+		PayloadID:       req.PayloadID,
+		Scanner:         req.Scanner,
+		Target:          req.Target,
+		Template:        req.Template,
+		DeliveryMethod:  req.DeliveryMethod,
+		Command:         command,
+		Jsonl:           jsonl,
+		PackageManifest: packageManifest,
+		PackageHash:     packageHash,
+		Status:          models.ScannerRunStatusCreated,
+		CreatedBy:       userID,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
 	}
 
 	if _, err := s.engine.Insert(scannerRun); err != nil {
@@ -304,37 +305,261 @@ func generateID() string {
 	return base32.StdEncoding.EncodeToString(bytes)
 }
 
-// generateNucleiCommandAndJsonl generates Nuclei command and JSONL record
-// Uses Sprint H logic from frontend-next/src/lib/scanner-hub.ts
-func (s *Service) generateNucleiCommandAndJsonl(req *models.ScannerRunCreateRequest, payload *models.Payload, baseURL string) (string, string, error) {
-	// Generate Nuclei command with shell quoting
-	target := shellQuote(req.Target)
-	payloadVar := shellQuote(fmt.Sprintf("godnslog_payload=%s", payload.TemplateRendered))
+func scannerAdapterCatalog() []models.ScannerAdapter {
+	return []models.ScannerAdapter{
+		{
+			ID:               models.ScannerNuclei,
+			Name:             "Nuclei",
+			Category:         "Script",
+			Maturity:         "L3 Official Script",
+			SupportedMethods: []string{models.DeliveryMethodNucleiJsonl, models.DeliveryMethodNucleiVar},
+			DefaultMethod:    models.DeliveryMethodNucleiJsonl,
+			Description:      "Automated vulnerability scanning with template variables and JSONL distribution packages.",
+		},
+		{
+			ID:               models.ScannerBurp,
+			Name:             "Burp Suite",
+			Category:         "Native",
+			Maturity:         "L4 Native Plugin Path",
+			SupportedMethods: []string{models.DeliveryMethodBurpExtension},
+			DefaultMethod:    models.DeliveryMethodBurpExtension,
+			Description:      "Manual and semi-automated verification package for Burp Suite extension workflows.",
+		},
+		{
+			ID:               models.ScannerYakit,
+			Name:             "Yakit/Yak",
+			Category:         "Script",
+			Maturity:         "L3 Official Script",
+			SupportedMethods: []string{models.DeliveryMethodYakitScript},
+			DefaultMethod:    models.DeliveryMethodYakitScript,
+			Description:      "Yak script package for hybrid manual and automated security validation.",
+		},
+		{
+			ID:               models.ScannerZap,
+			Name:             "ZAP",
+			Category:         "Script",
+			Maturity:         "L3 Official Script",
+			SupportedMethods: []string{models.DeliveryMethodZapScript},
+			DefaultMethod:    models.DeliveryMethodZapScript,
+			Description:      "OWASP ZAP script package for OAST probe injection and polling.",
+		},
+		{
+			ID:               models.ScannerXray,
+			Name:             "xray",
+			Category:         "Webhook",
+			Maturity:         "L2 Webhook Bridge",
+			SupportedMethods: []string{models.DeliveryMethodXrayWebhook},
+			DefaultMethod:    models.DeliveryMethodXrayWebhook,
+			Description:      "Webhook bridge package for mapping xray findings to GODNSLOG evidence.",
+		},
+		{
+			ID:               models.ScannerRad,
+			Name:             "rad",
+			Category:         "Webhook",
+			Maturity:         "L2 Webhook Bridge",
+			SupportedMethods: []string{models.DeliveryMethodRadWebhook},
+			DefaultMethod:    models.DeliveryMethodRadWebhook,
+			Description:      "Webhook bridge package for rad crawler and scanner automation.",
+		},
+		{
+			ID:               models.ScannerPostman,
+			Name:             "Postman",
+			Category:         "Environment",
+			Maturity:         "L2 Environment Bridge",
+			SupportedMethods: []string{models.DeliveryMethodPostmanEnv},
+			DefaultMethod:    models.DeliveryMethodPostmanEnv,
+			Description:      "Environment variable package for API testing with OAST verification.",
+		},
+		{
+			ID:               models.ScannerApifox,
+			Name:             "Apifox",
+			Category:         "Environment",
+			Maturity:         "L2 Environment Bridge",
+			SupportedMethods: []string{models.DeliveryMethodApifoxEnv},
+			DefaultMethod:    models.DeliveryMethodApifoxEnv,
+			Description:      "Environment variable package for Apifox API testing workflows.",
+		},
+	}
+}
 
-	command := fmt.Sprintf("nuclei -u %s -t godnslog-%s.yaml -var %s",
-		target, req.Template, payloadVar)
+func validateScannerDelivery(scanner, delivery string) error {
+	knownScanner := false
+	for _, adapter := range scannerAdapterCatalog() {
+		if adapter.ID != scanner {
+			continue
+		}
+		knownScanner = true
+		for _, method := range adapter.SupportedMethods {
+			if method == delivery {
+				return nil
+			}
+		}
+	}
+	if !knownScanner {
+		return ErrInvalidScanner
+	}
+	return ErrInvalidDelivery
+}
 
-	// Generate JSONL record
+// generateScannerArtifacts generates an operator-facing integration package and a structured JSONL record.
+func (s *Service) generateScannerArtifacts(req *models.ScannerRunCreateRequest, payload *models.Payload, baseURL string) (string, string, models.ScannerPackageManifest, string, error) {
+	interactionsURL := fmt.Sprintf("%s/api/v2/interactions?payload_id=%s", baseURL, req.PayloadID)
+	evidenceURL := fmt.Sprintf("%s/dashboard/evidence?payload_id=%s", baseURL, req.PayloadID)
+	command := generateScannerCommand(req, payload, interactionsURL, evidenceURL)
+
 	jsonlRecord := map[string]interface{}{
 		"scanner":          req.Scanner,
+		"delivery_method":  req.DeliveryMethod,
 		"case_id":          req.CaseID,
 		"payload_id":       req.PayloadID,
 		"token":            payload.Token,
 		"target":           req.Target,
 		"template":         req.Template,
 		"rendered_payload": payload.TemplateRendered,
-		"interactions_url": fmt.Sprintf("%s/api/v2/interactions?payload_id=%s", baseURL, req.PayloadID),
-		"evidence_url":     fmt.Sprintf("%s/dashboard/evidence?payload_id=%s", baseURL, req.PayloadID),
+		"interactions_url": interactionsURL,
+		"evidence_url":     evidenceURL,
 		"created_at":       time.Now().Format(time.RFC3339),
 	}
 
-	// Convert to single-line JSON
 	jsonlBytes, err := jsonEncode(jsonlRecord)
 	if err != nil {
-		return "", "", err
+		return "", "", models.ScannerPackageManifest{}, "", err
 	}
 
-	return command, string(jsonlBytes), nil
+	jsonl := string(jsonlBytes)
+	manifest := buildScannerPackageManifest(req, interactionsURL, evidenceURL)
+	packageHash, err := computeScannerPackageHash(req, command, jsonl, manifest)
+	if err != nil {
+		return "", "", models.ScannerPackageManifest{}, "", err
+	}
+	manifest.PackageHash = packageHash
+
+	return command, jsonl, manifest, packageHash, nil
+}
+
+func buildScannerPackageManifest(req *models.ScannerRunCreateRequest, interactionsURL, evidenceURL string) models.ScannerPackageManifest {
+	files := []models.ScannerPackageFile{
+		{
+			Name:        "README.md",
+			Kind:        "instructions",
+			Description: "Operator and Agent instructions for distributing this GODNSLOG scanner package.",
+		},
+		{
+			Name:        "godnslog-package.jsonl",
+			Kind:        "jsonl",
+			Description: "Single-line GODNSLOG scanner package record with payload, target, and callback URLs.",
+		},
+	}
+
+	switch req.DeliveryMethod {
+	case models.DeliveryMethodNucleiJsonl:
+		files = append(files, models.ScannerPackageFile{Name: "godnslog-nuclei.jsonl", Kind: "jsonl", Description: "Nuclei JSONL import/distribution record."})
+	case models.DeliveryMethodNucleiVar:
+		files = append(files, models.ScannerPackageFile{Name: fmt.Sprintf("godnslog-%s.yaml", req.Template), Kind: "nuclei-template", Description: "Nuclei template using the godnslog_payload variable."})
+	case models.DeliveryMethodBurpExtension:
+		files = append(files, models.ScannerPackageFile{Name: "burp-extension-config.json", Kind: "burp-extension-config", Description: "Burp Suite extension configuration inputs and polling URLs."})
+	case models.DeliveryMethodYakitScript:
+		files = append(files, models.ScannerPackageFile{Name: "godnslog-oast.yak", Kind: "yak-script", Description: "Yak script skeleton for OAST payload injection and interaction polling."})
+	case models.DeliveryMethodZapScript:
+		files = append(files, models.ScannerPackageFile{Name: "godnslog-oast.js", Kind: "zap-script", Description: "ZAP script skeleton for OAST payload injection."})
+	case models.DeliveryMethodXrayWebhook, models.DeliveryMethodRadWebhook:
+		files = append(files, models.ScannerPackageFile{Name: "webhook-bridge.json", Kind: "webhook-bridge", Description: "Webhook bridge mapping scanner findings to GODNSLOG evidence references."})
+	case models.DeliveryMethodPostmanEnv:
+		files = append(files, models.ScannerPackageFile{Name: "godnslog.postman_environment.json", Kind: "postman-environment", Description: "Postman environment variables for OAST validation."})
+	case models.DeliveryMethodApifoxEnv:
+		files = append(files, models.ScannerPackageFile{Name: "godnslog.apifox_environment.json", Kind: "apifox-environment", Description: "Apifox environment variables for OAST validation."})
+	}
+
+	return models.ScannerPackageManifest{
+		SchemaVersion:   "scanner-package.v1",
+		Scanner:         req.Scanner,
+		DeliveryMethod:  req.DeliveryMethod,
+		HashAlgorithm:   "sha256",
+		Files:           files,
+		InteractionsURL: interactionsURL,
+		EvidenceURL:     evidenceURL,
+		NextActions: []string{
+			"Distribute the generated payload through the selected scanner adapter.",
+			"Poll interactions_url until the expected callback is observed.",
+			"Open evidence_url or call the Evidence API to produce the final proof chain.",
+		},
+	}
+}
+
+func computeScannerPackageHash(req *models.ScannerRunCreateRequest, command, jsonl string, manifest models.ScannerPackageManifest) (string, error) {
+	manifest.PackageHash = ""
+	return models.ComputeDeterministicHash(map[string]interface{}{
+		"scanner":          req.Scanner,
+		"delivery_method":  req.DeliveryMethod,
+		"target":           req.Target,
+		"template":         req.Template,
+		"command":          command,
+		"jsonl":            jsonlWithoutCreatedAt(jsonl),
+		"package_manifest": manifest,
+	})
+}
+
+func jsonlWithoutCreatedAt(jsonl string) map[string]interface{} {
+	var record map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonl), &record); err != nil {
+		return map[string]interface{}{"raw": jsonl}
+	}
+	delete(record, "created_at")
+	return record
+}
+
+func generateScannerCommand(req *models.ScannerRunCreateRequest, payload *models.Payload, interactionsURL, evidenceURL string) string {
+	target := shellQuote(req.Target)
+	payloadVar := shellQuote(fmt.Sprintf("godnslog_payload=%s", payload.TemplateRendered))
+
+	switch req.Scanner {
+	case models.ScannerNuclei:
+		return fmt.Sprintf("nuclei -u %s -t godnslog-%s.yaml -var %s",
+			target, req.Template, payloadVar)
+	case models.ScannerBurp:
+		return strings.Join([]string{
+			"Burp Suite Extension Package",
+			fmt.Sprintf("Target: %s", req.Target),
+			fmt.Sprintf("Create probe API: /api/v2/payloads"),
+			fmt.Sprintf("Rendered payload: %s", payload.TemplateRendered),
+			fmt.Sprintf("Poll interactions: %s", interactionsURL),
+			fmt.Sprintf("Open evidence: %s", evidenceURL),
+		}, "\n")
+	case models.ScannerYakit:
+		return strings.Join([]string{
+			"yak godnslog-oast.yak",
+			fmt.Sprintf("target = %q", req.Target),
+			fmt.Sprintf("payload = %q", payload.TemplateRendered),
+			"CreateHTTPFlow(target, payload)",
+			fmt.Sprintf("interactions = %q", interactionsURL),
+		}, "\n")
+	case models.ScannerZap:
+		return strings.Join([]string{
+			"ZAP Script Package",
+			"zap.script.load godnslog-oast.js",
+			fmt.Sprintf("target=%s", req.Target),
+			fmt.Sprintf("payload=%s", payload.TemplateRendered),
+			fmt.Sprintf("interactions=%s", interactionsURL),
+		}, "\n")
+	case models.ScannerXray, models.ScannerRad:
+		return strings.Join([]string{
+			fmt.Sprintf("%s webhook bridge package", req.Scanner),
+			fmt.Sprintf("webhook.target=%s", req.Target),
+			fmt.Sprintf("webhook.payload=%s", payload.TemplateRendered),
+			fmt.Sprintf("webhook.interactions=%s", interactionsURL),
+			fmt.Sprintf("webhook.evidence=%s", evidenceURL),
+		}, "\n")
+	case models.ScannerPostman, models.ScannerApifox:
+		return strings.Join([]string{
+			fmt.Sprintf("%s Environment Package", req.Scanner),
+			fmt.Sprintf("GODNSLOG_TARGET=%s", req.Target),
+			fmt.Sprintf("GODNSLOG_PAYLOAD=%s", payload.TemplateRendered),
+			fmt.Sprintf("GODNSLOG_INTERACTIONS_URL=%s", interactionsURL),
+			fmt.Sprintf("GODNSLOG_EVIDENCE_URL=%s", evidenceURL),
+		}, "\n")
+	default:
+		return ""
+	}
 }
 
 // shellQuote quotes a string for shell use
