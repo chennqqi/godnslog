@@ -1210,3 +1210,26 @@ git diff --check
 ```
 
 Acceptance result: **passed**. Sprint Z adds the Evidence Summary UI page at `/dashboard/evidence-summary` with scope selection (case/payload/scanner_run), evidence stats display, scanner runs, package hashes, next actions, and metadata. Sidebar navigation and page title mapping updated.
+
+## Sprint AA: OpenAPI Spec Sync Verification (2026-06-19)
+
+### Focused Tests
+
+```bash
+GOCACHE=/tmp/gocache go test ./docs -v
+# Result: PASS — 7 tests (file exists, required sections, v2 paths, auth methods, response structure, error codes, model updates)
+```
+
+### Full Verification
+
+```bash
+GOCACHE=/tmp/gocache go test ./...
+# Result: PASS — all packages ok
+```
+
+```bash
+git diff --check
+# Result: PASS
+```
+
+Acceptance result: **passed**. Sprint AA syncs the OpenAPI spec with all missing v2 API endpoints from Sprints U-Y: evidence/generate, evidence/summary, agent-policy/scopes, scanner-hub/adapters, scanner-runs (CRUD + status), and all agent-runs endpoints (list, create, get, review, status, operations, followups, review-decision, review-export, review-delivery, review-deliveries, review-queue, review-package-trace). 20+ new schemas added.

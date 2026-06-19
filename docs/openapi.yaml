@@ -56,6 +56,14 @@ tags:
     description: Audit log operations
   - name: users
     description: User management
+  - name: agent-policy
+    description: Agent policy and scope management
+  - name: scanner-hub
+    description: Scanner hub adapters and runs
+  - name: scanner-runs
+    description: Scanner run management
+  - name: agent-runs
+    description: Agent run management and review
 
 paths:
   /auth/login:
@@ -921,6 +929,832 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /evidence/generate:
+    post:
+      tags:
+        - evidence
+      summary: Generate evidence report
+      description: Generate evidence chain for a case or payload in specified format
+      operationId: generateEvidenceReport
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                case_id:
+                  type: string
+                payload_id:
+                  type: string
+                format:
+                  type: string
+                  enum: [json, markdown]
+                  default: json
+      responses:
+        '200':
+          description: Evidence report generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /evidence/summary:
+    post:
+      tags:
+        - evidence
+      summary: Get evidence summary bundle
+      description: Retrieve a structured evidence summary bundle for a case, payload, or scanner run
+      operationId: getEvidenceSummary
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvidenceSummaryRequest'
+      responses:
+        '200':
+          description: Evidence summary bundle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceSummaryResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /agent-policy/scopes:
+    get:
+      tags:
+        - agent-policy
+      summary: List agent policy scopes
+      description: Retrieve the shared agent policy catalog with scopes, risk levels, and MCP tool mappings
+      operationId: listAgentPolicyScopes
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Agent policy scope catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentScopeCatalog'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /scanner-hub/adapters:
+    get:
+      tags:
+        - scanner-hub
+      summary: List scanner adapters
+      description: Retrieve available scanner adapters for OAST integration
+      operationId: listScannerAdapters
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of scanner adapters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScannerAdapterListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /scanner-runs:
+    get:
+      tags:
+        - scanner-runs
+      summary: List scanner runs
+      description: Retrieve scanner runs with optional filtering by case, payload, scanner, or status
+      operationId: listScannerRuns
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: case_id
+          in: query
+          schema:
+            type: string
+        - name: payload_id
+          in: query
+          schema:
+            type: string
+        - name: scanner
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: List of scanner runs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScannerRunListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+        - scanner-runs
+      summary: Create scanner run
+      description: Create a new scanner run associated with a case or payload
+      operationId: createScannerRun
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScannerRunCreateRequest'
+      responses:
+        '200':
+          description: Scanner run created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScannerRun'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /scanner-runs/{id}:
+    get:
+      tags:
+        - scanner-runs
+      summary: Get scanner run detail
+      description: Retrieve detailed information about a specific scanner run
+      operationId: getScannerRun
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scanner run detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScannerRunDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /scanner-runs/{id}/status:
+    put:
+      tags:
+        - scanner-runs
+      summary: Update scanner run status
+      description: Update the status of a scanner run
+      operationId: updateScannerRunStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScannerRunUpdateStatusRequest'
+      responses:
+        '200':
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScannerRun'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /agent-runs:
+    get:
+      tags:
+        - agent-runs
+      summary: List agent runs
+      description: Retrieve agent runs with optional filtering
+      operationId: listAgentRuns
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: agent_type
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: List of agent runs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRunListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+        - agent-runs
+      summary: Create agent run
+      description: Create a new agent run
+      operationId: createAgentRun
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRunCreateRequest'
+      responses:
+        '200':
+          description: Agent run created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRun'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /agent-runs/{id}:
+    get:
+      tags:
+        - agent-runs
+      summary: Get agent run detail
+      description: Retrieve detailed information about a specific agent run
+      operationId: getAgentRun
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent run detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRunDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /agent-runs/{id}/review:
+    get:
+      tags:
+        - agent-runs
+      summary: Get agent run review packet
+      description: Retrieve a review packet for an agent run
+      operationId: getAgentRunReview
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, markdown]
+            default: json
+      responses:
+        '200':
+          description: Review packet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRunReviewPacket'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /agent-runs/{id}/status:
+    put:
+      tags:
+        - agent-runs
+      summary: Update agent run status
+      description: Update the status of an agent run
+      operationId: updateAgentRunStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRunUpdateStatusRequest'
+      responses:
+        '200':
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRun'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /agent-runs/{id}/operations:
+    post:
+      tags:
+        - agent-runs
+      summary: Append agent operation
+      description: Append an operation log entry to an agent run
+      operationId: appendAgentOperation
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentOperationCreateRequest'
+      responses:
+        '200':
+          description: Operation appended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRun'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /agent-runs/{id}/followups:
+    post:
+      tags:
+        - agent-runs
+      summary: Create agent run followup
+      description: Create a followup for an agent run
+      operationId: createAgentRunFollowup
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRunFollowupRequest'
+      responses:
+        '200':
+          description: Followup created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRunFollowupResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      tags:
+        - agent-runs
+      summary: List followup history
+      description: Retrieve followup history for an agent run
+      operationId: listFollowupHistory
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Followup history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AgentRunFollowupHistoryItem'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /agent-runs/{id}/review-decision:
+    post:
+      tags:
+        - agent-runs
+      summary: Record review decision
+      description: Record a review decision for an agent run
+      operationId: recordReviewDecision
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRunReviewDecisionRequest'
+      responses:
+        '200':
+          description: Decision recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRunReviewDecisionResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /agent-runs/{id}/review-export:
+    post:
+      tags:
+        - agent-runs
+      summary: Export review package
+      description: Generate an auditable export package for an agent run review
+      operationId: exportReviewPackage
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRunReviewExportRequest'
+      responses:
+        '200':
+          description: Export package generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRunReviewExportResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /agent-runs/{id}/review-delivery:
+    post:
+      tags:
+        - agent-runs
+      summary: Deliver review package
+      description: Deliver a review package to an external endpoint via HTTPS
+      operationId: deliverReviewPackage
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRunReviewDeliveryRequest'
+      responses:
+        '200':
+          description: Delivery result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRunReviewDeliveryResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /agent-runs/{id}/review-deliveries:
+    get:
+      tags:
+        - agent-runs
+      summary: List review deliveries
+      description: Retrieve delivery history for an agent run review
+      operationId: listReviewDeliveries
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Delivery history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRunReviewDeliveryHistoryResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /agent-runs/review-queue:
+    get:
+      tags:
+        - agent-runs
+      summary: List review queue
+      description: Retrieve the review queue with optional filters
+      operationId: listReviewQueue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: risk_level
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Review queue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRunReviewQueueResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /agent-runs/review-package-trace:
+    get:
+      tags:
+        - agent-runs
+      summary: Trace review package
+      description: Trace a review package by its hash
+      operationId: traceReviewPackage
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: package_hash
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Package trace result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRunReviewPackageTraceResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1656,3 +2490,502 @@ components:
               type: integer
             page_size:
               type: integer
+
+    EvidenceSummaryRequest:
+      type: object
+      properties:
+        case_id:
+          type: string
+        payload_id:
+          type: string
+        scanner_run_id:
+          type: string
+
+    EvidenceSummaryScope:
+      type: object
+      properties:
+        case_id:
+          type: string
+        payload_id:
+          type: string
+        scanner_run_id:
+          type: string
+        source:
+          type: string
+
+    EvidenceSummaryResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: OK
+        data:
+          type: object
+          required:
+            - scope
+            - evidence
+            - summary_hash
+            - next_actions
+            - generated_at
+            - metadata
+          properties:
+            scope:
+              $ref: '#/components/schemas/EvidenceSummaryScope'
+            evidence:
+              $ref: '#/components/schemas/EvidenceResponse'
+            scanner_runs:
+              type: array
+              items:
+                $ref: '#/components/schemas/ScannerRun'
+            package_hashes:
+              type: array
+              items:
+                type: string
+            summary_hash:
+              type: string
+            next_actions:
+              type: array
+              items:
+                type: string
+            generated_at:
+              type: string
+              format: date-time
+            metadata:
+              type: object
+              properties:
+                base_url:
+                  type: string
+                scanner_run_count:
+                  type: integer
+                package_count:
+                  type: integer
+
+    AgentScopeCatalog:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  scope:
+                    type: string
+                  risk_level:
+                    type: string
+                  default_granted:
+                    type: boolean
+                  high_risk:
+                    type: boolean
+                  mcp_tools:
+                    type: array
+                    items:
+                      type: string
+                  description:
+                    type: string
+            default_scopes:
+              type: array
+              items:
+                type: string
+            high_risk_scopes:
+              type: array
+              items:
+                type: string
+
+    ScannerRun:
+      type: object
+      properties:
+        id:
+          type: string
+        case_id:
+          type: string
+        payload_id:
+          type: string
+        scanner:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        package_hash:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ScannerRunDetail:
+      allOf:
+        - $ref: '#/components/schemas/ScannerRun'
+        - type: object
+          properties:
+            config:
+              type: object
+            result:
+              type: object
+
+    ScannerRunListResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ScannerRun'
+            total:
+              type: integer
+            page:
+              type: integer
+            page_size:
+              type: integer
+
+    ScannerRunCreateRequest:
+      type: object
+      properties:
+        case_id:
+          type: string
+        payload_id:
+          type: string
+        scanner:
+          type: string
+        config:
+          type: object
+
+    ScannerRunUpdateStatusRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        result:
+          type: object
+
+    ScannerAdapterListResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  display_name:
+                    type: string
+                  supported:
+                    type: boolean
+
+    AgentRun:
+      type: object
+      properties:
+        id:
+          type: string
+        agent_type:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed, reviewed]
+        risk_level:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AgentRunDetail:
+      allOf:
+        - $ref: '#/components/schemas/AgentRun'
+        - type: object
+          properties:
+            operations:
+              type: array
+              items:
+                type: object
+            followups:
+              type: array
+              items:
+                type: object
+
+    AgentRunListResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/AgentRun'
+            total:
+              type: integer
+            page:
+              type: integer
+            page_size:
+              type: integer
+
+    AgentRunCreateRequest:
+      type: object
+      properties:
+        agent_type:
+          type: string
+        risk_level:
+          type: string
+        metadata:
+          type: object
+
+    AgentRunUpdateStatusRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [pending, running, completed, failed, reviewed]
+
+    AgentOperationCreateRequest:
+      type: object
+      required:
+        - action
+        - risk_level
+      properties:
+        action:
+          type: string
+        risk_level:
+          type: string
+        request:
+          type: object
+        result:
+          type: object
+
+    AgentRunReviewPacket:
+      type: object
+      properties:
+        agent_run_id:
+          type: string
+        summary:
+          type: string
+        operations:
+          type: array
+          items:
+            type: object
+        evidence:
+          type: object
+        format:
+          type: string
+
+    AgentRunFollowupRequest:
+      type: object
+      properties:
+        action:
+          type: string
+        note:
+          type: string
+        metadata:
+          type: object
+
+    AgentRunFollowupResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        agent_run_id:
+          type: string
+        action:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    AgentRunFollowupHistoryItem:
+      type: object
+      properties:
+        id:
+          type: string
+        action:
+          type: string
+        note:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    AgentRunReviewDecisionRequest:
+      type: object
+      required:
+        - decision
+      properties:
+        decision:
+          type: string
+          enum: [approved, rejected, needs_info]
+        comment:
+          type: string
+
+    AgentRunReviewDecisionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        agent_run_id:
+          type: string
+        decision:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    AgentRunReviewExportRequest:
+      type: object
+      properties:
+        format:
+          type: string
+          enum: [json, markdown]
+          default: json
+        include_evidence:
+          type: boolean
+          default: true
+
+    AgentRunReviewExportResponse:
+      type: object
+      properties:
+        package_hash:
+          type: string
+        content:
+          type: string
+        format:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    AgentRunReviewDeliveryRequest:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+        format:
+          type: string
+          enum: [json, markdown]
+          default: json
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+
+    AgentRunReviewDeliveryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        status_code:
+          type: integer
+        response_body:
+          type: string
+        delivered_at:
+          type: string
+          format: date-time
+
+    AgentRunReviewDeliveryHistoryResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentRunReviewDeliveryResponse'
+
+    AgentRunReviewQueueResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/AgentRun'
+            total:
+              type: integer
+            page:
+              type: integer
+            page_size:
+              type: integer
+
+    AgentRunReviewPackageTraceResponse:
+      type: object
+      properties:
+        found:
+          type: boolean
+        agent_run_id:
+          type: string
+        package_hash:
+          type: string
+        export_date:
+          type: string
+          format: date-time
+        delivery_count:
+          type: integer
