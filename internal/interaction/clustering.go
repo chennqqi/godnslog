@@ -1,6 +1,7 @@
 package interaction
 
 import (
+	"regexp"
 	"time"
 )
 
@@ -112,10 +113,13 @@ func (s *Service) extractPattern(path string) string {
 	return pattern
 }
 
-// replacePattern is a helper to replace regex patterns
+// replacePattern replaces all occurrences of a regex pattern with the replacement string
 func replacePattern(s, pattern, replacement string) string {
-	// Simple implementation - in production use regex
-	return s
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return s
+	}
+	return re.ReplaceAllString(s, replacement)
 }
 
 // generateClusterID generates a unique cluster ID

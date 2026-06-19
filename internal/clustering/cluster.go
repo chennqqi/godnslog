@@ -1,6 +1,7 @@
 package clustering
 
 import (
+	"regexp"
 	"time"
 
 	"github.com/chennqqi/godnslog/internal/interaction"
@@ -160,13 +161,16 @@ func (c *Clusterer) checkNoise(cluster *Cluster) {
 		return
 	}
 
-	// Check against noise patterns
-	for _, pattern := range c.config.NoisePatterns {
-		if pattern.Type == cluster.Type {
-			// Simple pattern matching (in production, use regex)
-			if cluster.Pattern == pattern.Pattern {
+	// Check against noise patterns using regex
+	for _, np := range c.config.NoisePatterns {
+		if np.Type == cluster.Type {
+			re, err := regexp.Compile(np.Pattern)
+			if err != nil {
+				continue
+			}
+			if re.MatchString(cluster.Pattern) {
 				cluster.IsNoise = true
-				cluster.NoiseReason = pattern.Description
+				cluster.NoiseReason = np.Description
 				return
 			}
 		}
