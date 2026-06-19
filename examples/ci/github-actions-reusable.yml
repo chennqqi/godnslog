@@ -1,0 +1,159 @@
+# Reusable GODNSLOG OAST Scan Workflow
+#
+# Usage in your repository:
+#
+#   jobs:
+#     oast:
+#       uses: your-org/godnslog/.github/workflows/oast-scan-reusable.yml@main
+#       with:
+#         scan-target: https://your-target.com
+#         nuclei-templates: oast-templates/
+#         timeout: 10m
+#       secrets:
+#         GODNSLOG_API_URL: ${{ secrets.GODNSLOG_API_URL }}
+#         GODNSLOG_API_KEY: ${{ secrets.GODNSLOG_API_KEY }}
+
+name: Reusable OAST Scan
+
+on:
+  workflow_call:
+    inputs:
+      scan-target:
+        description: 'Target URL for OAST scan'
+        required: true
+        type: string
+      nuclei-templates:
+        description: 'Path to Nuclei templates directory'
+        required: false
+        default: 'oast-templates/'
+        type: string
+      timeout:
+        description: 'Interaction polling timeout'
+        required: false
+        default: '10m'
+        type: string
+      case-title:
+        description: 'Title for the OAST case'
+        required: false
+        default: 'CI/CD OAST Scan'
+        type: string
+      fail-on-critical:
+        description: 'Fail pipeline on critical interactions'
+        required: false
+        default: true
+        type: boolean
+    secrets:
+      GODNSLOG_API_URL:
+        required: true
+      GODNSLOG_API_KEY:
+        required: true
+
+jobs:
+  oast-scan:
+    name: OAST Security Scan
+    runs-on: ubuntu-latest
+
+    env:
+      GODNSLOG_API_URL: ${{ secrets.GODNSLOG_API_URL }}
+      GODNSLOG_API_KEY: ${{ secrets.GODNSLOG_API_KEY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Install GODNSLOG CLI
+        run: go install github.com/chennqqi/godnslog/cmd/cli@latest
+
+      - name: Create Case
+        id: create-case
+        run: |
+          CASE_ID=$(godnslog case create \
+            --title "${{ inputs.case-title }} - ${{ github.repository }}" \
+            --description "Automated OAST scan for ${{ inputs.scan-target }}" \
+            --target "${{ inputs.scan-target }}" \
+            --tags "ci-cd,github-actions,reusable" | grep "ID:" | awk '{print $2}')
+          echo "case_id=$CASE_ID" >> $GITHUB_OUTPUT
+          echo "Created case: $CASE_ID"
+
+      - name: Generate Payload
+        id: create-payload
+        run: |
+          PAYLOAD=$(godnslog payload create \
+            --template "{{.Token}}.oast.example.com" \
+            --case-id ${{ steps.create-case.outputs.case_id }} \
+            --expires 24h | grep "Token:" | awk '{print $2}')
+          echo "payload_token=$PAYLOAD" >> $GITHUB_OUTPUT
+          echo "Generated payload: $PAYLOAD"
+
+      - name: Run Nuclei Scan
+        run: |
+          if [ ! -d "${{ inputs.nuclei-templates }}" ]; then
+            echo "Templates directory not found, using default OAST templates"
+            docker run projectdiscovery/nuclei:latest \
+              -u ${{ inputs.scan-target }} \
+              -var "payload=${{ steps.create-payload.outputs.payload_token }}" \
+              -o nuclei-results.json || true
+          else
+            docker run -v "$(pwd)/${{ inputs.nuclei-templates }}:/templates" \
+              projectdiscovery/nuclei:latest \
+              -u ${{ inputs.scan-target }} \
+              -t /templates/ \
+              -var "payload=${{ steps.create-payload.outputs.payload_token }}" \
+              -o nuclei-results.json || true
+          fi
+
+      - name: Poll for Interactions
+        run: |
+          godnslog interaction poll ${{ steps.create-payload.outputs.payload_token }} \
+            --timeout ${{ inputs.timeout }} \
+            --interval 30s || true
+
+      - name: Export Report
+        run: |
+          godnslog report export ${{ steps.create-case.outputs.case_id }} \
+            --format markdown \
+            --output oast-report.md
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: oast-report
+          path: oast-report.md
+
+      - name: Check for High-Risk Interactions
+        if: ${{ inputs.fail-on-critical }}
+        run: |
+          INTERACTIONS=$(godnslog interaction list \
+            --case-id ${{ steps.create-case.outputs.case_id }} \
+            --limit 100)
+
+          CRITICAL_PATTERNS="root|privilege|escalation|exec|cmd|shell"
+          CRITICAL_COUNT=0
+
+          for pattern in $CRITICAL_PATTERNS; do
+            COUNT=$(echo "$INTERACTIONS" | grep -i "$pattern" | wc -l)
+            CRITICAL_COUNT=$((CRITICAL_COUNT + COUNT))
+          done
+
+          echo "Critical interactions: $CRITICAL_COUNT"
+
+          if [ $CRITICAL_COUNT -gt 0 ]; then
+            echo "::error::Critical OAST interactions detected! Pipeline blocked."
+            exit 1
+          fi
+
+          echo "Gate check passed"
+
+      - name: Post Summary
+        if: always()
+        run: |
+          echo "## OAST Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Case ID: ${{ steps.create-case.outputs.case_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Payload: ${{ steps.create-payload.outputs.payload_token }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Target: ${{ inputs.scan-target }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Report: [oast-report.md](artifacts/oast-report)" >> $GITHUB_STEP_SUMMARY
