@@ -1285,3 +1285,143 @@ func TestGetEvidenceSummaryToolPermissionDenied(t *testing.T) {
 		t.Fatal("Audit log should be posted when permission is denied")
 	}
 }
+
+// TestListAgentRunsTool tests listAgentRuns tool success path
+func TestListAgentRunsTool(t *testing.T) {
+	server := newTestServer(func(r *http.Request) string {
+		if r.Method == http.MethodGet && r.URL.Path == "/api/v2/agent-runs" {
+			return `{"code":0,"message":"success","data":{"items":[{"id":"run-1","agent_type":"claude","status":"running","risk_level":"medium"},{"id":"run-2","agent_type":"cursor","status":"completed","risk_level":"low"}],"total":2,"page":1,"page_size":20}}`
+		}
+		return ""
+	})
+
+	args := map[string]interface{}{
+		"status": "running",
+	}
+
+	result, err := server.listAgentRuns(nil, args)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	toolResult, ok := result.(ToolResult)
+	if !ok {
+		t.Fatal("Result should be ToolResult type")
+	}
+
+	if !toolResult.Success {
+		t.Fatalf("Expected success, got error: %s", toolResult.Error)
+	}
+
+	data, ok := toolResult.Data.(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map")
+	}
+
+	items, ok := data["items"].([]interface{})
+	if !ok {
+		t.Fatal("Expected items to be an array")
+	}
+	if len(items) != 2 {
+		t.Fatalf("Expected 2 items, got %d", len(items))
+	}
+}
+
+// TestGetAgentRunTool tests getAgentRun tool success path
+func TestGetAgentRunTool(t *testing.T) {
+	server := newTestServer(func(r *http.Request) string {
+		if r.Method == http.MethodGet && r.URL.Path == "/api/v2/agent-runs/run-1" {
+			return `{"code":0,"message":"success","data":{"id":"run-1","agent_type":"claude","status":"running","risk_level":"medium","operations":[{"action":"create_oast_probe","risk_level":"medium"}]}}`
+		}
+		return ""
+	})
+
+	args := map[string]interface{}{
+		"id": "run-1",
+	}
+
+	result, err := server.getAgentRun(nil, args)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	toolResult, ok := result.(ToolResult)
+	if !ok {
+		t.Fatal("Result should be ToolResult type")
+	}
+
+	if !toolResult.Success {
+		t.Fatalf("Expected success, got error: %s", toolResult.Error)
+	}
+
+	data, ok := toolResult.Data.(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map")
+	}
+	if data["id"] != "run-1" {
+		t.Errorf("Expected id run-1, got %v", data["id"])
+	}
+}
+
+// TestGetAgentRunToolMissingID tests getAgentRun without required id param
+func TestGetAgentRunToolMissingID(t *testing.T) {
+	server := newTestServer(func(r *http.Request) string {
+		return ""
+	})
+
+	args := map[string]interface{}{}
+
+	result, err := server.getAgentRun(nil, args)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	toolResult, ok := result.(ToolResult)
+	if !ok {
+		t.Fatal("Result should be ToolResult type")
+	}
+
+	if toolResult.Success {
+		t.Fatal("Expected failure due to missing id")
+	}
+
+	if !strings.Contains(toolResult.Error, "id is required") {
+		t.Fatalf("Expected missing id error, got: %s", toolResult.Error)
+	}
+}
+
+// TestListAgentRunsToolPermissionDenied tests listAgentRuns without required scope
+func TestListAgentRunsToolPermissionDenied(t *testing.T) {
+	var auditLogPosted bool
+
+	server := newTestServer(func(r *http.Request) string {
+		if strings.Contains(r.URL.Path, "/api/v2/auth/info") {
+			return `{"code":0,"message":"success","data":{"user_id":"test-user","api_key_id":"key-1","api_key_prefix":"key_","scopes":["agent:read_interactions"],"is_agent":true,"risk_tolerance":"medium"}}`
+		}
+		if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/api/v2/audit/logs") {
+			auditLogPosted = true
+			return `{"code":0,"message":"success"}`
+		}
+		return ""
+	})
+
+	args := map[string]interface{}{}
+
+	result, err := server.listAgentRuns(nil, args)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	toolResult, ok := result.(ToolResult)
+	if !ok {
+		t.Fatal("Result should be ToolResult type")
+	}
+
+	if toolResult.Success {
+		t.Fatal("Expected permission denied, but tool succeeded")
+	}
+
+	if !auditLogPosted {
+		t.Fatal("Audit log should be posted when permission is denied")
+	}
+}
