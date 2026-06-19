@@ -1320,3 +1320,32 @@ git diff --check
 - Added `TestPayloadTemplateMetadataConsistency` test verifying bidirectional consistency between templates and metadata
 
 Acceptance result: **passed**. Sprint DD expands the payload template library from 5 to 33 templates covering all categories listed in Roadmap 2.0 (SSRF, XXE, RCE, Blind SQLi, SSTI, CORS/JSONP, SMTP injection, PDF/HTML rendering, Webhook, CI/CD, deserialization, LDAP, SMB, FTP, DNS rebinding, Log4j, YAML, JWT, and more), with full metadata consistency tests.
+
+## Sprint EE: Burp Suite Extension Prototype Verification (2026-06-19)
+
+### Scope
+
+Create a Burp Suite extension prototype using Montoya API that integrates GODNSLOG OAST functionality into Burp Suite.
+
+### Verification
+
+```bash
+GOCACHE=/tmp/gocache go test ./...
+# Result: PASS — all packages ok (no Go code changes, Java extension only)
+```
+
+```bash
+git diff --check
+# Result: PASS
+```
+
+### Files Added
+
+- `examples/burp-suite/README.md` — Installation, configuration, and usage guide
+- `examples/burp-suite/pom.xml` — Maven build configuration with Montoya API and Gson dependencies
+- `examples/burp-suite/src/main/java/com/godnslog/burp/GodnslogExtension.java` — Main extension entry point
+- `examples/burp-suite/src/main/java/com/godnslog/burp/GodnslogApiClient.java` — REST API client (case, payload, interactions, evidence)
+- `examples/burp-suite/src/main/java/com/godnslog/burp/OastTabProvider.java` — OAST tab UI with configuration, payload list, and interaction display
+- `examples/burp-suite/src/main/java/com/godnslog/burp/ContextMenuProvider.java` — Right-click context menu with 33 template options, payload insertion, and evidence export
+
+Acceptance result: **passed**. Sprint EE provides a complete Burp Suite extension prototype with Montoya API integration, REST API client, OAST tab UI, context menu with all 33 payload templates, evidence export, and evidence summary retrieval.
