@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation'
 import { authApi } from '@/lib/api-client'
 import type { LoginRequest } from '@/types'
 import { t, getCurrentLanguage, Language } from '@/lib/i18n'
+import { useAuthStore } from '@/features/auth/store'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { setToken, setUser } = useAuthStore()
   const [formData, setFormData] = useState<LoginRequest>({
     username: '',
     password: '',
@@ -34,18 +36,22 @@ export default function LoginPage() {
 
     try {
       const response = await authApi.login(formData)
-      console.log('Login response:', response)
       if (response.code === 0 && response.data) {
         localStorage.setItem('token', response.data.token)
         localStorage.setItem('user', JSON.stringify(response.data.user))
-        console.log('Token stored:', response.data.token)
+        setToken(response.data.token)
+        setUser({
+          id: String(response.data.user.id),
+          name: response.data.user.username,
+          email: response.data.user.email,
+          role: String(response.data.user.role),
+        })
         router.push('/dashboard')
       } else {
         setError(response.message || t('login.error', lang))
       }
     } catch (err: any) {
-      console.error('Login error:', err)
-      setError(err.response?.data?.message || t('login.error', lang))
+      setError(err.response?.data?.message || err.message || t('login.error', lang))
     } finally {
       setLoading(false)
     }
@@ -76,7 +82,7 @@ export default function LoginPage() {
         <p className="mt-2 text-center text-sm text-gray-600">
           {t('login.subtitle', lang)}
         </p>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className="mt-8 space-y-6" method="POST" onSubmit={handleSubmit}>
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
               {error}
