@@ -86,8 +86,19 @@ export default function PayloadsPage() {
 
   const handleBatchCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Batch creation logic would go here
-    alert('批量生成功能需要后端 API 支持')
+    if (batchCount < 1 || batchCount > 100) return
+    try {
+      await payloadApi.batchCreate({
+        case_id: '',
+        template: selectedTemplate.id,
+        variables,
+        count: batchCount,
+      })
+      setShowBatchModal(false)
+      loadPayloads()
+    } catch (error) {
+      console.error('Failed to batch create payloads:', error)
+    }
   }
 
   const updatePreview = () => {
@@ -112,43 +123,43 @@ export default function PayloadsPage() {
   )
 
   if (loading) {
-    return <div className="text-center py-12">加载中...</div>
+    return <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading...</div>
   }
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Payload Studio</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Payload Studio</h2>
         <div className="flex space-x-2">
           <Button onClick={() => setShowCreateModal(true)}>
-            创建 Payload
+            Create Payload
           </Button>
           <Button variant="secondary" onClick={() => setShowBatchModal(true)}>
-            批量生成
+            Batch Create
           </Button>
         </div>
       </div>
 
-      <div className="bg-white shadow rounded-lg mb-4 p-4">
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg mb-4 p-4 border border-gray-200 dark:border-gray-700">
         <Input
-          placeholder="搜索 token 或模板..."
+          placeholder="Search by token or template..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
       </div>
 
-      <div className="bg-white shadow rounded-lg">
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg border border-gray-200 dark:border-gray-700">
         <div className="px-4 py-5 sm:p-6">
           {filteredPayloads.length === 0 ? (
-            <p className="text-gray-500">暂无 Payloads</p>
+            <p className="text-gray-500 dark:text-gray-400">No payloads yet</p>
           ) : (
-            <ul className="divide-y divide-gray-200">
+            <ul className="divide-y divide-gray-200 dark:divide-gray-700">
               {filteredPayloads.map((payload) => (
-                <li key={payload.id} className="py-4">
+                <li key={payload.id} className="py-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors" onClick={() => router.push(`/dashboard/payloads/${payload.id}`)}>
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
-                        <p className="text-sm font-medium text-indigo-600">{payload.template}</p>
+                        <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">{payload.template}</p>
                         <Badge variant={
                           payload.status === 'hit' ? 'default' :
                           payload.status === 'deployed' ? 'secondary' :
@@ -159,28 +170,28 @@ export default function PayloadsPage() {
                         </Badge>
                       </div>
                       <div className="flex items-center space-x-2 mt-1">
-                        <p className="text-sm text-gray-600 break-all">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 break-all">
                           Token: {payload.token}
                         </p>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => copyToClipboard(payload.token)}
+                          onClick={(e) => { e.stopPropagation(); copyToClipboard(payload.token) }}
                         >
-                          复制
+                          Copy
                         </Button>
                       </div>
                       {payload.rendered_payload && (
                         <div className="flex items-center space-x-2 mt-1">
-                          <p className="text-xs text-gray-500 break-all">
+                          <p className="text-xs text-gray-500 dark:text-gray-500 break-all">
                             Payload: {payload.rendered_payload}
                           </p>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => copyToClipboard(payload.rendered_payload)}
+                            onClick={(e) => { e.stopPropagation(); copyToClipboard(payload.rendered_payload) }}
                           >
-                            复制
+                            Copy
                           </Button>
                         </div>
                       )}
@@ -196,7 +207,7 @@ export default function PayloadsPage() {
                       </p>
                       {payload.expires_at && (
                         <p className="text-xs text-gray-400">
-                          过期: {new Date(payload.expires_at).toLocaleString()}
+                          Expires: {new Date(payload.expires_at).toLocaleString()}
                         </p>
                       )}
                     </div>
@@ -212,11 +223,11 @@ export default function PayloadsPage() {
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>创建 Payload</DialogTitle>
+            <DialogTitle>Create Payload</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreatePayload}>
             <div className="mb-4">
-              <Label htmlFor="template">选择模板</Label>
+              <Label htmlFor="template">Select Template</Label>
               <Select value={selectedTemplate.id} onValueChange={(value) => setSelectedTemplate(templates.find(t => t.id === value) || templates[0])}>
                 <SelectTrigger id="template">
                   <SelectValue />
@@ -229,16 +240,16 @@ export default function PayloadsPage() {
               </Select>
             </div>
             <div className="mb-4">
-              <Label htmlFor="template-content">模板内容</Label>
+              <Label htmlFor="template-content">Template Content</Label>
               <Input
                 id="template-content"
                 value={selectedTemplate.template}
                 readOnly
-                className="bg-gray-50"
+                className="bg-gray-50 dark:bg-gray-900"
               />
             </div>
             <div className="mb-4">
-              <Label htmlFor="variables">变量</Label>
+              <Label htmlFor="variables">Variables</Label>
               <Input
                 id="variables"
                 placeholder='{"key": "value"}'
@@ -251,17 +262,17 @@ export default function PayloadsPage() {
               />
             </div>
             <div className="mb-4">
-              <Label>预览</Label>
-              <div className="p-3 bg-gray-50 rounded border">
-                <p className="text-sm break-all">{previewPayload}</p>
+              <Label>Preview</Label>
+              <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
+                <p className="text-sm break-all text-gray-900 dark:text-gray-100">{previewPayload}</p>
               </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowCreateModal(false)}>
-                取消
+                Cancel
               </Button>
               <Button type="submit">
-                创建
+                Create
               </Button>
             </DialogFooter>
           </form>
@@ -272,26 +283,39 @@ export default function PayloadsPage() {
       <Dialog open={showBatchModal} onOpenChange={setShowBatchModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>批量生成 Payload</DialogTitle>
+            <DialogTitle>Batch Create Payloads</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleBatchCreate}>
             <div className="mb-4">
-              <Label htmlFor="batch-count">生成数量 (1-100)</Label>
+              <Label htmlFor="batch-template">Select Template</Label>
+              <Select value={selectedTemplate.id} onValueChange={(value) => setSelectedTemplate(templates.find(t => t.id === value) || templates[0])}>
+                <SelectTrigger id="batch-template">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map(t => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="mb-4">
+              <Label htmlFor="batch-count">Count (1-100)</Label>
               <Input
                 id="batch-count"
                 type="number"
                 min="1"
                 max="100"
                 value={batchCount}
-                onChange={(e) => setBatchCount(parseInt(e.target.value))}
+                onChange={(e) => setBatchCount(parseInt(e.target.value) || 1)}
               />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowBatchModal(false)}>
-                取消
+                Cancel
               </Button>
               <Button type="submit" variant="secondary">
-                生成
+                Generate
               </Button>
             </DialogFooter>
           </form>

@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { payloadApi, caseApi, interactionApi } from '@/lib/api-client'
 import type { Payload, Case, Interaction } from '@/types'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 
 export default function PayloadDetailPage() {
   const params = useParams()
@@ -12,6 +14,10 @@ export default function PayloadDetailPage() {
   const [associatedCase, setAssociatedCase] = useState<Case | null>(null)
   const [recentInteractions, setRecentInteractions] = useState<Interaction[]>([])
   const [loading, setLoading] = useState(true)
+  const [copied, setCopied] = useState(false)
+  const [previewData, setPreviewData] = useState<string | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [revoking, setRevoking] = useState(false)
 
   const loadPayload = useCallback(async () => {
     try {
@@ -26,7 +32,6 @@ export default function PayloadDetailPage() {
       if (payloadData) {
         setPayload(payloadData)
 
-        // Load associated case if case_id exists
         if (payloadData.case_id) {
           try {
             const caseResp = await caseApi.get(payloadData.case_id)
@@ -38,20 +43,19 @@ export default function PayloadDetailPage() {
           } catch (err) {
             console.error('Failed to load associated case:', err)
           }
+        }
 
-          // Load recent interactions
-          try {
-            const interactionsResp = await interactionApi.list({
-              payload_id: params.id as string,
-              page: 1,
-              page_size: 5,
-            })
-            if (interactionsResp.data) {
-              setRecentInteractions(interactionsResp.data.items || [])
-            }
-          } catch (err) {
-            console.error('Failed to load recent interactions:', err)
+        try {
+          const interactionsResp = await interactionApi.list({
+            payload_id: params.id as string,
+            page: 1,
+            page_size: 5,
+          })
+          if (interactionsResp.data) {
+            setRecentInteractions(interactionsResp.data.items || [])
           }
+        } catch (err) {
+          console.error('Failed to load recent interactions:', err)
         }
       }
     } catch (error) {
@@ -68,88 +72,150 @@ export default function PayloadDetailPage() {
     }
   }, [params.id, loadPayload])
 
+  const handleCopyToken = async () => {
+    if (!payload) return
+    try {
+      await navigator.clipboard.writeText(payload.token)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy token:', err)
+    }
+  }
+
+  const handlePreview = async () => {
+    if (!payload) return
+    setPreviewLoading(true)
+    try {
+      const resp = await payloadApi.preview(payload.id)
+      const data = resp.data as unknown as { data: { rendered: string } }
+      setPreviewData(data?.data?.rendered || payload.rendered_payload || '')
+    } catch (err) {
+      console.error('Failed to preview payload:', err)
+      setPreviewData(payload.rendered_payload || '')
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  const handleRevoke = async () => {
+    if (!payload) return
+    if (!confirm('Are you sure you want to revoke this payload? This action cannot be undone.')) return
+    setRevoking(true)
+    try {
+      await payloadApi.revoke(payload.id)
+      loadPayload()
+    } catch (err) {
+      console.error('Failed to revoke payload:', err)
+    } finally {
+      setRevoking(false)
+    }
+  }
+
   if (loading) {
-    return <div className="text-center py-12">加载中...</div>
+    return <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading...</div>
   }
 
   if (!payload) {
-    return <div className="text-center py-12">Payload 不存在</div>
+    return <div className="text-center py-12 text-gray-500 dark:text-gray-400">Payload not found</div>
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <button
         onClick={() => router.back()}
-        className="mb-4 text-indigo-600 hover:text-indigo-800"
+        className="text-indigo-600 dark:text-indigo-400 hover:underline text-sm"
       >
-        ← 返回
+        ← Back
       </button>
 
-      <div className="bg-white shadow rounded-lg mb-6">
+      {/* Payload Header */}
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
         <div className="px-4 py-5 sm:p-6">
           <div className="flex justify-between items-start mb-4">
-            <h2 className="text-2xl font-bold text-gray-900">{payload.template}</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{payload.template}</h2>
+            <Badge variant={
+              payload.status === 'hit' ? 'default' :
+              payload.status === 'deployed' ? 'secondary' :
+              payload.status === 'archived' ? 'outline' :
+              'outline'
+            }>
+              {payload.status}
+            </Badge>
           </div>
 
           <div className="space-y-4">
             <div>
-              <p className="text-sm text-gray-500">Token</p>
-              <p className="text-sm font-medium break-all bg-gray-50 p-2 rounded">{payload.token}</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-500 dark:text-gray-400">Token</p>
+                <Button size="sm" variant="outline" onClick={handleCopyToken}>
+                  {copied ? 'Copied!' : 'Copy'}
+                </Button>
+              </div>
+              <p className="text-sm font-medium break-all bg-gray-50 dark:bg-gray-900 p-2 rounded mt-1 text-gray-900 dark:text-gray-100">{payload.token}</p>
             </div>
 
             {payload.rendered_payload && (
               <div>
-                <p className="text-sm text-gray-500">渲染Payload</p>
-                <p className="text-sm font-medium break-all bg-gray-50 p-2 rounded">{payload.rendered_payload}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Rendered Payload</p>
+                <p className="text-sm font-medium break-all bg-gray-50 dark:bg-gray-900 p-2 rounded mt-1 text-gray-900 dark:text-gray-100">{payload.rendered_payload}</p>
               </div>
             )}
 
             {payload.scenario && (
               <div>
-                <p className="text-sm text-gray-500">场景</p>
-                <p className="text-sm font-medium">{payload.scenario}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Scenario</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{payload.scenario}</p>
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-gray-500">状态</p>
-                <span className={`px-2 py-1 text-xs rounded ${
-                  payload.status === 'hit' ? 'bg-green-100 text-green-800' :
-                  payload.status === 'deployed' ? 'bg-blue-100 text-blue-800' :
-                  payload.status === 'archived' ? 'bg-red-100 text-red-800' :
-                  payload.status === 'expired' ? 'bg-gray-100 text-gray-800' :
-                  'bg-gray-100 text-gray-800'
-                }`}>
-                  {payload.status}
-                </span>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">创建时间</p>
-                <p className="text-sm font-medium">{new Date(payload.created_at).toLocaleString()}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Created</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{new Date(payload.created_at).toLocaleString()}</p>
               </div>
               {payload.expires_at && (
                 <div>
-                  <p className="text-sm text-gray-500">过期时间</p>
-                  <p className="text-sm font-medium">{new Date(payload.expires_at).toLocaleString()}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Expires</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{new Date(payload.expires_at).toLocaleString()}</p>
                 </div>
               )}
             </div>
           </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-2 mt-4">
+            <Button size="sm" variant="outline" onClick={handlePreview} disabled={previewLoading}>
+              {previewLoading ? 'Previewing...' : 'Preview'}
+            </Button>
+            {payload.status !== 'archived' && (
+              <Button size="sm" variant="destructive" onClick={handleRevoke} disabled={revoking}>
+                {revoking ? 'Revoking...' : 'Revoke'}
+              </Button>
+            )}
+          </div>
+
+          {/* Preview Result */}
+          {previewData !== null && (
+            <div className="mt-4">
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Preview Result</p>
+              <pre className="text-sm bg-gray-50 dark:bg-gray-900 p-3 rounded overflow-x-auto text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-all">{previewData}</pre>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Associated Case */}
       {associatedCase && (
-        <div className="bg-white shadow rounded-lg mb-6">
+        <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">关联 Case</h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Associated Case</h3>
             <div
-              className="p-4 bg-gray-50 rounded cursor-pointer hover:bg-gray-100 transition-colors"
+              className="p-4 bg-gray-50 dark:bg-gray-900 rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               onClick={() => router.push(`/dashboard/cases/${associatedCase.id}`)}
             >
-              <p className="text-sm font-medium text-indigo-600">{associatedCase.title}</p>
-              <p className="text-sm text-gray-500">{associatedCase.description}</p>
+              <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">{associatedCase.title}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{associatedCase.description}</p>
               {associatedCase.target && (
                 <p className="text-xs text-gray-400 mt-1">Target: {associatedCase.target}</p>
               )}
@@ -159,30 +225,31 @@ export default function PayloadDetailPage() {
       )}
 
       {/* Recent Interactions */}
-      <div className="bg-white shadow rounded-lg mb-6">
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
         <div className="px-4 py-5 sm:p-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium text-gray-900">最近交互</h3>
-            <button
-              onClick={() => router.push(`/dashboard/interactions?payload_id=${payload.id}`)}
-              className="text-sm text-indigo-600 hover:text-indigo-800"
-            >
-              查看全部 →
-            </button>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Interactions</h3>
+            <Button size="sm" variant="outline" onClick={() => router.push(`/dashboard/interactions?payload_id=${payload.id}`)}>
+              View All
+            </Button>
           </div>
           {recentInteractions.length === 0 ? (
-            <p className="text-gray-500">暂无交互记录</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">No interactions yet</p>
           ) : (
-            <ul className="divide-y divide-gray-200">
+            <ul className="divide-y divide-gray-200 dark:divide-gray-700">
               {recentInteractions.map((interaction) => (
                 <li key={interaction.id} className="py-3">
                   <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{interaction.type.toUpperCase()}</p>
-                      <p className="text-xs text-gray-500">
-                        {interaction.source_ip}
-                        {interaction.domain && ` | ${interaction.domain}`}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <Badge variant={interaction.type === 'dns' ? 'default' : 'secondary'}>
+                        {interaction.type.toUpperCase()}
+                      </Badge>
+                      <div>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
+                          {interaction.source_ip}
+                          {interaction.domain && ` | ${interaction.domain}`}
+                        </p>
+                      </div>
                     </div>
                     <p className="text-xs text-gray-400">
                       {new Date(interaction.timestamp).toLocaleString()}
@@ -196,22 +263,16 @@ export default function PayloadDetailPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white shadow rounded-lg">
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
         <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">快速操作</h3>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Quick Actions</h3>
           <div className="flex flex-wrap gap-3">
-            <button
-              onClick={() => router.push(`/dashboard/interactions?payload_id=${payload.id}`)}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-            >
-              查看交互
-            </button>
-            <button
-              onClick={() => router.push(`/dashboard/evidence?payload_id=${payload.id}`)}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
-            >
-              查看证据
-            </button>
+            <Button variant="outline" onClick={() => router.push(`/dashboard/interactions?payload_id=${payload.id}`)}>
+              View Interactions
+            </Button>
+            <Button variant="outline" onClick={() => router.push(`/dashboard/evidence?payload_id=${payload.id}`)}>
+              View Evidence
+            </Button>
           </div>
         </div>
       </div>
