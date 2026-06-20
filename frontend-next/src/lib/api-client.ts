@@ -92,6 +92,9 @@ export const payloadApi = {
   get: (id: string) => api.get<{ data: Payload }>(`/payloads/${id}`),
   create: (data: PayloadCreateRequest) => api.post<{ data: Payload }>('/payloads', data),
   revoke: (id: string) => api.post(`/payloads/${id}/revoke`),
+  preview: (id: string) => api.post<{ data: { rendered: string } }>(`/payloads/${id}/preview`),
+  batchCreate: (data: { case_id: string; template: string; variables?: Record<string, string>; count: number }) =>
+    api.post<{ data: Payload[] }>('/payloads/batch', data),
 }
 
 // Interaction API
