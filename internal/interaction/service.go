@@ -299,3 +299,48 @@ func (s *Service) exportToMarkdown(interactions []models.Interaction, includeRaw
 
 	return md, nil
 }
+
+// BatchImport imports interactions idempotently.
+// Skips records where an interaction with the same timestamp+token already exists.
+// Returns the number of records actually inserted.
+func (s *Service) BatchImport(interactions []*models.Interaction) (int, error) {
+	if len(interactions) == 0 {
+		return 0, nil
+	}
+
+	inserted := 0
+	for _, inter := range interactions {
+		// Check by ID first (handles re-import of same objects)
+		if inter.ID != "" {
+			exists, err := s.engine.ID(inter.ID).Exist(&models.Interaction{})
+			if err != nil {
+				return inserted, fmt.Errorf("failed to check existing interaction by ID: %w", err)
+			}
+			if exists {
+				continue
+			}
+		}
+		// Check by timestamp+token (handles idempotency for converted records)
+		if inter.Token != nil && *inter.Token != "" {
+			tsStr := inter.Timestamp.UTC().Format("2006-01-02 15:04:05")
+			exists, err := s.engine.Where("token = ? AND strftime('%Y-%m-%d %H:%M:%S', timestamp) = ?",
+				*inter.Token, tsStr).Exist(&models.Interaction{})
+			if err != nil {
+				return inserted, fmt.Errorf("failed to check existing interaction: %w", err)
+			}
+			if exists {
+				continue
+			}
+		}
+		if inter.ID == "" {
+			inter.ID = models.GenerateID()
+		}
+		_, err := s.engine.Insert(inter)
+		if err != nil {
+			return inserted, fmt.Errorf("failed to insert interaction: %w", err)
+		}
+		inserted++
+	}
+
+	return inserted, nil
+}
