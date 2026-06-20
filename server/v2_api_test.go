@@ -772,6 +772,167 @@ func TestV2ListAuditLogs(t *testing.T) {
 	if auditW6.Code != http.StatusUnauthorized {
 		t.Errorf("Expected status 401 for unauthenticated request, got %d", auditW6.Code)
 	}
+
+	// Test RBAC: normal user can only see own logs
+	normalUser := &models.TblUser{
+		Name:    "normaluser",
+		Email:   "normal@test.com",
+		Pass:    string(hashedPassword),
+		Role:    2, // roleNormal
+		Lang:    "en-US",
+		ShortId: fmt.Sprintf("short-%d", time.Now().UnixNano()),
+		Token:   fmt.Sprintf("token-%d", time.Now().UnixNano()),
+	}
+	if _, err := server.orm.Insert(normalUser); err != nil {
+		t.Fatalf("Failed to create normal user: %v", err)
+	}
+
+	// Create an audit log for the normal user
+	normalUserIDStr := fmt.Sprintf("%d", normalUser.Id)
+	normalAuditLog := &v2models.AuditLog{
+		ID:           v2models.GenerateID(),
+		UserID:       &normalUserIDStr,
+		Action:       "view_dashboard",
+		ResourceType: "dashboard",
+		Result:       "success",
+		IPAddress:    "127.0.0.1",
+		UserAgent:    "test-agent",
+		Timestamp:    time.Now(),
+	}
+	if _, err := server.orm.Insert(normalAuditLog); err != nil {
+		t.Fatalf("Failed to create audit log for normal user: %v", err)
+	}
+
+	normalLoginReq := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(`{"username":"normaluser","password":"password"}`))
+	normalLoginReq.Header.Set("Content-Type", "application/json")
+	normalLoginW := httptest.NewRecorder()
+	r.ServeHTTP(normalLoginW, normalLoginReq)
+
+	var normalLoginResp LoginResponse
+	if err := json.Unmarshal(normalLoginW.Body.Bytes(), &normalLoginResp); err != nil {
+		t.Fatalf("Failed to unmarshal normal user login response: %v", err)
+	}
+	normalToken := normalLoginResp.Data.Token
+
+	// Extract seed from JWT and set normal user in cache
+	normalParts := strings.Split(normalToken, ".")
+	if len(normalParts) != 3 {
+		t.Fatal("Invalid JWT token format for normal user")
+	}
+	normalDecoded, err := base64.RawURLEncoding.DecodeString(normalParts[1])
+	if err != nil {
+		t.Fatalf("Failed to decode JWT payload for normal user: %v", err)
+	}
+	var normalClaims map[string]interface{}
+	if err := json.Unmarshal(normalDecoded, &normalClaims); err != nil {
+		t.Fatalf("Failed to unmarshal JWT claims for normal user: %v", err)
+	}
+	normalSeedValue := normalClaims["seed"]
+	var normalSeedStr string
+	switch v := normalSeedValue.(type) {
+	case float64:
+		normalSeedStr = fmt.Sprintf("%.0f", v)
+	case string:
+		normalSeedStr = v
+	default:
+		t.Fatalf("Unexpected seed type: %T, value: %v", normalSeedValue, normalSeedValue)
+	}
+	normalSeedKey := fmt.Sprintf("%v.seed", normalUser.Id)
+	normalUserKey := fmt.Sprintf("%v.user", normalUser.Id)
+	store.Set(normalSeedKey, normalSeedStr, cache.NoExpiration)
+	store.Set(normalUserKey, normalUser, cache.NoExpiration)
+
+	// Normal user should only see their own logs
+	normalAuditReq := httptest.NewRequest("GET", "/api/v2/audit/logs?page=1&page_size=10", nil)
+	normalAuditReq.Header.Set("Access-Token", normalToken)
+	normalAuditW := httptest.NewRecorder()
+	r.ServeHTTP(normalAuditW, normalAuditReq)
+
+	if normalAuditW.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 for normal user, got %d: %s", normalAuditW.Code, normalAuditW.Body.String())
+	}
+
+	var normalResponse map[string]interface{}
+	if err := json.Unmarshal(normalAuditW.Body.Bytes(), &normalResponse); err != nil {
+		t.Fatalf("Failed to unmarshal normal user response: %v", err)
+	}
+	normalData, ok := normalResponse["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map for normal user")
+	}
+	// Normal user may have no audit logs, so items could be nil/empty
+	normalItems, _ := normalData["items"].([]interface{})
+	// All returned items (if any) should belong to the normal user
+	for _, item := range normalItems {
+		itemMap := item.(map[string]interface{})
+		itemUserID, _ := itemMap["user_id"].(string)
+		if itemUserID != normalUserIDStr {
+			t.Errorf("Normal user should only see own logs, got user_id=%v", itemMap["user_id"])
+		}
+	}
+
+	// Test RBAC: guest user is denied access
+	guestUser := &models.TblUser{
+		Name:    "guestuser",
+		Email:   "guest@test.com",
+		Pass:    string(hashedPassword),
+		Role:    3, // roleGuest
+		Lang:    "en-US",
+		ShortId: fmt.Sprintf("short-g-%d", time.Now().UnixNano()),
+		Token:   fmt.Sprintf("token-g-%d", time.Now().UnixNano()),
+	}
+	if _, err := server.orm.Insert(guestUser); err != nil {
+		t.Fatalf("Failed to create guest user: %v", err)
+	}
+
+	guestLoginReq := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(`{"username":"guestuser","password":"password"}`))
+	guestLoginReq.Header.Set("Content-Type", "application/json")
+	guestLoginW := httptest.NewRecorder()
+	r.ServeHTTP(guestLoginW, guestLoginReq)
+
+	var guestLoginResp LoginResponse
+	if err := json.Unmarshal(guestLoginW.Body.Bytes(), &guestLoginResp); err != nil {
+		t.Fatalf("Failed to unmarshal guest user login response: %v", err)
+	}
+	guestToken := guestLoginResp.Data.Token
+
+	// Extract seed from JWT and set guest user in cache
+	guestParts := strings.Split(guestToken, ".")
+	if len(guestParts) != 3 {
+		t.Fatal("Invalid JWT token format for guest user")
+	}
+	guestDecoded, err := base64.RawURLEncoding.DecodeString(guestParts[1])
+	if err != nil {
+		t.Fatalf("Failed to decode JWT payload for guest user: %v", err)
+	}
+	var guestClaims map[string]interface{}
+	if err := json.Unmarshal(guestDecoded, &guestClaims); err != nil {
+		t.Fatalf("Failed to unmarshal JWT claims for guest user: %v", err)
+	}
+	guestSeedValue := guestClaims["seed"]
+	var guestSeedStr string
+	switch v := guestSeedValue.(type) {
+	case float64:
+		guestSeedStr = fmt.Sprintf("%.0f", v)
+	case string:
+		guestSeedStr = v
+	default:
+		t.Fatalf("Unexpected seed type: %T, value: %v", guestSeedValue, guestSeedValue)
+	}
+	guestSeedKey := fmt.Sprintf("%v.seed", guestUser.Id)
+	guestUserKey := fmt.Sprintf("%v.user", guestUser.Id)
+	store.Set(guestSeedKey, guestSeedStr, cache.NoExpiration)
+	store.Set(guestUserKey, guestUser, cache.NoExpiration)
+
+	// Guest user should be denied access
+	guestAuditReq := httptest.NewRequest("GET", "/api/v2/audit/logs", nil)
+	guestAuditReq.Header.Set("Access-Token", guestToken)
+	guestAuditW := httptest.NewRecorder()
+	r.ServeHTTP(guestAuditW, guestAuditReq)
+
+	if guestAuditW.Code != http.StatusForbidden {
+		t.Errorf("Expected status 403 for guest user, got %d: %s", guestAuditW.Code, guestAuditW.Body.String())
+	}
 }
 
 func TestV2Login(t *testing.T) {
