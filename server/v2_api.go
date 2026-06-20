@@ -215,6 +215,7 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			scannerRuns.POST("", self.v2CreateScannerRun)
 			scannerRuns.GET("/:id", self.v2GetScannerRun)
 			scannerRuns.PUT("/:id/status", self.v2UpdateScannerRunStatus)
+			scannerRuns.POST("/:id/backfill", self.v2BackfillScannerResults)
 		}
 
 		// Agent Runs
@@ -3512,6 +3513,55 @@ func (self *WebServer) v2UpdateScannerRunStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
+	})
+}
+
+// v2BackfillScannerResults imports scan results and associates them with a scanner run
+func (self *WebServer) v2BackfillScannerResults(c *gin.Context) {
+	id := c.Param("id")
+
+	var req struct {
+		Format     string `json:"format"`
+		RawResults string `json:"raw_results"`
+	}
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": fmt.Sprintf("invalid request: %v", err),
+		})
+		return
+	}
+
+	if req.Format == "" {
+		req.Format = "jsonl"
+	}
+
+	scannerHubService := scannerhub.NewService(self.orm)
+	result, err := scannerHubService.BackfillResults(&scannerhub.BackfillResultsRequest{
+		Format:       req.Format,
+		RawResults:   req.RawResults,
+		ScannerRunID: id,
+	})
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2BackfillScannerResults] error: %v", err)
+		if err == scannerhub.ErrScannerRunNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"code":    404,
+				"message": "scanner run not found",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to backfill scanner results",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    result,
 	})
 }
 

