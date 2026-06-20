@@ -82,7 +82,7 @@ func (s *Service) AddPluginVersion(ctx context.Context, version *PluginVersion) 
 	if err := s.store.CreatePluginVersion(ctx, version); err != nil {
 		return err
 	}
-	
+
 	// Update plugin's latest version
 	plugin, err := s.store.GetPlugin(ctx, version.PluginID)
 	if err != nil {
@@ -104,10 +104,10 @@ func (s *Service) AddPluginReview(ctx context.Context, review *PluginReview) err
 	if err := s.store.CreatePluginReview(ctx, review); err != nil {
 		return err
 	}
-	
+
 	// Recalculate plugin rating
 	s.recalculatePluginRating(ctx, review.PluginID)
-	
+
 	return nil
 }
 
@@ -122,25 +122,25 @@ func (s *Service) recalculatePluginRating(ctx context.Context, pluginID string) 
 	if err != nil {
 		return err
 	}
-	
+
 	if len(reviews) == 0 {
 		return nil
 	}
-	
+
 	sum := 0
 	for _, review := range reviews {
 		sum += review.Rating
 	}
-	
+
 	plugin, err := s.store.GetPlugin(ctx, pluginID)
 	if err != nil {
 		return err
 	}
-	
+
 	plugin.Rating = float64(sum) / float64(len(reviews))
 	plugin.Reviews = len(reviews)
 	plugin.UpdatedAt = time.Now()
-	
+
 	return s.store.UpdatePlugin(ctx, plugin)
 }
 
@@ -210,10 +210,10 @@ func (s *Service) AddTemplateReview(ctx context.Context, review *TemplateReview)
 	if err := s.store.CreateTemplateReview(ctx, review); err != nil {
 		return err
 	}
-	
+
 	// Recalculate template rating
 	s.recalculateTemplateRating(ctx, review.TemplateID)
-	
+
 	return nil
 }
 
@@ -228,25 +228,25 @@ func (s *Service) recalculateTemplateRating(ctx context.Context, templateID stri
 	if err != nil {
 		return err
 	}
-	
+
 	if len(reviews) == 0 {
 		return nil
 	}
-	
+
 	sum := 0
 	for _, review := range reviews {
 		sum += review.Rating
 	}
-	
+
 	template, err := s.store.GetTemplate(ctx, templateID)
 	if err != nil {
 		return err
 	}
-	
+
 	template.Rating = float64(sum) / float64(len(reviews))
 	template.Reviews = len(reviews)
 	template.UpdatedAt = time.Now()
-	
+
 	return s.store.UpdateTemplate(ctx, template)
 }
 
@@ -255,22 +255,22 @@ func (s *Service) recalculateTemplateRating(ctx context.Context, templateID stri
 // InstallPlugin installs a plugin
 func (s *Service) InstallPlugin(ctx context.Context, pluginID string, version string, config string) (*PluginInstallation, error) {
 	installation := &PluginInstallation{
-		ID:             generateInstallationID(),
-		PluginID:       pluginID,
-		PluginVersion:  version,
-		Status:         "installed",
-		Config:         config,
-		CreatedAt:      time.Now(),
-		UpdatedAt:      time.Now(),
+		ID:            generateInstallationID(),
+		PluginID:      pluginID,
+		PluginVersion: version,
+		Status:        "installed",
+		Config:        config,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
-	
+
 	if err := s.store.CreatePluginInstallation(ctx, installation); err != nil {
 		return nil, err
 	}
-	
+
 	// Increment plugin download count
 	s.store.IncrementPluginDownloads(ctx, pluginID)
-	
+
 	return installation, nil
 }
 
@@ -298,16 +298,16 @@ func generateInstallationID() string {
 // Filters
 
 type PluginFilters struct {
-	Type     string
-	Category string
-	IsOfficial *bool
+	Type        string
+	Category    string
+	IsOfficial  *bool
 	IsPublished *bool
 }
 
 type TemplateFilters struct {
-	Type     string
-	Category string
-	IsOfficial *bool
+	Type        string
+	Category    string
+	IsOfficial  *bool
 	IsPublished *bool
 }
 
@@ -320,15 +320,15 @@ type Store interface {
 	UpdatePlugin(ctx context.Context, plugin *Plugin) error
 	DeletePlugin(ctx context.Context, id string) error
 	IncrementPluginDownloads(ctx context.Context, id string) error
-	
+
 	// Plugin version operations
 	CreatePluginVersion(ctx context.Context, version *PluginVersion) error
 	GetPluginVersions(ctx context.Context, pluginID string) ([]PluginVersion, error)
-	
+
 	// Plugin review operations
 	CreatePluginReview(ctx context.Context, review *PluginReview) error
 	GetPluginReviews(ctx context.Context, pluginID string) ([]PluginReview, error)
-	
+
 	// Template operations
 	CreateTemplate(ctx context.Context, template *Template) error
 	GetTemplate(ctx context.Context, id string) (*Template, error)
@@ -336,11 +336,11 @@ type Store interface {
 	UpdateTemplate(ctx context.Context, template *Template) error
 	DeleteTemplate(ctx context.Context, id string) error
 	IncrementTemplateDownloads(ctx context.Context, id string) error
-	
+
 	// Template review operations
 	CreateTemplateReview(ctx context.Context, review *TemplateReview) error
 	GetTemplateReviews(ctx context.Context, templateID string) ([]TemplateReview, error)
-	
+
 	// Plugin installation operations
 	CreatePluginInstallation(ctx context.Context, installation *PluginInstallation) error
 	GetPluginInstallation(ctx context.Context, id string) (*PluginInstallation, error)

@@ -15,11 +15,11 @@ type Workspace struct {
 
 // WorkspaceMember represents a workspace member
 type WorkspaceMember struct {
-	ID         string    `json:"id" xorm:"'id' pk"`
-	WorkspaceID string   `json:"workspace_id"`
-	UserID     string    `json:"user_id"`
-	Role       string    `json:"role"` // owner, admin, member, viewer
-	JoinedAt   time.Time `json:"joined_at" xorm:"created"`
+	ID          string    `json:"id" xorm:"'id' pk"`
+	WorkspaceID string    `json:"workspace_id"`
+	UserID      string    `json:"user_id"`
+	Role        string    `json:"role"` // owner, admin, member, viewer
+	JoinedAt    time.Time `json:"joined_at" xorm:"created"`
 }
 
 // WorkspaceDomain represents a domain associated with a workspace
@@ -33,13 +33,13 @@ type WorkspaceDomain struct {
 
 // WorkspaceConfig holds workspace configuration
 type WorkspaceConfig struct {
-	MaxCases       int    `json:"max_cases"`
-	MaxPayloads    int    `json:"max_payloads"`
-	MaxInteractions int   `json:"max_interactions"`
-	RetentionDays  int    `json:"retention_days"`
-	EnableCanary   bool   `json:"enable_canary"`
-	EnableRebinding bool  `json:"enable_rebinding"`
-	EnableListeners bool   `json:"enable_listeners"`
+	MaxCases        int  `json:"max_cases"`
+	MaxPayloads     int  `json:"max_payloads"`
+	MaxInteractions int  `json:"max_interactions"`
+	RetentionDays   int  `json:"retention_days"`
+	EnableCanary    bool `json:"enable_canary"`
+	EnableRebinding bool `json:"enable_rebinding"`
+	EnableListeners bool `json:"enable_listeners"`
 }
 
 // WorkspaceStats represents workspace statistics

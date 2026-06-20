@@ -9,13 +9,13 @@ import (
 // Resolve represents DNS resolution configuration
 // This is a wrapper around models.TblResolve for compatibility
 type Resolve struct {
-	ID         int64     `json:"id" xorm:"pk autoincr"`
-	Host       string    `json:"host" xorm:"varchar(255) notnull index"` // host record, eg. www
-	Type       string    `json:"type" xorm:"varchar(16) notnull"` // record type, eg. CNAME/A/MX/TXT/SRV/NS
-	Value      string    `json:"value" xorm:"varchar(255) notnull"`
-	TTL        uint32    `json:"ttl" xorm:"default 300"`
-	CreatedAt  time.Time `json:"created_at" xorm:"datetime created"`
-	UpdatedAt  time.Time `json:"updated_at" xorm:"datetime updated"`
+	ID        int64     `json:"id" xorm:"pk autoincr"`
+	Host      string    `json:"host" xorm:"varchar(255) notnull index"` // host record, eg. www
+	Type      string    `json:"type" xorm:"varchar(16) notnull"`        // record type, eg. CNAME/A/MX/TXT/SRV/NS
+	Value     string    `json:"value" xorm:"varchar(255) notnull"`
+	TTL       uint32    `json:"ttl" xorm:"default 300"`
+	CreatedAt time.Time `json:"created_at" xorm:"datetime created"`
+	UpdatedAt time.Time `json:"updated_at" xorm:"datetime updated"`
 }
 
 // TableName returns the table name for Resolve model

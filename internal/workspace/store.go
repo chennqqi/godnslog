@@ -193,21 +193,21 @@ func (s *XormStore) GetWorkspaceStats(ctx context.Context, workspaceID string) (
 	stats := &WorkspaceStats{
 		WorkspaceID: workspaceID,
 	}
-	
+
 	// Count members
 	members, err := s.GetWorkspaceMembers(ctx, workspaceID)
 	if err == nil {
 		stats.MemberCount = len(members)
 	}
-	
+
 	// Count domains
 	domains, err := s.GetWorkspaceDomains(ctx, workspaceID)
 	if err == nil {
 		stats.DomainCount = len(domains)
 	}
-	
+
 	// For MVP, case/payload/interaction counts would require joins
 	// In production, implement proper counting
-	
+
 	return stats, nil
 }

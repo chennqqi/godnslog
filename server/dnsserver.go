@@ -219,7 +219,6 @@ func (self *DnsServer) responseStandard(w dns.ResponseWriter, req *dns.Msg) {
 		default:
 			return nil
 		}
-		return nil
 	}
 
 	findResolves := func(origin, t string) []*Resolve {
@@ -398,7 +397,7 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 			Class:  dns.ClassINET,
 			Ttl:    ttl,
 		}
-		a := &dns.A{rr_header, ip}
+		a := &dns.A{Hdr: rr_header, A: ip}
 		m.Answer = append(m.Answer, a)
 		w.WriteMsg(m)
 
@@ -411,7 +410,6 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 				Ip:     remoteIp.String(),
 			})
 		}
-		return
 	}
 
 	//r.u3yszl9nidbsx8p9.example.com.

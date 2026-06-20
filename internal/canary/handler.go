@@ -95,10 +95,10 @@ func (h *Handler) CreateCanary(c *gin.Context) {
 // @Router /canaries [get]
 func (h *Handler) ListCanaries(c *gin.Context) {
 	enabledStr := c.Query("enabled")
-	
+
 	var canaries []Canary
 	var err error
-	
+
 	if enabledStr == "" {
 		canaries, err = h.store.GetAllCanaries(c)
 	} else {
@@ -136,7 +136,7 @@ func (h *Handler) ListCanaries(c *gin.Context) {
 // @Router /canaries/{id} [get]
 func (h *Handler) GetCanary(c *gin.Context) {
 	id := c.Param("id")
-	
+
 	canary, err := h.store.GetCanary(c, id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"code": -1, "message": "Canary not found"})
@@ -158,7 +158,7 @@ func (h *Handler) GetCanary(c *gin.Context) {
 // @Router /canaries/{id} [put]
 func (h *Handler) UpdateCanary(c *gin.Context) {
 	id := c.Param("id")
-	
+
 	var req UpdateCanaryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": -1, "message": err.Error()})
@@ -195,7 +195,7 @@ func (h *Handler) UpdateCanary(c *gin.Context) {
 // @Router /canaries/{id} [delete]
 func (h *Handler) DeleteCanary(c *gin.Context) {
 	id := c.Param("id")
-	
+
 	if err := h.store.DeleteCanary(c, id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": -1, "message": err.Error()})
 		return
@@ -214,7 +214,7 @@ func (h *Handler) DeleteCanary(c *gin.Context) {
 // @Router /canaries/{id}/hits [get]
 func (h *Handler) ListCanaryHits(c *gin.Context) {
 	id := c.Param("id")
-	
+
 	hits, err := h.store.GetCanaryHits(c, id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": -1, "message": err.Error()})
@@ -234,7 +234,7 @@ func (h *Handler) ListCanaryHits(c *gin.Context) {
 // @Router /canaries/{id}/stats [get]
 func (h *Handler) GetCanaryStats(c *gin.Context) {
 	id := c.Param("id")
-	
+
 	hits, err := h.store.GetCanaryHits(c, id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": -1, "message": err.Error()})
@@ -248,12 +248,12 @@ func (h *Handler) GetCanaryStats(c *gin.Context) {
 	}
 
 	stats := CanaryStats{
-		CanaryID:    id,
-		TotalHits:   len(hits),
-		RiskLevel:   h.assessOverallRisk(hits, canary),
-		FirstHit:    getFirstHitTime(hits),
-		LastHit:     getLastHitTime(hits),
-		UniqueIPs:   countUniqueIPs(hits),
+		CanaryID:  id,
+		TotalHits: len(hits),
+		RiskLevel: h.assessOverallRisk(hits, canary),
+		FirstHit:  getFirstHitTime(hits),
+		LastHit:   getLastHitTime(hits),
+		UniqueIPs: countUniqueIPs(hits),
 	}
 
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": stats})
@@ -261,12 +261,12 @@ func (h *Handler) GetCanaryStats(c *gin.Context) {
 
 // CanaryStats represents canary statistics
 type CanaryStats struct {
-	CanaryID    string `json:"canary_id"`
-	TotalHits   int    `json:"total_hits"`
-	RiskLevel   string `json:"risk_level"`
-	FirstHit    string `json:"first_hit"`
-	LastHit     string `json:"last_hit"`
-	UniqueIPs   int    `json:"unique_ips"`
+	CanaryID  string `json:"canary_id"`
+	TotalHits int    `json:"total_hits"`
+	RiskLevel string `json:"risk_level"`
+	FirstHit  string `json:"first_hit"`
+	LastHit   string `json:"last_hit"`
+	UniqueIPs int    `json:"unique_ips"`
 }
 
 // parseExpiration parses expiration string to time

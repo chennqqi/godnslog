@@ -46,7 +46,7 @@ func (s *XormStore) CreateRule(ctx context.Context, rule *Rule) error {
 	rule.ID = generateID()
 	rule.CreatedAt = time.Now()
 	rule.UpdatedAt = time.Now()
-	
+
 	_, err := s.db.Insert(rule)
 	if err != nil {
 		return fmt.Errorf("failed to create rule: %w", err)
@@ -57,7 +57,7 @@ func (s *XormStore) CreateRule(ctx context.Context, rule *Rule) error {
 // UpdateRule updates an existing rule
 func (s *XormStore) UpdateRule(ctx context.Context, rule *Rule) error {
 	rule.UpdatedAt = time.Now()
-	
+
 	_, err := s.db.ID(rule.ID).Update(rule)
 	if err != nil {
 		return fmt.Errorf("failed to update rule: %w", err)

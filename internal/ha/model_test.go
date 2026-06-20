@@ -41,19 +41,19 @@ func TestClusterNodeModel(t *testing.T) {
 func TestClusterConfigModel(t *testing.T) {
 	now := time.Now()
 	config := &ClusterConfig{
-		ID:                "config-1",
-		EnableFailover:    true,
-		FailoverTimeout:   30,
-		EnableLoadBalance: true,
-		BalanceAlgorithm:  "round_robin",
-		EnableReplication: false,
-		ReplicationMode:   "async",
+		ID:                  "config-1",
+		EnableFailover:      true,
+		FailoverTimeout:     30,
+		EnableLoadBalance:   true,
+		BalanceAlgorithm:    "round_robin",
+		EnableReplication:   false,
+		ReplicationMode:     "async",
 		HealthCheckInterval: 10,
-		HealthCheckTimeout: 5,
-		EnableQuorum:      false,
-		QuorumSize:        2,
-		CreatedAt:         now,
-		UpdatedAt:         now,
+		HealthCheckTimeout:  5,
+		EnableQuorum:        false,
+		QuorumSize:          2,
+		CreatedAt:           now,
+		UpdatedAt:           now,
 	}
 
 	if config.ID == "" {

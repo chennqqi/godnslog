@@ -295,3 +295,10 @@ Analysis:
 - The updated spec is coherent, consistent, and sufficiently detailed for implementation.
 
 Verdict: Approved. The spec is ready to serve as the engineering baseline.
+
+## 2026-06-20 (production readiness evaluation)
+
+分析当前代码基线是否生产可用。
+- 实际验证：`go build`/`go test` 通过，但 `go vet`、`gofmt`、前端 lint、E2E 均失败。
+- 与 ROADMAP 对照：MVP 雏形存在，2.1-2.3 大量功能仍为 stub 或测试缺失。
+- 结论：不满足生产可用，需按已批准 spec 分阶段补齐后端实现、前端质量与部署工程。

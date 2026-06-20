@@ -35,9 +35,9 @@ func init() {
 }
 
 type EvidenceExportRequest struct {
-	CaseID      string `json:"case_id"`
-	Format      string `json:"format"`
-	IncludeRaw  bool   `json:"include_raw"`
+	CaseID     string `json:"case_id"`
+	Format     string `json:"format"`
+	IncludeRaw bool   `json:"include_raw"`
 }
 
 func runReportExport(cmd *cobra.Command, args []string) error {

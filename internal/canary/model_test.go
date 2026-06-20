@@ -46,14 +46,14 @@ func TestCanaryType(t *testing.T) {
 func TestCanaryModel(t *testing.T) {
 	now := time.Now()
 	c := Canary{
-		ID:          "test-canary-1",
-		Type:        string(CanaryTypeDNS),
-		Token:       "test-token-abc123",
-		Context:     "encoded-context",
-		ExpiresAt:   now,
-		IsEnabled:   true,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:        "test-canary-1",
+		Type:      string(CanaryTypeDNS),
+		Token:     "test-token-abc123",
+		Context:   "encoded-context",
+		ExpiresAt: now,
+		IsEnabled: true,
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 
 	if c.ID == "" {
@@ -73,11 +73,11 @@ func TestCanaryModel(t *testing.T) {
 func TestCanaryHitModel(t *testing.T) {
 	now := time.Now()
 	h := CanaryHit{
-		ID:          "test-hit-1",
-		CanaryID:    "test-canary-1",
-		SourceIP:    "192.168.1.1",
-		UserAgent:   "test-agent",
-		Timestamp:   now,
+		ID:           "test-hit-1",
+		CanaryID:     "test-canary-1",
+		SourceIP:     "192.168.1.1",
+		UserAgent:    "test-agent",
+		Timestamp:    now,
 		IsCompressed: false,
 	}
 
@@ -93,11 +93,11 @@ func TestCanaryHitModel(t *testing.T) {
 // TestCanaryConfig tests canary config
 func TestCanaryConfig(t *testing.T) {
 	config := CanaryConfig{
-		MaxRetentionDays: 90,
-		DefaultExpiry:    "90d",
-		SilentWindow:     300,
+		MaxRetentionDays:     90,
+		DefaultExpiry:        "90d",
+		SilentWindow:         300,
 		CompressionThreshold: 10,
-		NotificationLevels: []string{"low", "medium", "high"},
+		NotificationLevels:   []string{"low", "medium", "high"},
 	}
 
 	if config.MaxRetentionDays != 90 {

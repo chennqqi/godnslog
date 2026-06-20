@@ -12,14 +12,14 @@ import (
 
 // ActionLog records the result of a single action execution
 type ActionLog struct {
-	WorkflowID  string
-	ActionID    string
-	ActionType  string
-	Success     bool
-	Error       string
-	Duration    time.Duration
-	Attempt     int
-	ExecutedAt  time.Time
+	WorkflowID string
+	ActionID   string
+	ActionType string
+	Success    bool
+	Error      string
+	Duration   time.Duration
+	Attempt    int
+	ExecutedAt time.Time
 }
 
 // QueueJob represents a workflow execution job

@@ -39,17 +39,17 @@ var agentCompleteCmd = &cobra.Command{
 }
 
 var (
-	agentID      string
-	agentOperator string
-	agentTarget  string
-	agentTitle   string
-	agentCaseID  string
-	agentPayloadID string
-	agentFormat  string
-	agentDecision string
+	agentID             string
+	agentOperator       string
+	agentTarget         string
+	agentTitle          string
+	agentCaseID         string
+	agentPayloadID      string
+	agentFormat         string
+	agentDecision       string
 	agentDecisionReason string
-	agentIncludeAudit bool
-	agentStatusFilter string
+	agentIncludeAudit   bool
+	agentStatusFilter   string
 )
 
 func init() {
@@ -110,8 +110,8 @@ func runAgentList(cmd *cobra.Command, args []string) error {
 	}
 
 	var resp struct {
-		Code    int                  `json:"code"`
-		Message string               `json:"message"`
+		Code    int                   `json:"code"`
+		Message string                `json:"message"`
 		Data    *AgentRunListResponse `json:"data"`
 	}
 	if err := json.Unmarshal(body, &resp); err != nil {
@@ -145,9 +145,9 @@ func runAgentGet(cmd *cobra.Command, args []string) error {
 	}
 
 	var resp struct {
-		Code    int        `json:"code"`
-		Message string     `json:"message"`
-		Data    *AgentRun  `json:"data"`
+		Code    int       `json:"code"`
+		Message string    `json:"message"`
+		Data    *AgentRun `json:"data"`
 	}
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return fmt.Errorf("failed to parse response: %w", err)
@@ -200,9 +200,9 @@ func runAgentCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	var resp struct {
-		Code    int        `json:"code"`
-		Message string     `json:"message"`
-		Data    *AgentRun  `json:"data"`
+		Code    int       `json:"code"`
+		Message string    `json:"message"`
+		Data    *AgentRun `json:"data"`
 	}
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return fmt.Errorf("failed to parse response: %w", err)
