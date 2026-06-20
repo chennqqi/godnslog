@@ -376,6 +376,59 @@ func TestService_ExecuteDNSAction_UnsupportedType(t *testing.T) {
 	assert.Contains(t, err.Error(), "unsupported")
 }
 
+// --- SMTP Action Executor Tests ---
+
+func TestService_ExecuteSMTPAction_MissingSMTPHost(t *testing.T) {
+	engine, err := MockEngine()
+	assert.NoError(t, err)
+	service := NewService(engine)
+
+	action := models.Action{
+		Type: models.ActionTypeSMTP, Enabled: true,
+		Config: map[string]interface{}{},
+	}
+	token := "smtp-token"
+	interaction := &models.Interaction{ID: models.GenerateID(), Type: "dns", Token: &token}
+
+	err = service.executeSMTPAction(action, interaction)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing smtp_host")
+}
+
+func TestService_ExecuteSMTPAction_MissingFrom(t *testing.T) {
+	engine, err := MockEngine()
+	assert.NoError(t, err)
+	service := NewService(engine)
+
+	action := models.Action{
+		Type: models.ActionTypeSMTP, Enabled: true,
+		Config: map[string]interface{}{"smtp_host": "localhost"},
+	}
+	token := "smtp-token"
+	interaction := &models.Interaction{ID: models.GenerateID(), Type: "dns", Token: &token}
+
+	err = service.executeSMTPAction(action, interaction)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing from")
+}
+
+func TestService_ExecuteSMTPAction_MissingTo(t *testing.T) {
+	engine, err := MockEngine()
+	assert.NoError(t, err)
+	service := NewService(engine)
+
+	action := models.Action{
+		Type: models.ActionTypeSMTP, Enabled: true,
+		Config: map[string]interface{}{"smtp_host": "localhost", "from": "alert@example.com"},
+	}
+	token := "smtp-token"
+	interaction := &models.Interaction{ID: models.GenerateID(), Type: "dns", Token: &token}
+
+	err = service.executeSMTPAction(action, interaction)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing to")
+}
+
 // --- Notify Action Executor Tests ---
 
 func TestService_ExecuteNotifyAction_WebhookChannel(t *testing.T) {
@@ -425,7 +478,7 @@ func TestService_ExecuteNotifyAction_UnsupportedChannel(t *testing.T) {
 
 	action := models.Action{
 		Type: models.ActionTypeNotify, Enabled: true,
-		Config: map[string]interface{}{"channel": "email"},
+		Config: map[string]interface{}{"channel": "unsupported_channel"},
 	}
 	token := "notify-token"
 	interaction := &models.Interaction{ID: models.GenerateID(), Type: "dns", Token: &token}
@@ -433,6 +486,59 @@ func TestService_ExecuteNotifyAction_UnsupportedChannel(t *testing.T) {
 	err = service.executeNotifyAction(action, interaction)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported")
+}
+
+// --- Email Notification Tests ---
+
+func TestService_ExecuteNotifyAction_Email_MissingSMTPHost(t *testing.T) {
+	engine, err := MockEngine()
+	assert.NoError(t, err)
+	service := NewService(engine)
+
+	action := models.Action{
+		Type: models.ActionTypeNotify, Enabled: true,
+		Config: map[string]interface{}{"channel": "email"},
+	}
+	token := "notify-token"
+	interaction := &models.Interaction{ID: models.GenerateID(), Type: "dns", Token: &token}
+
+	err = service.executeNotifyAction(action, interaction)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing smtp_host")
+}
+
+func TestService_ExecuteNotifyAction_Email_MissingFrom(t *testing.T) {
+	engine, err := MockEngine()
+	assert.NoError(t, err)
+	service := NewService(engine)
+
+	action := models.Action{
+		Type: models.ActionTypeNotify, Enabled: true,
+		Config: map[string]interface{}{"channel": "email", "smtp_host": "localhost"},
+	}
+	token := "notify-token"
+	interaction := &models.Interaction{ID: models.GenerateID(), Type: "dns", Token: &token}
+
+	err = service.executeNotifyAction(action, interaction)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing from")
+}
+
+func TestService_ExecuteNotifyAction_Email_MissingTo(t *testing.T) {
+	engine, err := MockEngine()
+	assert.NoError(t, err)
+	service := NewService(engine)
+
+	action := models.Action{
+		Type: models.ActionTypeNotify, Enabled: true,
+		Config: map[string]interface{}{"channel": "email", "smtp_host": "localhost", "from": "alert@example.com"},
+	}
+	token := "notify-token"
+	interaction := &models.Interaction{ID: models.GenerateID(), Type: "dns", Token: &token}
+
+	err = service.executeNotifyAction(action, interaction)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing to")
 }
 
 // --- Notification Channel Tests ---

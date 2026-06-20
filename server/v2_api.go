@@ -3477,8 +3477,29 @@ func (self *WebServer) v2ListAuditLogs(c *gin.Context) {
 		pageSize = 50
 	}
 
-	// TODO: Implement proper RBAC for audit log access
-	// For now, allow all authenticated users to see all logs
+	// RBAC: restrict audit log access by role
+	role := c.GetInt("role")
+	currentUserID := fmt.Sprintf("%d", c.GetInt64("id"))
+
+	switch role {
+	case roleSuper, roleAdmin:
+		// Admin and super can view all logs, optional user_id filter applies
+	case roleNormal:
+		// Normal users can only see their own logs
+		userID = currentUserID
+	case roleGuest:
+		c.JSON(http.StatusForbidden, gin.H{
+			"code":    403,
+			"message": "guest users cannot access audit logs",
+		})
+		return
+	default:
+		c.JSON(http.StatusForbidden, gin.H{
+			"code":    403,
+			"message": "insufficient permissions to access audit logs",
+		})
+		return
+	}
 
 	authService := auth.NewService(self.orm)
 	resp, err := authService.ListAuditLogs(userID, action, resourceType, resourceID, startTime, endTime, page, pageSize)

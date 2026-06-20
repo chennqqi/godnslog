@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/smtp"
 	"strings"
 	"time"
 )
@@ -193,11 +194,58 @@ func (e *Executor) sendTelegramNotification(ctx context.Context, notif Notificat
 	return e.sendHTTP(ctx, url, "POST", nil, payload)
 }
 
-// sendEmailNotification sends an email notification
+// sendEmailNotification sends an email notification via SMTP.
+// Config fields: smtp_host (required), smtp_port (default 587), username, password,
+// from (required), to (required, comma-separated), subject (default "OAST Alert").
 func (e *Executor) sendEmailNotification(ctx context.Context, notif Notification, inter map[string]interface{}) error {
-	// Email implementation requires SMTP configuration
-	// This is a placeholder for email notification
-	return fmt.Errorf("email notification not implemented")
+	smtpHost, ok := notif.Config["smtp_host"].(string)
+	if !ok || smtpHost == "" {
+		return fmt.Errorf("missing smtp_host in email config")
+	}
+
+	smtpPort, _ := notif.Config["smtp_port"].(string)
+	if smtpPort == "" {
+		smtpPort = "587"
+	}
+
+	from, ok := notif.Config["from"].(string)
+	if !ok || from == "" {
+		return fmt.Errorf("missing from in email config")
+	}
+
+	toStr, ok := notif.Config["to"].(string)
+	if !ok || toStr == "" {
+		return fmt.Errorf("missing to in email config")
+	}
+	toList := strings.Split(toStr, ",")
+	for i := range toList {
+		toList[i] = strings.TrimSpace(toList[i])
+	}
+
+	subject, _ := notif.Config["subject"].(string)
+	if subject == "" {
+		subject = "OAST Alert"
+	}
+
+	username, _ := notif.Config["username"].(string)
+	password, _ := notif.Config["password"].(string)
+
+	message := e.renderTemplate(notif.Template, inter)
+
+	body := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s\r\n",
+		from, toStr, subject, message)
+
+	addr := fmt.Sprintf("%s:%s", smtpHost, smtpPort)
+	var auth smtp.Auth
+	if username != "" {
+		auth = smtp.PlainAuth("", username, password, smtpHost)
+	}
+
+	err := smtp.SendMail(addr, auth, from, toList, []byte(body))
+	if err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+	return nil
 }
 
 // sendWebhookNotification sends a generic webhook notification

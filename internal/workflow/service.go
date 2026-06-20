@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/smtp"
 	"strings"
 	"time"
 
@@ -153,6 +154,8 @@ func (s *Service) executeAction(action models.Action, interaction *models.Intera
 		return s.executeHTTPAction(action, interaction)
 	case models.ActionTypeDNS:
 		return s.executeDNSAction(action, interaction)
+	case models.ActionTypeSMTP:
+		return s.executeSMTPAction(action, interaction)
 	case models.ActionTypeWebhook:
 		return s.executeWebhookAction(action, interaction)
 	case models.ActionTypeNotify:
@@ -272,6 +275,65 @@ func (s *Service) executeDNSAction(action models.Action, interaction *models.Int
 	return nil
 }
 
+// executeSMTPAction sends an email via SMTP on interaction hit.
+// Config fields: smtp_host (required), smtp_port (default 587), username, password,
+// from (required), to (required, comma-separated), subject (default "OAST Alert"),
+// message (template with {{.field}} placeholders).
+func (s *Service) executeSMTPAction(action models.Action, interaction *models.Interaction) error {
+	smtpHost, _ := action.Config["smtp_host"].(string)
+	if smtpHost == "" {
+		return errors.New("missing smtp_host in SMTP action config")
+	}
+
+	smtpPort, _ := action.Config["smtp_port"].(string)
+	if smtpPort == "" {
+		smtpPort = "587"
+	}
+
+	from, _ := action.Config["from"].(string)
+	if from == "" {
+		return errors.New("missing from in SMTP action config")
+	}
+
+	toStr, _ := action.Config["to"].(string)
+	if toStr == "" {
+		return errors.New("missing to in SMTP action config")
+	}
+	toList := strings.Split(toStr, ",")
+	for i := range toList {
+		toList[i] = strings.TrimSpace(toList[i])
+	}
+
+	subject, _ := action.Config["subject"].(string)
+	if subject == "" {
+		subject = "OAST Alert"
+	}
+
+	messageTemplate, _ := action.Config["message"].(string)
+	if messageTemplate == "" {
+		messageTemplate = "OAST interaction: {{.id}} from {{.source_ip}}"
+	}
+	message := renderActionTemplate(messageTemplate, interaction)
+
+	username, _ := action.Config["username"].(string)
+	password, _ := action.Config["password"].(string)
+
+	body := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s\r\n",
+		from, toStr, subject, message)
+
+	addr := fmt.Sprintf("%s:%s", smtpHost, smtpPort)
+	var auth smtp.Auth
+	if username != "" {
+		auth = smtp.PlainAuth("", username, password, smtpHost)
+	}
+
+	err := smtp.SendMail(addr, auth, from, toList, []byte(body))
+	if err != nil {
+		return fmt.Errorf("failed to send SMTP action email: %w", err)
+	}
+	return nil
+}
+
 // executeWebhookAction executes a webhook action with template rendering and security.
 // Config fields: url (required), method (default POST), headers, body (supports {{.field}} placeholders).
 func (s *Service) executeWebhookAction(action models.Action, interaction *models.Interaction) error {
@@ -382,6 +444,8 @@ func (s *Service) executeNotifyAction(action models.Action, interaction *models.
 		return s.sendNotifyDiscord(action, message)
 	case "telegram":
 		return s.sendNotifyTelegram(action, message)
+	case "email":
+		return s.sendNotifyEmail(action, message)
 	default:
 		return fmt.Errorf("unsupported notify channel: %s", channel)
 	}
@@ -490,6 +554,58 @@ func (s *Service) sendNotifyTelegram(action models.Action, message string) error
 		"text":    message,
 	})
 	return s.sendNotifyRequest(url, payload)
+}
+
+// sendNotifyEmail sends an email notification via SMTP.
+// Config fields: smtp_host (required), smtp_port (default 587), username, password,
+// from (required), to (required, comma-separated), subject (default "OAST Alert").
+func (s *Service) sendNotifyEmail(action models.Action, message string) error {
+	smtpHost, _ := action.Config["smtp_host"].(string)
+	if len(smtpHost) == 0 {
+		return errors.New("missing smtp_host for email notify channel")
+	}
+
+	smtpPort, _ := action.Config["smtp_port"].(string)
+	if smtpPort == "" {
+		smtpPort = "587"
+	}
+
+	from, _ := action.Config["from"].(string)
+	if len(from) == 0 {
+		return errors.New("missing from for email notify channel")
+	}
+
+	toStr, _ := action.Config["to"].(string)
+	if len(toStr) == 0 {
+		return errors.New("missing to for email notify channel")
+	}
+	toList := strings.Split(toStr, ",")
+	for i := range toList {
+		toList[i] = strings.TrimSpace(toList[i])
+	}
+
+	subject, _ := action.Config["subject"].(string)
+	if subject == "" {
+		subject = "OAST Alert"
+	}
+
+	username, _ := action.Config["username"].(string)
+	password, _ := action.Config["password"].(string)
+
+	body := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s\r\n",
+		from, toStr, subject, message)
+
+	addr := fmt.Sprintf("%s:%s", smtpHost, smtpPort)
+	var auth smtp.Auth
+	if username != "" {
+		auth = smtp.PlainAuth("", username, password, smtpHost)
+	}
+
+	err := smtp.SendMail(addr, auth, from, toList, []byte(body))
+	if err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+	return nil
 }
 
 // validateNotifyURL validates a URL against the outbound security policy
