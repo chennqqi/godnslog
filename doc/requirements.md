@@ -523,3 +523,29 @@ Phase 2 Core Loop Completion — MVP feature gap filling.
 - 4.4 Evidence Export: format selection + redaction 选项已实现
 - 4.5 User Management: create/edit/delete CRUD wired to v2 API，Settings wired to v2 API
 - 4.6 Data Model Unification: DNS/HTTP dual-write 已实现
+
+## 2026-06-20 (Phase 2 acceptance verification)
+
+Phase 2 验收完成，结果保存至 `docs/superpowers/acceptance/phase2-acceptance-report.md`。
+- `go build/test/vet/fmt` 全部通过；前端 lint 0 errors，build 成功。
+- E2E 116 passed / 1 failed（`agent-runs.spec.ts` 创建 follow-up 动作超时，pre-existing，非 Phase 2 范围）。
+- Phase 2 核心闭环（Case/Payload/Interaction/Evidence/User/Settings）及 DNS/HTTP 双写均已验证通过。
+
+## 2026-06-20 (Phase 3 Frontend Production)
+
+Phase 3 前端深度改造完成：
+- 5.1 TanStack Query 全集成：Cases/Payloads/PayloadDetail/Interactions/Users 页面迁移到 useQuery/useMutation hooks
+- 5.2 RHF + Zod：Login/Case/Payload/Settings 表单均使用 React Hook Form + Zod 验证
+- 5.3 ErrorBoundary + API 错误处理：全局 ErrorBoundary 已接入 dashboard layout，401→login 重定向，500→toast 事件
+- 5.4 SSE 实时更新：useInteractionStream hook 已实现并接入 interactions 页面
+- 5.5 i18n 扩展：翻译 keys 覆盖 cases/payloads/users/evidence/settings/common，中英双语
+- 5.6 Dark Mode：theme-store + topbar toggle + SSR flash prevention 已完整
+- 5.7 DataTable 增强：sorting/pagination/batch selection + LoadingSkeleton 组件
+- 验证：lint 0 errors，build 成功，E2E 116 passed / 1 failed（pre-existing agent-runs）
+
+## 2026-06-20 (Phase 3 acceptance verification)
+
+Phase 3 验收完成，结果保存至 `docs/superpowers/acceptance/phase3-acceptance-report.md`。
+- `go build/test/vet/fmt` 全部通过；前端 lint 0 errors，build 成功，E2E **117 passed / 0 failed**（包括之前失败的 agent-runs 用例已修复）。
+- TanStack Query、RHF+Zod、ErrorBoundary、SSE、i18n、Dark Mode、DataTable 增强均验证通过。
+- `docker build -t godnslog .` 通过。

@@ -4,11 +4,18 @@ import { QueryClient, QueryClientConfig, QueryCache, MutationCache } from '@tans
 
 function handleApiError(error: unknown) {
   if (error && typeof error === 'object' && 'response' in error) {
-    const resp = error as { response?: { status?: number } }
+    const resp = error as { response?: { status?: number; data?: { message?: string } } }
     if (resp.response?.status === 401) {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('token')
         window.location.href = '/login'
+      }
+    }
+    if (resp.response?.status && resp.response.status >= 500) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('api-error', {
+          detail: { message: resp.response.data?.message || 'Server error occurred' },
+        }))
       }
     }
   }

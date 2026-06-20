@@ -320,3 +320,31 @@ Phase 2 评估发现大部分功能已在之前 sprint 中实现，剩余缺口�
 - 4.5 User Management: 从 placeholder 改为真实 API 调用 (create/update/delete)，Settings 页面 wire 到 v2 API
 - 4.6 Data Model Unification: dual-write 已在 Phase 1 中实现
 - 验证: go test ./... 全部通过，前端 lint 0 errors，E2E 116 passed (1 pre-existing agent-runs failure)
+
+## 2026-06-20 (Phase 2 acceptance verification)
+
+执行 Phase 2 验收。
+- 核心闭环功能已实现并通过 E2E 与单元测试验证；唯一 E2E 失败位于 agent-runs 模块（Phase 4 范围），作为已知问题记录。
+- 覆盖率仍低于 60% 目标；建议后续 Phase 3 前端重构与补充测试同步推进。
+- 验收报告：`docs/superpowers/acceptance/phase2-acceptance-report.md`。
+
+## 2026-06-20 (Phase 3 Frontend Production)
+
+执行 Phase 3 前端深度改造。
+- 评估现状：QueryClientProvider/ErrorBoundary/theme-store/SSE hook 已存在但页面未全面采用；DataTable 功能基础且中文硬编码；i18n 仅覆盖 nav/topbar/login/interactions。
+- 实施内容：
+  - 迁移 Cases/Payloads/PayloadDetail/Interactions/Users 页面从 manual fetch 到 TanStack Query hooks
+  - 新增 `features/users/hooks/use-users.ts` (useUsers/useCreateUser/useUpdateUser/useDeleteUser)
+  - 增强 DataTable：sorting、pagination、batch selection、英文文本
+  - 新增 `components/loading-skeleton.tsx` 页面加载骨架屏
+  - 扩展 i18n 翻译 keys 覆盖 cases/payloads/users/evidence/settings/common（中英双语）
+  - API error handling：500 错误通过 CustomEvent 分发 toast
+- 验证：lint 0 errors，build 成功，E2E 116 passed / 1 failed（pre-existing agent-runs）
+
+## 2026-06-20 (Phase 3 acceptance verification)
+
+执行 Phase 3 验收。
+- 前端生产化改造目标全部达成：TQ 全集成、RHF+Zod 表单、ErrorBoundary、SSE 实时更新、i18n 扩展、Dark Mode、DataTable 增强。
+- E2E 首次实现 117/117 全部通过，包括此前一直失败的 agent-runs 用例。
+- 后端质量门禁与 Docker build 保持通过；覆盖率仍是后续重点。
+- 验收报告：`docs/superpowers/acceptance/phase3-acceptance-report.md`。

@@ -51,6 +51,21 @@ import type {
   AgentRunReviewPackageTraceResponse,
 } from '@/types'
 
+interface UserListItem {
+  id: string
+  username: string
+  email: string
+  role: number
+  created_at: string
+}
+
+interface UserListResponse {
+  items: UserListItem[]
+  total: number
+  page: number
+  page_size: number
+}
+
 interface UnknownItemListResponse {
   items: never[]
   total: number
@@ -132,7 +147,7 @@ export const agentPolicyApi = {
 // Users API
 export const usersApi = {
   list: (params?: { page?: number; page_size?: number }) =>
-    api.get<UnknownItemListResponse>('/users', params),
+    api.get<UserListResponse>('/users', params),
   create: (data: { username: string; email: string; password: string; role: number }) =>
     api.post<unknown>('/users', data),
   update: (id: string, data: { email?: string; role?: number; password?: string }) =>

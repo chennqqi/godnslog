@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { usersApi } from '@/lib/api-client'
+import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/features/users/hooks/use-users'
 import { useConfirmDialog } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -58,8 +58,11 @@ export default function UsersPage() {
     }
   }, [router])
 
-  const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: usersData, isLoading: loading } = useUsers()
+  const createUser = useCreateUser()
+  const updateUser = useUpdateUser()
+  const deleteUser = useDeleteUser()
+  const users = usersData?.data?.items ?? []
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
@@ -68,32 +71,13 @@ export default function UsersPage() {
   const [submitting, setSubmitting] = useState(false)
   const { confirm, dialogElement } = useConfirmDialog()
 
-  const loadUsers = useCallback(async () => {
-    try {
-      const response = await usersApi.list()
-      if (response.data && response.data.items) {
-        setUsers(response.data.items)
-      }
-    } catch (error) {
-      console.error('Failed to load users:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    const timer = setTimeout(() => loadUsers(), 0)
-    return () => clearTimeout(timer)
-  }, [loadUsers])
-
   const handleCreateUser = async () => {
     if (!newUser.username || !newUser.password) return
     setSubmitting(true)
     try {
-      await usersApi.create(newUser)
+      await createUser.mutateAsync(newUser)
       setShowCreateModal(false)
       setNewUser({ username: '', email: '', password: '', role: 2 })
-      await loadUsers()
     } catch (error) {
       console.error('Failed to create user:', error)
     } finally {
@@ -118,10 +102,9 @@ export default function UsersPage() {
       if (editForm.password) {
         data.password = editForm.password
       }
-      await usersApi.update(editingUser.id, data)
+      await updateUser.mutateAsync({ id: editingUser.id, data })
       setShowEditModal(false)
       setEditingUser(null)
-      await loadUsers()
     } catch (error) {
       console.error('Failed to update user:', error)
     } finally {
@@ -138,8 +121,7 @@ export default function UsersPage() {
     })
     if (!ok) return
     try {
-      await usersApi.delete(user.id)
-      await loadUsers()
+      await deleteUser.mutateAsync(user.id)
     } catch (error) {
       console.error('Failed to delete user:', error)
     }

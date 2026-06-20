@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { usePayload, useRevokePayload } from '@/features/payloads/hooks/use-payloads'
 import { payloadApi, caseApi, interactionApi } from '@/lib/api-client'
-import type { Payload, Case, Interaction } from '@/types'
+import type { Case, Interaction, Payload } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { LoadingState } from '@/components/loading-state'
@@ -12,68 +13,51 @@ import { useConfirmDialog } from '@/components/ui/alert-dialog'
 export default function PayloadDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const [payload, setPayload] = useState<Payload | null>(null)
+  const { data: payloadData, isLoading: loading } = usePayload(params.id as string)
+  const revokePayload = useRevokePayload()
+  const payload: Payload | null = (payloadData?.data as unknown as Payload) ?? null
   const [associatedCase, setAssociatedCase] = useState<Case | null>(null)
   const [recentInteractions, setRecentInteractions] = useState<Interaction[]>([])
-  const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
   const [previewData, setPreviewData] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [revoking, setRevoking] = useState(false)
   const { confirm, dialogElement } = useConfirmDialog()
 
-  const loadPayload = useCallback(async () => {
-    try {
-      const response = await payloadApi.get(params.id as string)
-      let payloadData: Payload | null = null
-      if (response.data && 'data' in response.data) {
-        payloadData = response.data.data as Payload
-      } else if (response.data) {
-        payloadData = response.data as Payload
-      }
-
-      if (payloadData) {
-        setPayload(payloadData)
-
-        if (payloadData.case_id) {
-          try {
-            const caseResp = await caseApi.get(payloadData.case_id)
-            if (caseResp.data && 'data' in caseResp.data) {
-              setAssociatedCase(caseResp.data.data as Case)
-            } else if (caseResp.data) {
-              setAssociatedCase(caseResp.data as Case)
-            }
-          } catch (err) {
-            console.error('Failed to load associated case:', err)
-          }
+  const loadAssociatedData = useCallback(async (p: Payload) => {
+    if (p.case_id) {
+      try {
+        const caseResp = await caseApi.get(p.case_id)
+        if (caseResp.data && 'data' in caseResp.data) {
+          setAssociatedCase(caseResp.data.data as Case)
+        } else if (caseResp.data) {
+          setAssociatedCase(caseResp.data as Case)
         }
-
-        try {
-          const interactionsResp = await interactionApi.list({
-            payload_id: params.id as string,
-            page: 1,
-            page_size: 5,
-          })
-          if (interactionsResp.data) {
-            setRecentInteractions(interactionsResp.data.items || [])
-          }
-        } catch (err) {
-          console.error('Failed to load recent interactions:', err)
-        }
+      } catch (err) {
+        console.error('Failed to load associated case:', err)
       }
-    } catch (error) {
-      console.error('Failed to load payload:', error)
-    } finally {
-      setLoading(false)
     }
-  }, [params.id])
+
+    try {
+      const interactionsResp = await interactionApi.list({
+        payload_id: p.id,
+        page: 1,
+        page_size: 5,
+      })
+      if (interactionsResp.data) {
+        setRecentInteractions(interactionsResp.data.items || [])
+      }
+    } catch (err) {
+      console.error('Failed to load recent interactions:', err)
+    }
+  }, [])
 
   useEffect(() => {
-    if (params.id) {
+    if (payload) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      loadPayload()
+      loadAssociatedData(payload)
     }
-  }, [params.id, loadPayload])
+  }, [payload, loadAssociatedData])
 
   const handleCopyToken = async () => {
     if (!payload) return
@@ -112,8 +96,7 @@ export default function PayloadDetailPage() {
     if (!ok) return
     setRevoking(true)
     try {
-      await payloadApi.revoke(payload.id)
-      loadPayload()
+      await revokePayload.mutateAsync(payload.id)
     } catch (err) {
       console.error('Failed to revoke payload:', err)
     } finally {
