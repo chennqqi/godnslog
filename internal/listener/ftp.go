@@ -36,6 +36,15 @@ func NewFTPListener(config *ListenerConfig, store Store, listener *Listener) *FT
 	}
 }
 
+// DefaultFTPConfig returns default FTP configuration
+func DefaultFTPConfig() *ListenerConfig {
+	return &ListenerConfig{
+		MaxConnections: 10,
+		Timeout:        30 * time.Second,
+		BufferSize:     4096,
+	}
+}
+
 // Start starts the FTP listener
 func (f *FTPListener) Start(ctx context.Context) error {
 	addr := fmt.Sprintf("%s:%d", f.listener.Host, f.listener.Port)

@@ -2875,6 +2875,13 @@ func (self *WebServer) v2CreateListener(c *gin.Context) {
 		return
 	}
 
+	// Start the listener if it's enabled
+	if req.IsEnabled && self.listenerMgr != nil {
+		if err := self.listenerMgr.StartListener(&req); err != nil {
+			logrus.Errorf("[v2_api.go::v2CreateListener] failed to start listener: %v", err)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
@@ -2926,6 +2933,17 @@ func (self *WebServer) v2UpdateListener(c *gin.Context) {
 		return
 	}
 
+	// Restart or stop the listener via manager
+	if self.listenerMgr != nil {
+		if req.IsEnabled {
+			if err := self.listenerMgr.RestartListener(&req); err != nil {
+				logrus.Errorf("[v2_api.go::v2UpdateListener] failed to restart listener: %v", err)
+			}
+		} else {
+			_ = self.listenerMgr.StopListener(id)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
@@ -2944,6 +2962,11 @@ func (self *WebServer) v2DeleteListener(c *gin.Context) {
 			"message": "Failed to delete listener",
 		})
 		return
+	}
+
+	// Stop the listener via manager
+	if self.listenerMgr != nil {
+		_ = self.listenerMgr.StopListener(id)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
