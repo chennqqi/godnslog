@@ -1,7 +1,15 @@
 package workflow
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"strings"
 	"time"
 
 	"xorm.io/xorm"
@@ -15,12 +23,18 @@ var (
 
 // Service provides workflow management services
 type Service struct {
-	engine *xorm.Engine
+	engine   *xorm.Engine
+	security *OutboundSecurity
 }
 
 // NewService creates a new workflow service
 func NewService(engine *xorm.Engine) *Service {
 	return &Service{engine: engine}
+}
+
+// SetOutboundSecurity sets the outbound security policy for action executors.
+func (s *Service) SetOutboundSecurity(sec *OutboundSecurity) {
+	s.security = sec
 }
 
 // CreateWorkflow creates a new workflow
@@ -148,26 +162,242 @@ func (s *Service) executeAction(action models.Action, interaction *models.Intera
 	}
 }
 
-// executeHTTPAction executes an HTTP action
+// executeHTTPAction executes an HTTP action with outbound security constraints.
+// Config fields: url (required), method (default GET), body, headers (map[string]string).
 func (s *Service) executeHTTPAction(action models.Action, interaction *models.Interaction) error {
-	// TODO: Implement HTTP action execution
+	urlStr, _ := action.Config["url"].(string)
+	if urlStr == "" {
+		return errors.New("missing url in action config")
+	}
+
+	method, _ := action.Config["method"].(string)
+	if method == "" {
+		method = "GET"
+	}
+
+	if s.security == nil {
+		s.security = NewOutboundSecurity(nil)
+	}
+	actionID := action.ID
+	if actionID == "" {
+		actionID = urlStr
+	}
+	if err := s.security.ValidateURL(actionID, urlStr); err != nil {
+		return err
+	}
+
+	bodyStr, _ := action.Config["body"].(string)
+	var bodyReader *bytes.Buffer
+	if bodyStr != "" {
+		bodyReader = bytes.NewBufferString(bodyStr)
+	} else {
+		bodyReader = bytes.NewBuffer(nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, method, urlStr, bodyReader)
+	if err != nil {
+		return fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	if headers, ok := action.Config["headers"].(map[string]interface{}); ok {
+		for k, v := range headers {
+			req.Header.Set(k, fmt.Sprintf("%v", v))
+		}
+	}
+	if bodyStr != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("HTTP action request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	limitedReader := io.LimitReader(resp.Body, 1<<20)
+	respBody, _ := io.ReadAll(limitedReader)
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("HTTP action returned status %d: %s", resp.StatusCode, string(respBody))
+	}
+
 	return nil
 }
 
-// executeDNSAction executes a DNS action
+// executeDNSAction executes a DNS lookup action on hit.
+// Config fields: domain (required), type (default A; supports A, TXT, MX, NS).
 func (s *Service) executeDNSAction(action models.Action, interaction *models.Interaction) error {
-	// TODO: Implement DNS action execution
+	domain, _ := action.Config["domain"].(string)
+	if domain == "" {
+		return errors.New("missing domain in DNS action config")
+	}
+
+	recordType, _ := action.Config["type"].(string)
+	if recordType == "" {
+		recordType = "A"
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resolver := net.Resolver{}
+	switch recordType {
+	case "A":
+		_, err := resolver.LookupHost(ctx, domain)
+		if err != nil {
+			return fmt.Errorf("DNS A lookup failed for %s: %w", domain, err)
+		}
+	case "TXT":
+		_, err := resolver.LookupTXT(ctx, domain)
+		if err != nil {
+			return fmt.Errorf("DNS TXT lookup failed for %s: %w", domain, err)
+		}
+	case "MX":
+		_, err := resolver.LookupMX(ctx, domain)
+		if err != nil {
+			return fmt.Errorf("DNS MX lookup failed for %s: %w", domain, err)
+		}
+	case "NS":
+		_, err := resolver.LookupNS(ctx, domain)
+		if err != nil {
+			return fmt.Errorf("DNS NS lookup failed for %s: %w", domain, err)
+		}
+	default:
+		return fmt.Errorf("unsupported DNS record type: %s", recordType)
+	}
+
 	return nil
 }
 
-// executeWebhookAction executes a webhook action
+// executeWebhookAction executes a webhook action with template rendering and security.
+// Config fields: url (required), method (default POST), headers, body (supports {{.field}} placeholders).
 func (s *Service) executeWebhookAction(action models.Action, interaction *models.Interaction) error {
-	// TODO: Implement webhook action execution
+	urlStr, _ := action.Config["url"].(string)
+	if urlStr == "" {
+		return errors.New("missing url in webhook config")
+	}
+
+	method, _ := action.Config["method"].(string)
+	if method == "" {
+		method = "POST"
+	}
+
+	if s.security == nil {
+		s.security = NewOutboundSecurity(nil)
+	}
+	actionID := action.ID
+	if actionID == "" {
+		actionID = urlStr
+	}
+	if err := s.security.ValidateURL(actionID, urlStr); err != nil {
+		return err
+	}
+
+	bodyTemplate, _ := action.Config["body"].(string)
+	renderedBody := renderActionTemplate(bodyTemplate, interaction)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, method, urlStr, bytes.NewBufferString(renderedBody))
+	if err != nil {
+		return fmt.Errorf("failed to create webhook request: %w", err)
+	}
+
+	if headers, ok := action.Config["headers"].(map[string]interface{}); ok {
+		for k, v := range headers {
+			req.Header.Set(k, fmt.Sprintf("%v", v))
+		}
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("webhook request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("webhook returned status %d", resp.StatusCode)
+	}
+
 	return nil
 }
 
-// executeNotifyAction executes a notification action
+// renderActionTemplate renders {{.field}} placeholders with interaction data.
+// Supported fields: id, type, source_ip, token, domain, path.
+func renderActionTemplate(template string, inter *models.Interaction) string {
+	data := map[string]string{
+		"id":        inter.ID,
+		"type":      inter.Type,
+		"source_ip": inter.SourceIP,
+	}
+	if inter.Token != nil {
+		data["token"] = *inter.Token
+	}
+	if inter.Domain != nil {
+		data["domain"] = *inter.Domain
+	}
+	if inter.Path != nil {
+		data["path"] = *inter.Path
+	}
+	result := template
+	for k, v := range data {
+		result = strings.ReplaceAll(result, fmt.Sprintf("{{.%s}}", k), v)
+	}
+	return result
+}
+
+// executeNotifyAction triggers a notification via webhook channel.
+// Config fields: channel (required, only "webhook" supported in Phase 1),
+// webhook_url (required for webhook channel), message (template with {{.field}} placeholders).
 func (s *Service) executeNotifyAction(action models.Action, interaction *models.Interaction) error {
-	// TODO: Implement notification action execution
-	return nil
+	channel, _ := action.Config["channel"].(string)
+	if channel == "" {
+		return errors.New("missing channel in notify action config")
+	}
+
+	messageTemplate, _ := action.Config["message"].(string)
+	if messageTemplate == "" {
+		messageTemplate = "OAST interaction: {{.id}} from {{.source_ip}}"
+	}
+	message := renderActionTemplate(messageTemplate, interaction)
+
+	switch channel {
+	case "webhook":
+		webhookURL, _ := action.Config["webhook_url"].(string)
+		if webhookURL == "" {
+			return errors.New("missing webhook_url for webhook notify channel")
+		}
+		if s.security == nil {
+			s.security = NewOutboundSecurity(nil)
+		}
+		if err := s.security.ValidateURL(action.ID, webhookURL); err != nil {
+			return err
+		}
+		payload, _ := json.Marshal(map[string]string{"message": message})
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, "POST", webhookURL, bytes.NewBuffer(payload))
+		if err != nil {
+			return fmt.Errorf("failed to create notify request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		client := &http.Client{Timeout: 30 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("notify webhook request failed: %w", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode >= 400 {
+			return fmt.Errorf("notify webhook returned status %d", resp.StatusCode)
+		}
+		return nil
+	default:
+		return fmt.Errorf("unsupported notify channel: %s (only 'webhook' supported in Phase 1)", channel)
+	}
 }

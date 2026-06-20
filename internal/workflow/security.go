@@ -105,13 +105,30 @@ func (s *OutboundSecurity) CheckRate(actionID string) bool {
 	return true
 }
 
+// isExplicitlyAllowed checks if the URL's host matches a specific (non-wildcard) allowlist entry.
+func (s *OutboundSecurity) isExplicitlyAllowed(rawURL string) bool {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	host := parsed.Hostname()
+	for _, allowed := range s.allowlist {
+		if allowed != "*" && host == allowed {
+			return true
+		}
+	}
+	return false
+}
+
 // ValidateURL performs all security checks: allowlist + SSRF + rate limit.
+// SSRF check is skipped for hosts explicitly listed in the allowlist (non-wildcard).
 // Returns an error if any check fails.
 func (s *OutboundSecurity) ValidateURL(actionID, rawURL string) error {
 	if !s.IsURLAllowed(rawURL) {
 		return fmt.Errorf("url not in allowlist: %s", rawURL)
 	}
-	if s.IsSSRF(rawURL) {
+	// Skip SSRF check for explicitly allowed hosts; only enforce for wildcard allowlist
+	if !s.isExplicitlyAllowed(rawURL) && s.IsSSRF(rawURL) {
 		return fmt.Errorf("url targets blocked private/localhost range: %s", rawURL)
 	}
 	if !s.CheckRate(actionID) {
