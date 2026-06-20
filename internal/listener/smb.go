@@ -36,6 +36,15 @@ func NewSMBListener(config *ListenerConfig, store Store, listener *Listener) *SM
 	}
 }
 
+// DefaultSMBConfig returns default SMB configuration
+func DefaultSMBConfig() *ListenerConfig {
+	return &ListenerConfig{
+		MaxConnections: 10,
+		Timeout:        30 * time.Second,
+		BufferSize:     4096,
+	}
+}
+
 // Start starts the SMB listener
 func (s *SMBListener) Start(ctx context.Context) error {
 	addr := fmt.Sprintf("%s:%d", s.listener.Host, s.listener.Port)
