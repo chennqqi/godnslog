@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { caseApi } from '@/lib/api-client'
-import type { Case, CaseCreateRequest } from '@/types'
+import { useCases, useCreateCase } from '@/features/cases/hooks/use-cases'
+import type { CaseCreateRequest } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -32,11 +32,18 @@ const STATUS_FILTER_ALL = 'all'
 
 export default function CasesPage() {
   const router = useRouter()
-  const [cases, setCases] = useState<Case[]>([])
-  const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState(STATUS_FILTER_ALL)
+
+  const { data, isLoading: loading } = useCases({
+    page: 1,
+    page_size: 50,
+    search: searchTerm,
+    ...(statusFilter !== STATUS_FILTER_ALL ? { status: statusFilter } : {}),
+  })
+  const createCase = useCreateCase()
+  const cases = data?.data?.items ?? []
 
   const form = useForm<CaseFormValues>({
     resolver: zodResolver(caseSchema),
@@ -49,53 +56,11 @@ export default function CasesPage() {
     },
   })
 
-  const loadCases = useCallback(async () => {
-    try {
-      console.log('Loading cases...')
-      const response = await caseApi.list({
-        page: 1,
-        page_size: 50,
-        search: searchTerm,
-        ...(statusFilter !== STATUS_FILTER_ALL ? { status: statusFilter } : {}),
-      })
-      console.log('Cases response:', response)
-      if (response.data) {
-        setCases(response.data.items || [])
-      }
-    } catch (error) {
-      console.error('Failed to load cases:', error)
-      setCases([])
-    } finally {
-      setLoading(false)
-    }
-  }, [searchTerm, statusFilter])
-
-  useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      router.push('/login')
-      return
-    }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadCases()
-  }, [router, loadCases])
-
-  const handleSearchChange = (value: string) => {
-    setSearchTerm(value)
-  }
-
-  const handleStatusChange = (value: string) => {
-    setStatusFilter(value)
-  }
-
   const handleCreateCase = async (values: CaseFormValues) => {
     try {
-      const response = await caseApi.create(values as CaseCreateRequest)
-      if (response.code === 0 && response.data) {
-        setShowCreateModal(false)
-        form.reset()
-        loadCases()
-      }
+      await createCase.mutateAsync(values as CaseCreateRequest)
+      setShowCreateModal(false)
+      form.reset()
     } catch (error) {
       console.error('Failed to create case:', error)
     }
@@ -124,9 +89,9 @@ export default function CasesPage() {
             placeholder="Search cases..."
             className="flex-1 min-w-[160px]"
             value={searchTerm}
-            onChange={(e) => handleSearchChange(e.target.value)}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <Select value={statusFilter} onValueChange={handleStatusChange}>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>

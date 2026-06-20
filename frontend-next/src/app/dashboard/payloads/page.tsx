@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { usePayloads, useCreatePayload } from '@/features/payloads/hooks/use-payloads'
 import { payloadApi } from '@/lib/api-client'
 import { LoadingState } from '@/components/loading-state'
-import type { Payload, PayloadCreateRequest } from '@/types'
+import type { PayloadCreateRequest } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -34,8 +35,9 @@ const templates = [
 
 export default function PayloadsPage() {
   const router = useRouter()
-  const [payloads, setPayloads] = useState<Payload[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data, isLoading: loading } = usePayloads({ page: 1, page_size: 100 })
+  const createPayload = useCreatePayload()
+  const payloads = data?.data?.items ?? []
   const [filter, setFilter] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showBatchModal, setShowBatchModal] = useState(false)
@@ -43,29 +45,6 @@ export default function PayloadsPage() {
   const [selectedTemplate, setSelectedTemplate] = useState(templates[0])
   const [variables, setVariables] = useState<Record<string, string>>({})
   const [batchCount, setBatchCount] = useState(1)
-
-  const loadPayloads = async () => {
-    try {
-      const response = await payloadApi.list({ page: 1, page_size: 100 })
-      if (response.data) {
-        setPayloads(response.data.items)
-      }
-    } catch (error) {
-      console.error('Failed to load payloads:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      router.push('/login')
-      return
-    }
-    const timer = setTimeout(() => loadPayloads(), 0)
-    return () => clearTimeout(timer)
-  }, [router])
 
   const updatePreview = () => {
     let preview = selectedTemplate.template
@@ -88,12 +67,9 @@ export default function PayloadsPage() {
       variables,
     }
     try {
-      const response = await payloadApi.create(req)
-      if (response.code === 0) {
-        setShowCreateModal(false)
-        setVariables({})
-        loadPayloads()
-      }
+      await createPayload.mutateAsync(req)
+      setShowCreateModal(false)
+      setVariables({})
     } catch (error) {
       console.error('Failed to create payload:', error)
     }
@@ -110,7 +86,6 @@ export default function PayloadsPage() {
         count: batchCount,
       })
       setShowBatchModal(false)
-      loadPayloads()
     } catch (error) {
       console.error('Failed to batch create payloads:', error)
     }

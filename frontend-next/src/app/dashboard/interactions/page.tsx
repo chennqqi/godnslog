@@ -4,6 +4,7 @@
 import { useEffect, useState, Suspense, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { interactionApi } from '@/lib/api-client'
+import { useInteractions, useInteractionStats } from '@/features/interactions/hooks/use-interactions'
 import type { Interaction } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -33,60 +34,34 @@ const TYPE_FILTER_ALL = 'all'
 function InteractionsPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [interactions, setInteractions] = useState<Interaction[]>([])
-  const [loading, setLoading] = useState(true)
+
+  // Get scope from URL
+  const caseId = searchParams.get('case_id') ?? undefined
+  const payloadId = searchParams.get('payload_id') ?? undefined
+  const typeParam = searchParams.get('type')
+
+  const { data: interactionsData, isLoading: loading } = useInteractions({
+    page: 1, page_size: 100,
+    ...(caseId ? { case_id: caseId } : {}),
+    ...(payloadId ? { payload_id: payloadId } : {}),
+  })
+  const { data: statsData } = useInteractionStats({
+    ...(caseId ? { case_id: caseId } : {}),
+    ...(payloadId ? { payload_id: payloadId } : {}),
+  })
+  const interactions = interactionsData?.data?.items ?? []
+  const stats = statsData?.data ?? { total: 0, dns_count: 0, http_count: 0, smtp_count: 0, ldap_count: 0 }
+
   const [filter, setFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState(TYPE_FILTER_ALL)
   const [viewMode, setViewMode] = useState<'table' | 'timeline'>('table')
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null)
-  const [stats, setStats] = useState({ total: 0, dns_count: 0, http_count: 0, smtp_count: 0, ldap_count: 0 })
-  const { t } = useI18n()
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [liveCount, setLiveCount] = useState(0)
   const [exporting, setExporting] = useState(false)
   const [startTimeFilter, setStartTimeFilter] = useState('')
   const [endTimeFilter, setEndTimeFilter] = useState('')
-
-  // Get scope from URL
-  const caseId = searchParams.get('case_id')
-  const payloadId = searchParams.get('payload_id')
-  const typeParam = searchParams.get('type')
-
-  const loadInteractions = useCallback(async () => {
-    try {
-      const params: { page: number; page_size: number; case_id?: string; payload_id?: string } = { page: 1, page_size: 100 }
-      if (caseId) params.case_id = caseId
-      if (payloadId) params.payload_id = payloadId
-      const response = await interactionApi.list(params)
-      if (response.data) {
-        setInteractions(response.data.items)
-      }
-    } catch (error) {
-      console.error('Failed to load interactions:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [caseId, payloadId])
-
-  const loadStats = useCallback(async () => {
-    try {
-      const params: { case_id?: string; payload_id?: string } = {}
-      if (caseId) params.case_id = caseId
-      if (payloadId) params.payload_id = payloadId
-      const response = await interactionApi.stats(params)
-      if (response.code === 0 && response.data) {
-        setStats({
-          total: response.data.total ?? 0,
-          dns_count: response.data.dns_count ?? 0,
-          http_count: response.data.http_count ?? 0,
-          smtp_count: response.data.smtp_count ?? 0,
-          ldap_count: response.data.ldap_count ?? 0,
-        })
-      }
-    } catch (error) {
-      console.error('Failed to load stats:', error)
-    }
-  }, [caseId, payloadId])
+  const { t } = useI18n()
 
   // Set type filter from URL param if present
   useEffect(() => {
@@ -95,27 +70,10 @@ function InteractionsPageContent() {
     }
   }, [typeParam])
 
-  useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      router.push('/login')
-      return
-    }
-    loadInteractions()
-    loadStats()
-  }, [router, caseId, payloadId, loadInteractions, loadStats])
-
   // SSE real-time stream
   const handleNewInteraction = useCallback((interaction: Interaction) => {
-    setInteractions((prev) => {
-      // Avoid duplicates
-      if (prev.some((i) => i.id === interaction.id)) return prev
-      return [interaction, ...prev].slice(0, 200)
-    })
     setLiveCount((c) => c + 1)
-    // Refresh stats in background
-    loadStats()
-  }, [loadStats])
+  }, [])
 
   const { connected: sseConnected, error: sseError } = useInteractionStream({
     caseId: caseId || undefined,
