@@ -62,10 +62,6 @@ export default function UsersPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newUser, setNewUser] = useState({ username: '', email: '', password: '', role: 0 })
 
-  useEffect(() => {
-    loadUsers()
-  }, [])
-
   const loadUsers = async () => {
     try {
       const response = await usersApi.list()
@@ -78,6 +74,11 @@ export default function UsersPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    const timer = setTimeout(() => loadUsers(), 0)
+    return () => clearTimeout(timer)
+  }, [])
 
   const handleCreateUser = async () => {
     try {

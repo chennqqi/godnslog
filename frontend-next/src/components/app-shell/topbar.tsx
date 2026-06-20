@@ -68,7 +68,11 @@ export function TopBar({ onToggleSidebar, pageTitle }: TopBarProps) {
       const userStr = localStorage.getItem('user')
       if (userStr) {
         const user = JSON.parse(userStr)
-        if (user?.username) setUsername(user.username)
+        if (user?.username) {
+          const name = user.username as string
+          const timer = setTimeout(() => setUsername(name), 0)
+          return () => clearTimeout(timer)
+        }
       }
     } catch {
       // ignore malformed user data

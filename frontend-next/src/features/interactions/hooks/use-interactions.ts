@@ -45,6 +45,6 @@ export function useDeleteInteractions() {
 
 export function useExportInteractions() {
   return useMutation({
-    mutationFn: (data: any) => interactionApi.export(data),
+    mutationFn: (data: Record<string, unknown>) => interactionApi.export(data),
   })
 }
