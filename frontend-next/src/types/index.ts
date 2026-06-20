@@ -148,6 +148,7 @@ export interface InteractionListResponse {
 /** Aggregated interaction counts returned by GET /interactions/stats */
 export interface InteractionStats {
   total: number
+  today?: number
   by_type?: Record<string, number>
   dns_count?: number
   http_count?: number

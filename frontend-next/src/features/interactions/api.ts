@@ -1,5 +1,5 @@
 import { interactionApi } from '@/lib/api-client'
-import type { Interaction, InteractionListResponse } from '@/types'
+import type { Interaction, InteractionListResponse, InteractionStats } from '@/types'
 
 /** Feature-layer interaction API wrapper */
 export const interactionsApi = {
@@ -13,17 +13,9 @@ export const interactionsApi = {
     return response.data as unknown as Interaction | undefined
   },
 
-  getStats: async (): Promise<{ today: number; total: number; high_risk: number } | undefined> => {
-    const response = await fetch('/api/v2/interactions/stats', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    })
-    if (!response.ok) {
-      return undefined
-    }
-    const result = await response.json()
-    return result.data
+  getStats: async (): Promise<InteractionStats | undefined> => {
+    const response = await interactionApi.stats()
+    return response.data
   },
 
   export: async (data: Record<string, unknown>): Promise<Blob> => {

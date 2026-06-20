@@ -488,3 +488,15 @@ GODNSLOG 2.0 所有计划阶段已全部完成，共计 35 个主要功能模块
 - 采用自底向上5阶段方案：Phase 1后端做实→Phase 2核心闭环→Phase 3前端生产化→Phase 4 Agent协同→Phase 5平台化
 - 设计文档：docs/superpowers/specs/2026-06-20-mvp-to-production-design.md
 - 预估总工作量：14-20周
+
+## 2026-06-20
+
+Review the spec `docs/superpowers/specs/2026-06-20-mvp-to-production-design.md` and save the review result as a markdown file under `docs/superpowers/reviews/`.
+
+## 2026-06-20 (re-review)
+
+The spec `docs/superpowers/specs/2026-06-20-mvp-to-production-design.md` has been updated; re-review it and update the review markdown file.
+
+## 2026-06-20 (plan split)
+
+Spec approved. Split Phase 1 (Backend Realization) into 5 implementation plans under `docs/superpowers/plans/`: workflow action executors, rule engine completion, v2 API gaps, APIKey security, data model migration.
