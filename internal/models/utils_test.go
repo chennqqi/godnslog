@@ -59,9 +59,9 @@ func TestComputeDeterministicHash(t *testing.T) {
 			validate: true,
 		},
 		{
-			name: "nil data",
-			data: nil,
-			wantErr: false,
+			name:     "nil data",
+			data:     nil,
+			wantErr:  false,
 			validate: true,
 		},
 	}

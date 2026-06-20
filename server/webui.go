@@ -1446,7 +1446,6 @@ func (self *WebServer) updateResolveCache(host, rType string, all []models.TblRe
 		key := fmt.Sprintf("%v#%v", host, k)
 		self.store.Set(key, v, cache.NoExpiration)
 	}
-	return
 }
 
 func (self *WebServer) setResolveRecord(c *gin.Context) {

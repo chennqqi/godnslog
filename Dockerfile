@@ -1,8 +1,9 @@
 # build frontend
-FROM node:24.13.0-alpine as frontend-builder
+FROM node:24.13.0-alpine AS frontend-builder
 WORKDIR /app
-COPY frontend-next /app
+COPY frontend-next/package.json frontend-next/package-lock.json* ./
 RUN npm config set registry https://registry.npmmirror.com && npm install
+COPY frontend-next ./
 RUN npm run build
 
 # build backend
@@ -20,16 +21,19 @@ COPY *.go go.mod go.sum /src/godnslog/
 WORKDIR /src/godnslog
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o /go/bin/godnslog
 
-# build app
-FROM alpine:3.20
+# final image: Node runtime for Next.js + Go binary
+FROM node:24.13.0-alpine
 
 RUN apk add --no-cache -U tzdata ca-certificates libcap wget && \
 	update-ca-certificates
 
-RUN mkdir -p /app
+RUN mkdir -p /app/frontend /app
 
 COPY --from=backend-builder /go/bin/godnslog /app/godnslog
-COPY --from=frontend-builder /app/dist /app/dist
+COPY --from=frontend-builder /app/dist /app/frontend/dist
+COPY --from=frontend-builder /app/package.json /app/frontend/package.json
+COPY --from=frontend-builder /app/node_modules /app/frontend/node_modules
+COPY --from=frontend-builder /app/public /app/frontend/public
 
 ARG UID=1000
 ARG GID=1000
@@ -41,10 +45,14 @@ RUN addgroup -g $GID -S app && adduser -u $UID -S -g app app && \
 WORKDIR /app
 USER app
 
+ENV GODNSLOG_API_URL=http://localhost:8080
+
 EXPOSE 8080
+EXPOSE 3000
 EXPOSE 53/UDP 53/TCP
 
 HEALTHCHECK --interval=20s --timeout=3s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:8080/api/v2/health || exit 1
 
-ENTRYPOINT [ "/app/godnslog" ]
+# Start Go backend and Next.js frontend
+CMD ["sh", "-c", "/app/godnslog serve -domain ${DOMAIN:-example.com} -4 ${DNS_IP:-0.0.0.0} & cd /app/frontend && npx next start -p 3000"]

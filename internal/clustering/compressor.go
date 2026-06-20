@@ -11,10 +11,10 @@ type Compressor struct {
 
 // CompressionConfig holds configuration for interaction compression
 type CompressionConfig struct {
-	MaxRawDataLength int    `json:"max_raw_data_length"` // Max length for raw data
-	CompressHeaders  bool   `json:"compress_headers"`     // Compress header data
-	RemoveDuplicates bool  `json:"remove_duplicates"`     // Remove duplicate interactions
-	KeepFirstN       int    `json:"keep_first_n"`          // Keep first N interactions per cluster
+	MaxRawDataLength int  `json:"max_raw_data_length"` // Max length for raw data
+	CompressHeaders  bool `json:"compress_headers"`    // Compress header data
+	RemoveDuplicates bool `json:"remove_duplicates"`   // Remove duplicate interactions
+	KeepFirstN       int  `json:"keep_first_n"`        // Keep first N interactions per cluster
 }
 
 // DefaultCompressionConfig returns default compression configuration
@@ -40,11 +40,11 @@ func (c *Compressor) CompressInteractions(interactions []interaction.Interaction
 	if c.config.RemoveDuplicates {
 		interactions = c.removeDuplicates(interactions)
 	}
-	
+
 	for i := range interactions {
 		interactions[i] = c.compressInteraction(interactions[i])
 	}
-	
+
 	return interactions
 }
 
@@ -54,12 +54,12 @@ func (c *Compressor) compressInteraction(inter interaction.Interaction) interact
 	if len(inter.RawData) > c.config.MaxRawDataLength {
 		inter.RawData = inter.RawData[:c.config.MaxRawDataLength] + "... (truncated)"
 	}
-	
+
 	// Compress headers
 	if c.config.CompressHeaders && len(inter.Headers) > 0 {
 		inter.Headers = c.compressHeaders(inter.Headers)
 	}
-	
+
 	return inter
 }
 
@@ -69,19 +69,19 @@ func (c *Compressor) compressHeaders(headers interaction.Headers) interaction.He
 	importantHeaders := map[string]string{
 		"User-Agent":      "",
 		"Content-Type":    "",
-		"Authorization":  "",
-		"Cookie":         "",
-		"Referer":        "",
+		"Authorization":   "",
+		"Cookie":          "",
+		"Referer":         "",
 		"X-Forwarded-For": "",
 	}
-	
+
 	compressed := make(interaction.Headers)
 	for k, v := range headers {
 		if _, important := importantHeaders[k]; important {
 			compressed[k] = v
 		}
 	}
-	
+
 	return compressed
 }
 
@@ -89,7 +89,7 @@ func (c *Compressor) compressHeaders(headers interaction.Headers) interaction.He
 func (c *Compressor) removeDuplicates(interactions []interaction.Interaction) []interaction.Interaction {
 	seen := make(map[string]bool)
 	result := make([]interaction.Interaction, 0)
-	
+
 	for _, inter := range interactions {
 		key := generateInteractionKey(inter)
 		if !seen[key] {
@@ -97,7 +97,7 @@ func (c *Compressor) removeDuplicates(interactions []interaction.Interaction) []
 			result = append(result, inter)
 		}
 	}
-	
+
 	return result
 }
 
@@ -118,10 +118,10 @@ func (c *Compressor) CompressCluster(cluster *Cluster) *Cluster {
 	if len(cluster.Interactions) <= c.config.KeepFirstN {
 		return cluster
 	}
-	
+
 	// Keep first N interactions
 	cluster.Interactions = cluster.Interactions[:c.config.KeepFirstN]
 	cluster.Count = c.config.KeepFirstN
-	
+
 	return cluster
 }

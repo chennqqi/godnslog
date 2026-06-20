@@ -373,9 +373,6 @@ func (self *WebServer) IsDuplicate(err error) bool {
 	orm := self.orm
 	switch orm.DriverName() {
 	case "sqlite3", "sqlite":
-		if err == nil {
-			return false
-		}
 		// modernc.org/sqlite error checking
 		errStr := err.Error()
 		// Check for constraint violation in error message

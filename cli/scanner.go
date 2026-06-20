@@ -32,13 +32,13 @@ var scannerGetCmd = &cobra.Command{
 }
 
 var (
-	scannerName       string
-	scannerTarget     string
-	scannerTemplate   string
-	scannerDelivery   string
-	scannerCaseID     string
-	scannerPayloadID  string
-	scannerStatus     string
+	scannerName      string
+	scannerTarget    string
+	scannerTemplate  string
+	scannerDelivery  string
+	scannerCaseID    string
+	scannerPayloadID string
+	scannerStatus    string
 )
 
 func init() {
@@ -174,8 +174,8 @@ func runScannerList(cmd *cobra.Command, args []string) error {
 	}
 
 	var resp struct {
-		Code    int                   `json:"code"`
-		Message string                `json:"message"`
+		Code    int                     `json:"code"`
+		Message string                  `json:"message"`
 		Data    *ScannerRunListResponse `json:"data"`
 	}
 	if err := json.Unmarshal(body, &resp); err != nil {

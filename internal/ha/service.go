@@ -54,19 +54,19 @@ func (s *Service) GetConfig(ctx context.Context) (*ClusterConfig, error) {
 	if len(configs) == 0 {
 		// Return default config
 		return &ClusterConfig{
-			ID:                 "default",
-			EnableFailover:     true,
-			FailoverTimeout:    30,
-			EnableLoadBalance:  true,
-			BalanceAlgorithm:   "round_robin",
-			EnableReplication:  false,
-			ReplicationMode:    "async",
+			ID:                  "default",
+			EnableFailover:      true,
+			FailoverTimeout:     30,
+			EnableLoadBalance:   true,
+			BalanceAlgorithm:    "round_robin",
+			EnableReplication:   false,
+			ReplicationMode:     "async",
 			HealthCheckInterval: 10,
 			HealthCheckTimeout:  5,
-			EnableQuorum:       false,
-			QuorumSize:         2,
-			CreatedAt:          time.Now(),
-			UpdatedAt:          time.Now(),
+			EnableQuorum:        false,
+			QuorumSize:          2,
+			CreatedAt:           time.Now(),
+			UpdatedAt:           time.Now(),
 		}, nil
 	}
 	return &configs[0], nil
@@ -84,25 +84,25 @@ func (s *Service) PerformHealthCheck(ctx context.Context, nodeID string) (*Healt
 	if err != nil {
 		return nil, fmt.Errorf("failed to get node: %w", err)
 	}
-	
+
 	healthCheck := &HealthCheck{
-		ID:         generateHealthCheckID(),
-		NodeID:     nodeID,
-		CheckType:  "general",
-		Status:     "healthy",
+		ID:           generateHealthCheckID(),
+		NodeID:       nodeID,
+		CheckType:    "general",
+		Status:       "healthy",
 		ResponseTime: 10, // Simulated
-		Timestamp:  time.Now(),
+		Timestamp:    time.Now(),
 	}
-	
+
 	// Update node last ping
 	node.LastPing = time.Now()
 	node.Status = "online"
 	s.store.UpdateNode(ctx, node)
-	
+
 	if err := s.store.CreateHealthCheck(ctx, healthCheck); err != nil {
 		return nil, fmt.Errorf("failed to create health check: %w", err)
 	}
-	
+
 	return healthCheck, nil
 }
 
@@ -117,10 +117,10 @@ func (s *Service) GetClusterStatus(ctx context.Context) (map[string]interface{},
 	if err != nil {
 		return nil, err
 	}
-	
+
 	onlineCount := 0
 	offlineCount := 0
-	
+
 	for _, node := range nodes {
 		if node.Status == "online" {
 			onlineCount++
@@ -128,10 +128,10 @@ func (s *Service) GetClusterStatus(ctx context.Context) (map[string]interface{},
 			offlineCount++
 		}
 	}
-	
+
 	return map[string]interface{}{
-		"total_nodes":  len(nodes),
-		"online_nodes": onlineCount,
+		"total_nodes":   len(nodes),
+		"online_nodes":  onlineCount,
 		"offline_nodes": offlineCount,
 		"cluster_status": func() string {
 			if offlineCount == 0 {
@@ -158,13 +158,13 @@ type Store interface {
 	ListNodes(ctx context.Context) ([]ClusterNode, error)
 	UpdateNode(ctx context.Context, node *ClusterNode) error
 	DeleteNode(ctx context.Context, id string) error
-	
+
 	// Config operations
 	CreateConfig(ctx context.Context, config *ClusterConfig) error
 	GetConfig(ctx context.Context, id string) (*ClusterConfig, error)
 	ListConfigs(ctx context.Context) ([]ClusterConfig, error)
 	UpdateConfig(ctx context.Context, config *ClusterConfig) error
-	
+
 	// Health check operations
 	CreateHealthCheck(ctx context.Context, check *HealthCheck) error
 	ListHealthChecks(ctx context.Context, nodeID string) ([]HealthCheck, error)

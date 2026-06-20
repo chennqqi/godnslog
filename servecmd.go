@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/chennqqi/godnslog/cache"
@@ -131,8 +132,8 @@ func (p *servePwCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 		}()
 	}
 
-	sigCh := make(chan os.Signal)
-	signal.Notify(sigCh, os.Kill, os.Interrupt)
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGTERM, os.Interrupt)
 	<-sigCh
 
 	dns.Shutdown()

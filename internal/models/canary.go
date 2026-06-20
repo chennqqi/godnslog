@@ -24,16 +24,16 @@ type CanaryHit struct {
 	Headers      string    `json:"headers" xorm:"mediumtext"` // JSON string
 	Body         string    `json:"body" xorm:"mediumtext"`
 	Timestamp    time.Time `json:"timestamp" xorm:"datetime notnull created"`
-	IsCompressed bool     `json:"is_compressed" xorm:"bool notnull default false"`
+	IsCompressed bool      `json:"is_compressed" xorm:"bool notnull default false"`
 }
 
 // CanaryConfig holds canary configuration
 type CanaryConfig struct {
-	MaxRetentionDays      int      `json:"max_retention_days"` // How long to keep canary tokens
-	DefaultExpiry         string   `json:"default_expiry"`     // Default expiration (e.g., "90d")
-	SilentWindow          int      `json:"silent_window"`      // Silent window in seconds
-	CompressionThreshold  int      `json:"compression_threshold"` // Hits before compression
-	NotificationLevels    []string `json:"notification_levels"` // low, medium, high, critical
+	MaxRetentionDays     int      `json:"max_retention_days"`    // How long to keep canary tokens
+	DefaultExpiry        string   `json:"default_expiry"`        // Default expiration (e.g., "90d")
+	SilentWindow         int      `json:"silent_window"`         // Silent window in seconds
+	CompressionThreshold int      `json:"compression_threshold"` // Hits before compression
+	NotificationLevels   []string `json:"notification_levels"`   // low, medium, high, critical
 }
 
 // CanaryType represents the type of canary
@@ -80,8 +80,8 @@ type CanaryListResponse struct {
 // CanaryHitListResponse represents the response for listing canary hits
 type CanaryHitListResponse struct {
 	Items      []CanaryHit `json:"items"`
-	Total      int64      `json:"total"`
-	Page       int        `json:"page"`
-	PageSize   int        `json:"page_size"`
-	TotalPages int        `json:"total_pages"`
+	Total      int64       `json:"total"`
+	Page       int         `json:"page"`
+	PageSize   int         `json:"page_size"`
+	TotalPages int         `json:"total_pages"`
 }

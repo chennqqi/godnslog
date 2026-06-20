@@ -9,23 +9,23 @@ import (
 // User represents a user in the system (migrated from TblUser)
 // This is a wrapper around models.TblUser for compatibility
 type User struct {
-	ID              int64     `json:"id" xorm:"pk autoincr"`
-	Name            string    `json:"name" xorm:"varchar(64) notnull unique"`
-	Email           string    `json:"email" xorm:"varchar(64) notnull unique"`
-	Role            int       `json:"role" xorm:"tinyint notnull default 0"` // 0=super, 1=admin, 2=normal, 3=guest
-	ShortID         string    `json:"short_id" xorm:"varchar(32) notnull unique"` // For subdomain
-	Token           string    `json:"-" xorm:"varchar(128) notnull unique"` // API Token
-	Pass            string    `json:"-" xorm:"varchar(128) notnull"` // Password hash
-	
+	ID      int64  `json:"id" xorm:"pk autoincr"`
+	Name    string `json:"name" xorm:"varchar(64) notnull unique"`
+	Email   string `json:"email" xorm:"varchar(64) notnull unique"`
+	Role    int    `json:"role" xorm:"tinyint notnull default 0"`      // 0=super, 1=admin, 2=normal, 3=guest
+	ShortID string `json:"short_id" xorm:"varchar(32) notnull unique"` // For subdomain
+	Token   string `json:"-" xorm:"varchar(128) notnull unique"`       // API Token
+	Pass    string `json:"-" xorm:"varchar(128) notnull"`              // Password hash
+
 	// Settings
 	Lang            string   `json:"lang" xorm:"varchar(16) default('en-US') notnull"`
 	Callback        string   `json:"callback" xorm:"text"`
 	CallbackMessage string   `json:"callback_message" xorm:"text"`
 	Rebind          []string `json:"rebind" xorm:"json"`
 	CleanInterval   int64    `json:"clean_interval" xorm:"default 3600"`
-	
-	CreatedAt       time.Time `json:"created_at" xorm:"datetime created"`
-	UpdatedAt       time.Time `json:"updated_at" xorm:"datetime updated"`
+
+	CreatedAt time.Time `json:"created_at" xorm:"datetime created"`
+	UpdatedAt time.Time `json:"updated_at" xorm:"datetime updated"`
 }
 
 // TableName returns the table name for User model

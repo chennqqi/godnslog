@@ -158,10 +158,10 @@ const (
 
 // MCPHandler handles MCP protocol requests over Streamable HTTP transport
 type MCPHandler struct {
-	server      *Server
-	sessions    *SessionStore
-	toolMap     map[string]Tool
-	tools       []Tool
+	server   *Server
+	sessions *SessionStore
+	toolMap  map[string]Tool
+	tools    []Tool
 }
 
 // NewMCPHandler creates a new MCP protocol handler

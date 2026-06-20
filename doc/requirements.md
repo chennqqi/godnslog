@@ -500,3 +500,10 @@ The spec `docs/superpowers/specs/2026-06-20-mvp-to-production-design.md` has bee
 ## 2026-06-20 (plan split)
 
 Spec approved. Split Phase 1 (Backend Realization) into 5 implementation plans under `docs/superpowers/plans/`: workflow action executors, rule engine completion, v2 API gaps, APIKey security, data model migration.
+
+## 2026-06-20 (production readiness evaluation)
+
+执行生产可用性评估，结果保存至 `doc/production-readiness-evaluation.md`。
+- 结论：尚未达到生产可用，ROADMAP 2.0 目标未全部达成。
+- 主要阻塞：Dockerfile 前端产物路径错误、前端 lint 28 errors、E2E 24 failed、go vet 失败、gofmt 26 文件未格式化、核心功能仍有 stub。
+- 建议：按 2026-06-20 spec 进入 Phase 1，建立 CI 门禁，修复容器化与测试同步。

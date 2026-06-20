@@ -18,17 +18,17 @@ type CompleteAgentRunRequest struct {
 
 // CompleteAgentRunResponse is the response body for completing an agent run.
 type CompleteAgentRunResponse struct {
-	AgentRunID     string      `json:"agent_run_id"`
-	Status         string      `json:"status"`
-	ReviewPacket   interface{} `json:"review_packet,omitempty"`
-	ExportPackage  interface{} `json:"export_package,omitempty"`
-	PackageHash    string      `json:"package_hash,omitempty"`
-	Decision       string      `json:"decision,omitempty"`
-	OperationID    string      `json:"operation_id,omitempty"`
-	AuditRefID     string      `json:"audit_ref_id,omitempty"`
-	InteractionCount int       `json:"interaction_count"`
-	EvidenceStrength string    `json:"evidence_strength,omitempty"`
-	CompletedAt    time.Time   `json:"completed_at"`
+	AgentRunID       string      `json:"agent_run_id"`
+	Status           string      `json:"status"`
+	ReviewPacket     interface{} `json:"review_packet,omitempty"`
+	ExportPackage    interface{} `json:"export_package,omitempty"`
+	PackageHash      string      `json:"package_hash,omitempty"`
+	Decision         string      `json:"decision,omitempty"`
+	OperationID      string      `json:"operation_id,omitempty"`
+	AuditRefID       string      `json:"audit_ref_id,omitempty"`
+	InteractionCount int         `json:"interaction_count"`
+	EvidenceStrength string      `json:"evidence_strength,omitempty"`
+	CompletedAt      time.Time   `json:"completed_at"`
 }
 
 // CompleteAgentRun orchestrates the full agent run completion loop:
@@ -135,12 +135,12 @@ func (s *ReviewService) CompleteAgentRun(agentRunID string, req *CompleteAgentRu
 		ResourceType: "agent_run",
 		ResourceID:   &agentRunID,
 		Details: models.AuditDetails{
-			"format":             format,
-			"interaction_count":  packet.InteractionSummary.Total,
-			"evidence_strength":  resp.EvidenceStrength,
-			"package_hash":       exportResp.PackageHash,
+			"format":              format,
+			"interaction_count":   packet.InteractionSummary.Total,
+			"evidence_strength":   resp.EvidenceStrength,
+			"package_hash":        exportResp.PackageHash,
 			"export_operation_id": exportResp.OperationID,
-			"decision":           req.Decision,
+			"decision":            req.Decision,
 		},
 		Timestamp: time.Now(),
 	}
