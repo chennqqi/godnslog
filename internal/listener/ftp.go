@@ -73,6 +73,7 @@ func (f *FTPListener) Stop() error {
 
 // acceptConnections accepts incoming FTP connections
 func (f *FTPListener) acceptConnections(ctx context.Context) {
+	sc := GetSecurityContext(f.listener.ID)
 	for {
 		select {
 		case <-ctx.Done():
@@ -91,7 +92,16 @@ func (f *FTPListener) acceptConnections(ctx context.Context) {
 				}
 			}
 
-			go f.handleConnection(ctx, conn)
+			if !sc.CheckConnection(conn.RemoteAddr()) {
+				log.Printf("FTP connection rejected by rate/connection limit from %s", conn.RemoteAddr())
+				conn.Close()
+				continue
+			}
+
+			go func() {
+				defer sc.ReleaseConnection()
+				f.handleConnection(ctx, conn)
+			}()
 		}
 	}
 }

@@ -71,7 +71,10 @@ func (m *Manager) Start(ctx context.Context) error {
 	m.wg.Add(1)
 	go m.cleanupLoop()
 
-	m.logger.Infof("[listener/manager] started %d listeners", len(m.active))
+	m.mu.Lock()
+	count := len(m.active)
+	m.mu.Unlock()
+	m.logger.Infof("[listener/manager] started %d listeners", count)
 	return nil
 }
 
@@ -86,6 +89,7 @@ func (m *Manager) Stop() {
 		if err := ml.listener.Stop(); err != nil {
 			m.logger.Errorf("[listener/manager] error stopping listener %s: %v", id, err)
 		}
+		ClearSecurityContext(id)
 	}
 	m.active = make(map[string]*managedListener)
 	m.mu.Unlock()
@@ -116,6 +120,7 @@ func (m *Manager) StopListener(id string) error {
 	delete(m.active, id)
 	m.mu.Unlock()
 
+	ClearSecurityContext(id)
 	m.logger.Infof("[listener/manager] stopped listener %s", id)
 	return nil
 }
@@ -150,6 +155,10 @@ func (m *Manager) startListener(ctx context.Context, l *Listener) error {
 	// Create rate and connection limiters
 	rateLim := NewRateLimiter(1*time.Minute, cfg.MaxConnections)
 	connLim := NewConnLimiter(cfg.MaxConnections)
+
+	// Register security context so listeners can check limits in accept loop
+	sc := NewSecurityContext(rateLim, connLim)
+	SetSecurityContext(l.ID, sc)
 
 	// Create the store wrapper with rate limiting
 	wrappedStore := &rateLimitedStore{
