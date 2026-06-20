@@ -21,9 +21,9 @@ test.describe('Settings Page', () => {
   });
 
   test('should display tab buttons', async ({ page }) => {
-    // Page uses Radix Tabs with Chinese labels
-    await expect(page.getByRole('tab').filter({ hasText: '通用设置' })).toBeVisible({ timeout: 5000 });
-    await expect(page.getByRole('tab').filter({ hasText: '域名设置' })).toBeVisible();
-    await expect(page.getByRole('tab').filter({ hasText: '监听配置' })).toBeVisible();
+    // Page uses Radix Tabs with English labels
+    await expect(page.getByRole('tab').filter({ hasText: 'General' })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('tab').filter({ hasText: 'Domain' })).toBeVisible();
+    await expect(page.getByRole('tab').filter({ hasText: 'Listener' })).toBeVisible();
   });
 });

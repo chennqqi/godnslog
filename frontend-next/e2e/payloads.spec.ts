@@ -26,11 +26,11 @@ test.describe('Payloads Page', () => {
   });
 
   test('should display empty state for payloads', async ({ page }) => {
-    await expect(page.getByText('暂无 Payloads')).toBeVisible();
+    await expect(page.getByText('No payloads yet')).toBeVisible();
   });
 
   test('should display search input', async ({ page }) => {
-    await expect(page.getByPlaceholder('搜索 token 或模板...')).toBeVisible();
+    await expect(page.getByPlaceholder('Search by token or template...')).toBeVisible();
   });
 
   test('should display payload detail from API', async ({ page }) => {
