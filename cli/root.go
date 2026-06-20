@@ -41,6 +41,7 @@ func Execute() error {
 	rootCmd.AddCommand(payloadCmd)
 	rootCmd.AddCommand(interactionCmd)
 	rootCmd.AddCommand(reportCmd)
+	rootCmd.AddCommand(scannerCmd)
 	return rootCmd.Execute()
 }
 
