@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { authApi } from '@/lib/api-client'
 import type { LoginRequest } from '@/types'
-import { t, getCurrentLanguage, Language } from '@/lib/i18n'
+import { useI18n } from '@/lib/i18n-context'
 import { useAuthStore } from '@/features/auth/store'
 import { loginSchema, type LoginFormValues } from '@/features/auth/schemas/login-schema'
 
@@ -44,9 +44,9 @@ function FeatureIcon({ name }: { name: string }) {
 export default function LoginPage() {
   const router = useRouter()
   const { setToken, setUser } = useAuthStore()
+  const { t, lang, setLang } = useI18n()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [lang, setLang] = useState<Language>('en-US')
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -56,15 +56,8 @@ export default function LoginPage() {
     },
   })
 
-  useEffect(() => {
-    setLang(getCurrentLanguage())
-  }, [])
-
-  const handleLanguageChange = (newLang: Language) => {
+  const handleLanguageChange = (newLang: 'en-US' | 'zh-CN') => {
     setLang(newLang)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('language', newLang)
-    }
   }
 
   const onSubmit = async (data: LoginFormValues) => {
@@ -85,10 +78,10 @@ export default function LoginPage() {
         })
         router.push('/dashboard')
       } else {
-        setError(response.message || t('login.error', lang))
+        setError(response.message || t('login.error'))
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || t('login.error', lang))
+      setError(err.response?.data?.message || err.message || t('login.error'))
     } finally {
       setLoading(false)
     }
@@ -185,10 +178,10 @@ export default function LoginPage() {
           {/* Title */}
           <div>
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
-              {t('login.title', lang)}
+              {t('login.title')}
             </h2>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              {t('login.subtitle', lang)}
+              {t('login.subtitle')}
             </p>
           </div>
 
@@ -206,14 +199,14 @@ export default function LoginPage() {
             {/* Username */}
             <div className="space-y-1.5">
               <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                {t('login.username', lang)}
+                {t('login.username')}
               </label>
               <input
                 id="username"
                 type="text"
                 autoComplete="username"
                 className="block w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 sm:text-sm"
-                placeholder={t('login.username', lang)}
+                placeholder={t('login.username')}
                 {...form.register('username')}
               />
               {form.formState.errors.username && (
@@ -224,14 +217,14 @@ export default function LoginPage() {
             {/* Password */}
             <div className="space-y-1.5">
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                {t('login.password', lang)}
+                {t('login.password')}
               </label>
               <input
                 id="password"
                 type="password"
                 autoComplete="current-password"
                 className="block w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 sm:text-sm"
-                placeholder={t('login.password', lang)}
+                placeholder={t('login.password')}
                 {...form.register('password')}
               />
               {form.formState.errors.password && (
@@ -251,10 +244,10 @@ export default function LoginPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  {t('login.button.loading', lang)}
+                  {t('login.button.loading')}
                 </span>
               ) : (
-                t('login.button', lang)
+                t('login.button')
               )}
             </button>
           </form>

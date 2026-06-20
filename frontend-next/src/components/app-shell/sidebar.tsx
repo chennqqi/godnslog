@@ -3,17 +3,18 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { useI18n, type TranslationKey } from '@/lib/i18n-context'
 
 /** Navigation item type for sidebar entries */
 interface NavItem {
-  label: string
+  labelKey: TranslationKey
   href: string
   icon: React.ReactNode
 }
 
 /** Navigation group containing a section title and items */
 interface NavGroup {
-  title: string
+  titleKey: TranslationKey
   items: NavItem[]
 }
 
@@ -46,6 +47,24 @@ const ClipboardCheckIcon = () => (
 const BeakerIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v10.17l-3 5.83h12l-3-5.83V3M9 3h6M9 3H6M15 3h3" />
+  </svg>
+)
+
+const RocketIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.59 14.37a6 6 0 11-5.18-5.18M15.59 14.37L21 20M15.59 14.37L12 11M12 11l-3-3m3 3l3-3m-3 3v-7m0 7h-7" />
+  </svg>
+)
+
+const TerminalIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  </svg>
+)
+
+const StoreIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
   </svg>
 )
 
@@ -107,31 +126,39 @@ const WorkflowIcon = () => (
 /** All navigation groups matching the design spec */
 const NAV_GROUPS: NavGroup[] = [
   {
-    title: 'OAST CORE',
+    titleKey: 'nav.group.oast',
     items: [
-      { label: 'Dashboard', href: '/dashboard', icon: <LayoutIcon /> },
-      { label: 'Cases', href: '/dashboard/cases', icon: <FolderIcon /> },
-      { label: 'Payloads', href: '/dashboard/payloads', icon: <BeakerIcon /> },
-      { label: 'Interactions', href: '/dashboard/interactions', icon: <TimelineIcon /> },
-      { label: 'Evidence Summary', href: '/dashboard/evidence-summary', icon: <ClipboardCheckIcon /> },
+      { labelKey: 'nav.dashboard', href: '/dashboard', icon: <LayoutIcon /> },
+      { labelKey: 'nav.cases', href: '/dashboard/cases', icon: <FolderIcon /> },
+      { labelKey: 'nav.payloads', href: '/dashboard/payloads', icon: <BeakerIcon /> },
+      { labelKey: 'nav.agent-runs', href: '/dashboard/agent-runs', icon: <RocketIcon /> },
+      { labelKey: 'nav.interactions', href: '/dashboard/interactions', icon: <TimelineIcon /> },
+      { labelKey: 'nav.evidence-summary', href: '/dashboard/evidence-summary', icon: <ClipboardCheckIcon /> },
     ],
   },
   {
-    title: 'MONITOR',
+    titleKey: 'nav.group.monitor',
     items: [
-      { label: 'Canary Tokens', href: '/dashboard/canary', icon: <ShieldIcon /> },
-      { label: 'Rebinding Lab', href: '/dashboard/rebinding', icon: <GlobeIcon /> },
-      { label: 'Workflow', href: '/dashboard/workflow', icon: <WorkflowIcon /> },
+      { labelKey: 'nav.canary', href: '/dashboard/canary', icon: <ShieldIcon /> },
+      { labelKey: 'nav.rebinding', href: '/dashboard/rebinding', icon: <GlobeIcon /> },
+      { labelKey: 'nav.workflow', href: '/dashboard/workflow', icon: <WorkflowIcon /> },
     ],
   },
   {
-    title: 'SYSTEM',
+    titleKey: 'nav.group.integrations',
     items: [
-      { label: 'Settings', href: '/dashboard/settings', icon: <CogIcon /> },
-      { label: 'Users', href: '/dashboard/users', icon: <UsersIcon /> },
-      { label: 'API Keys', href: '/dashboard/apikeys', icon: <KeyIcon /> },
-      { label: 'Audit Log', href: '/dashboard/audit', icon: <AuditIcon /> },
-      { label: 'Docs', href: '/dashboard/docs', icon: <BookIcon /> },
+      { labelKey: 'nav.scanner-hub', href: '/dashboard/scanner-hub', icon: <TerminalIcon /> },
+      { labelKey: 'nav.marketplace', href: '/dashboard/marketplace', icon: <StoreIcon /> },
+    ],
+  },
+  {
+    titleKey: 'nav.group.system',
+    items: [
+      { labelKey: 'nav.settings', href: '/dashboard/settings', icon: <CogIcon /> },
+      { labelKey: 'nav.users', href: '/dashboard/users', icon: <UsersIcon /> },
+      { labelKey: 'nav.apikeys', href: '/dashboard/apikeys', icon: <KeyIcon /> },
+      { labelKey: 'nav.audit', href: '/dashboard/audit', icon: <AuditIcon /> },
+      { labelKey: 'nav.docs', href: '/dashboard/docs', icon: <BookIcon /> },
     ],
   },
 ]
@@ -139,6 +166,7 @@ const NAV_GROUPS: NavGroup[] = [
 /** AppShell left sidebar with grouped navigation */
 export function Sidebar({ collapsed = false, onClose }: SidebarProps) {
   const pathname = usePathname()
+  const { t } = useI18n()
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard'
@@ -177,15 +205,16 @@ export function Sidebar({ collapsed = false, onClose }: SidebarProps) {
       {/* Navigation groups */}
       <nav className="flex-1 overflow-y-auto py-4 space-y-6">
         {NAV_GROUPS.map((group) => (
-          <div key={group.title}>
+          <div key={group.titleKey}>
             {!collapsed && (
               <p className="px-4 mb-1 text-xs font-semibold text-gray-500 uppercase tracking-widest">
-                {group.title}
+                {t(group.titleKey)}
               </p>
             )}
             <ul className="space-y-0.5">
               {group.items.map((item) => {
                 const active = isActive(item.href)
+                const label = t(item.labelKey)
                 return (
                   <li key={item.href}>
                     <Link
@@ -197,10 +226,10 @@ export function Sidebar({ collapsed = false, onClose }: SidebarProps) {
                           ? 'bg-indigo-600 text-white'
                           : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                       )}
-                      title={collapsed ? item.label : undefined}
+                      title={collapsed ? label : undefined}
                     >
                       <span className="shrink-0">{item.icon}</span>
-                      {!collapsed && <span>{item.label}</span>}
+                      {!collapsed && <span>{label}</span>}
                     </Link>
                   </li>
                 )

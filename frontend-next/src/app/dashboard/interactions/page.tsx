@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useInteractionStream } from '@/features/interactions/hooks/use-interaction-stream'
+import { useI18n } from '@/lib/i18n-context'
 
 /** Radix SelectItem cannot use value="" for "all types" */
 const TYPE_FILTER_ALL = 'all'
@@ -38,6 +39,7 @@ function InteractionsPageContent() {
   const [viewMode, setViewMode] = useState<'table' | 'timeline'>('table')
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null)
   const [stats, setStats] = useState({ total: 0, dns_count: 0, http_count: 0, smtp_count: 0, ldap_count: 0 })
+  const { t } = useI18n()
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [liveCount, setLiveCount] = useState(0)
 
@@ -148,7 +150,7 @@ function InteractionsPageContent() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Interaction Timeline</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t('interactions.title')}</h2>
           {caseId && (
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Case scoped: {caseId}
@@ -176,7 +178,7 @@ function InteractionsPageContent() {
             </p>
           )}
           {!caseId && !payloadId && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">All Interactions</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('interactions.all')}</p>
           )}
         </div>
         <div className="flex space-x-2">
@@ -188,13 +190,13 @@ function InteractionsPageContent() {
               if (!autoRefresh) setLiveCount(0)
             }}
           >
-            {autoRefresh ? (sseConnected ? "● Live" : "● Connecting..." ) : "Live Stream: OFF"}
+            {autoRefresh ? (sseConnected ? t('interactions.live.on') : t('interactions.live.connecting')) : t('interactions.live.off')}
           </Button>
           {autoRefresh && sseError && (
             <span className="text-xs text-amber-500">{sseError}</span>
           )}
           {autoRefresh && liveCount > 0 && (
-            <span className="text-xs text-green-500">{liveCount} new</span>
+            <span className="text-xs text-green-500">{liveCount} {t('interactions.new_count')}</span>
           )}
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-[180px]">
@@ -228,13 +230,13 @@ function InteractionsPageContent() {
       {/* Stats Card */}
       <Card className="mb-4">
         <CardHeader>
-          <CardTitle>Statistics</CardTitle>
+          <CardTitle>{t('interactions.statistics')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-5 gap-4">
             <div className="text-center">
               <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.total}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Total</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{t('interactions.total')}</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-purple-600">{stats.dns_count}</p>
@@ -263,7 +265,7 @@ function InteractionsPageContent() {
         <CardContent>
           {filteredInteractions.length === 0 ? (
             <p className="text-gray-500 dark:text-gray-400">
-              {caseId || payloadId ? 'No interactions for this Case/Payload' : 'No interactions yet'}
+              {caseId || payloadId ? 'No interactions for this Case/Payload' : t('interactions.no_data')}
             </p>
           ) : viewMode === 'table' ? (
             <Table>
