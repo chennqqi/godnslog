@@ -352,12 +352,12 @@ func renderActionTemplate(template string, inter *models.Interaction) string {
 	return result
 }
 
-// executeNotifyAction triggers a notification via webhook channel.
-// Config fields: channel (required, only "webhook" supported in Phase 1),
-// webhook_url (required for webhook channel), message (template with {{.field}} placeholders).
+// executeNotifyAction triggers a notification via various channels.
+// Config fields: channel (required), webhook_url (for webhook/feishu/wecom/dingtalk/slack/discord),
+// bot_token + chat_id (for telegram), message (template with {{.field}} placeholders).
 func (s *Service) executeNotifyAction(action models.Action, interaction *models.Interaction) error {
 	channel, _ := action.Config["channel"].(string)
-	if channel == "" {
+	if len(channel) == 0 {
 		return errors.New("missing channel in notify action config")
 	}
 
@@ -369,35 +369,157 @@ func (s *Service) executeNotifyAction(action models.Action, interaction *models.
 
 	switch channel {
 	case "webhook":
-		webhookURL, _ := action.Config["webhook_url"].(string)
-		if webhookURL == "" {
-			return errors.New("missing webhook_url for webhook notify channel")
-		}
-		if s.security == nil {
-			s.security = NewOutboundSecurity(nil)
-		}
-		if err := s.security.ValidateURL(action.ID, webhookURL); err != nil {
-			return err
-		}
-		payload, _ := json.Marshal(map[string]string{"message": message})
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		req, err := http.NewRequestWithContext(ctx, "POST", webhookURL, bytes.NewBuffer(payload))
-		if err != nil {
-			return fmt.Errorf("failed to create notify request: %w", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-		client := &http.Client{Timeout: 30 * time.Second}
-		resp, err := client.Do(req)
-		if err != nil {
-			return fmt.Errorf("notify webhook request failed: %w", err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode >= 400 {
-			return fmt.Errorf("notify webhook returned status %d", resp.StatusCode)
-		}
-		return nil
+		return s.sendNotifyWebhook(action, message)
+	case "feishu":
+		return s.sendNotifyFeishu(action, message)
+	case "wecom":
+		return s.sendNotifyWecom(action, message)
+	case "dingtalk":
+		return s.sendNotifyDingtalk(action, message)
+	case "slack":
+		return s.sendNotifySlack(action, message)
+	case "discord":
+		return s.sendNotifyDiscord(action, message)
+	case "telegram":
+		return s.sendNotifyTelegram(action, message)
 	default:
-		return fmt.Errorf("unsupported notify channel: %s (only 'webhook' supported in Phase 1)", channel)
+		return fmt.Errorf("unsupported notify channel: %s", channel)
 	}
+}
+
+// sendNotifyWebhook sends a generic webhook notification
+func (s *Service) sendNotifyWebhook(action models.Action, message string) error {
+	webhookURL, _ := action.Config["webhook_url"].(string)
+	if len(webhookURL) == 0 {
+		return errors.New("missing webhook_url for webhook notify channel")
+	}
+	if err := s.validateNotifyURL(action.ID, webhookURL); err != nil {
+		return err
+	}
+	payload, _ := json.Marshal(map[string]string{"message": message})
+	return s.sendNotifyRequest(webhookURL, payload)
+}
+
+// sendNotifyFeishu sends a Feishu (Lark) notification
+func (s *Service) sendNotifyFeishu(action models.Action, message string) error {
+	webhookURL, _ := action.Config["webhook_url"].(string)
+	if len(webhookURL) == 0 {
+		return errors.New("missing webhook_url for feishu notify channel")
+	}
+	if err := s.validateNotifyURL(action.ID, webhookURL); err != nil {
+		return err
+	}
+	payload, _ := json.Marshal(map[string]interface{}{
+		"msg_type": "text",
+		"content":  map[string]string{"text": message},
+	})
+	return s.sendNotifyRequest(webhookURL, payload)
+}
+
+// sendNotifyWecom sends a WeChat Work notification
+func (s *Service) sendNotifyWecom(action models.Action, message string) error {
+	webhookURL, _ := action.Config["webhook_url"].(string)
+	if len(webhookURL) == 0 {
+		return errors.New("missing webhook_url for wecom notify channel")
+	}
+	if err := s.validateNotifyURL(action.ID, webhookURL); err != nil {
+		return err
+	}
+	payload, _ := json.Marshal(map[string]interface{}{
+		"msgtype": "text",
+		"text":    map[string]string{"content": message},
+	})
+	return s.sendNotifyRequest(webhookURL, payload)
+}
+
+// sendNotifyDingtalk sends a DingTalk notification
+func (s *Service) sendNotifyDingtalk(action models.Action, message string) error {
+	webhookURL, _ := action.Config["webhook_url"].(string)
+	if len(webhookURL) == 0 {
+		return errors.New("missing webhook_url for dingtalk notify channel")
+	}
+	if err := s.validateNotifyURL(action.ID, webhookURL); err != nil {
+		return err
+	}
+	payload, _ := json.Marshal(map[string]interface{}{
+		"msgtype": "text",
+		"text":    map[string]string{"content": message},
+	})
+	return s.sendNotifyRequest(webhookURL, payload)
+}
+
+// sendNotifySlack sends a Slack notification
+func (s *Service) sendNotifySlack(action models.Action, message string) error {
+	webhookURL, _ := action.Config["webhook_url"].(string)
+	if len(webhookURL) == 0 {
+		return errors.New("missing webhook_url for slack notify channel")
+	}
+	if err := s.validateNotifyURL(action.ID, webhookURL); err != nil {
+		return err
+	}
+	payload, _ := json.Marshal(map[string]string{"text": message})
+	return s.sendNotifyRequest(webhookURL, payload)
+}
+
+// sendNotifyDiscord sends a Discord notification
+func (s *Service) sendNotifyDiscord(action models.Action, message string) error {
+	webhookURL, _ := action.Config["webhook_url"].(string)
+	if len(webhookURL) == 0 {
+		return errors.New("missing webhook_url for discord notify channel")
+	}
+	if err := s.validateNotifyURL(action.ID, webhookURL); err != nil {
+		return err
+	}
+	payload, _ := json.Marshal(map[string]string{"content": message})
+	return s.sendNotifyRequest(webhookURL, payload)
+}
+
+// sendNotifyTelegram sends a Telegram notification
+func (s *Service) sendNotifyTelegram(action models.Action, message string) error {
+	botToken, _ := action.Config["bot_token"].(string)
+	if len(botToken) == 0 {
+		return errors.New("missing bot_token for telegram notify channel")
+	}
+	chatID, _ := action.Config["chat_id"].(string)
+	if len(chatID) == 0 {
+		return errors.New("missing chat_id for telegram notify channel")
+	}
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
+	payload, _ := json.Marshal(map[string]string{
+		"chat_id": chatID,
+		"text":    message,
+	})
+	return s.sendNotifyRequest(url, payload)
+}
+
+// validateNotifyURL validates a URL against the outbound security policy
+func (s *Service) validateNotifyURL(actionID, urlStr string) error {
+	if s.security == nil {
+		s.security = NewOutboundSecurity(nil)
+	}
+	if len(actionID) == 0 {
+		actionID = urlStr
+	}
+	return s.security.ValidateURL(actionID, urlStr)
+}
+
+// sendNotifyRequest sends an HTTP POST with JSON payload for notifications
+func (s *Service) sendNotifyRequest(url string, payload []byte) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payload))
+	if err != nil {
+		return fmt.Errorf("failed to create notify request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("notify request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("notify returned status %d", resp.StatusCode)
+	}
+	return nil
 }

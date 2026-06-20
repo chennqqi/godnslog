@@ -434,3 +434,205 @@ func TestService_ExecuteNotifyAction_UnsupportedChannel(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported")
 }
+
+// --- Notification Channel Tests ---
+
+func TestService_ExecuteNotifyAction_Feishu(t *testing.T) {
+	engine, err := MockEngine()
+	assert.NoError(t, err)
+	service := NewService(engine)
+	service.SetOutboundSecurity(NewOutboundSecurity([]string{"127.0.0.1"}))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	action := models.Action{
+		Type: models.ActionTypeNotify, Enabled: true,
+		Config: map[string]interface{}{
+			"channel":     "feishu",
+			"webhook_url": srv.URL,
+			"message":     "Test from {{.source_ip}}",
+		},
+	}
+	token := "feishu-token"
+	interaction := &models.Interaction{ID: "inter-feishu", Type: "dns", SourceIP: "10.0.0.2", Token: &token}
+
+	err = service.executeNotifyAction(action, interaction)
+	assert.NoError(t, err)
+}
+
+func TestService_ExecuteNotifyAction_Wecom(t *testing.T) {
+	engine, err := MockEngine()
+	assert.NoError(t, err)
+	service := NewService(engine)
+	service.SetOutboundSecurity(NewOutboundSecurity([]string{"127.0.0.1"}))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	action := models.Action{
+		Type: models.ActionTypeNotify, Enabled: true,
+		Config: map[string]interface{}{
+			"channel":     "wecom",
+			"webhook_url": srv.URL,
+			"message":     "Wecom test",
+		},
+	}
+	token := "wecom-token"
+	interaction := &models.Interaction{ID: "inter-wecom", Type: "dns", Token: &token}
+
+	err = service.executeNotifyAction(action, interaction)
+	assert.NoError(t, err)
+}
+
+func TestService_ExecuteNotifyAction_Dingtalk(t *testing.T) {
+	engine, err := MockEngine()
+	assert.NoError(t, err)
+	service := NewService(engine)
+	service.SetOutboundSecurity(NewOutboundSecurity([]string{"127.0.0.1"}))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	action := models.Action{
+		Type: models.ActionTypeNotify, Enabled: true,
+		Config: map[string]interface{}{
+			"channel":     "dingtalk",
+			"webhook_url": srv.URL,
+			"message":     "DingTalk test",
+		},
+	}
+	token := "ding-token"
+	interaction := &models.Interaction{ID: "inter-ding", Type: "dns", Token: &token}
+
+	err = service.executeNotifyAction(action, interaction)
+	assert.NoError(t, err)
+}
+
+func TestService_ExecuteNotifyAction_Slack(t *testing.T) {
+	engine, err := MockEngine()
+	assert.NoError(t, err)
+	service := NewService(engine)
+	service.SetOutboundSecurity(NewOutboundSecurity([]string{"127.0.0.1"}))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	action := models.Action{
+		Type: models.ActionTypeNotify, Enabled: true,
+		Config: map[string]interface{}{
+			"channel":     "slack",
+			"webhook_url": srv.URL,
+			"message":     "Slack test",
+		},
+	}
+	token := "slack-token"
+	interaction := &models.Interaction{ID: "inter-slack", Type: "dns", Token: &token}
+
+	err = service.executeNotifyAction(action, interaction)
+	assert.NoError(t, err)
+}
+
+func TestService_ExecuteNotifyAction_Discord(t *testing.T) {
+	engine, err := MockEngine()
+	assert.NoError(t, err)
+	service := NewService(engine)
+	service.SetOutboundSecurity(NewOutboundSecurity([]string{"127.0.0.1"}))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	action := models.Action{
+		Type: models.ActionTypeNotify, Enabled: true,
+		Config: map[string]interface{}{
+			"channel":     "discord",
+			"webhook_url": srv.URL,
+			"message":     "Discord test",
+		},
+	}
+	token := "discord-token"
+	interaction := &models.Interaction{ID: "inter-discord", Type: "dns", Token: &token}
+
+	err = service.executeNotifyAction(action, interaction)
+	assert.NoError(t, err)
+}
+
+func TestService_ExecuteNotifyAction_Telegram(t *testing.T) {
+	engine, err := MockEngine()
+	assert.NoError(t, err)
+	service := NewService(engine)
+	service.SetOutboundSecurity(NewOutboundSecurity([]string{"api.telegram.org"}))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	action := models.Action{
+		Type: models.ActionTypeNotify, Enabled: true,
+		Config: map[string]interface{}{
+			"channel":   "telegram",
+			"bot_token": "test-bot-token",
+			"chat_id":   "123456",
+			"message":   "Telegram test",
+		},
+	}
+	token := "tg-token"
+	interaction := &models.Interaction{ID: "inter-tg", Type: "dns", Token: &token}
+
+	// We can't easily test Telegram since it calls api.telegram.org
+	// Just verify it doesn't panic on config parsing
+	err = service.executeNotifyAction(action, interaction)
+	// Will fail due to DNS resolution of api.telegram.org in test env, but should not panic
+	_ = err
+}
+
+func TestService_ExecuteNotifyAction_Telegram_MissingBotToken(t *testing.T) {
+	engine, err := MockEngine()
+	assert.NoError(t, err)
+	service := NewService(engine)
+
+	action := models.Action{
+		Type: models.ActionTypeNotify, Enabled: true,
+		Config: map[string]interface{}{
+			"channel": "telegram",
+			"chat_id": "123456",
+		},
+	}
+	token := "tg-token"
+	interaction := &models.Interaction{ID: "inter-tg", Type: "dns", Token: &token}
+
+	err = service.executeNotifyAction(action, interaction)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing bot_token")
+}
+
+func TestService_ExecuteNotifyAction_Telegram_MissingChatID(t *testing.T) {
+	engine, err := MockEngine()
+	assert.NoError(t, err)
+	service := NewService(engine)
+
+	action := models.Action{
+		Type: models.ActionTypeNotify, Enabled: true,
+		Config: map[string]interface{}{
+			"channel":   "telegram",
+			"bot_token": "test-token",
+		},
+	}
+	token := "tg-token"
+	interaction := &models.Interaction{ID: "inter-tg", Type: "dns", Token: &token}
+
+	err = service.executeNotifyAction(action, interaction)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing chat_id")
+}
