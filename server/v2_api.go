@@ -18,8 +18,10 @@ import (
 	"github.com/chennqqi/godnslog/internal/interaction"
 	"github.com/chennqqi/godnslog/internal/listener"
 	"github.com/chennqqi/godnslog/internal/marketplace"
+	"github.com/chennqqi/godnslog/internal/mcp"
 	"github.com/chennqqi/godnslog/internal/notification"
 	"github.com/chennqqi/godnslog/internal/payload"
+	"github.com/chennqqi/godnslog/internal/retention"
 	"github.com/chennqqi/godnslog/internal/scannerhub"
 	"github.com/dgrijalva/jwt-go"
 
@@ -170,6 +172,8 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			rebinding.PUT("/rules/:id", self.v2UpdateRebindingRule)
 			rebinding.DELETE("/rules/:id", self.v2DeleteRebindingRule)
 			rebinding.GET("/rules/:id/sessions", self.v2ListRebindingSessions)
+			rebinding.GET("/scenarios", self.v2ListRebindingScenarios)
+			rebinding.POST("/scenarios/:name/rules", self.v2CreateRebindingFromScenario)
 		}
 
 		// DNS Records
@@ -203,6 +207,19 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			settings.GET("/:key", self.v2GetSetting)
 			settings.PUT("/:key", self.v2UpdateSetting)
 			settings.DELETE("/:key", self.v2DeleteSetting)
+		}
+
+		// Retention
+		retentionGroup := v2.Group("/retention", self.authHandler)
+		{
+			retentionGroup.GET("/policies", self.v2ListRetentionPolicies)
+			retentionGroup.POST("/policies", self.v2CreateRetentionPolicy)
+			retentionGroup.GET("/policies/:id", self.v2GetRetentionPolicy)
+			retentionGroup.PUT("/policies/:id", self.v2UpdateRetentionPolicy)
+			retentionGroup.DELETE("/policies/:id", self.v2DeleteRetentionPolicy)
+			retentionGroup.POST("/policies/:id/run", self.v2RunRetentionPolicy)
+			retentionGroup.GET("/jobs", self.v2ListRetentionJobs)
+			retentionGroup.GET("/archives", self.v2ListRetentionArchives)
 		}
 
 		// Scanner Hub
@@ -258,6 +275,10 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 	// Health endpoints (no auth required)
 	v2.GET("/health", self.v2HealthCheck)
 	v2.GET("/ready", self.v2ReadinessCheck)
+
+	// MCP Streamable HTTP transport (JSON-RPC 2.0)
+	// Uses APIKey auth via Bearer token; no session-based authHandler
+	v2.POST("/mcp", self.v2MCPHandler)
 }
 
 // v2Login handles v2 login
@@ -2905,6 +2926,48 @@ func (self *WebServer) v2ListRebindingSessions(c *gin.Context) {
 	})
 }
 
+// v2ListRebindingScenarios lists predefined rebinding scenarios
+func (self *WebServer) v2ListRebindingScenarios(c *gin.Context) {
+	scenarios := rebinding.GetPredefinedScenarios()
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    scenarios,
+	})
+}
+
+// v2CreateRebindingFromScenario creates a rebinding rule from a predefined scenario
+func (self *WebServer) v2CreateRebindingFromScenario(c *gin.Context) {
+	scenarioName := c.Param("name")
+
+	var req struct {
+		Domain string `json:"domain" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "domain is required",
+		})
+		return
+	}
+
+	rebindingService := rebinding.NewService(self.orm)
+	rule, err := rebindingService.CreateRuleFromScenario(scenarioName, req.Domain)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    rule,
+	})
+}
+
 // v2ListListeners lists protocol listeners
 func (self *WebServer) v2ListListeners(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -4759,4 +4822,160 @@ func (self *WebServer) v2ListFollowupHistory(c *gin.Context) {
 		"message": "success",
 		"data":    history,
 	})
+}
+
+// v2MCPHandler handles MCP Streamable HTTP transport requests.
+// It authenticates via Bearer API key, creates an MCP Server instance,
+// and delegates to MCPHandler for JSON-RPC 2.0 protocol processing.
+func (self *WebServer) v2MCPHandler(c *gin.Context) {
+	// Extract API key from Authorization header
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"jsonrpc": "2.0",
+			"error":   map[string]interface{}{"code": -32001, "message": "missing Authorization header"},
+		})
+		return
+	}
+
+	// Strip "Bearer " prefix to get the API key
+	apiKey := strings.TrimPrefix(authHeader, "Bearer ")
+	if apiKey == authHeader {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"jsonrpc": "2.0",
+			"error":   map[string]interface{}{"code": -32001, "message": "invalid Authorization format, expected Bearer token"},
+		})
+		return
+	}
+
+	// Build base URL for internal API calls
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	baseURL := fmt.Sprintf("%s://%s", scheme, c.Request.Host)
+
+	// Create MCP Server instance with the API key
+	mcpServer := mcp.NewServer(baseURL, apiKey)
+
+	// Get registered tools and tool map
+	tools, toolMap := mcpServer.GetTools()
+
+	handler := mcp.NewMCPHandler(mcpServer, toolMap, tools)
+	handler.ServeHTTP(c.Writer, c.Request)
+}
+
+// v2ListRetentionPolicies lists retention policies
+func (self *WebServer) v2ListRetentionPolicies(c *gin.Context) {
+	store := retention.NewXormStore(self.orm)
+	svc := retention.NewService(store)
+	policies, err := svc.ListPolicies(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to list policies"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": gin.H{"items": policies, "total": len(policies)}})
+}
+
+// v2CreateRetentionPolicy creates a retention policy
+func (self *WebServer) v2CreateRetentionPolicy(c *gin.Context) {
+	var policy retention.RetentionPolicy
+	if err := c.ShouldBindJSON(&policy); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		return
+	}
+	if policy.ID == "" {
+		policy.ID = v2models.GenerateID()
+	}
+	store := retention.NewXormStore(self.orm)
+	svc := retention.NewService(store)
+	if err := svc.CreatePolicy(c, &policy); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": policy})
+}
+
+// v2GetRetentionPolicy gets a specific retention policy
+func (self *WebServer) v2GetRetentionPolicy(c *gin.Context) {
+	id := c.Param("id")
+	store := retention.NewXormStore(self.orm)
+	svc := retention.NewService(store)
+	policy, err := svc.GetPolicy(c, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "Policy not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": policy})
+}
+
+// v2UpdateRetentionPolicy updates a retention policy
+func (self *WebServer) v2UpdateRetentionPolicy(c *gin.Context) {
+	id := c.Param("id")
+	store := retention.NewXormStore(self.orm)
+	svc := retention.NewService(store)
+	policy, err := svc.GetPolicy(c, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "Policy not found"})
+		return
+	}
+	if err := c.ShouldBindJSON(policy); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		return
+	}
+	policy.ID = id
+	if err := svc.UpdatePolicy(c, policy); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": policy})
+}
+
+// v2DeleteRetentionPolicy deletes a retention policy
+func (self *WebServer) v2DeleteRetentionPolicy(c *gin.Context) {
+	id := c.Param("id")
+	store := retention.NewXormStore(self.orm)
+	svc := retention.NewService(store)
+	if err := svc.DeletePolicy(c, id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success"})
+}
+
+// v2RunRetentionPolicy manually triggers a retention policy
+func (self *WebServer) v2RunRetentionPolicy(c *gin.Context) {
+	id := c.Param("id")
+	store := retention.NewXormStore(self.orm)
+	svc := retention.NewService(store)
+	job, err := svc.RunPolicy(c, id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": job})
+}
+
+// v2ListRetentionJobs lists retention jobs
+func (self *WebServer) v2ListRetentionJobs(c *gin.Context) {
+	store := retention.NewXormStore(self.orm)
+	svc := retention.NewService(store)
+	jobs, err := svc.ListJobs(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to list jobs"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": gin.H{"items": jobs, "total": len(jobs)}})
+}
+
+// v2ListRetentionArchives lists retention archives
+func (self *WebServer) v2ListRetentionArchives(c *gin.Context) {
+	store := retention.NewXormStore(self.orm)
+	svc := retention.NewService(store)
+	archives, err := svc.ListArchives(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to list archives"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": gin.H{"items": archives, "total": len(archives)}})
 }

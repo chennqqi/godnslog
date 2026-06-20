@@ -168,7 +168,18 @@ func (s *Server) writePermissionDeniedAudit(ctx context.Context, toolName, requi
 
 // Run starts the MCP server
 func (s *Server) Run(ctx context.Context) error {
-	// Register tools
+	tools, toolMap := s.GetTools()
+
+	// Start stdio transport (simplified for MVP)
+	log.Printf("MCP Server listening on stdio with %d tools", len(tools))
+
+	// In production, use proper MCP transport (stdio or SSE)
+	// For MVP, we'll implement a simple HTTP server
+	return s.runHTTPServer(ctx, toolMap, tools)
+}
+
+// GetTools returns the registered MCP tools and a name→tool map for external integration.
+func (s *Server) GetTools() ([]Tool, map[string]Tool) {
 	tools := []Tool{
 		{Name: "create_oast_probe", Description: "Create an agent-native OAST probe with a case and payload", Execute: s.createOASTProbe},
 		{Name: "create_case", Description: "Create a new case", Execute: s.createCase},
@@ -185,18 +196,11 @@ func (s *Server) Run(ctx context.Context) error {
 		{Name: "revoke_token", Description: "Revoke API token", Execute: s.revokeToken},
 	}
 
-	// Start stdio transport (simplified for MVP)
-	log.Printf("MCP Server listening on stdio with %d tools", len(tools))
-
-	// Convert to map for lookup
 	toolMap := make(map[string]Tool)
 	for _, tool := range tools {
 		toolMap[tool.Name] = tool
 	}
-
-	// In production, use proper MCP transport (stdio or SSE)
-	// For MVP, we'll implement a simple HTTP server
-	return s.runHTTPServer(ctx, toolMap, tools)
+	return tools, toolMap
 }
 
 // Tool represents an MCP tool

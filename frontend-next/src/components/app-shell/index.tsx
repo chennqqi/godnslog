@@ -17,6 +17,8 @@ const PAGE_TITLES: Record<string, TranslationKey> = {
   '/dashboard/evidence-summary': 'page.evidence-summary',
   '/dashboard/canary': 'page.canary',
   '/dashboard/rebinding': 'page.rebinding',
+  '/dashboard/listeners': 'page.listeners',
+  '/dashboard/retention': 'page.retention',
   '/dashboard/workflow': 'page.workflow',
   '/dashboard/scanner-hub': 'page.scanner-hub',
   '/dashboard/marketplace': 'page.marketplace',

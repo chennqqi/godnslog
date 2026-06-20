@@ -247,3 +247,175 @@ export const agentRunApi = {
   traceReviewPackage: (packageHash: string) =>
     api.get<AgentRunReviewPackageTraceResponse>('/agent-runs/review-package-trace', { package_hash: packageHash }),
 }
+
+// Listener API
+export interface ProtocolListener {
+  id: string
+  protocol: 'smtp' | 'ldap' | 'smb' | 'ftp'
+  host: string
+  port: number
+  token: string
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export const listenerApi = {
+  list: (params?: { page?: number; page_size?: number }) =>
+    api.get<{ items: ProtocolListener[]; total: number }>('/listeners', params),
+  get: (id: string) => api.get<{ data: ProtocolListener }>(`/listeners/${id}`),
+  create: (data: Partial<ProtocolListener>) => api.post<{ data: ProtocolListener }>('/listeners', data),
+  update: (id: string, data: Partial<ProtocolListener>) => api.put<{ data: ProtocolListener }>(`/listeners/${id}`, data),
+  delete: (id: string) => api.delete(`/listeners/${id}`),
+}
+
+// Canary API
+export interface CanaryToken {
+  id: string
+  type: string
+  token: string
+  description: string
+  context: string
+  expires_at: string
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CanaryHit {
+  id: string
+  canary_id: string
+  source_ip: string
+  user_agent: string
+  headers: string
+  body: string
+  timestamp: string
+  is_compressed: boolean
+}
+
+export const canaryApi = {
+  list: (params?: { page?: number; page_size?: number }) =>
+    api.get<{ items: CanaryToken[]; total: number }>('/canary', params),
+  create: (data: { type: string; token: string; description?: string; context?: string; expires_at?: string }) =>
+    api.post<{ data: CanaryToken }>('/canary', data),
+  get: (id: string) => api.get<{ data: CanaryToken }>(`/canary/${id}`),
+  update: (id: string, data: { description?: string; is_enabled?: boolean }) =>
+    api.put<{ data: CanaryToken }>(`/canary/${id}`, data),
+  delete: (id: string) => api.delete(`/canary/${id}`),
+  listHits: (id: string) => api.get<{ data: CanaryHit[] }>(`/canary/${id}/hits`),
+}
+
+// Rebinding API
+export interface RebindingStage {
+  order: number
+  target_ip: string
+  ttl: number
+  hit_count: number
+  max_hits: number
+  condition: string
+  description: string
+}
+
+export interface RebindingRule {
+  id: string
+  domain: string
+  stages: RebindingStage[]
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface RebindingScenario {
+  name: string
+  description: string
+  stages: RebindingStage[]
+}
+
+export interface RebindingSession {
+  id: string
+  rule_id: string
+  source_ip: string
+  current_stage: number
+  hit_count: number
+  started_at: string
+  last_hit: string
+}
+
+export const rebindingApi = {
+  listRules: (params?: { page?: number; page_size?: number }) =>
+    api.get<{ items: RebindingRule[]; total: number }>('/rebinding/rules', params),
+  createRule: (data: Partial<RebindingRule>) => api.post<{ data: RebindingRule }>('/rebinding/rules', data),
+  getRule: (id: string) => api.get<{ data: RebindingRule }>(`/rebinding/rules/${id}`),
+  updateRule: (id: string, data: Partial<RebindingRule>) => api.put<{ data: RebindingRule }>(`/rebinding/rules/${id}`, data),
+  deleteRule: (id: string) => api.delete(`/rebinding/rules/${id}`),
+  listSessions: (id: string) => api.get<{ data: { rule_id: string; sessions: RebindingSession[]; total: number } }>(`/rebinding/rules/${id}/sessions`),
+  listScenarios: () => api.get<{ data: RebindingScenario[] }>('/rebinding/scenarios'),
+  createFromScenario: (name: string, data: { domain: string }) =>
+    api.post<{ data: RebindingRule }>(`/rebinding/scenarios/${name}/rules`, data),
+}
+
+// Retention API
+export interface RetentionPolicy {
+  id: string
+  name: string
+  description: string
+  apply_to_interactions: boolean
+  apply_to_cases: boolean
+  apply_to_payloads: boolean
+  apply_to_evidence: boolean
+  apply_to_logs: boolean
+  retention_days: number
+  max_records: number
+  archive_after_days: number
+  archive_to_storage: string
+  delete_after_archive: boolean
+  run_hourly: boolean
+  run_daily: boolean
+  run_weekly: boolean
+  run_monthly: boolean
+  run_interval_hours: number
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+  last_run_at: string | null
+}
+
+export interface RetentionJob {
+  id: string
+  policy_id: string
+  job_type: string
+  status: string
+  records_processed: number
+  records_deleted: number
+  records_archived: number
+  error_message: string
+  started_at: string
+  completed_at: string | null
+  duration: number
+  created_at: string
+}
+
+export interface RetentionArchive {
+  id: string
+  policy_id: string
+  data_type: string
+  record_count: number
+  storage_path: string
+  file_size: number
+  checksum: string
+  compression: string
+  status: string
+  created_at: string
+  completed_at: string | null
+}
+
+export const retentionApi = {
+  listPolicies: () => api.get<{ items: RetentionPolicy[]; total: number }>('/retention/policies'),
+  createPolicy: (data: Partial<RetentionPolicy>) => api.post<{ data: RetentionPolicy }>('/retention/policies', data),
+  getPolicy: (id: string) => api.get<{ data: RetentionPolicy }>(`/retention/policies/${id}`),
+  updatePolicy: (id: string, data: Partial<RetentionPolicy>) => api.put<{ data: RetentionPolicy }>(`/retention/policies/${id}`, data),
+  deletePolicy: (id: string) => api.delete(`/retention/policies/${id}`),
+  runPolicy: (id: string) => api.post<{ data: RetentionJob }>(`/retention/policies/${id}/run`),
+  listJobs: () => api.get<{ items: RetentionJob[]; total: number }>('/retention/jobs'),
+  listArchives: () => api.get<{ items: RetentionArchive[]; total: number }>('/retention/archives'),
+}

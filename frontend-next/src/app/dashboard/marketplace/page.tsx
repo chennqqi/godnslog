@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { marketplaceApi } from '@/lib/api-client'
 
@@ -37,9 +37,11 @@ export default function MarketplacePage() {
   const [activeTab, setActiveTab] = useState<'plugins' | 'templates' | 'installed'>('plugins')
   const [plugins, setPlugins] = useState<Plugin[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
+  const [installedPlugins, setInstalledPlugins] = useState<Plugin[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
       if (activeTab === 'plugins') {
@@ -52,18 +54,30 @@ export default function MarketplacePage() {
         if (response.data && response.data.items) {
           setTemplates(response.data.items)
         }
+      } else if (activeTab === 'installed') {
+        const response = await marketplaceApi.listPlugins()
+        if (response.data && response.data.items) {
+          setInstalledPlugins((response.data.items || []).filter((p: Plugin) => p.installed))
+        }
       }
     } catch (error) {
       console.error('Failed to load data:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [activeTab])
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/login')
+    }
+  }, [router])
 
   useEffect(() => {
     const timer = setTimeout(() => loadData(), 0)
     return () => clearTimeout(timer)
-  }, [activeTab])
+  }, [loadData])
 
   const installPlugin = async (pluginId: string) => {
     try {
@@ -85,7 +99,7 @@ export default function MarketplacePage() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">插件和模板市场</h2>
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Marketplace</h2>
 
       {/* Tab Navigation */}
       <div className="mb-6">
@@ -98,7 +112,7 @@ export default function MarketplacePage() {
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
-            插件市场
+            Plugins
           </button>
           <button
             onClick={() => setActiveTab('templates')}
@@ -108,7 +122,7 @@ export default function MarketplacePage() {
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
-            模板市场
+            Templates
           </button>
           <button
             onClick={() => setActiveTab('installed')}
@@ -118,7 +132,7 @@ export default function MarketplacePage() {
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
-            已安装
+            Installed
           </button>
         </div>
       </div>
@@ -127,15 +141,17 @@ export default function MarketplacePage() {
       <div className="mb-6">
         <input
           type="text"
-          placeholder="搜索插件或模板..."
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="Search plugins or templates..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
         />
       </div>
 
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <p className="text-gray-500">加载中...</p>
+          <p className="text-gray-500">Loading...</p>
         </div>
       ) : (
         <div>
@@ -143,10 +159,12 @@ export default function MarketplacePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {plugins.length === 0 ? (
                 <div className="col-span-full text-center py-12">
-                  <p className="text-gray-500">暂无插件</p>
+                  <p className="text-gray-500">No plugins available</p>
                 </div>
               ) : (
-                plugins.map((plugin) => (
+                plugins
+                  .filter((p) => !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.description.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .map((plugin) => (
                   <div key={plugin.id} className="bg-white shadow rounded-lg p-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">{plugin.name}</h3>
                     <p className="text-sm text-gray-600 mb-4">{plugin.description}</p>
@@ -169,7 +187,7 @@ export default function MarketplacePage() {
                           : 'bg-indigo-600 text-white hover:bg-indigo-700'
                       }`}
                     >
-                      {plugin.installed ? '已安装' : '安装'}
+                      {plugin.installed ? 'Installed' : 'Install'}
                     </button>
                   </div>
                 ))
@@ -181,10 +199,12 @@ export default function MarketplacePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {templates.length === 0 ? (
                 <div className="col-span-full text-center py-12">
-                  <p className="text-gray-500">暂无模板</p>
+                  <p className="text-gray-500">No templates available</p>
                 </div>
               ) : (
-                templates.map((template) => (
+                templates
+                  .filter((t) => !searchQuery || t.name.toLowerCase().includes(searchQuery.toLowerCase()) || t.description.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .map((template) => (
                   <div key={template.id} className="bg-white shadow rounded-lg p-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">{template.name}</h3>
                     <p className="text-sm text-gray-600 mb-4">{template.description}</p>
@@ -201,7 +221,7 @@ export default function MarketplacePage() {
                           : 'bg-indigo-600 text-white hover:bg-indigo-700'
                       }`}
                     >
-                      {template.installed ? '已安装' : '安装'}
+                      {template.installed ? 'Installed' : 'Install'}
                     </button>
                   </div>
                 ))
@@ -210,8 +230,35 @@ export default function MarketplacePage() {
           )}
 
           {activeTab === 'installed' && (
-            <div className="text-center py-12">
-              <p className="text-gray-500">暂无已安装的插件或模板</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {installedPlugins.length === 0 ? (
+                <div className="col-span-full text-center py-12">
+                  <p className="text-gray-500">No installed plugins</p>
+                </div>
+              ) : (
+                installedPlugins.map((plugin) => (
+                  <div key={plugin.id} className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">{plugin.name}</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{plugin.description}</p>
+                    <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                      <span>v{plugin.version}</span>
+                      <span>by {plugin.author}</span>
+                    </div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm">★ {plugin.rating}</span>
+                        <span className="text-sm">↓ {plugin.downloads}</span>
+                      </div>
+                    </div>
+                    <button
+                      className="w-full py-2 rounded-lg bg-gray-300 text-gray-600 cursor-not-allowed"
+                      disabled
+                    >
+                      Installed
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>

@@ -271,6 +271,95 @@ func generateArchiveID() string {
 	return fmt.Sprintf("archive-%d", time.Now().UnixNano())
 }
 
+// Scheduler runs retention policies on a periodic basis.
+// It iterates all enabled policies and executes those whose interval has elapsed
+// since the last run.
+type Scheduler struct {
+	service  *Service
+	interval time.Duration
+	stopCh   chan struct{}
+}
+
+// NewScheduler creates a new retention scheduler that checks for due policies
+// at the given interval.
+func NewScheduler(service *Service, interval time.Duration) *Scheduler {
+	return &Scheduler{
+		service:  service,
+		interval: interval,
+		stopCh:   make(chan struct{}),
+	}
+}
+
+// Start launches the scheduler goroutine.
+func (sc *Scheduler) Start() {
+	go sc.run()
+}
+
+// Stop signals the scheduler to stop.
+func (sc *Scheduler) Stop() {
+	close(sc.stopCh)
+}
+
+// run is the main scheduler loop.
+func (sc *Scheduler) run() {
+	ticker := time.NewTicker(sc.interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-sc.stopCh:
+			return
+		case <-ticker.C:
+			sc.runDuePolicies()
+		}
+	}
+}
+
+// runDuePolicies executes all enabled policies whose run interval has elapsed.
+func (sc *Scheduler) runDuePolicies() {
+	ctx := context.Background()
+	policies, err := sc.service.ListPolicies(ctx)
+	if err != nil {
+		return
+	}
+
+	for _, policy := range policies {
+		if !policy.IsEnabled {
+			continue
+		}
+		if !sc.isPolicyDue(&policy) {
+			continue
+		}
+		// Run the policy, ignore errors to continue processing other policies
+		_, _ = sc.service.RunPolicy(ctx, policy.ID)
+	}
+}
+
+// isPolicyDue checks if a policy is due to run based on its schedule and last run time.
+func (sc *Scheduler) isPolicyDue(policy *RetentionPolicy) bool {
+	intervalHours := policy.RunIntervalHours
+	if intervalHours <= 0 {
+		// Derive from schedule flags
+		switch {
+		case policy.RunHourly:
+			intervalHours = 1
+		case policy.RunDaily:
+			intervalHours = 24
+		case policy.RunWeekly:
+			intervalHours = 168
+		case policy.RunMonthly:
+			intervalHours = 720
+		default:
+			return false
+		}
+	}
+	if policy.LastRunAt == nil {
+		return true
+	}
+	nextRun := policy.LastRunAt.Add(time.Duration(intervalHours) * time.Hour)
+	return time.Now().After(nextRun)
+}
+
 // InteractionRecord is a lightweight record for retention operations on the interactions table.
 type InteractionRecord struct {
 	ID        string    `xorm:"'id' pk varchar(36)"`

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	v2models "github.com/chennqqi/godnslog/internal/models"
 	"xorm.io/xorm"
 )
 
@@ -108,10 +109,14 @@ func (s *XormStore) DeleteListener(ctx context.Context, id string) error {
 	return err
 }
 
-// SaveListenerInteraction saves a listener interaction
+// SaveListenerInteraction saves a listener interaction and dual-writes to unified Interaction table
 func (s *XormStore) SaveListenerInteraction(ctx context.Context, interaction *ListenerInteraction) error {
 	_, err := s.engine.Insert(interaction)
-	return err
+	if err != nil {
+		return err
+	}
+	s.dualWriteUnifiedInteraction(interaction)
+	return nil
 }
 
 // GetListenerInteractions retrieves interactions for a listener
@@ -185,10 +190,14 @@ func (s *XormStore) DeleteLDAPQuery(ctx context.Context, id string) error {
 	return err
 }
 
-// CreateListenerInteraction creates a listener interaction
+// CreateListenerInteraction creates a listener interaction and dual-writes to unified Interaction table
 func (s *XormStore) CreateListenerInteraction(ctx context.Context, interaction *ListenerInteraction) error {
 	_, err := s.engine.Insert(interaction)
-	return err
+	if err != nil {
+		return err
+	}
+	s.dualWriteUnifiedInteraction(interaction)
+	return nil
 }
 
 // CreateSMTPMessage creates an SMTP message
@@ -259,4 +268,20 @@ func (s *XormStore) GetFTPCommand(ctx context.Context, id string) (*FTPCommand, 
 func (s *XormStore) DeleteFTPCommand(ctx context.Context, id string) error {
 	_, err := s.engine.ID(id).Delete(&FTPCommand{})
 	return err
+}
+
+// dualWriteUnifiedInteraction converts a ListenerInteraction to a unified Interaction
+// and inserts it into the interactions table for unified querying and attribution.
+func (s *XormStore) dualWriteUnifiedInteraction(li *ListenerInteraction) {
+	unified := &v2models.Interaction{
+		ID:        li.ID,
+		Type:      string(li.Protocol),
+		Timestamp: li.Timestamp,
+		SourceIP:  li.SourceIP,
+		RawData:   li.Data,
+	}
+	if _, err := s.engine.Insert(unified); err != nil {
+		// Log but don't fail the original operation
+		_ = err
+	}
 }
