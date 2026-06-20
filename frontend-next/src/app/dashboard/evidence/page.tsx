@@ -31,7 +31,7 @@ function EvidenceReportContent() {
       }
     } catch (error) {
       console.error('Failed to load cases:', error)
-      setError('加载Case列表失败')
+      setError('Failed to load cases')
     } finally {
       setLoading(false)
     }
@@ -54,19 +54,19 @@ function EvidenceReportContent() {
         setEvidence(response.data.evidence)
         setReportContent(response.data.content)
       } else {
-        setError(response.message || '生成证据失败')
+        setError(response.message || 'Failed to generate evidence')
       }
     } catch (error: unknown) {
       console.error('Failed to generate evidence:', error)
       if (error && typeof error === 'object' && 'response' in error) {
         const err = error as { response?: { status?: number } }
         if (err.response?.status === 404) {
-          setError('未找到该证据数据')
+          setError('Evidence data not found')
         } else {
-          setError('生成证据失败: 未知错误')
+          setError('Failed to generate evidence: unknown error')
         }
       } else {
-        setError('生成证据失败: 未知错误')
+        setError('Failed to generate evidence: unknown error')
       }
     } finally {
       setGenerating(false)
@@ -114,19 +114,19 @@ function EvidenceReportContent() {
         setEvidence(response.data.evidence)
         setReportContent(response.data.content)
       } else {
-        setError(response.message || '生成证据失败')
+        setError(response.message || 'Failed to generate evidence')
       }
     } catch (error: unknown) {
       console.error('Failed to generate evidence:', error)
       if (error && typeof error === 'object' && 'response' in error) {
         const err = error as { response?: { status?: number } }
         if (err.response?.status === 404) {
-          setError('未找到该Case的证据数据')
+          setError('Evidence data not found for this case')
         } else {
-          setError('生成证据失败: 未知错误')
+          setError('Failed to generate evidence: unknown error')
         }
       } else {
-        setError('生成证据失败: 未知错误')
+        setError('Failed to generate evidence: unknown error')
       }
     } finally {
       setGenerating(false)
@@ -164,72 +164,72 @@ function EvidenceReportContent() {
   const getStrengthLabel = (strength: string) => {
     switch (strength) {
       case 'critical':
-        return '严重'
+        return 'Critical'
       case 'high':
-        return '高'
+        return 'High'
       case 'medium':
-        return '中'
+        return 'Medium'
       case 'low':
-        return '低'
+        return 'Low'
       default:
         return strength
     }
   }
 
   if (loading) {
-    return <div className="text-center py-12">加载中...</div>
+    return <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading...</div>
   }
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">证据报告</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Evidence Report</h2>
           {caseId && (
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Case scoped: {caseId}
               <button
                 onClick={() => router.push('/dashboard/evidence')}
-                className="ml-2 text-indigo-600 hover:text-indigo-800"
+                className="ml-2 text-indigo-600 dark:text-indigo-400 hover:underline"
               >
                 Clear scope
               </button>
             </p>
           )}
           {payloadId && (
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Payload scoped: {payloadId}
               <button
                 onClick={() => router.push('/dashboard/evidence')}
-                className="ml-2 text-indigo-600 hover:text-indigo-800"
+                className="ml-2 text-indigo-600 dark:text-indigo-400 hover:underline"
               >
                 Clear scope
               </button>
             </p>
           )}
           {!caseId && !payloadId && (
-            <p className="text-sm text-gray-500 mt-1">All Evidence</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">All Evidence</p>
           )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left panel: Controls */}
-        <div className="lg:col-span-1 bg-white shadow rounded-lg">
+        <div className="lg:col-span-1 bg-white dark:bg-gray-800 shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">生成证据</h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Generate Evidence</h3>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  选择Case
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Select Case
                 </label>
                 <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   value={selectedCase}
                   onChange={(e) => setSelectedCase(e.target.value)}
                 >
-                  <option value="">选择Case</option>
+                  <option value="">Select a case</option>
                   {cases.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.title} ({c.status})
@@ -239,11 +239,11 @@ function EvidenceReportContent() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  报告格式
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Report Format
                 </label>
                 <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   value={format}
                   onChange={(e) => setFormat(e.target.value as 'json' | 'markdown')}
                 >
@@ -258,20 +258,20 @@ function EvidenceReportContent() {
                   disabled={!selectedCase || generating}
                   className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {generating ? '生成中...' : '生成证据'}
+                  {generating ? 'Generating...' : 'Generate'}
                 </button>
                 {reportContent && (
                   <button
                     onClick={handleDownload}
                     className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                   >
-                    下载
+                    Download
                   </button>
                 )}
               </div>
 
               {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-red-700 dark:text-red-400 text-sm">
                   {error}
                 </div>
               )}
@@ -284,60 +284,60 @@ function EvidenceReportContent() {
           {evidence ? (
             <>
               {/* Evidence Summary */}
-              <div className="bg-white shadow rounded-lg">
+              <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
                 <div className="px-4 py-5 sm:p-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">证据摘要</h3>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Evidence Summary</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <div className="text-sm text-gray-500">证据强度</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">Evidence Strength</div>
                       <div className={`inline-block px-2 py-1 rounded text-sm font-medium mt-1 ${getStrengthColor(evidence.evidence_strength)}`}>
                         {getStrengthLabel(evidence.evidence_strength)}
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">置信度</div>
-                      <div className="text-2xl font-bold text-gray-900">{evidence.confidence}%</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">Confidence</div>
+                      <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{evidence.confidence}%</div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">交互数量</div>
-                      <div className="text-2xl font-bold text-gray-900">{evidence.interaction_count}</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">Interactions</div>
+                      <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{evidence.interaction_count}</div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">唯一来源</div>
-                      <div className="text-2xl font-bold text-gray-900">{evidence.unique_sources}</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">Unique Sources</div>
+                      <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{evidence.unique_sources}</div>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Explainability */}
-              <div className="bg-white shadow rounded-lg">
+              <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
                 <div className="px-4 py-5 sm:p-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">可解释性</h3>
-                  <p className="text-gray-700 whitespace-pre-wrap">{evidence.explainability}</p>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Explainability</h3>
+                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{evidence.explainability}</p>
                 </div>
               </div>
 
               {/* Timeline */}
-              <div className="bg-white shadow rounded-lg">
+              <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
                 <div className="px-4 py-5 sm:p-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">时间线 ({evidence.timeline.length} 条交互)</h3>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Timeline ({evidence.timeline.length} interactions)</h3>
                   <div className="space-y-3 max-h-96 overflow-y-auto">
                     {evidence.timeline.map((interaction) => (
-                      <div key={interaction.id} className="p-3 bg-gray-50 rounded border border-gray-200">
+                      <div key={interaction.id} className="p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
                             <div className="flex items-center space-x-2">
                               <span className="inline-block px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">
                                 {interaction.type.toUpperCase()}
                               </span>
-                              <span className="text-sm text-gray-500">{interaction.timestamp}</span>
+                              <span className="text-sm text-gray-500 dark:text-gray-400">{interaction.timestamp}</span>
                             </div>
-                            <div className="mt-1 text-sm text-gray-700">
-                              <span className="font-medium">来源:</span> {interaction.source_ip}
-                              {interaction.domain && <span className="ml-2">| 域名: {interaction.domain}</span>}
-                              {interaction.method && <span className="ml-2">| 方法: {interaction.method}</span>}
-                              {interaction.path && <span className="ml-2">| 路径: {interaction.path}</span>}
+                            <div className="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                              <span className="font-medium">Source:</span> {interaction.source_ip}
+                              {interaction.domain && <span className="ml-2">| Domain: {interaction.domain}</span>}
+                              {interaction.method && <span className="ml-2">| Method: {interaction.method}</span>}
+                              {interaction.path && <span className="ml-2">| Path: {interaction.path}</span>}
                             </div>
                           </div>
                         </div>
@@ -348,20 +348,20 @@ function EvidenceReportContent() {
               </div>
 
               {/* Report Preview */}
-              <div className="bg-white shadow rounded-lg">
+              <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
                 <div className="px-4 py-5 sm:p-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">报告预览</h3>
-                  <pre className="bg-gray-50 p-4 rounded text-xs overflow-auto max-h-96">{reportContent}</pre>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Report Preview</h3>
+                  <pre className="bg-gray-50 dark:bg-gray-900 p-4 rounded text-xs overflow-auto max-h-96 text-gray-900 dark:text-gray-100">{reportContent}</pre>
                 </div>
               </div>
             </>
           ) : (
-            <div className="bg-white shadow rounded-lg">
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
               <div className="px-4 py-5 sm:p-6 text-center">
-                <p className="text-gray-500 py-8">
-                  {generating ? '生成中...' : 
-                   caseId || payloadId ? '暂无证据数据' : 
-                   selectedCase ? '选择Case后点击"生成证据"按钮' : '请先选择一个Case'}
+                <p className="text-gray-500 dark:text-gray-400 py-8">
+                  {generating ? 'Generating...' : 
+                   caseId || payloadId ? 'No evidence data available' : 
+                   selectedCase ? 'Click "Generate" to create evidence' : 'Please select a case first'}
                 </p>
               </div>
             </div>
@@ -374,7 +374,7 @@ function EvidenceReportContent() {
 
 export default function EvidenceReportPage() {
   return (
-    <Suspense fallback={<div className="text-center py-12">加载中...</div>}>
+    <Suspense fallback={<div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading...</div>}>
       <EvidenceReportContent />
     </Suspense>
   )
