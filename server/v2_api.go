@@ -63,6 +63,7 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			payloads.PUT("/:id", self.v2UpdatePayload)
 			payloads.POST("/:id/revoke", self.v2RevokePayload)
 			payloads.POST("/:id/preview", self.v2PreviewPayload)
+			payloads.GET("/:id/interactions", self.v2ListPayloadInteractions)
 		}
 
 		// Interactions
@@ -1382,6 +1383,124 @@ func (self *WebServer) v2ListInteractions(c *gin.Context) {
 			Method:      method,
 			Path:        path,
 			Headers:     headers,
+			Body:        body,
+			UserAgent:   userAgent,
+			ContentType: contentType,
+			RawData:     item.RawData,
+			CreatedAt:   item.CreatedAt.Format(time.RFC3339),
+		}
+	}
+
+	totalPages := int(total) / pageSize
+	if int(total)%pageSize > 0 {
+		totalPages++
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": models.InteractionListResponse{
+			Items:      items,
+			Total:      int(total),
+			Page:       page,
+			PageSize:   pageSize,
+			TotalPages: totalPages,
+		},
+	})
+}
+
+// v2ListPayloadInteractions lists interactions associated with a specific payload
+func (self *WebServer) v2ListPayloadInteractions(c *gin.Context) {
+	payloadId := c.Param("id")
+	if payloadId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "payload id is required"})
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	var interactions []v2models.Interaction
+	query := session.Table(new(v2models.Interaction)).Where("payload_id = ?", payloadId)
+
+	total, err := query.Count()
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2ListPayloadInteractions] count error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "server internal error"})
+		return
+	}
+
+	err = query.OrderBy("timestamp DESC").Limit(pageSize, (page-1)*pageSize).Find(&interactions)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2ListPayloadInteractions] find error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "server internal error"})
+		return
+	}
+
+	items := make([]models.Interaction, len(interactions))
+	for i, item := range interactions {
+		token := ""
+		if item.Token != nil {
+			token = *item.Token
+		}
+		domain := ""
+		if item.Domain != nil {
+			domain = *item.Domain
+		}
+		dnsType := ""
+		if item.DNSType != nil {
+			dnsType = *item.DNSType
+		}
+		method := ""
+		if item.Method != nil {
+			method = *item.Method
+		}
+		path := ""
+		if item.Path != nil {
+			path = *item.Path
+		}
+		body := ""
+		if item.Body != nil {
+			body = *item.Body
+		}
+		userAgent := ""
+		if item.UserAgent != nil {
+			userAgent = *item.UserAgent
+		}
+		contentType := ""
+		if item.ContentType != nil {
+			contentType = *item.ContentType
+		}
+		caseId := ""
+		if item.CaseID != nil {
+			caseId = *item.CaseID
+		}
+
+		items[i] = models.Interaction{
+			Id:          item.ID,
+			Type:        item.Type,
+			CaseId:      caseId,
+			PayloadId:   payloadId,
+			Token:       token,
+			Timestamp:   item.Timestamp.Format(time.RFC3339),
+			SourceIp:    item.SourceIP,
+			Domain:      domain,
+			DnsType:     dnsType,
+			Method:      method,
+			Path:        path,
+			Headers:     item.Headers,
 			Body:        body,
 			UserAgent:   userAgent,
 			ContentType: contentType,
