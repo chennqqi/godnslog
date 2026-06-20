@@ -35,7 +35,8 @@ func (s Scopes) Value() (driver.Value, error) {
 // Unified from internal/auth/apikey.go and models/v2.go TblAPIKey
 type APIKey struct {
 	ID            string     `json:"id" xorm:"pk varchar(36) notnull"`
-	Key           string     `json:"key" xorm:"varchar(128) notnull unique"` // Only shown on creation
+	Key           string     `json:"key" xorm:"varchar(128)"` // Plaintext key for legacy keys; empty after bcrypt migration
+	KeyHash       string     `json:"-" xorm:"varchar(128)"`   // Bcrypt hash; empty for legacy keys
 	KeyPrefix     string     `json:"key_prefix" xorm:"varchar(16) notnull index"`
 	Name          string     `json:"name" xorm:"varchar(128) notnull"`
 	Scopes        Scopes     `json:"scopes" xorm:"json"`

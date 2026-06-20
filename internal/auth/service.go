@@ -5,10 +5,12 @@ import (
 	"encoding/base32"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/chennqqi/godnslog/internal/agentpolicy"
 	"github.com/chennqqi/godnslog/internal/models"
+	"golang.org/x/crypto/bcrypt"
 	"xorm.io/xorm"
 )
 
@@ -106,9 +108,15 @@ func (s *Service) CreateAPIKey(req *models.APIKeyCreateRequest, userID string) (
 		return nil, err
 	}
 
+	hash, err := bcrypt.GenerateFromPassword([]byte(key), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash api key: %w", err)
+	}
+
 	apiKey := &models.APIKey{
 		ID:            generateID(),
 		Key:           key,
+		KeyHash:       string(hash),
 		KeyPrefix:     prefix,
 		Name:          req.Name,
 		Scopes:        models.Scopes(req.Scopes),
@@ -193,38 +201,33 @@ func (s *Service) RevokeAPIKey(id string) error {
 	return err
 }
 
-// UpdateLastUsed updates the last used timestamp for an API key by full key
+// UpdateLastUsed updates the last used timestamp for an API key by prefix.
+// Uses key_prefix for lookup (works for both bcrypt and legacy keys).
 func (s *Service) UpdateLastUsed(fullKey string) error {
-	// Extract prefix from full key
 	if len(fullKey) < 8 {
 		return errors.New("invalid api key format")
 	}
 	prefix := fullKey[:8]
 
 	now := time.Now()
-	_, err := s.engine.Where("key_prefix = ? AND key = ?", prefix, fullKey).
+	_, err := s.engine.Where("key_prefix = ?", prefix).
 		Cols("last_used_at").
 		Update(&models.APIKey{LastUsedAt: &now})
 	return err
 }
 
-// ValidateAPIKey validates an API key by full key and returns it if valid
+// ValidateAPIKey validates an API key by full key and returns it if valid.
+// Supports both bcrypt-hashed keys and legacy plaintext keys.
+// Legacy keys are automatically migrated to bcrypt hash on successful validation.
 func (s *Service) ValidateAPIKey(fullKey string) (*models.APIKey, error) {
-	// Extract prefix from full key
 	if len(fullKey) < 8 {
 		return nil, errors.New("invalid api key format")
 	}
 	prefix := fullKey[:8]
 
-	// First find by prefix
 	apiKey, err := s.GetAPIKeyByPrefix(prefix)
 	if err != nil {
 		return nil, err
-	}
-
-	// Then verify the full key matches
-	if apiKey.Key != fullKey {
-		return nil, ErrAPIKeyNotFound
 	}
 
 	if !apiKey.IsValid() {
@@ -234,7 +237,59 @@ func (s *Service) ValidateAPIKey(fullKey string) (*models.APIKey, error) {
 		return nil, ErrAPIKeyExpired
 	}
 
+	// If KeyHash is set, use bcrypt comparison
+	if len(apiKey.KeyHash) > 0 {
+		if err := bcrypt.CompareHashAndPassword([]byte(apiKey.KeyHash), []byte(fullKey)); err != nil {
+			return nil, ErrAPIKeyNotFound
+		}
+		return apiKey, nil
+	}
+
+	// Legacy plaintext key — compare directly
+	if apiKey.Key != fullKey {
+		return nil, ErrAPIKeyNotFound
+	}
+
+	// Auto-migrate: compute bcrypt hash, store in KeyHash, clear plaintext Key
+	hash, err := bcrypt.GenerateFromPassword([]byte(fullKey), bcrypt.DefaultCost)
+	if err == nil {
+		s.engine.ID(apiKey.ID).Cols("key_hash", "key").Update(&models.APIKey{
+			KeyHash: string(hash),
+			Key:     "",
+		})
+	}
+
 	return apiKey, nil
+}
+
+// RotateAPIKey generates a new key for an existing API key ID.
+// Returns the new plaintext key (shown only once). The old key becomes invalid.
+func (s *Service) RotateAPIKey(id string) (string, error) {
+	_, err := s.GetAPIKeyByID(id)
+	if err != nil {
+		return "", err
+	}
+
+	newKey, newPrefix, err := generateAPIKey()
+	if err != nil {
+		return "", err
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newKey), bcrypt.DefaultCost)
+	if err != nil {
+		return "", fmt.Errorf("failed to hash api key: %w", err)
+	}
+
+	_, err = s.engine.ID(id).Cols("key", "key_hash", "key_prefix").Update(&models.APIKey{
+		Key:       newKey,
+		KeyHash:   string(hash),
+		KeyPrefix: newPrefix,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return newKey, nil
 }
 
 // CreateAuditLog creates an audit log entry
