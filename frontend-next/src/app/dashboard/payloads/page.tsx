@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { payloadApi } from '@/lib/api-client'
+import { LoadingState } from '@/components/loading-state'
 import type { Payload, PayloadCreateRequest } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -123,7 +124,7 @@ export default function PayloadsPage() {
   )
 
   if (loading) {
-    return <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading...</div>
+    return <LoadingState />
   }
 
   return (

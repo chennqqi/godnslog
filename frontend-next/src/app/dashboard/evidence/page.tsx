@@ -3,6 +3,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState, Suspense, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { LoadingState } from '@/components/loading-state'
 import { caseApi, evidenceApi } from '@/lib/api-client'
 import type { Case, Evidence } from '@/types'
 
@@ -177,7 +178,7 @@ function EvidenceReportContent() {
   }
 
   if (loading) {
-    return <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading...</div>
+    return <LoadingState />
   }
 
   return (
@@ -374,7 +375,7 @@ function EvidenceReportContent() {
 
 export default function EvidenceReportPage() {
   return (
-    <Suspense fallback={<div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading...</div>}>
+    <Suspense fallback={<LoadingState />}>
       <EvidenceReportContent />
     </Suspense>
   )

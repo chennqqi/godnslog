@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { caseApi, payloadApi, interactionApi } from '@/lib/api-client'
+import { LoadingState } from '@/components/loading-state'
 import type { Case, Payload, Interaction } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -104,7 +105,7 @@ export default function CaseDetailPage() {
   }
 
   if (loading) {
-    return <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading...</div>
+    return <LoadingState />
   }
 
   if (!case_) {
