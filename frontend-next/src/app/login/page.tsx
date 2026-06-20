@@ -2,21 +2,59 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { authApi } from '@/lib/api-client'
 import type { LoginRequest } from '@/types'
 import { t, getCurrentLanguage, Language } from '@/lib/i18n'
 import { useAuthStore } from '@/features/auth/store'
+import { loginSchema, type LoginFormValues } from '@/features/auth/schemas/login-schema'
+
+/** Feature highlights shown on the brand panel */
+const FEATURES = [
+  { icon: 'shield', title: 'OAST Verification', desc: 'DNS/HTTP/SMTP interaction capture & evidence' },
+  { icon: 'beaker', title: 'Payload Studio', desc: 'Trackable payloads with auto-attribution' },
+  { icon: 'clipboard', title: 'Evidence Chain', desc: 'Auditable reports with full provenance' },
+  { icon: 'workflow', title: 'Scanner Hub', desc: 'Nuclei, Burp, ZAP, Yak integration ready' },
+] as const
+
+/** Icon renderer for feature highlights */
+function FeatureIcon({ name }: { name: string }) {
+  const icons: Record<string, React.ReactNode> = {
+    shield: (
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    ),
+    beaker: (
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 3v10.17l-3 5.83h12l-3-5.83V3M9 3h6M9 3H6M15 3h3" />
+    ),
+    clipboard: (
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+    ),
+    workflow: (
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
+    ),
+  }
+  return (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      {icons[name] || icons.shield}
+    </svg>
+  )
+}
 
 export default function LoginPage() {
   const router = useRouter()
   const { setToken, setUser } = useAuthStore()
-  const [formData, setFormData] = useState<LoginRequest>({
-    username: '',
-    password: '',
-  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [lang, setLang] = useState<Language>('en-US')
+
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      username: '',
+      password: '',
+    },
+  })
 
   useEffect(() => {
     setLang(getCurrentLanguage())
@@ -29,13 +67,12 @@ export default function LoginPage() {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const onSubmit = async (data: LoginFormValues) => {
     setLoading(true)
     setError('')
 
     try {
-      const response = await authApi.login(formData)
+      const response = await authApi.login(data as LoginRequest)
       if (response.code === 0 && response.data) {
         localStorage.setItem('token', response.data.token)
         localStorage.setItem('user', JSON.stringify(response.data.user))
@@ -58,79 +95,175 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8">
-        <div className="flex justify-between items-center">
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 flex-1">
-            {t('login.title', lang)}
-          </h2>
-          <div className="flex gap-2">
-            <button
-              onClick={() => handleLanguageChange('en-US')}
-              className={`px-2 py-1 text-sm rounded ${lang === 'en-US' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-            >
-              EN
-            </button>
-            <button
-              onClick={() => handleLanguageChange('zh-CN')}
-              className={`px-2 py-1 text-sm rounded ${lang === 'zh-CN' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-            >
-              中
-            </button>
+    <div className="min-h-screen flex bg-gray-50 dark:bg-gray-950">
+      {/* Left brand panel - hidden on mobile */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900">
+        {/* Decorative grid pattern */}
+        <div
+          className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          }}
+        />
+
+        {/* Content */}
+        <div className="relative z-10 flex flex-col justify-between p-12 text-white w-full">
+          {/* Logo & title */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500 flex items-center justify-center font-bold text-lg shadow-lg">
+              G
+            </div>
+            <span className="font-bold text-xl tracking-tight">GODNSLOG</span>
+          </div>
+
+          {/* Hero text */}
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-4xl font-bold leading-tight">
+                OAST Evidence<br />Verification Platform
+              </h1>
+              <p className="mt-4 text-lg text-indigo-200 max-w-md">
+                Self-hosted interaction monitoring for security teams, scanners, and AI agents.
+              </p>
+            </div>
+
+            {/* Feature highlights */}
+            <div className="grid grid-cols-2 gap-4 max-w-md">
+              {FEATURES.map((f) => (
+                <div
+                  key={f.title}
+                  className="flex items-start gap-3 p-3 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10"
+                >
+                  <span className="text-indigo-300 shrink-0 mt-0.5">
+                    <FeatureIcon name={f.icon} />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-white">{f.title}</p>
+                    <p className="text-xs text-indigo-200/70 mt-0.5">{f.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center gap-4 text-sm text-indigo-300/60">
+            <span>v2.0</span>
+            <span>·</span>
+            <span>Self-hosted &amp; Secure</span>
           </div>
         </div>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          {t('login.subtitle', lang)}
-        </p>
-        <form className="mt-8 space-y-6" method="POST" onSubmit={handleSubmit}>
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {error}
+      </div>
+
+      {/* Right form panel */}
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-12">
+        <div className="w-full max-w-md space-y-8">
+          {/* Mobile logo & language switcher */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 lg:hidden">
+              <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white">
+                G
+              </div>
+              <span className="font-bold text-lg text-gray-900 dark:text-white">GODNSLOG</span>
             </div>
-          )}
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="username" className="sr-only">
+            <div className="flex gap-2 ml-auto">
+              <button
+                onClick={() => handleLanguageChange('en-US')}
+                className={`px-3 py-1 text-sm rounded-md transition-colors ${lang === 'en-US' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'}`}
+              >
+                EN
+              </button>
+              <button
+                onClick={() => handleLanguageChange('zh-CN')}
+                className={`px-3 py-1 text-sm rounded-md transition-colors ${lang === 'zh-CN' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'}`}
+              >
+                中
+              </button>
+            </div>
+          </div>
+
+          {/* Title */}
+          <div>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+              {t('login.title', lang)}
+            </h2>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              {t('login.subtitle', lang)}
+            </p>
+          </div>
+
+          {/* Form */}
+          <form className="space-y-5" method="POST" onSubmit={form.handleSubmit(onSubmit)}>
+            {error && (
+              <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
+                <svg className="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm">{error}</span>
+              </div>
+            )}
+
+            {/* Username */}
+            <div className="space-y-1.5">
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 {t('login.username', lang)}
               </label>
               <input
                 id="username"
-                name="username"
                 type="text"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                autoComplete="username"
+                className="block w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 sm:text-sm"
                 placeholder={t('login.username', lang)}
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                {...form.register('username')}
               />
+              {form.formState.errors.username && (
+                <p className="text-xs text-red-500">{form.formState.errors.username.message}</p>
+              )}
             </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
+
+            {/* Password */}
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 {t('login.password', lang)}
               </label>
               <input
                 id="password"
-                name="password"
                 type="password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                autoComplete="current-password"
+                className="block w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-500 sm:text-sm"
                 placeholder={t('login.password', lang)}
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                {...form.register('password')}
               />
+              {form.formState.errors.password && (
+                <p className="text-xs text-red-500">{form.formState.errors.password.message}</p>
+              )}
             </div>
-          </div>
 
-          <div>
+            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-semibold rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:focus:ring-offset-gray-900"
             >
-              {loading ? t('login.button.loading', lang) : t('login.button', lang)}
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  {t('login.button.loading', lang)}
+                </span>
+              ) : (
+                t('login.button', lang)
+              )}
             </button>
+          </form>
+
+          {/* Footer info */}
+          <div className="text-center text-xs text-gray-400 dark:text-gray-600">
+            GODNSLOG v2.0 · Self-hosted OAST Platform
           </div>
-        </form>
+        </div>
       </div>
     </div>
   )
