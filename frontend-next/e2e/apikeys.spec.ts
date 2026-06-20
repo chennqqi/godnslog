@@ -343,11 +343,12 @@ test.describe('API Keys Page', () => {
       }
     });
 
-    // Handle native confirm dialog
-    page.on('dialog', dialog => dialog.accept());
-
+    // Handle custom confirm dialog (not native)
     await page.goto('/dashboard/apikeys');
     await page.click('button:has-text("删除")');
+    // Wait for the custom confirm dialog and click Delete
+    await page.waitForTimeout(500);
+    await page.click('button:has-text("Delete")');
 
     expect(deleteCalled).toBe(true);
   });

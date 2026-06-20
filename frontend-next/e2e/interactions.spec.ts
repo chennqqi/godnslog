@@ -102,7 +102,7 @@ test.describe('Interactions Page', () => {
     await page.goto('/dashboard/interactions?payload_id=payload-1');
     await page.waitForLoadState('networkidle');
     await expect(page.locator('text=Payload scoped: payload-1')).toBeVisible();
-    await expect(page.locator('text=总数').locator('..').getByText('2')).toBeVisible();
+    await expect(page.locator('text=Total').locator('..').getByText('2')).toBeVisible();
   });
 
   test('should clear scope and return to all interactions', async ({ page }) => {
@@ -124,24 +124,24 @@ test.describe('Interactions Page', () => {
     await page.goto('/dashboard/interactions?case_id=case-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
-    await expect(page.getByText('当前 Case/Payload 暂无交互')).toBeVisible();
+    await expect(page.getByText('No interactions for this Case/Payload')).toBeVisible();
   });
 
   test('should open triage panel and display interaction details', async ({ page }) => {
     await page.goto('/dashboard/interactions');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
-    await page.click('button:has-text("详情")');
+    await page.click('button:has-text("Details")');
     await page.waitForTimeout(500);
     await expect(page.locator('text=Interaction Triage')).toBeVisible();
-    await expect(page.locator('text=归因信息')).toBeVisible();
+    await expect(page.locator('text=Attribution')).toBeVisible();
   });
 
   test('should display case and payload attribution in triage panel', async ({ page }) => {
     await page.goto('/dashboard/interactions');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
-    await page.click('button:has-text("详情")');
+    await page.click('button:has-text("Details")');
     await page.waitForTimeout(500);
     await expect(page.locator('text=Case ID: case-1')).toBeVisible();
     await expect(page.locator('text=Payload ID: payload-1')).toBeVisible();
@@ -151,7 +151,7 @@ test.describe('Interactions Page', () => {
     await page.goto('/dashboard/interactions');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
-    await page.click('button:has-text("详情")');
+    await page.click('button:has-text("Details")');
     await page.waitForTimeout(500);
     await expect(page.locator('button:has-text("Copy")').first()).toBeVisible();
   });
@@ -160,7 +160,7 @@ test.describe('Interactions Page', () => {
     await page.goto('/dashboard/interactions');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
-    await page.click('button:has-text("详情")');
+    await page.click('button:has-text("Details")');
     await page.waitForTimeout(500);
     await expect(page.locator('button:has-text("View Case")')).toBeVisible();
     await expect(page.locator('button:has-text("View Payload")')).toBeVisible();
@@ -170,7 +170,7 @@ test.describe('Interactions Page', () => {
     await page.goto('/dashboard/interactions');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
-    await page.click('button:has-text("详情")');
+    await page.click('button:has-text("Details")');
     await page.waitForTimeout(500);
     await expect(page.locator('button:has-text("Generate Evidence (Case)")')).toBeVisible();
     await expect(page.locator('button:has-text("Generate Evidence (Payload)")')).toBeVisible();

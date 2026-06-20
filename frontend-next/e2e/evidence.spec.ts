@@ -56,7 +56,7 @@ test.describe('Evidence Page', () => {
     await page.goto('/dashboard/evidence');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
-    await expect(page.locator('h2').first()).toContainText('证据报告');
+    await expect(page.locator('h2').first()).toContainText('Evidence Report');
   });
 
   test('should display case scoped evidence', async ({ page }) => {
@@ -86,8 +86,8 @@ test.describe('Evidence Page', () => {
     await evidenceRequestPromise;
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
-    await expect(page.locator('text=证据摘要')).toBeVisible();
-    await expect(page.locator('text=证据强度')).toBeVisible();
+    await expect(page.locator('h3:has-text("Evidence Summary")')).toBeVisible();
+    await expect(page.locator('text=Evidence Strength').first()).toBeVisible();
   });
 
   test('should auto-generate evidence for payload_id', async ({ page }) => {
@@ -101,8 +101,8 @@ test.describe('Evidence Page', () => {
     await evidenceRequestPromise;
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
-    await expect(page.locator('text=证据摘要')).toBeVisible();
-    await expect(page.locator('text=置信度')).toBeVisible();
+    await expect(page.locator('h3:has-text("Evidence Summary")')).toBeVisible();
+    await expect(page.locator('text=Confidence').first()).toBeVisible();
   });
 
   test('should use requested evidence format from URL scope', async ({ page }) => {
@@ -122,48 +122,48 @@ test.describe('Evidence Page', () => {
     await page.goto('/dashboard/evidence?case_id=case-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
-    await expect(page.locator('text=证据摘要').first()).toBeVisible();
-    await expect(page.locator('text=交互数量')).toBeVisible();
-    await expect(page.locator('text=唯一来源')).toBeVisible();
+    await expect(page.locator('h3:has-text("Evidence Summary")')).toBeVisible();
+    await expect(page.locator('text=Interactions').first()).toBeVisible();
+    await expect(page.locator('text=Unique Sources').first()).toBeVisible();
   });
 
   test('should display explainability section', async ({ page }) => {
     await page.goto('/dashboard/evidence?case_id=case-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
-    await expect(page.locator('text=可解释性').first()).toBeVisible();
+    await expect(page.locator('text=Explainability').first()).toBeVisible();
   });
 
   test('should display timeline section', async ({ page }) => {
     await page.goto('/dashboard/evidence?case_id=case-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
-    await expect(page.locator('text=时间线').first()).toBeVisible();
+    await expect(page.locator('text=Timeline').first()).toBeVisible();
   });
 
   test('should display report preview', async ({ page }) => {
     await page.goto('/dashboard/evidence?case_id=case-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
-    await expect(page.locator('text=报告预览').first()).toBeVisible();
+    await expect(page.locator('text=Report Preview').first()).toBeVisible();
   });
 
   test('should display no evidence state when no data', async ({ page }) => {
     await page.route('**/api/v2/evidence/generate', route => {
       return route.fulfill({
-        json: { code: 404, message: '未找到该证据数据' }
+        json: { code: 404, message: 'Evidence data not found' }
       });
     });
     await page.goto('/dashboard/evidence?case_id=case-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
-    await expect(page.locator('text=暂无证据数据')).toBeVisible();
+    await expect(page.locator('text=No evidence data available')).toBeVisible();
   });
 
   test('should handle API error gracefully', async ({ page }) => {
     await page.route('**/api/v2/evidence/generate', route => {
       return route.fulfill({
-        json: { code: 500, message: '生成证据失败' }
+        json: { code: 500, message: 'Failed to generate evidence' }
       });
     });
     await page.goto('/dashboard/evidence?case_id=case-1');
