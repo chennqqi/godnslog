@@ -268,6 +268,7 @@ export interface EvidenceRequest {
   case_id?: string
   payload_id?: string
   format: 'json' | 'markdown'
+  redact_sensitive?: boolean
 }
 
 export interface EvidenceResponse {

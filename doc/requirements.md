@@ -507,3 +507,19 @@ Spec approved. Split Phase 1 (Backend Realization) into 5 implementation plans u
 - 结论：尚未达到生产可用，ROADMAP 2.0 目标未全部达成。
 - 主要阻塞：Dockerfile 前端产物路径错误、前端 lint 28 errors、E2E 24 failed、go vet 失败、gofmt 26 文件未格式化、核心功能仍有 stub。
 - 建议：按 2026-06-20 spec 进入 Phase 1，建立 CI 门禁，修复容器化与测试同步。
+
+## 2026-06-20 (Phase 1 acceptance)
+
+Phase 1 后端验收完成，结果保存至 `doc/phase1-acceptance-report.md`。
+- 后端 5 个子计划（workflow action executors、rule engine、v2 API gaps、APIKey security、data model migration）全部实现并通过测试。
+- `go build/test/vet/fmt` 全部通过；前端 lint 0 errors，E2E 116 passed / 0 failed。
+- 后续修复：`Dockerfile` 后端构建阶段缺少 `gcc`、引用不存在的 `public` 目录、UID 与 `node` 镜像冲突，已一并修复并验证 `docker build` 通过。
+## 2026-06-20 (Phase 2)
+
+Phase 2 Core Loop Completion — MVP feature gap filling.
+- 4.1 Case Management: edit+RHF/Zod/stats/associations 已实现
+- 4.2 Payload Management: detail/preview/revoke 已实现，移除 E2E skip
+- 4.3 Interaction: detail drawer/filters/export CSV+JSON 已实现，添加时间范围筛选
+- 4.4 Evidence Export: format selection + redaction 选项已实现
+- 4.5 User Management: create/edit/delete CRUD wired to v2 API，Settings wired to v2 API
+- 4.6 Data Model Unification: DNS/HTTP dual-write 已实现

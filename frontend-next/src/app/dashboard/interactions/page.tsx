@@ -43,6 +43,9 @@ function InteractionsPageContent() {
   const { t } = useI18n()
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [liveCount, setLiveCount] = useState(0)
+  const [exporting, setExporting] = useState(false)
+  const [startTimeFilter, setStartTimeFilter] = useState('')
+  const [endTimeFilter, setEndTimeFilter] = useState('')
 
   // Get scope from URL
   const caseId = searchParams.get('case_id')
@@ -131,8 +134,43 @@ function InteractionsPageContent() {
       (i.domain && i.domain.includes(filter)) ||
       (i.token && i.token.includes(filter))
     const matchesType = typeFilter === TYPE_FILTER_ALL || i.type === typeFilter
-    return matchesSearch && matchesType
+    const interactionTime = new Date(i.timestamp).getTime()
+    const matchesStart = !startTimeFilter || interactionTime >= new Date(startTimeFilter).getTime()
+    const matchesEnd = !endTimeFilter || interactionTime <= new Date(endTimeFilter).getTime()
+    return matchesSearch && matchesType && matchesStart && matchesEnd
   })
+
+  const handleExport = async (format: 'json' | 'csv' | 'markdown') => {
+    setExporting(true)
+    try {
+      const response = await interactionApi.export({
+        format,
+        case_id: caseId,
+        payload_id: payloadId,
+        start_time: startTimeFilter || undefined,
+        end_time: endTimeFilter || undefined,
+      })
+      const content = response.data as unknown as { data?: { content?: string } }
+      const exportContent = content?.data?.content || ''
+      if (exportContent) {
+        const blob = new Blob([exportContent], {
+          type: format === 'json' ? 'application/json' : format === 'csv' ? 'text/csv' : 'text/markdown',
+        })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `interactions-export.${format === 'markdown' ? 'md' : format}`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      }
+    } catch (error) {
+      console.error('Failed to export interactions:', error)
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const groupedByTime = filteredInteractions.reduce((acc, interaction) => {
     const date = new Date(interaction.timestamp).toLocaleDateString()
@@ -220,6 +258,36 @@ function InteractionsPageContent() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
+          <Input
+            type="datetime-local"
+            className="w-48"
+            value={startTimeFilter}
+            onChange={(e) => setStartTimeFilter(e.target.value)}
+            title="Start time filter"
+          />
+          <Input
+            type="datetime-local"
+            className="w-48"
+            value={endTimeFilter}
+            onChange={(e) => setEndTimeFilter(e.target.value)}
+            title="End time filter"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exporting}
+            onClick={() => handleExport('csv')}
+          >
+            {exporting ? 'Exporting...' : 'Export CSV'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exporting}
+            onClick={() => handleExport('json')}
+          >
+            Export JSON
+          </Button>
           <Button
             onClick={() => setViewMode(viewMode === 'table' ? 'timeline' : 'table')}
           >

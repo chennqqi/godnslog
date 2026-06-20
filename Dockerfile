@@ -9,6 +9,8 @@ RUN npm run build
 # build backend
 FROM golang:1.25-alpine AS backend-builder
 
+RUN apk add --no-cache build-base git musl-dev
+
 COPY models /src/godnslog/models
 COPY server /src/godnslog/server
 COPY cache /src/godnslog/cache
@@ -33,10 +35,9 @@ COPY --from=backend-builder /go/bin/godnslog /app/godnslog
 COPY --from=frontend-builder /app/dist /app/frontend/dist
 COPY --from=frontend-builder /app/package.json /app/frontend/package.json
 COPY --from=frontend-builder /app/node_modules /app/frontend/node_modules
-COPY --from=frontend-builder /app/public /app/frontend/public
 
-ARG UID=1000
-ARG GID=1000
+ARG UID=1001
+ARG GID=1001
 
 RUN addgroup -g $GID -S app && adduser -u $UID -S -g app app && \
   chown -R app:app /app && \

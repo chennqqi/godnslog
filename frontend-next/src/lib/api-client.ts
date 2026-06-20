@@ -133,6 +133,11 @@ export const agentPolicyApi = {
 export const usersApi = {
   list: (params?: { page?: number; page_size?: number }) =>
     api.get<UnknownItemListResponse>('/users', params),
+  create: (data: { username: string; email: string; password: string; role: number }) =>
+    api.post<unknown>('/users', data),
+  update: (id: string, data: { email?: string; role?: number; password?: string }) =>
+    api.put<unknown>(`/users/${id}`, data),
+  delete: (id: string) => api.delete(`/users/${id}`),
 }
 
 // Marketplace API
@@ -173,6 +178,12 @@ export const auditApi = {
     page?: number
     page_size?: number
   }) => api.get<AuditLogListResponse>('/audit/logs', params),
+}
+
+// Settings API
+export const settingsApi = {
+  get: () => api.get<unknown>('/settings'),
+  update: (data: Record<string, unknown>) => api.put<unknown>('/settings', data),
 }
 
 // Scanner Run API
