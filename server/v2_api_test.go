@@ -3947,3 +3947,343 @@ func TestV2TraceReviewPackage(t *testing.T) {
 		}
 	})
 }
+
+// --- V2 DNS Records CRUD Tests ---
+
+func setupV2DNSTest(t *testing.T) (*WebServer, *gin.Engine, string) {
+	t.Helper()
+
+	cfg := &WebServerConfig{
+		Domain:          "test.example.com",
+		Driver:          "sqlite",
+		Dsn:             ":memory:",
+		AuthExpire:      3600,
+		DefaultLanguage: "en-US",
+	}
+	store := cache.NewCache(300, 60)
+	server, err := NewWebServer(cfg, store)
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+	if err := server.initDatabase(); err != nil {
+		t.Fatalf("failed to initialize database: %v", err)
+	}
+	if err := server.orm.Sync2(new(models.TblResolve)); err != nil {
+		t.Fatalf("failed to sync TblResolve: %v", err)
+	}
+
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	user := &models.TblUser{
+		Name:    "dnsadmin",
+		Email:   "dnsadmin@test.com",
+		Pass:    string(hashedPassword),
+		Role:    0,
+		Lang:    "en-US",
+		Token:   "test-token-dns",
+		ShortId: "testshortid1",
+	}
+	if _, err := server.orm.Insert(user); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+
+	r := gin.New()
+	server.registerV2API(r)
+
+	loginReq := httptest.NewRequest("POST", "/api/v2/auth/login", strings.NewReader(`{"username":"dnsadmin","password":"password"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginW := httptest.NewRecorder()
+	r.ServeHTTP(loginW, loginReq)
+	if loginW.Code != http.StatusOK {
+		t.Fatalf("login failed with status %d: %s", loginW.Code, loginW.Body.String())
+	}
+	var loginResp struct {
+		Data struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	json.Unmarshal(loginW.Body.Bytes(), &loginResp)
+
+	parts := strings.Split(loginResp.Data.Token, ".")
+	decoded, _ := base64.RawURLEncoding.DecodeString(parts[1])
+	var claims map[string]interface{}
+	json.Unmarshal(decoded, &claims)
+	seed, _ := claims["seed"].(string)
+	store.Set(fmt.Sprintf("%v.seed", user.Id), seed, cache.NoExpiration)
+	store.Set(fmt.Sprintf("%v.user", user.Id), user, cache.NoExpiration)
+
+	return server, r, loginResp.Data.Token
+}
+
+func TestV2DNSRecordsCRUD(t *testing.T) {
+	_, r, token := setupV2DNSTest(t)
+	authHeader := "Bearer " + token
+
+	// Create
+	createBody := `{"host":"www","type":"A","value":"192.168.1.1","ttl":300}`
+	req := httptest.NewRequest("POST", "/api/v2/dns/records", strings.NewReader(createBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", authHeader)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("create failed: %d %s", w.Code, w.Body.String())
+	}
+	var createResp struct {
+		Code int                    `json:"code"`
+		Data map[string]interface{} `json:"data"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &createResp)
+	if createResp.Code != 0 {
+		t.Fatalf("create failed: code=%d", createResp.Code)
+	}
+	recordID, _ := createResp.Data["id"].(string)
+	if recordID == "" {
+		t.Fatal("expected record id")
+	}
+
+	// List
+	req = httptest.NewRequest("GET", "/api/v2/dns/records", nil)
+	req.Header.Set("Authorization", authHeader)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("list failed: %d", w.Code)
+	}
+	var listResp struct {
+		Code int `json:"code"`
+		Data struct {
+			Items []map[string]interface{} `json:"items"`
+			Total int                      `json:"total"`
+		} `json:"data"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &listResp)
+	if listResp.Code != 0 {
+		t.Fatalf("list failed: code=%d", listResp.Code)
+	}
+	if listResp.Data.Total < 1 {
+		t.Fatalf("expected at least 1 record, got %d", listResp.Data.Total)
+	}
+
+	// Update
+	updateBody := `{"value":"10.0.0.1"}`
+	req = httptest.NewRequest("PUT", "/api/v2/dns/records/"+recordID, strings.NewReader(updateBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", authHeader)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("update failed: %d %s", w.Code, w.Body.String())
+	}
+
+	// Verify update via list
+	req = httptest.NewRequest("GET", "/api/v2/dns/records", nil)
+	req.Header.Set("Authorization", authHeader)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	json.Unmarshal(w.Body.Bytes(), &listResp)
+	found := false
+	for _, item := range listResp.Data.Items {
+		if item["id"] == recordID && item["value"] == "10.0.0.1" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("updated record not found or value not updated")
+	}
+
+	// Delete
+	req = httptest.NewRequest("DELETE", "/api/v2/dns/records/"+recordID, nil)
+	req.Header.Set("Authorization", authHeader)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("delete failed: %d", w.Code)
+	}
+
+	// Verify deleted via list
+	req = httptest.NewRequest("GET", "/api/v2/dns/records", nil)
+	req.Header.Set("Authorization", authHeader)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	json.Unmarshal(w.Body.Bytes(), &listResp)
+	for _, item := range listResp.Data.Items {
+		if item["id"] == recordID {
+			t.Fatal("record should have been deleted")
+		}
+	}
+
+	// Update non-existent → 404
+	req = httptest.NewRequest("PUT", "/api/v2/dns/records/99999", strings.NewReader(`{"value":"1.2.3.4"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", authHeader)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for non-existent record, got %d", w.Code)
+	}
+}
+
+func TestV2QueryXip(t *testing.T) {
+	_, r, token := setupV2DNSTest(t)
+	authHeader := "Bearer " + token
+
+	// Valid IPv4
+	req := httptest.NewRequest("GET", "/api/v2/dns/xip/192.168.1.1", nil)
+	req.Header.Set("Authorization", authHeader)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("xip query failed: %d %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Code int `json:"code"`
+		Data struct {
+			Dotted   string            `json:"dotted"`
+			Hex      string            `json:"hex"`
+			Binary   string            `json:"binary"`
+			Examples map[string]string `json:"examples"`
+		} `json:"data"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp.Code != 0 {
+		t.Fatalf("xip query failed: code=%d", resp.Code)
+	}
+	if resp.Data.Dotted != "192.168.1.1" {
+		t.Errorf("expected dotted=192.168.1.1, got %s", resp.Data.Dotted)
+	}
+	if resp.Data.Hex != "c0a80101" {
+		t.Errorf("expected hex=c0a80101, got %s", resp.Data.Hex)
+	}
+	if resp.Data.Binary != "0b11000000101010000000000100000001" {
+		t.Errorf("expected binary=0b11000000101010000000000100000001, got %s", resp.Data.Binary)
+	}
+	if resp.Data.Examples["dotted_decimal"] != "192.168.1.1.example.com" {
+		t.Errorf("unexpected dotted_decimal example: %s", resp.Data.Examples["dotted_decimal"])
+	}
+
+	// Invalid IP
+	req = httptest.NewRequest("GET", "/api/v2/dns/xip/notanip", nil)
+	req.Header.Set("Authorization", authHeader)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid IP, got %d", w.Code)
+	}
+
+	// IPv6 → 400
+	req = httptest.NewRequest("GET", "/api/v2/dns/xip/::1", nil)
+	req.Header.Set("Authorization", authHeader)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for IPv6, got %d", w.Code)
+	}
+}
+
+func TestV2UserManagement(t *testing.T) {
+	_, r, token := setupV2DNSTest(t)
+	authHeader := "Bearer " + token
+
+	// Create user
+	createBody := `{"username":"newuser","email":"new@test.com","password":"StrongPass123!","role":1}`
+	req := httptest.NewRequest("POST", "/api/v2/users", strings.NewReader(createBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", authHeader)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("create user failed: %d %s", w.Code, w.Body.String())
+	}
+	var createResp struct {
+		Code int                    `json:"code"`
+		Data map[string]interface{} `json:"data"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &createResp)
+	if createResp.Code != 0 {
+		t.Fatalf("create user failed: code=%d", createResp.Code)
+	}
+	userID, _ := createResp.Data["id"].(string)
+	if userID == "" {
+		t.Fatal("expected user id")
+	}
+
+	// List users → at least 2
+	req = httptest.NewRequest("GET", "/api/v2/users", nil)
+	req.Header.Set("Authorization", authHeader)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	var listResp struct {
+		Code int `json:"code"`
+		Data struct {
+			Items []map[string]interface{} `json:"items"`
+			Total int                      `json:"total"`
+		} `json:"data"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &listResp)
+	if listResp.Data.Total < 2 {
+		t.Fatalf("expected at least 2 users, got %d", listResp.Data.Total)
+	}
+
+	// Update user role
+	updateBody := `{"role":2}`
+	req = httptest.NewRequest("PUT", "/api/v2/users/"+userID, strings.NewReader(updateBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", authHeader)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("update user failed: %d %s", w.Code, w.Body.String())
+	}
+
+	// Update user password
+	updateBody = `{"password":"NewStrongPass456!"}`
+	req = httptest.NewRequest("PUT", "/api/v2/users/"+userID, strings.NewReader(updateBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", authHeader)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("update password failed: %d %s", w.Code, w.Body.String())
+	}
+
+	// Delete user
+	req = httptest.NewRequest("DELETE", "/api/v2/users/"+userID, nil)
+	req.Header.Set("Authorization", authHeader)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("delete user failed: %d %s", w.Code, w.Body.String())
+	}
+
+	// Delete super user → 403
+	// The admin user (role=0) is the first user with id=1
+	req = httptest.NewRequest("DELETE", "/api/v2/users/1", nil)
+	req.Header.Set("Authorization", authHeader)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for deleting super user, got %d", w.Code)
+	}
+
+	// Create with weak password → 400
+	createBody = `{"username":"weakuser","email":"weak@test.com","password":"short","role":1}`
+	req = httptest.NewRequest("POST", "/api/v2/users", strings.NewReader(createBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", authHeader)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for weak password, got %d", w.Code)
+	}
+
+	// Create with duplicate username → 409
+	createBody = `{"username":"dnsadmin","email":"dup@test.com","password":"StrongPass123!","role":1}`
+	req = httptest.NewRequest("POST", "/api/v2/users", strings.NewReader(createBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", authHeader)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusConflict {
+		t.Errorf("expected 409 for duplicate username, got %d", w.Code)
+	}
+}
