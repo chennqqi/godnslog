@@ -1100,22 +1100,31 @@ func (s *Server) findInteractions(token string) (interface{}, bool) {
 	}, true
 }
 
-// runHTTPServer runs a simple HTTP server for MCP (MVP)
+// runHTTPServer runs the MCP server with Streamable HTTP transport
 func (s *Server) runHTTPServer(ctx context.Context, toolMap map[string]Tool, tools []Tool) error {
 	mux := http.NewServeMux()
 
+	// MCP Streamable HTTP endpoint
+	handler := NewMCPHandler(s, toolMap, tools)
+	handler.StartCleanup(ctx)
+
+	mux.Handle("/mcp", handler)
+
+	// Legacy endpoints for backward compatibility
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// MCP endpoint
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"name":    "godnslog-mcp-server",
 			"version": "1.0.0",
 			"tools":   s.listTools(tools),
+			"endpoints": map[string]string{
+				"mcp":  "POST /mcp — MCP Streamable HTTP transport (JSON-RPC 2.0)",
+				"tool": "POST /tool/{name} — Legacy direct tool execution",
+			},
 		})
 	})
 
 	mux.HandleFunc("/tool/", func(w http.ResponseWriter, r *http.Request) {
-		// Tool execution endpoint
 		toolName := r.URL.Path[len("/tool/"):]
 		tool, ok := toolMap[toolName]
 		if !ok {
@@ -1138,13 +1147,14 @@ func (s *Server) runHTTPServer(ctx context.Context, toolMap map[string]Tool, too
 		json.NewEncoder(w).Encode(result)
 	})
 
-	server := &http.Server{Addr: ":8081"}
+	addr := ":8081"
+	server := &http.Server{Addr: addr}
 	go func() {
 		<-ctx.Done()
 		server.Shutdown(context.Background())
 	}()
 
-	log.Println("MCP HTTP server listening on :8081")
+	log.Printf("MCP Streamable HTTP server listening on %s/mcp", addr)
 	return server.ListenAndServe()
 }
 
