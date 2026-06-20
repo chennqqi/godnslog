@@ -189,15 +189,24 @@ func (self *WebServer) v2UpdateClusterConfig(c *gin.Context) {
 	store := ha.NewXormStore(self.orm)
 	svc := ha.NewService(store)
 
-	// Try update first, if no rows affected, create
-	existing, err := svc.GetConfig(c)
-	if err == nil && existing != nil {
-		config.CreatedAt = existing.CreatedAt
+	// Check if config already exists in DB
+	configs, err := store.ListConfigs(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to check cluster config"})
+		return
 	}
-	if err := svc.UpdateConfig(c, &config); err != nil {
-		// If update fails (no existing row), try create
-		if createErr := store.CreateConfig(c, &config); createErr != nil {
+
+	if len(configs) > 0 {
+		// Update existing
+		config.CreatedAt = configs[0].CreatedAt
+		if err := svc.UpdateConfig(c, &config); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to update cluster config"})
+			return
+		}
+	} else {
+		// Create new
+		if err := store.CreateConfig(c, &config); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to create cluster config"})
 			return
 		}
 	}

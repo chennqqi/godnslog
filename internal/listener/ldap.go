@@ -71,6 +71,7 @@ func (l *LDAPListener) Stop() error {
 
 // acceptConnections accepts incoming connections
 func (l *LDAPListener) acceptConnections(ctx context.Context) {
+	sc := GetSecurityContext(l.listener.ID)
 	for {
 		select {
 		case <-ctx.Done():
@@ -82,7 +83,16 @@ func (l *LDAPListener) acceptConnections(ctx context.Context) {
 				continue
 			}
 
-			go l.handleConnection(ctx, conn)
+			if !sc.CheckConnection(conn.RemoteAddr()) {
+				l.logger.Printf("LDAP connection rejected by rate/connection limit from %s", conn.RemoteAddr())
+				conn.Close()
+				continue
+			}
+
+			go func() {
+				defer sc.ReleaseConnection()
+				l.handleConnection(ctx, conn)
+			}()
 		}
 	}
 }

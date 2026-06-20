@@ -73,6 +73,7 @@ func (s *SMBListener) Stop() error {
 
 // acceptConnections accepts incoming SMB connections
 func (s *SMBListener) acceptConnections(ctx context.Context) {
+	sc := GetSecurityContext(s.listener.ID)
 	for {
 		select {
 		case <-ctx.Done():
@@ -91,7 +92,16 @@ func (s *SMBListener) acceptConnections(ctx context.Context) {
 				}
 			}
 
-			go s.handleConnection(ctx, conn)
+			if !sc.CheckConnection(conn.RemoteAddr()) {
+				log.Printf("SMB connection rejected by rate/connection limit from %s", conn.RemoteAddr())
+				conn.Close()
+				continue
+			}
+
+			go func() {
+				defer sc.ReleaseConnection()
+				s.handleConnection(ctx, conn)
+			}()
 		}
 	}
 }
