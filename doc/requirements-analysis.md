@@ -348,3 +348,25 @@ Phase 2 评估发现大部分功能已在之前 sprint 中实现，剩余缺口�
 - E2E 首次实现 117/117 全部通过，包括此前一直失败的 agent-runs 用例。
 - 后端质量门禁与 Docker build 保持通过；覆盖率仍是后续重点。
 - 验收报告：`docs/superpowers/acceptance/phase3-acceptance-report.md`。
+
+## 2026-06-20 (Phase 4: Agent & Scanner Integration — 分析)
+
+### 评估发现
+- MCP transport.go/session.go 已在 Phase 1-2 实现，但未接入主 web server（仅独立 cmd/mcp-server）
+- Workflow notification channels 8 种全部已实现，async queue 已实现但未集成到主 server
+- Custom HTTP response (SCA-02) 未实现，Payload 模型缺少 CustomResponse 字段
+- Scanner Hub service 层完整（CRUD + backfill + Nuclei 集成），前端缺 backfill UI
+- CLI 子命令全部已实现但缺少注册验证测试
+- Agent Run 前端已完整实现 lifecycle/review queue/follow-up/evidence export
+
+### 实施内容
+1. MCP: 新增 `v2MCPHandler` 将 `POST /api/v2/mcp` 接入主 web server，通过 `GetTools()` 导出工具列表
+2. Workflow: 在 `WebServer` 结构体添加 `workflowQueue`/`workflowSvc`，`Run` 中初始化 3-worker queue，DNS/HTTP interaction 存储后调用 `triggerWorkflows` 异步执行匹配的 workflow actions
+3. Custom HTTP Response: Payload 模型新增 `CustomResponse` 字段，webapi.go Record handler 在 interaction 存储后检查 payload 的 CustomResponse 并返回自定义 status/headers/body/redirect
+4. Scanner Hub: 前端 scanner-hub/[id]/page.tsx 新增 backfill UI section（format 选择 + 结果粘贴 + 导入按钮 + 结果展示）
+5. CLI: 新增 `cli/commands_test.go` 验证所有子命令注册和 persistent flags
+
+### 验证结果
+- go build/test: 全部通过
+- 前端 lint: 0 errors, build 通过
+- E2E: 117 passed, 0 failed

@@ -549,3 +549,49 @@ Phase 3 验收完成，结果保存至 `docs/superpowers/acceptance/phase3-accep
 - `go build/test/vet/fmt` 全部通过；前端 lint 0 errors，build 成功，E2E **117 passed / 0 failed**（包括之前失败的 agent-runs 用例已修复）。
 - TanStack Query、RHF+Zod、ErrorBoundary、SSE、i18n、Dark Mode、DataTable 增强均验证通过。
 - `docker build -t godnslog .` 通过。
+
+## 2026-06-20 (Phase 4: Agent & Scanner Integration)
+
+### 6.1 MCP Protocol Compliance
+- POST /api/v2/mcp 已接入主 web server，支持 Streamable HTTP transport (JSON-RPC 2.0)
+- Transport layer: initialize, notifications/initialized, tools/list, tools/call, ping
+- Session layer: UUID session, 30min idle timeout cleanup
+- Tool registration: 13 tools (create_oast_probe, create_case, create_payload, list_interactions, wait_for_interaction, summarize_evidence, export_report, get_evidence_summary, explain_evidence, list_agent_runs, get_agent_run, complete_agent_run, revoke_token)
+- Permission gating: APIKey scope check + risk tolerance + audit logging
+- 新增 GetTools() 导出方法供外部集成
+
+### 6.2 Workflow Action Executor Completion
+- Notification channels: webhook/feishu/wecom/dingtalk/slack/discord/telegram/email 全部已实现
+- Async queue: workflow.Queue 已集成到主 web server，3 workers + exponential backoff retry
+- triggerWorkflows: DNS/HTTP interaction 存储后自动触发匹配的 workflow actions
+- Custom HTTP response (SCA-02): Payload.CustomResponse 字段，支持自定义 status/headers/body/redirect
+
+### 6.3 Scanner Hub Realization
+- Nuclei 深度集成: command generation, package manifest, JSONL/SARIF output
+- Scanner Run complete flow: create → generate package → execute → backfill results → associate interactions
+- Backfill API: POST /api/v2/scanner-runs/:id/backfill (JSONL + SARIF)
+- Frontend: scanner-hub list + detail page + backfill UI section
+- CI/CD examples: GitHub Actions, GitLab CI, Jenkinsfile
+
+### 6.4 CLI Tool Completion
+- case: create/list/get/delete/close
+- payload: create/list/revoke/preview
+- interaction: list/poll (with timeout and interval)
+- report: export (json/markdown/csv)
+- scanner: run/list/get
+- agent: list/get/create/complete
+- 新增 commands_test.go 验证所有子命令注册
+
+### 6.5 Agent Run Complete Loop
+- Agent Run lifecycle: created → running → waiting → completed/failed
+- Review Queue: all/review-queue tabs, filter by review_state/evidence_strength
+- Follow-up Action: create + history view
+- Evidence package export: json/markdown + webhook delivery
+- Review decision: accepted/rejected/needs_info
+
+### 验证结果
+- go build: 通过
+- go test ./...: 全部通过
+- 前端 lint: 0 errors, 21 warnings
+- 前端 build: 通过
+- E2E: 117 passed, 0 failed

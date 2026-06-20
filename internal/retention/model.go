@@ -30,6 +30,10 @@ type RetentionPolicy struct {
 	RunWeekly  bool `json:"run_weekly"`  // Run weekly
 	RunMonthly bool `json:"run_monthly"` // Run monthly
 
+	// RunIntervalHours is the computed interval in hours derived from the schedule flags.
+	// 0 means no automatic scheduling.
+	RunIntervalHours int `json:"run_interval_hours"`
+
 	IsEnabled bool       `json:"is_enabled"`
 	CreatedAt time.Time  `json:"created_at" xorm:"created"`
 	UpdatedAt time.Time  `json:"updated_at" xorm:"updated"`

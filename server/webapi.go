@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"net"
 	"sort"
@@ -12,8 +13,8 @@ import (
 
 	v2models "github.com/chennqqi/godnslog/internal/models"
 	"github.com/chennqqi/godnslog/models"
-
 	"github.com/chennqqi/goutils/ginutils"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
@@ -270,6 +271,40 @@ func (self *WebServer) record(c *gin.Context) {
 	if _, err2 := session.InsertOne(interaction); err2 != nil {
 		logrus.Errorf("[webapi.go::Record] dual-write interactions: %v", err2)
 	}
+
+	// Trigger matching workflows asynchronously
+	self.triggerWorkflows(interaction)
+
+	// Check for custom HTTP response configured on the payload (SCA-02)
+	token := c.Param("any")
+	if token != "" {
+		var payload v2models.Payload
+		has, err := self.orm.Where("token = ?", token).Get(&payload)
+		if err == nil && has && payload.CustomResponse != "" {
+			var customResp struct {
+				Status   int               `json:"status"`
+				Headers  map[string]string `json:"headers"`
+				Body     string            `json:"body"`
+				Redirect string            `json:"redirect"`
+			}
+			if err := json.Unmarshal([]byte(payload.CustomResponse), &customResp); err == nil {
+				if customResp.Redirect != "" {
+					c.Redirect(customResp.Status, customResp.Redirect)
+					return
+				}
+				status := customResp.Status
+				if status == 0 {
+					status = 200
+				}
+				for k, v := range customResp.Headers {
+					c.Header(k, v)
+				}
+				c.String(status, customResp.Body)
+				return
+			}
+		}
+	}
+
 	self.resp(c, 200, &CR{
 		Message: "OK",
 	})

@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { canaryApi, type CanaryToken as APICanaryToken } from '@/lib/api-client'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,14 +23,17 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-/** Canary token entry */
+/** Canary token entry — extends API model with UI-only fields */
 interface CanaryToken {
   id: string
   type: string
   token: string
+  description: string
   context: string
+  is_enabled: boolean
   status: 'active' | 'silent' | 'revoked'
   created_at: string
+  expires_at: string
   expires_in?: number
   silent_window?: string
 }
@@ -69,12 +73,6 @@ const CANARY_TYPES: CanaryType[] = [
   { value: 'email',    label: 'Email Address', description: 'Triggers on email delivery' },
 ]
 
-/** Seed data for demonstration when backend data is unavailable */
-const SEED_TOKENS: CanaryToken[] = [
-  { id: '1', type: 'dns',      token: 'canary-abc123', context: 'Project-A / Database credentials backup', status: 'active',  created_at: '2024-01-01' },
-  { id: '2', type: 'http',     token: 'canary-def456', context: 'Project-B / Internal API key file',       status: 'active',  created_at: '2024-01-15' },
-  { id: '3', type: 'document', token: 'canary-ghi789', context: 'Project-C / HR document template',        status: 'silent',  created_at: '2024-02-01' },
-]
 
 /** Form state for creating a new canary token */
 interface CreateForm {
@@ -91,46 +89,91 @@ const DEFAULT_FORM: CreateForm = {
   silent_window: '',
 }
 
+/** Maps an API canary token to the UI format with computed status */
+function mapApiToken(api: APICanaryToken): CanaryToken {
+  let status: 'active' | 'silent' | 'revoked' = 'active'
+  if (!api.is_enabled) {
+    status = 'revoked'
+  }
+  return {
+    id: api.id,
+    type: api.type,
+    token: api.token,
+    description: api.description || '',
+    context: api.context || api.description || '',
+    is_enabled: api.is_enabled,
+    status,
+    created_at: api.created_at || '',
+    expires_at: api.expires_at || '',
+  }
+}
+
 /** Canary Tokens page — long-lived tripwire tokens for detecting unauthorized access */
 export default function CanaryPage() {
   const router = useRouter()
-  const [tokens, setTokens] = useState<CanaryToken[]>(SEED_TOKENS)
+  const [tokens, setTokens] = useState<CanaryToken[]>([])
+  const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [revokeTarget, setRevokeTarget] = useState<CanaryToken | null>(null)
   const [form, setForm] = useState<CreateForm>(DEFAULT_FORM)
+
+  const loadTokens = useCallback(async () => {
+    setLoading(true)
+    try {
+      const response = await canaryApi.list({ page: 1, page_size: 100 })
+      if (response.data) {
+        const apiTokens = (response.data.items || []).map(mapApiToken)
+        setTokens(apiTokens)
+      }
+    } catch (err) {
+      console.error('Failed to load canary tokens:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) {
       router.push('/login')
+      return
     }
-  }, [router])
+    setTimeout(() => {
+      loadTokens()
+    }, 0)
+  }, [router, loadTokens])
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    const newToken: CanaryToken = {
-      id: Date.now().toString(),
-      type: form.type,
-      context: form.context,
-      token: `canary-${Math.random().toString(36).slice(2, 10)}`,
-      status: 'active',
-      created_at: new Date().toISOString().split('T')[0],
-      expires_in: form.expires_in,
-      silent_window: form.silent_window || undefined,
+    const generatedToken = `canary-${Math.random().toString(36).slice(2, 12)}`
+    const expiresAt = new Date(Date.now() + form.expires_in * 1000).toISOString()
+    try {
+      await canaryApi.create({
+        type: form.type,
+        token: generatedToken,
+        description: form.context,
+        context: form.context,
+        expires_at: expiresAt,
+      })
+      setForm(DEFAULT_FORM)
+      setShowCreateModal(false)
+      loadTokens()
+    } catch (err) {
+      console.error('Failed to create canary token:', err)
     }
-    setTokens((prev) => [newToken, ...prev])
-    setForm(DEFAULT_FORM)
-    setShowCreateModal(false)
   }
 
   const confirmRevoke = (t: CanaryToken) => setRevokeTarget(t)
 
-  const executeRevoke = () => {
+  const executeRevoke = async () => {
     if (!revokeTarget) return
-    setTokens((prev) =>
-      prev.map((t) => (t.id === revokeTarget.id ? { ...t, status: 'revoked' } : t))
-    )
-    setRevokeTarget(null)
+    try {
+      await canaryApi.delete(revokeTarget.id)
+      setTokens((prev) => prev.filter((t) => t.id !== revokeTarget.id))
+      setRevokeTarget(null)
+    } catch (err) {
+      console.error('Failed to revoke canary token:', err)
+    }
   }
 
   const activeCount  = tokens.filter((t) => t.status === 'active').length
@@ -179,7 +222,11 @@ export default function CanaryPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          {tokens.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-16">
+              <p className="text-sm text-gray-500">Loading...</p>
+            </div>
+          ) : tokens.length === 0 ? (
             <div className="text-center py-16">
               <div className="text-4xl mb-3">🐦</div>
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No canary tokens yet</p>

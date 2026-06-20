@@ -615,6 +615,14 @@ test.describe('Agent Runs', () => {
     // Enter reason
     await page.getByPlaceholder('请输入原因...').fill('Evidence needs second review')
 
+    // Set up waiters for the refresh requests before clicking create
+    const agentRunRefreshPromise = page.waitForRequest(request =>
+      request.url().includes('/agent-runs/agent-run-1') && request.method() === 'GET'
+    )
+    const followupHistoryRefreshPromise = page.waitForRequest(request =>
+      request.url().includes('/agent-runs/agent-run-1/followups') && request.method() === 'GET'
+    )
+
     // Click create button and wait for API request
     const followupPromise = page.waitForResponse(response =>
       response.url().includes('/agent-runs/agent-run-1/followups') && response.request().method() === 'POST'
@@ -637,13 +645,6 @@ test.describe('Agent Runs', () => {
     await expect(page.getByRole('heading', { name: '创建 Follow-up Action' })).not.toBeVisible()
 
     // Wait for both agent run detail and followup history to refresh
-    const agentRunRefreshPromise = page.waitForRequest(request =>
-      request.url().includes('/agent-runs/agent-run-1') && request.method() === 'GET'
-    )
-    const followupHistoryRefreshPromise = page.waitForRequest(request =>
-      request.url().includes('/agent-runs/agent-run-1/followups') && request.method() === 'GET'
-    )
-
     await Promise.all([
       agentRunRefreshPromise,
       followupHistoryRefreshPromise,

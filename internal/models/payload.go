@@ -44,6 +44,7 @@ type Payload struct {
 	Variables        Variables  `json:"variables" xorm:"json"`                                     // Custom variable values used in rendering
 	Status           string     `json:"status" xorm:"varchar(32) notnull default('active') index"` // active, expired, revoked
 	ExpectedProtocol string     `json:"expected_protocol" xorm:"varchar(16)"`                      // dns, http, smtp, ldap
+	CustomResponse   string     `json:"custom_response,omitempty" xorm:"text"`                     // JSON: {status, headers, body, redirect}
 	ExpiresAt        *time.Time `json:"expires_at" xorm:"datetime"`
 	CreatedBy        string     `json:"created_by" xorm:"varchar(36) notnull"`
 	CreatedAt        time.Time  `json:"created_at" xorm:"datetime created"`

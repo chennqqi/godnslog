@@ -21,9 +21,9 @@ test.describe('Marketplace Page', () => {
   });
 
   test('should display tab buttons', async ({ page }) => {
-    // Page uses Chinese tab labels
-    await expect(page.locator('button').filter({ hasText: '插件市场' }).first()).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('button').filter({ hasText: '模板市场' }).first()).toBeVisible();
-    await expect(page.locator('button').filter({ hasText: '已安装' }).first()).toBeVisible();
+    // Page uses English tab labels
+    await expect(page.locator('button').filter({ hasText: 'Plugins' }).first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('button').filter({ hasText: 'Templates' }).first()).toBeVisible();
+    await expect(page.locator('button').filter({ hasText: 'Installed' }).first()).toBeVisible();
   });
 });

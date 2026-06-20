@@ -20,8 +20,8 @@ test.describe('Rebinding Page', () => {
     await expect(page.locator('h2').first()).toBeVisible();
   });
 
-  test('should display add stage button', async ({ page }) => {
-    // Page uses Chinese button text
-    await expect(page.locator('button').filter({ hasText: /添加阶段/ }).first()).toBeVisible({ timeout: 5000 });
+  test('should display predefined scenarios', async ({ page }) => {
+    // Page uses scenario cards to create rebinding rules
+    await expect(page.locator('text=Predefined Scenarios').first()).toBeVisible({ timeout: 5000 });
   });
 });

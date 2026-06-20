@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/chennqqi/godnslog/internal/models"
@@ -98,30 +99,50 @@ func (d *Detector) matchesCanary(inter models.Interaction, canary Canary) bool {
 		}
 	case string(CanaryTypeHTTP):
 		if inter.Type == "http" {
-			// Check in path, headers, or body
-			if inter.Path != nil && d.containsToken(*inter.Path, canary.Token) {
-				return true
-			}
-			if inter.Headers != nil {
-				for _, v := range inter.Headers {
-					if d.containsToken(v, canary.Token) {
-						return true
-					}
-				}
-			}
-			if inter.Body != nil && d.containsToken(*inter.Body, canary.Token) {
-				return true
-			}
+			return d.matchHTTPInteraction(inter, canary.Token)
 		}
+	case string(CanaryTypeDocument), string(CanaryTypeConfig), string(CanaryTypeCI),
+		string(CanaryTypeStorage), string(CanaryTypeEmail):
+		// These canary types are accessed via HTTP, so check HTTP interactions
+		// for the token in path, headers, body, or raw data
+		if inter.Type == "http" {
+			return d.matchHTTPInteraction(inter, canary.Token)
+		}
+		// Also check DNS interactions for token in domain
+		if inter.Type == "dns" && inter.Domain != nil {
+			return d.containsToken(*inter.Domain, canary.Token)
+		}
+		// Check raw data for any interaction type
+		return d.containsToken(inter.RawData, canary.Token)
 	}
 
 	return false
 }
 
+// matchHTTPInteraction checks if the canary token appears in any HTTP interaction field
+func (d *Detector) matchHTTPInteraction(inter models.Interaction, token string) bool {
+	if inter.Path != nil && d.containsToken(*inter.Path, token) {
+		return true
+	}
+	if inter.Headers != nil {
+		for _, v := range inter.Headers {
+			if d.containsToken(v, token) {
+				return true
+			}
+		}
+	}
+	if inter.Body != nil && d.containsToken(*inter.Body, token) {
+		return true
+	}
+	if inter.UserAgent != nil && d.containsToken(*inter.UserAgent, token) {
+		return true
+	}
+	return d.containsToken(inter.RawData, token)
+}
+
 // containsToken checks if token is contained in the string
 func (d *Detector) containsToken(s, token string) bool {
-	// Simple contains check (in production, use more sophisticated matching)
-	return len(s) > 0 && len(token) > 0 && s == token
+	return len(s) > 0 && len(token) > 0 && strings.Contains(s, token)
 }
 
 // isInSilentWindow checks if we're in silent window for this canary

@@ -1,0 +1,93 @@
+version: "3.8"
+
+# Docker Compose template for GoDNSLog HA deployment
+# Includes: 2 GoDNSLog instances, Redis cache, Nginx load balancer
+
+services:
+  # Redis cache for shared state between instances
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # GoDNSLog instance 1
+  godnslog-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - DOMAIN=example.com
+      - DNS_IP=0.0.0.0
+      - REDIS_URL=redis:6379
+      - GODNSLOG_API_URL=http://localhost:8080
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "8081:8080"
+      - "3001:3000"
+      - "5301:53/udp"
+      - "5301:53/tcp"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v2/health"]
+      interval: 20s
+      timeout: 3s
+      start_period: 15s
+      retries: 3
+
+  # GoDNSLog instance 2
+  godnslog-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - DOMAIN=example.com
+      - DNS_IP=0.0.0.0
+      - REDIS_URL=redis:6379
+      - GODNSLOG_API_URL=http://localhost:8080
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "8082:8080"
+      - "3002:3000"
+      - "5302:53/udp"
+      - "5302:53/tcp"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v2/health"]
+      interval: 20s
+      timeout: 3s
+      start_period: 15s
+      retries: 3
+
+  # Nginx load balancer
+  nginx-lb:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      - godnslog-1
+      - godnslog-2
+    ports:
+      - "8080:8080"
+      - "3000:3000"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v2/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  redis-data:

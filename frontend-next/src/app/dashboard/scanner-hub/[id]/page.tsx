@@ -9,6 +9,13 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 export default function ScannerRunDetailPage() {
   const router = useRouter()
@@ -17,6 +24,10 @@ export default function ScannerRunDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [backfillFormat, setBackfillFormat] = useState<'jsonl' | 'sarif'>('jsonl')
+  const [backfillResults, setBackfillResults] = useState('')
+  const [backfilling, setBackfilling] = useState(false)
+  const [backfillResult, setBackfillResult] = useState<{ findings_count: number; associated_count: number } | null>(null)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -61,6 +72,42 @@ export default function ScannerRunDetailPage() {
       setError('更新状态失败')
     } finally {
       setUpdatingStatus(false)
+    }
+  }
+
+  const handleBackfill = async () => {
+    if (!scannerRun || !backfillResults.trim()) return
+    setBackfilling(true)
+    setError('')
+    setBackfillResult(null)
+    try {
+      const response = await fetch(`/api/v2/scanner-runs/${scannerRun.id}/backfill`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({ format: backfillFormat, raw_results: backfillResults }),
+      })
+      const data = await response.json()
+      if (data.code === 0 && data.data) {
+        setBackfillResult({
+          findings_count: data.data.findings_count,
+          associated_count: data.data.associated_count,
+        })
+        // Reload scanner run to update interaction count
+        const detailResp = await scannerRunApi.get(scannerRun.id)
+        if (detailResp.data) {
+          setScannerRun(detailResp.data.data)
+        }
+      } else {
+        setError(data.message || 'Backfill failed')
+      }
+    } catch (err: unknown) {
+      console.error('Backfill failed:', err)
+      setError('Backfill request failed')
+    } finally {
+      setBackfilling(false)
     }
   }
 
@@ -298,6 +345,50 @@ export default function ScannerRunDetailPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Backfill Scan Results */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Backfill Scan Results</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2 items-center">
+              <span className="text-sm font-medium">Format:</span>
+              <Select value={backfillFormat} onValueChange={(v: 'jsonl' | 'sarif') => setBackfillFormat(v)}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="jsonl">Nuclei JSONL</SelectItem>
+                  <SelectItem value="sarif">SARIF</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Textarea
+              value={backfillResults}
+              onChange={(e) => setBackfillResults(e.target.value)}
+              placeholder="Paste Nuclei JSONL or SARIF scan output here..."
+              className="font-mono text-sm"
+              rows={6}
+            />
+            <Button
+              onClick={handleBackfill}
+              disabled={backfilling || !backfillResults.trim()}
+            >
+              {backfilling ? 'Importing...' : 'Import Results'}
+            </Button>
+            {backfillResult && (
+              <div className="rounded border p-3 text-sm">
+                <span className="font-medium">Imported {backfillResult.findings_count} findings</span>
+                {' — '}
+                <span>{backfillResult.associated_count} associated with interactions</span>
+              </div>
+            )}
+            {error && (
+              <div className="text-red-500 text-sm">{error}</div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Navigation Links */}
         <Card>
