@@ -17,6 +17,7 @@ import (
 	"github.com/chennqqi/godnslog/internal/evidencehub"
 	"github.com/chennqqi/godnslog/internal/interaction"
 	"github.com/chennqqi/godnslog/internal/listener"
+	"github.com/chennqqi/godnslog/internal/marketplace"
 	"github.com/chennqqi/godnslog/internal/notification"
 	"github.com/chennqqi/godnslog/internal/payload"
 	"github.com/chennqqi/godnslog/internal/scannerhub"
@@ -115,12 +116,12 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		}
 
 		// Marketplace
-		marketplace := v2.Group("/marketplace", self.authHandler)
+		marketplaceRoutes := v2.Group("/marketplace", self.authHandler)
 		{
-			marketplace.GET("/plugins", self.v2ListPlugins)
-			marketplace.GET("/plugins/:id", self.v2GetPlugin)
-			marketplace.GET("/templates", self.v2ListTemplates)
-			marketplace.GET("/templates/:id", self.v2GetTemplate)
+			marketplaceRoutes.GET("/plugins", self.v2ListPlugins)
+			marketplaceRoutes.GET("/plugins/:id", self.v2GetPlugin)
+			marketplaceRoutes.GET("/templates", self.v2ListTemplates)
+			marketplaceRoutes.GET("/templates/:id", self.v2GetTemplate)
 		}
 
 		// Rules/Workflow
@@ -238,7 +239,25 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			agentRuns.GET("/:id/followups", self.v2ListFollowupHistory)
 			agentRuns.POST("/:id/complete", self.v2CompleteAgentRun)
 		}
+
+		// HA Cluster
+		haCluster := v2.Group("/cluster", self.authHandler)
+		{
+			haCluster.GET("/nodes", self.v2ListClusterNodes)
+			haCluster.POST("/nodes", self.v2CreateClusterNode)
+			haCluster.GET("/nodes/:id", self.v2GetClusterNode)
+			haCluster.PUT("/nodes/:id", self.v2UpdateClusterNode)
+			haCluster.DELETE("/nodes/:id", self.v2DeleteClusterNode)
+			haCluster.GET("/nodes/:id/health", self.v2NodeHealthCheck)
+			haCluster.GET("/config", self.v2GetClusterConfig)
+			haCluster.PUT("/config", self.v2UpdateClusterConfig)
+			haCluster.GET("/status", self.v2ClusterStatus)
+		}
 	}
+
+	// Health endpoints (no auth required)
+	v2.GET("/health", self.v2HealthCheck)
+	v2.GET("/ready", self.v2ReadinessCheck)
 }
 
 // v2Login handles v2 login
@@ -2249,44 +2268,100 @@ func (self *WebServer) v2InteractionStream(c *gin.Context) {
 
 // v2ListPlugins lists marketplace plugins
 func (self *WebServer) v2ListPlugins(c *gin.Context) {
+	store := marketplace.NewXormStore(self.orm)
+	svc := marketplace.NewService(store)
+
+	filters := marketplace.PluginFilters{
+		Type:     c.Query("type"),
+		Category: c.Query("category"),
+	}
+	if published := c.Query("is_published"); published != "" {
+		isPub := published == "true" || published == "1"
+		filters.IsPublished = &isPub
+	}
+	if official := c.Query("is_official"); official != "" {
+		isOff := official == "true" || official == "1"
+		filters.IsOfficial = &isOff
+	}
+
+	plugins, err := svc.ListPlugins(c, filters)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to list plugins"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
 		"data": gin.H{
-			"items": []map[string]interface{}{},
-			"total": 0,
+			"items": plugins,
+			"total": len(plugins),
 		},
 	})
 }
 
 // v2GetPlugin gets a specific plugin
 func (self *WebServer) v2GetPlugin(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    nil,
-	})
+	id := c.Param("id")
+	store := marketplace.NewXormStore(self.orm)
+	svc := marketplace.NewService(store)
+
+	plugin, err := svc.GetPlugin(c, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "Plugin not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": plugin})
 }
 
 // v2ListTemplates lists marketplace templates
 func (self *WebServer) v2ListTemplates(c *gin.Context) {
+	store := marketplace.NewXormStore(self.orm)
+	svc := marketplace.NewService(store)
+
+	filters := marketplace.TemplateFilters{
+		Type:     c.Query("type"),
+		Category: c.Query("category"),
+	}
+	if published := c.Query("is_published"); published != "" {
+		isPub := published == "true" || published == "1"
+		filters.IsPublished = &isPub
+	}
+	if official := c.Query("is_official"); official != "" {
+		isOff := official == "true" || official == "1"
+		filters.IsOfficial = &isOff
+	}
+
+	templates, err := svc.ListTemplates(c, filters)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to list templates"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
 		"data": gin.H{
-			"items": []map[string]interface{}{},
-			"total": 0,
+			"items": templates,
+			"total": len(templates),
 		},
 	})
 }
 
 // v2GetTemplate gets a specific template
 func (self *WebServer) v2GetTemplate(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    nil,
-	})
+	id := c.Param("id")
+	store := marketplace.NewXormStore(self.orm)
+	svc := marketplace.NewService(store)
+
+	template, err := svc.GetTemplate(c, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "Template not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": template})
 }
 
 // v2ListRules lists workflow rules

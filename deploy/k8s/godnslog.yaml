@@ -1,0 +1,205 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: godnslog
+  labels:
+    app.kubernetes.io/name: godnslog
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: godnslog-config
+  namespace: godnslog
+  labels:
+    app.kubernetes.io/name: godnslog
+data:
+  GIN_MODE: "release"
+  GODNSLOG_DOMAIN: "dns.example.com"
+  GODNSLOG_DB_PATH: "/data/godnslog.db"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: godnslog-secret
+  namespace: godnslog
+  labels:
+    app.kubernetes.io/name: godnslog
+type: Opaque
+stringData:
+  # Replace with actual values before deploying
+  GODNSLOG_DB_DSN: "root:password@tcp(mysql:3306)/godnslog?charset=utf8mb4"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: godnslog-data
+  namespace: godnslog
+  labels:
+    app.kubernetes.io/name: godnslog
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: godnslog
+  namespace: godnslog
+  labels:
+    app.kubernetes.io/name: godnslog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: godnslog
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: godnslog
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: godnslog
+          image: godnslog:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: dns-udp
+              containerPort: 53
+              protocol: UDP
+            - name: dns-tcp
+              containerPort: 53
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: godnslog-config
+            - secretRef:
+                name: godnslog-secret
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /api/v2/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/v2/health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            capabilities:
+              add:
+                - NET_BIND_SERVICE
+            readOnlyRootFilesystem: false
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: godnslog-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: godnslog
+  namespace: godnslog
+  labels:
+    app.kubernetes.io/name: godnslog
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: godnslog
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+    - name: dns-udp
+      port: 53
+      targetPort: dns-udp
+      protocol: UDP
+    - name: dns-tcp
+      port: 53
+      targetPort: dns-tcp
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: godnslog-udp-lb
+  namespace: godnslog
+  annotations:
+    # Use LoadBalancer for external DNS access (UDP 53)
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+  labels:
+    app.kubernetes.io/name: godnslog
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: godnslog
+  ports:
+    - name: dns-udp
+      port: 53
+      targetPort: dns-udp
+      protocol: UDP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: godnslog
+  namespace: godnslog
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    # Enable SSE support
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+  labels:
+    app.kubernetes.io/name: godnslog
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: godnslog.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: godnslog
+                port:
+                  number: 8080
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: godnslog-pdb
+  namespace: godnslog
+  labels:
+    app.kubernetes.io/name: godnslog
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: godnslog

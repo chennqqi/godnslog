@@ -17,6 +17,20 @@ services:
     volumes:
       - godnslog-data:/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v2/health"]
+      interval: 20s
+      timeout: 3s
+      start_period: 15s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
     networks:
       - godnslog-net
 
