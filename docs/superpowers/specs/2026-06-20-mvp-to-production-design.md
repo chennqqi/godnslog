@@ -1,7 +1,7 @@
 # GODNSLOG 2.0: From MVP to Production — Multi-Phase Design
 
 > Date: 2026-06-20
-> Status: Approved (pending spec review)
+> Status: Revised — review issues addressed, pending final approval
 > Approach: Bottom-up (Phase A) — backend first, then core loop, then frontend, then agent, then platform
 
 ---
@@ -71,6 +71,8 @@ Phase 1 ──→ Phase 2 ──→ Phase 3
 
 Phase 4 depends on Phase 1-2 (stable APIs + core features). Phase 5 depends on all prior phases.
 
+**Phase 4 vs Phase 3 sequencing**: Phase 4 backend/agent work (MCP protocol, notification channels, CLI) can start once Phase 2 is stable. Phase 4 frontend pages (Scanner Hub UI, Agent Run UI) should be implemented **after** Phase 3 patterns (TanStack Query, ErrorBoundary, RHF+Zod) are established, to avoid building new pages on the old data-fetching pattern. In practice, Phase 4 backend and Phase 3 can run in parallel; Phase 4 frontend follows Phase 3.
+
 ---
 
 ## 3. Phase 1: Backend Realization — Stub Cleanup & API Gap Filling
@@ -87,10 +89,14 @@ Phase 4 depends on Phase 1-2 (stable APIs + core features). Phase 5 depends on a
 - `executeWebhookAction` — forward to configured Webhook URL with custom Header/Body template rendering
 - `executeNotifyAction` — trigger notification channels via `internal/notification` package
 
-**Constraints**:
-- All outbound requests: 30s timeout, domain allowlist, max 1MB response body
-- All actions: audit log entry with action type, target, result, duration
-- Async queue with exponential backoff retry (max 3 retries)
+**Outbound Action Security Constraints**:
+- **Allowlist configuration**: stored in system settings (`/api/v2/settings/security`), managed by Super/Admin only. Per-action URL must match allowlist; no per-action override.
+- **Default behavior**: deny all outbound requests if allowlist is empty or not configured.
+- **SSRF protection**: block private IP ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8, 169.254.0.0/16), localhost, and cloud metadata endpoints (169.254.169.254).
+- **Rate limiting**: max 10 outbound requests per action per minute.
+- **All outbound requests**: 30s timeout, max 1MB response body.
+- **All actions**: audit log entry with action type, target, result, duration.
+- **Async queue**: exponential backoff retry (max 3 retries, base delay 1s, max delay 30s).
 
 **Files affected**:
 - `internal/workflow/service.go` — implement 4 action executors
@@ -105,7 +111,7 @@ Phase 4 depends on Phase 1-2 (stable APIs + core features). Phase 5 depends on a
 - `matchCIDR` — replace `strings.HasPrefix` with `net.ParseCIDR` + `net.Contains`
 - `executeTagAction` — update Interaction tags in database via `internal/interaction` service
 - `executeReport` — integrate with Evidence generation system (`internal/evidencehub`)
-- `sendEmailNotification` — keep as `fmt.Errorf("email notification not implemented")` (per requirement doc Q2: no SMTP notification needed)
+- `sendEmailNotification` — **Won't do (by design)**: per `doc/2.0-Requirement.md` Q2, SMTP is not used for notifications. Keep returning `fmt.Errorf("email notification not implemented")`.
 - `DiscardNoise` — integrate with `internal/interaction/noise_filter.go`
 
 **Files affected**:
@@ -145,14 +151,15 @@ Phase 4 depends on Phase 1-2 (stable APIs + core features). Phase 5 depends on a
 - `server/v2_api_test.go` — add tests for new endpoints
 - `internal/rebinding/` — verify service layer completeness
 
-### 3.4 Data Model Unification
+### 3.4 Data Model Unification (Design + Migration Script)
 
 **Decision** (per requirement doc Q3): Approach A — dual-write synchronization.
 
-**Implementation**:
+**Phase 1 scope**: Design the dual-write contract and write the migration script. Actual dual-write landing in Phase 2 (§4.6).
+
+**Design**:
 - DNS handler in `server/dnsserver.go`: after writing to `TblDns`, also write to `Interaction` table
 - HTTP handler in `server/webserver.go`: after writing to `TblHttp`, also write to `Interaction` table
-- New `migration/sync.go`: one-time migration script to import historical `TblDns`/`TblHttp` into `Interaction` table
 - V2 API queries `Interaction` table exclusively for unified history
 
 **Interaction write fields**:
@@ -164,11 +171,16 @@ Phase 4 depends on Phase 1-2 (stable APIs + core features). Phase 5 depends on a
 - `timestamp`: event time
 - `case_id` / `payload_id`: auto-attributed via token lookup
 
-**Files affected**:
-- `server/dnsserver.go` — add Interaction write in DNS handler
-- `server/webserver.go` — add Interaction write in HTTP record handler
-- `migration/sync.go` — new migration script
+**Migration script** (`migration/sync.go`):
+- One-time script to import historical `TblDns`/`TblHttp` records into `Interaction` table
+- Supports `--dry-run` flag for testing on a copy of production data
+- Batch processing (1000 records per batch) with progress reporting
+- Idempotent: checks if Interaction records already exist for the same timestamp+token before inserting
+
+**Files affected (Phase 1)**:
+- `migration/sync.go` — new migration script with dry-run support
 - `internal/interaction/service.go` — add batch import method
+- `migration/sync_test.go` — tests for migration logic
 
 ### 3.5 APIKey Security Hardening
 
@@ -178,12 +190,20 @@ Phase 4 depends on Phase 1-2 (stable APIs + core features). Phase 5 depends on a
 - `CreateAPIKey`: generate plaintext key, return to user once, store bcrypt hash
 - `GetAPIKey`/`ListAPIKeys`: return only key prefix (first 8 chars + `...`)
 - `AuthenticateAPIKey`: bcrypt compare incoming key against stored hash
-- Migration: existing plaintext keys remain valid until next rotation; add `key_hash` column, backfill on first use
+
+**Migration Algorithm** (concrete):
+1. Add `key_hash` column to `tbl_api_keys` via XORM auto-migration (`internal/models/apikey.go`)
+2. On authentication, lookup APIKey by key prefix (first 8 chars):
+   - If `key_hash` is empty (legacy plaintext key): compare plaintext `key` field; if match, compute bcrypt hash, store in `key_hash`, clear `key` field (invalidate plaintext)
+   - If `key_hash` is non-empty: bcrypt compare incoming key against `key_hash`
+3. If no match by prefix, return 401 immediately (no full-table scan)
+4. Key rotation: user can voluntarily rotate via `POST /api/v2/apikeys/:id/rotate` — generates new key, returns plaintext once, stores new bcrypt hash
+5. Migration is complete when all rows have non-empty `key_hash`; a background job can be run to force-migrate remaining plaintext keys (optional)
 
 **Files affected**:
-- `internal/models/apikey.go` — add `KeyHash` field
-- `server/v2_api.go` — update `v2CreateAPIKey` and `v2ListAPIKeys` handlers
-- `internal/auth/middleware.go` — update API key authentication to use bcrypt
+- `internal/models/apikey.go` — add `KeyHash` field, update XORM tags
+- `server/v2_api.go` — update `v2CreateAPIKey`, `v2ListAPIKeys`, add `v2RotateAPIKey` handler
+- `internal/auth/middleware.go` — update API key authentication with migration logic
 
 ### 3.6 Phase 1 Acceptance Criteria
 
@@ -229,12 +249,12 @@ Phase 4 depends on Phase 1-2 (stable APIs + core features). Phase 5 depends on a
 - **Payload detail**: display Token, rendered payload, variables, status, related Interactions, copy button
 - **Payload preview**: wire to `v2PreviewPayload` API for real-time template variable rendering
 - **Payload revoke**: wire to `v2RevokePayload`, status changes to archived
-- **Payload interactions**: new API `GET /api/v2/payloads/:id/interactions` (currently missing)
+- **Payload interactions**: new API `GET /api/v2/payloads/:id/interactions` (currently missing — add to Phase 1 §3.3 backend API list)
 - **Remove E2E skip**: `e2e/payloads.spec.ts:44` — un-skip after detail page is functional
 
 **Files affected**:
 - `frontend-next/src/app/dashboard/payloads/[id]/page.tsx` — make functional
-- `server/v2_api.go` — add `GET /payloads/:id/interactions` endpoint
+- `server/v2_api.go` — add `GET /payloads/:id/interactions` endpoint (backend work, can be done in Phase 1)
 - `e2e/payloads.spec.ts` — remove `test.skip()`
 - `frontend-next/src/features/payloads/hooks/use-payloads.ts` — add preview/revoke mutations
 
@@ -282,16 +302,15 @@ Phase 4 depends on Phase 1-2 (stable APIs + core features). Phase 5 depends on a
 
 ### 4.6 Data Model Unification Landing
 
-Phase 1 designed dual-write sync; this phase lands it:
+Phase 1 (§3.4) designed the dual-write contract and wrote the migration script. This phase lands the actual dual-write in the DNS/HTTP handlers:
 
 - `server/dnsserver.go`: add Interaction table write in DNS handler
 - `server/webserver.go`: add Interaction table write in HTTP record handler
-- `migration/sync.go`: one-time migration script for historical data
+- Run `migration/sync.go` on a staging copy of production data, verify, then run on production
 
 **Files affected**:
 - `server/dnsserver.go` — add Interaction write
 - `server/webserver.go` — add Interaction write
-- `migration/sync.go` — new file
 
 ### 4.7 Phase 2 Acceptance Criteria
 
@@ -448,18 +467,26 @@ Phase 1 designed dual-write sync; this phase lands it:
 
 **Current state**: `internal/mcp/server.go` calls v2 API via HTTP but does not implement MCP protocol.
 
-**Changes** (per requirement doc Q4: Streamable HTTP protocol):
-- **MCP Streamable HTTP transport**: implement `POST /mcp` endpoint, support `initialize`, `tools/list`, `tools/call`, `notifications/initialized` MCP methods
-- **Session management**: MCP session ID generation, state tracking, timeout cleanup
-- **Tool registration**: register existing 7 tools (createCase, createPayload, listInteractions, waitForInteraction, summarizeEvidence, exportReport, createOastProbe) as MCP tools
-- **Permission gating**: maintain existing APIKey scope check and risk tolerance logic
-- **Audit logging**: all MCP tool calls recorded
+**Decomposed into 3 deliverables** (per review §3.10):
 
-**Files affected**:
-- `internal/mcp/server.go` — implement MCP protocol
-- `internal/mcp/transport.go` — new Streamable HTTP transport
-- `internal/mcp/session.go` — new session management
-- `cmd/mcp-server/main.go` — update to use new transport
+**Deliverable 6.1a — Transport Layer**:
+- Implement `POST /mcp` endpoint with Streamable HTTP transport
+- Support MCP methods: `initialize`, `notifications/initialized`
+- JSON-RPC 2.0 request/response handling
+- Files: `internal/mcp/transport.go` (new), `internal/mcp/transport_test.go`
+
+**Deliverable 6.1b — Session Layer**:
+- MCP session ID generation (UUID), state tracking, timeout cleanup (30min idle)
+- Session store (in-memory for MVP, Redis for HA in Phase 5)
+- Files: `internal/mcp/session.go` (new), `internal/mcp/session_test.go`
+
+**Deliverable 6.1c — Tool Registration & Permission Gating**:
+- Register existing 7 tools (createCase, createPayload, listInteractions, waitForInteraction, summarizeEvidence, exportReport, createOastProbe) as MCP tools via `tools/list` and `tools/call`
+- Maintain existing APIKey scope check and risk tolerance logic
+- Audit logging: all MCP tool calls recorded
+- Files: `internal/mcp/server.go` — refactor to use new transport/session, `cmd/mcp-server/main.go`
+
+**Note**: If Phase 4 runs long, Deliverable 6.1c can be deferred to early Phase 5 without blocking other Phase 4 work.
 
 ### 6.2 Workflow Action Executor Completion
 
@@ -538,6 +565,10 @@ Phase 1 implemented basic action executors; this phase completes them:
 ## 7. Phase 5: Platform — Enterprise-Grade
 
 **Goal**: Enterprise-level long-term monitoring, multi-protocol support, and production-grade deployment.
+
+**Split into two sub-phases** (per review §3.5): Phase 5a (multi-protocol + security) and Phase 5b (HA + marketplace). This reflects the high risk and security review requirements of real protocol listeners.
+
+### Phase 5a: Multi-Protocol Listeners & Security (3-4 weeks)
 
 ### 7.1 Multi-Protocol Listeners
 
@@ -630,14 +661,22 @@ Phase 1 implemented basic action executors; this phase completes them:
 - `internal/marketplace/service.go` — complete marketplace logic
 - `frontend-next/src/app/dashboard/marketplace/page.tsx` — make functional
 
-### 7.7 Phase 5 Acceptance Criteria
+### Phase 5a Acceptance Criteria
 
 - [ ] SMTP/LDAP/SMB/FTP listeners actually listen and record interactions
 - [ ] Canary tokens detect access and trigger alerts
 - [ ] Rebinding Lab visual configuration works
 - [ ] Data retention auto-cleanup works
+- [ ] Security review passed for all protocol listeners
+- [ ] All tests pass
+
+### Phase 5b: HA, Deployment & Marketplace (2-3 weeks)
+
+### 7.7 Phase 5b Acceptance Criteria
+
 - [ ] Multi-instance deployment with Redis cache works
 - [ ] Marketplace browse/search/install works
+- [ ] Docker Compose/K8s deployment templates validated
 - [ ] All tests pass
 
 ---
@@ -650,9 +689,10 @@ Phase 1 implemented basic action executors; this phase completes them:
 | **Phase 2** | Core Loop Completion — MVP feature gap filling | 3-4 weeks | Phase 1 |
 | **Phase 3** | Frontend Production — Deep overhaul | 2-3 weeks | Phase 2 |
 | **Phase 4** | Agent & Scanner Integration — Advanced capabilities | 3-4 weeks | Phase 1-2 |
-| **Phase 5** | Platform — Enterprise-grade | 4-6 weeks | Phase 1-4 |
+| **Phase 5a** | Multi-Protocol Listeners & Security | 3-4 weeks | Phase 1-4 |
+| **Phase 5b** | HA, Deployment & Marketplace | 2-3 weeks | Phase 5a |
 
-**Total estimated effort**: 14-20 weeks
+**Total estimated effort**: 16-23 weeks
 
 ---
 
@@ -660,15 +700,81 @@ Phase 1 implemented basic action executors; this phase completes them:
 
 | Risk | Probability | Impact | Mitigation |
 |------|-------------|--------|------------|
-| Data model unification breaks existing 1.0 data | Medium | High | Dual-write approach, migration script tested on copy first |
-| MCP protocol implementation complexity | Medium | Medium | Start with Streamable HTTP (simplest MCP transport), iterate |
-| Frontend overhaul introduces regressions | High | Medium | E2E tests as safety net, incremental migration |
-| Multi-protocol listener security exposure | Medium | High | Default disabled, explicit config required, security audit |
-| Scope creep during implementation | High | High | Strict phase boundaries, no new scope mid-phase |
+| Data model unification breaks existing 1.0 data | Medium | High | Dual-write approach, migration script tested on copy of production data first; dry-run mode |
+| MCP protocol implementation complexity | High | Medium | Decomposed into 3 deliverables (transport/session/tools); start with Streamable HTTP; 6.1c can defer to Phase 5 if needed |
+| Frontend overhaul introduces regressions | High | Medium | E2E tests as safety net; **incremental feature-by-feature migration**, not big-bang rewrite |
+| Multi-protocol listener security exposure | Medium | High | Default disabled, explicit config required, security audit; **all listeners run in sandboxed process or network namespace by default** |
+| Scope creep during implementation | High | High | **Change control: no new endpoints or features mid-phase without updating this spec and acceptance criteria** |
 
 ---
 
-## 10. References
+## 10. 1.0 to 2.0 Upgrade Path
+
+Existing 1.0 deployments need a clear migration path:
+
+### 10.1 Database Schema Migration
+- XORM auto-migration handles additive schema changes (new columns, new tables)
+- `migration/sync.go` (Phase 1) handles historical data import from `TblDns`/`TblHttp` to `Interaction` table
+- Run `migration/sync.go --dry-run` on a copy of production data first, verify row counts, then run on production with `--batch-size=1000`
+
+### 10.2 API Consumer Migration
+- V1 API (`/api/v1/*`, `/auth`, `/data`, `/setting`, `/admin`, `/payload`) remains available and functional throughout 2.0
+- V2 API (`/api/v2/*`) runs in parallel; no v1 endpoint is removed until 2.0 is stable
+- Deprecation timeline: v1 API marked deprecated in 2.0 release, removed in 2.1 release
+- V1 API consumers can migrate at their own pace; no forced cutover
+
+### 10.3 Frontend Migration
+- 1.0 frontend (`frontend/`) is directly deprecated per requirement doc Q3 conclusion
+- 2.0 frontend (`frontend-next/`) is the only supported UI from 2.0 release
+- User management, documentation, and API features from 1.0 are available in v2 API and 2.0 frontend
+
+### 10.4 DNS/HTTP Dual-Write Transition
+1. **Phase 1**: Migration script written and tested on staging
+2. **Phase 2**: Dual-write enabled in DNS/HTTP handlers — both `TblDns`/`TblHttp` and `Interaction` table written simultaneously
+3. **Post-Phase 2**: Verify Interaction table has complete data, run migration script for historical data
+4. **Phase 3+**: V2 API queries Interaction table exclusively; v1 API continues querying old tables for backward compatibility
+5. **2.1 release**: Stop dual-write, deprecate old tables
+
+---
+
+## 11. Testing Strategy
+
+### 11.1 Backend Testing
+- **Unit tests**: all new Go functions must have unit tests in `*_test.go` files
+- **Integration tests**: all new API endpoints must have integration tests in `server/v2_api_test.go`
+- **Coverage target**: > 60% for core business logic (per `doc/2.0-Requirement.md` §6.4)
+- **Run command**: `go test ./... -count=1`
+- **Verification log**: record commands and results in `docs/verification.md`
+
+### 11.2 Frontend Testing
+- **E2E tests**: all new or significantly modified pages must have Playwright E2E tests
+- **Component tests**: new reusable components (DataTable, ErrorBoundary, LoadingSkeleton) should have component tests
+- **Run command**: `cd frontend-next && npx playwright test --reporter=line`
+- **No blocking report server**: use one-shot non-interactive commands only (per AGENTS.md windsurf convention)
+
+### 11.3 Acceptance Testing
+- Each Phase has explicit acceptance criteria (checkboxes in spec)
+- All acceptance criteria must be verified before Phase is marked complete
+- Verification commands and results recorded in `docs/verification.md`
+
+---
+
+## 12. Decisions Table
+
+| Decision | Rationale | Reference |
+|----------|-----------|-----------|
+| Bottom-up phasing (backend first) | Building frontend on fake APIs is wasted effort | This spec §2 |
+| Dual-write for data model unification | Compatibility with 1.0, gradual migration | `doc/2.0-Requirement.md` Q3 |
+| SMTP notification not implemented | SMTP is for email user sniffening, not notifications | `doc/2.0-Requirement.md` Q2 |
+| MCP Streamable HTTP protocol | Per user decision | `doc/2.0-Requirement.md` Q4 |
+| Rebinding telemetry on by default | Anti-abuse measure | `doc/2.0-Requirement.md` Q6 |
+| 1.0 frontend directly deprecated | Per user decision, data migration tool provided | `doc/2.0-Requirement.md` Q3 |
+| APIKey bcrypt hash storage | Security requirement | `doc/2.0-Requirement.md` §6.2 |
+| Phase 5 split into 5a/5b | Protocol listeners are high-risk, need security review | Review §3.5 |
+
+---
+
+## 13. References
 
 - `doc/2.0-Requirement.md` — Product requirements and Q1-Q7 decisions
 - `doc/2.0-frontend-implementation-gap.md` — Frontend gap analysis
