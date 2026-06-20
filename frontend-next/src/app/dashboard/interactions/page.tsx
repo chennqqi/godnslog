@@ -133,16 +133,16 @@ function InteractionsPageContent() {
   }, {} as Record<string, Interaction[]>)
 
   if (loading) {
-    return <div className="text-center py-12">加载中...</div>
+    return <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading...</div>
   }
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Interaction Timeline</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Interaction Timeline</h2>
           {caseId && (
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Case scoped: {caseId}
               <Button
                 variant="ghost"
@@ -155,7 +155,7 @@ function InteractionsPageContent() {
             </p>
           )}
           {payloadId && (
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Payload scoped: {payloadId}
               <Button
                 variant="ghost"
@@ -168,7 +168,7 @@ function InteractionsPageContent() {
             </p>
           )}
           {!caseId && !payloadId && (
-            <p className="text-sm text-gray-500 mt-1">All Interactions</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">All Interactions</p>
           )}
         </div>
         <div className="flex space-x-2">
@@ -177,7 +177,7 @@ function InteractionsPageContent() {
             size="sm"
             onClick={() => setAutoRefresh(!autoRefresh)}
           >
-            {autoRefresh ? "自动刷新: 开" : "自动刷新: 关"}
+            {autoRefresh ? "Auto-refresh: ON" : "Auto-refresh: OFF"}
           </Button>
           {autoRefresh && (
             <Select value={refreshInterval.toString()} onValueChange={(v) => setRefreshInterval(parseInt(v))}>
@@ -185,19 +185,19 @@ function InteractionsPageContent() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="3000">3秒</SelectItem>
-                <SelectItem value="5000">5秒</SelectItem>
-                <SelectItem value="10000">10秒</SelectItem>
-                <SelectItem value="30000">30秒</SelectItem>
+                <SelectItem value="3000">3s</SelectItem>
+                <SelectItem value="5000">5s</SelectItem>
+                <SelectItem value="10000">10s</SelectItem>
+                <SelectItem value="30000">30s</SelectItem>
               </SelectContent>
             </Select>
           )}
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="所有类型" />
+              <SelectValue placeholder="All types" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={TYPE_FILTER_ALL}>所有类型</SelectItem>
+              <SelectItem value={TYPE_FILTER_ALL}>All types</SelectItem>
               <SelectItem value="dns">DNS</SelectItem>
               <SelectItem value="http">HTTP</SelectItem>
               <SelectItem value="smtp">SMTP</SelectItem>
@@ -208,7 +208,7 @@ function InteractionsPageContent() {
           </Select>
           <Input
             type="text"
-            placeholder="搜索 IP、域名或token..."
+            placeholder="Search IP, domain or token..."
             className="w-64"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
@@ -216,7 +216,7 @@ function InteractionsPageContent() {
           <Button
             onClick={() => setViewMode(viewMode === 'table' ? 'timeline' : 'table')}
           >
-            {viewMode === 'table' ? '时间线视图' : '表格视图'}
+            {viewMode === 'table' ? 'Timeline View' : 'Table View'}
           </Button>
         </div>
       </div>
@@ -224,29 +224,29 @@ function InteractionsPageContent() {
       {/* Stats Card */}
       <Card className="mb-4">
         <CardHeader>
-          <CardTitle>统计信息</CardTitle>
+          <CardTitle>Statistics</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-5 gap-4">
             <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-              <p className="text-sm text-gray-500">总数</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.total}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Total</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-purple-600">{stats.dns_count}</p>
-              <p className="text-sm text-gray-500">DNS</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">DNS</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-blue-600">{stats.http_count}</p>
-              <p className="text-sm text-gray-500">HTTP</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">HTTP</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-green-600">{stats.smtp_count}</p>
-              <p className="text-sm text-gray-500">SMTP</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">SMTP</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-yellow-600">{stats.ldap_count}</p>
-              <p className="text-sm text-gray-500">LDAP</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">LDAP</p>
             </div>
           </div>
         </CardContent>
@@ -254,22 +254,22 @@ function InteractionsPageContent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>交互记录</CardTitle>
+          <CardTitle>Interactions</CardTitle>
         </CardHeader>
         <CardContent>
           {filteredInteractions.length === 0 ? (
-            <p className="text-gray-500">
-              {caseId || payloadId ? '当前 Case/Payload 暂无交互' : '暂无命中记录'}
+            <p className="text-gray-500 dark:text-gray-400">
+              {caseId || payloadId ? 'No interactions for this Case/Payload' : 'No interactions yet'}
             </p>
           ) : viewMode === 'table' ? (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>类型</TableHead>
-                  <TableHead>来源IP</TableHead>
-                  <TableHead>详情</TableHead>
-                  <TableHead>时间</TableHead>
-                  <TableHead>操作</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Source IP</TableHead>
+                  <TableHead>Details</TableHead>
+                  <TableHead>Time</TableHead>
+                  <TableHead>Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -290,7 +290,7 @@ function InteractionsPageContent() {
                     </TableCell>
                     <TableCell>{interaction.source_ip}</TableCell>
                     <TableCell>
-                      {interaction.domain && <div>域名: {interaction.domain}</div>}
+                      {interaction.domain && <div>Domain: {interaction.domain}</div>}
                       {interaction.method && interaction.path && (
                         <div>{interaction.method} {interaction.path}</div>
                       )}
@@ -308,7 +308,7 @@ function InteractionsPageContent() {
                         size="sm"
                         onClick={() => setSelectedInteraction(interaction)}
                       >
-                        详情
+                        Details
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -319,7 +319,7 @@ function InteractionsPageContent() {
             <div className="space-y-6">
               {Object.entries(groupedByTime).map(([date, dayInteractions]) => (
                 <div key={date}>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">{date}</h3>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-3">{date}</h3>
                   <div className="border-l-2 border-indigo-200 pl-4 space-y-4">
                     {dayInteractions.map((interaction) => (
                       <div
@@ -328,7 +328,7 @@ function InteractionsPageContent() {
                       >
                         <div className="absolute -left-6 mt-1 w-4 h-4 bg-indigo-600 rounded-full"></div>
                         <div
-                          className="bg-gray-50 p-4 rounded cursor-pointer hover:bg-gray-100"
+                          className="bg-gray-50 dark:bg-gray-900 p-4 rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                           onClick={() => setSelectedInteraction(interaction)}
                         >
                           <div className="flex justify-between items-start">
@@ -344,17 +344,17 @@ function InteractionsPageContent() {
                               }>
                                 {interaction.type.toUpperCase()}
                               </Badge>
-                              <span className="ml-2 text-sm text-gray-600">{interaction.source_ip}</span>
+                              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">{interaction.source_ip}</span>
                             </div>
                             <span className="text-xs text-gray-400">
                               {new Date(interaction.timestamp).toLocaleTimeString()}
                             </span>
                           </div>
                           {interaction.domain && (
-                            <p className="text-sm text-gray-500 mt-2">域名: {interaction.domain}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Domain: {interaction.domain}</p>
                           )}
                           {interaction.token && (
-                            <p className="text-sm text-gray-500">Token: {interaction.token}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Token: {interaction.token}</p>
                           )}
                         </div>
                       </div>
@@ -378,22 +378,22 @@ function InteractionsPageContent() {
               {/* Basic Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm font-medium text-gray-500">类型</p>
-                  <p className="text-gray-900">{selectedInteraction.type.toUpperCase()}</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Type</p>
+                  <p className="text-gray-900 dark:text-gray-100">{selectedInteraction.type.toUpperCase()}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-500">时间戳</p>
-                  <p className="text-gray-900">{new Date(selectedInteraction.timestamp).toLocaleString()}</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Timestamp</p>
+                  <p className="text-gray-900 dark:text-gray-100">{new Date(selectedInteraction.timestamp).toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-500">来源 IP</p>
-                  <p className="text-gray-900">{selectedInteraction.source_ip}</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Source IP</p>
+                  <p className="text-gray-900 dark:text-gray-100">{selectedInteraction.source_ip}</p>
                 </div>
                 {selectedInteraction.token && (
                   <div>
-                    <p className="text-sm font-medium text-gray-500">Token</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Token</p>
                     <div className="flex items-center gap-2">
-                      <p className="text-gray-900 break-all">{selectedInteraction.token}</p>
+                      <p className="text-gray-900 dark:text-gray-100 break-all">{selectedInteraction.token}</p>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -409,11 +409,11 @@ function InteractionsPageContent() {
               {/* Attribution Info */}
               {(selectedInteraction.case_id || selectedInteraction.payload_id) && (
                 <div className="border-t pt-4">
-                  <p className="text-sm font-medium text-gray-900 mb-2">归因信息</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Attribution</p>
                   <div className="space-y-2">
                     {selectedInteraction.case_id && (
                       <div className="flex items-center justify-between">
-                        <p className="text-sm text-gray-600">Case ID: {selectedInteraction.case_id}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Case ID: {selectedInteraction.case_id}</p>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -425,7 +425,7 @@ function InteractionsPageContent() {
                     )}
                     {selectedInteraction.payload_id && (
                       <div className="flex items-center justify-between">
-                        <p className="text-sm text-gray-600">Payload ID: {selectedInteraction.payload_id}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Payload ID: {selectedInteraction.payload_id}</p>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -441,12 +441,12 @@ function InteractionsPageContent() {
 
               {/* Protocol Details */}
               <div className="border-t pt-4">
-                <p className="text-sm font-medium text-gray-900 mb-2">协议细节</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Protocol Details</p>
                 {selectedInteraction.domain && (
                   <div className="mb-2">
-                    <p className="text-sm font-medium text-gray-500">域名</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Domain</p>
                     <div className="flex items-center gap-2">
-                      <p className="text-gray-900">{selectedInteraction.domain}</p>
+                      <p className="text-gray-900 dark:text-gray-100">{selectedInteraction.domain}</p>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -459,15 +459,15 @@ function InteractionsPageContent() {
                 )}
                 {selectedInteraction.method && (
                   <div className="mb-2">
-                    <p className="text-sm font-medium text-gray-500">方法</p>
-                    <p className="text-gray-900">{selectedInteraction.method}</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Method</p>
+                    <p className="text-gray-900 dark:text-gray-100">{selectedInteraction.method}</p>
                   </div>
                 )}
                 {selectedInteraction.path && (
                   <div className="mb-2">
-                    <p className="text-sm font-medium text-gray-500">路径</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Path</p>
                     <div className="flex items-center gap-2">
-                      <p className="text-gray-900 break-all">{selectedInteraction.path}</p>
+                      <p className="text-gray-900 dark:text-gray-100 break-all">{selectedInteraction.path}</p>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -480,27 +480,27 @@ function InteractionsPageContent() {
                 )}
                 {selectedInteraction.user_agent && (
                   <div className="mb-2">
-                    <p className="text-sm font-medium text-gray-500">User Agent</p>
-                    <p className="text-gray-900 break-all text-sm">{selectedInteraction.user_agent}</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">User Agent</p>
+                    <p className="text-gray-900 dark:text-gray-100 break-all text-sm">{selectedInteraction.user_agent}</p>
                   </div>
                 )}
                 {selectedInteraction.headers && (
                   <div className="mb-2">
-                    <p className="text-sm font-medium text-gray-500">Headers</p>
-                    <pre className="text-gray-900 bg-gray-50 p-2 rounded text-xs overflow-auto max-h-40">{JSON.stringify(selectedInteraction.headers, null, 2)}</pre>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Headers</p>
+                    <pre className="text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 p-2 rounded text-xs overflow-auto max-h-40">{JSON.stringify(selectedInteraction.headers, null, 2)}</pre>
                   </div>
                 )}
                 {selectedInteraction.body && (
                   <div className="mb-2">
-                    <p className="text-sm font-medium text-gray-500">Body</p>
-                    <pre className="text-gray-900 bg-gray-50 p-2 rounded text-xs overflow-auto max-h-40">{selectedInteraction.body}</pre>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Body</p>
+                    <pre className="text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 p-2 rounded text-xs overflow-auto max-h-40">{selectedInteraction.body}</pre>
                   </div>
                 )}
               </div>
 
               {/* Quick Actions */}
               <div className="border-t pt-4">
-                <p className="text-sm font-medium text-gray-900 mb-2">快捷动作</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Quick Actions</p>
                 <div className="flex flex-wrap gap-2">
                   {selectedInteraction.case_id && (
                     <Button
@@ -532,7 +532,7 @@ function InteractionsPageContent() {
 
 export default function InteractionsPage() {
   return (
-    <Suspense fallback={<div className="text-center py-12">加载中...</div>}>
+    <Suspense fallback={<div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading...</div>}>
       <InteractionsPageContent />
     </Suspense>
   )
