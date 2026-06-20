@@ -23,6 +23,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { caseSchema, type CaseFormValues } from '@/features/cases/schemas/case-schema'
 
 /** Sentinel for Radix Select: empty string is reserved for clearing selection */
 const STATUS_FILTER_ALL = 'all'
@@ -34,11 +37,16 @@ export default function CasesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState(STATUS_FILTER_ALL)
-  const [newCase, setNewCase] = useState<CaseCreateRequest>({
-    title: '',
-    description: '',
-    target: '',
-    tags: [],
+
+  const form = useForm<CaseFormValues>({
+    resolver: zodResolver(caseSchema),
+    defaultValues: {
+      title: '',
+      description: '',
+      target: '',
+      status: 'active',
+      tags: [],
+    },
   })
 
   const loadCases = useCallback(async () => {
@@ -80,13 +88,12 @@ export default function CasesPage() {
     setStatusFilter(value)
   }
 
-  const handleCreateCase = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleCreateCase = async (values: CaseFormValues) => {
     try {
-      const response = await caseApi.create(newCase)
+      const response = await caseApi.create(values as CaseCreateRequest)
       if (response.code === 0 && response.data) {
         setShowCreateModal(false)
-        setNewCase({ title: '', description: '', target: '', tags: [] })
+        form.reset()
         loadCases()
       }
     } catch (error) {
@@ -181,28 +188,31 @@ export default function CasesPage() {
       </div>
 
       {/* Create Modal */}
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+      <Dialog open={showCreateModal} onOpenChange={(open) => {
+        setShowCreateModal(open)
+        if (!open) form.reset()
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New Case</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleCreateCase}>
+          <form onSubmit={form.handleSubmit(handleCreateCase)}>
             <div className="mb-4">
               <Label htmlFor="title">Title</Label>
               <Input
                 id="title"
-                required
-                value={newCase.title}
-                onChange={(e) => setNewCase({ ...newCase, title: e.target.value })}
+                {...form.register('title')}
               />
+              {form.formState.errors.title && (
+                <p className="text-xs text-red-500 mt-1">{form.formState.errors.title.message}</p>
+              )}
             </div>
             <div className="mb-4">
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
                 rows={3}
-                value={newCase.description}
-                onChange={(e) => setNewCase({ ...newCase, description: e.target.value })}
+                {...form.register('description')}
               />
             </div>
             <div className="mb-4">
@@ -210,8 +220,7 @@ export default function CasesPage() {
               <Input
                 id="target"
                 placeholder="e.g. internal-api.corp.com"
-                value={newCase.target}
-                onChange={(e) => setNewCase({ ...newCase, target: e.target.value })}
+                {...form.register('target')}
               />
             </div>
             <DialogFooter>
