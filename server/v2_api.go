@@ -70,9 +70,10 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		interactions := v2.Group("/interactions", self.authHandler)
 		{
 			interactions.GET("", self.v2ListInteractions)
-			// Register /stats and /timeline before /:id so paths like /interactions/stats are not captured as ids.
+			// Register /stats, /timeline, /stream before /:id so paths are not captured as ids.
 			interactions.GET("/stats", self.v2InteractionStats)
 			interactions.GET("/timeline", self.v2InteractionTimeline)
+			interactions.GET("/stream", self.v2InteractionStream)
 			interactions.POST("/delete", self.v2DeleteInteractions)
 			interactions.POST("/export", self.v2ExportInteractions)
 			interactions.GET("/:id", self.v2GetInteraction)
@@ -2150,6 +2151,99 @@ func getIntervalKey(t time.Time, interval string) string {
 		return t.Format("2006-01")
 	default:
 		return t.Format("2006-01-02 15:04")
+	}
+}
+
+// v2InteractionStream streams new interactions via Server-Sent Events (SSE).
+// Query params:
+//   - case_id: filter by case
+//   - payload_id: filter by payload
+//   - type: filter by interaction type
+//
+// The client sends a "since" query param (RFC3339 timestamp) to get interactions newer than that time.
+// The server polls the database every 2 seconds and sends any new interactions as SSE "interaction" events.
+// A "heartbeat" event is sent every 30 seconds to keep the connection alive.
+func (self *WebServer) v2InteractionStream(c *gin.Context) {
+	caseId := c.Query("case_id")
+	payloadId := c.Query("payload_id")
+	interactionType := c.Query("type")
+
+	// Parse "since" timestamp; default to now
+	sinceStr := c.Query("since")
+	var since time.Time
+	if sinceStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, sinceStr); err == nil {
+			since = parsed
+		} else {
+			since = time.Now()
+		}
+	} else {
+		since = time.Now()
+	}
+
+	// Set SSE headers
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "streaming not supported"})
+		return
+	}
+
+	// Send initial connected event
+	fmt.Fprintf(c.Writer, "event: connected\ndata: {\"since\":\"%s\"}\n\n", since.Format(time.RFC3339))
+	flusher.Flush()
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	heartbeatTicker := time.NewTicker(30 * time.Second)
+	defer heartbeatTicker.Stop()
+
+	ctx := c.Request.Context()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-heartbeatTicker.C:
+			fmt.Fprintf(c.Writer, "event: heartbeat\ndata: {\"time\":\"%s\"}\n\n", time.Now().Format(time.RFC3339))
+			flusher.Flush()
+		case <-ticker.C:
+			// Query for new interactions since last check
+			session := self.orm.NewSession()
+			if caseId != "" {
+				session = session.Where("case_id = ?", caseId)
+			}
+			if payloadId != "" {
+				session = session.Where("payload_id = ?", payloadId)
+			}
+			if interactionType != "" {
+				session = session.Where("type = ?", interactionType)
+			}
+
+			var newInteractions []v2models.Interaction
+			err := session.Where("timestamp > ?", since).OrderBy("timestamp ASC").Limit(100, 0).Find(&newInteractions)
+			session.Close()
+
+			if err != nil {
+				logrus.Errorf("[v2_api.go::v2InteractionStream] query error: %v", err)
+				continue
+			}
+
+			for _, interaction := range newInteractions {
+				data, err := json.Marshal(interaction)
+				if err != nil {
+					continue
+				}
+				fmt.Fprintf(c.Writer, "event: interaction\ndata: %s\n\n", data)
+				flusher.Flush()
+				since = interaction.Timestamp
+			}
+		}
 	}
 }
 

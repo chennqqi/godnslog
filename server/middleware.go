@@ -20,6 +20,10 @@ func (s *WebServer) authenticateJWT(c *gin.Context) (*models.TblUser, error) {
 			tokenString = authHeader[7:]
 		}
 	}
+	// Fallback: try query parameter "token" (needed for SSE/EventSource which cannot set headers)
+	if tokenString == "" {
+		tokenString = c.Query("token")
+	}
 	if tokenString == "" {
 		return nil, nil
 	}

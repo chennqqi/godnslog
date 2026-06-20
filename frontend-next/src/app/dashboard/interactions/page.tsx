@@ -23,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useInteractionStream } from '@/features/interactions/hooks/use-interaction-stream'
 
 /** Radix SelectItem cannot use value="" for "all types" */
 const TYPE_FILTER_ALL = 'all'
@@ -38,7 +39,7 @@ function InteractionsPageContent() {
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null)
   const [stats, setStats] = useState({ total: 0, dns_count: 0, http_count: 0, smtp_count: 0, ldap_count: 0 })
   const [autoRefresh, setAutoRefresh] = useState(false)
-  const [refreshInterval, setRefreshInterval] = useState(5000)
+  const [liveCount, setLiveCount] = useState(0)
 
   // Get scope from URL
   const caseId = searchParams.get('case_id')
@@ -98,17 +99,24 @@ function InteractionsPageContent() {
     loadStats()
   }, [router, caseId, payloadId, loadInteractions, loadStats])
 
-  // Auto-refresh polling
-  useEffect(() => {
-    if (!autoRefresh) return
+  // SSE real-time stream
+  const handleNewInteraction = useCallback((interaction: Interaction) => {
+    setInteractions((prev) => {
+      // Avoid duplicates
+      if (prev.some((i) => i.id === interaction.id)) return prev
+      return [interaction, ...prev].slice(0, 200)
+    })
+    setLiveCount((c) => c + 1)
+    // Refresh stats in background
+    loadStats()
+  }, [loadStats])
 
-    const interval = setInterval(() => {
-      loadInteractions()
-      loadStats()
-    }, refreshInterval)
-
-    return () => clearInterval(interval)
-  }, [autoRefresh, refreshInterval, loadInteractions, loadStats])
+  const { connected: sseConnected, error: sseError } = useInteractionStream({
+    caseId: caseId || undefined,
+    payloadId: payloadId || undefined,
+    enabled: autoRefresh,
+    onInteraction: handleNewInteraction,
+  })
 
   const clearScope = () => {
     router.push('/dashboard/interactions')
@@ -175,22 +183,18 @@ function InteractionsPageContent() {
           <Button
             variant={autoRefresh ? "default" : "outline"}
             size="sm"
-            onClick={() => setAutoRefresh(!autoRefresh)}
+            onClick={() => {
+              setAutoRefresh(!autoRefresh)
+              if (!autoRefresh) setLiveCount(0)
+            }}
           >
-            {autoRefresh ? "Auto-refresh: ON" : "Auto-refresh: OFF"}
+            {autoRefresh ? (sseConnected ? "● Live" : "● Connecting..." ) : "Live Stream: OFF"}
           </Button>
-          {autoRefresh && (
-            <Select value={refreshInterval.toString()} onValueChange={(v) => setRefreshInterval(parseInt(v))}>
-              <SelectTrigger className="w-[120px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="3000">3s</SelectItem>
-                <SelectItem value="5000">5s</SelectItem>
-                <SelectItem value="10000">10s</SelectItem>
-                <SelectItem value="30000">30s</SelectItem>
-              </SelectContent>
-            </Select>
+          {autoRefresh && sseError && (
+            <span className="text-xs text-amber-500">{sseError}</span>
+          )}
+          {autoRefresh && liveCount > 0 && (
+            <span className="text-xs text-green-500">{liveCount} new</span>
           )}
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-[180px]">
