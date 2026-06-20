@@ -6,6 +6,6 @@ export default defineConfig([
   ...nextCoreWebVitals,
   ...nextTypescript,
   {
-    ignores: ['.next/**', 'out/**', 'build/**', 'next-env.d.ts'],
+    ignores: ['.next/**', 'out/**', 'build/**', 'dist/**', 'next-env.d.ts'],
   },
 ])

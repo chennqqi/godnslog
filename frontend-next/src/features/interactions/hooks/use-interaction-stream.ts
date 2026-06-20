@@ -34,11 +34,17 @@ export function useInteractionStream({
   const eventSourceRef = useRef<EventSource | null>(null)
   const reconnectRef = useRef(0)
   const onInteractionRef = useRef(onInteraction)
+  const enabledRef = useRef(enabled)
+  const connectRef = useRef<() => void>(() => {})
 
   // Keep latest callback without re-creating EventSource
   useEffect(() => {
     onInteractionRef.current = onInteraction
   }, [onInteraction])
+
+  useEffect(() => {
+    enabledRef.current = enabled
+  }, [enabled])
 
   const connect = useCallback(() => {
     if (typeof window === 'undefined') return
@@ -96,10 +102,14 @@ export function useInteractionStream({
       reconnectRef.current++
       setError(`Connection lost, reconnecting in ${delay / 1000}s...`)
       setTimeout(() => {
-        if (enabled) connect()
+        if (enabledRef.current) connectRef.current()
       }, delay)
     }
   }, [caseId, payloadId, type, enabled])
+
+  useEffect(() => {
+    connectRef.current = connect
+  }, [connect])
 
   useEffect(() => {
     if (!enabled) {
@@ -107,14 +117,16 @@ export function useInteractionStream({
         eventSourceRef.current.close()
         eventSourceRef.current = null
       }
-      setConnected(false)
-      setError(null)
-      return
+      const timer = setTimeout(() => {
+        setConnected(false)
+        setError(null)
+      }, 0)
+      return () => clearTimeout(timer)
     }
 
-    connect()
-
+    const timer = setTimeout(() => connect(), 0)
     return () => {
+      clearTimeout(timer)
       if (eventSourceRef.current) {
         eventSourceRef.current.close()
         eventSourceRef.current = null

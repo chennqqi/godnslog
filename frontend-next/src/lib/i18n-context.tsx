@@ -195,7 +195,8 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('language') as Language
       if (saved === 'en-US' || saved === 'zh-CN') {
-        setLangState(saved)
+        const timer = setTimeout(() => setLangState(saved), 0)
+        return () => clearTimeout(timer)
       }
     }
   }, [])

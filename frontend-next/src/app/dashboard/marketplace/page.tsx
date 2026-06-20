@@ -39,10 +39,6 @@ export default function MarketplacePage() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadData()
-  }, [activeTab])
-
   const loadData = async () => {
     setLoading(true)
     try {
@@ -63,6 +59,11 @@ export default function MarketplacePage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    const timer = setTimeout(() => loadData(), 0)
+    return () => clearTimeout(timer)
+  }, [activeTab])
 
   const installPlugin = async (pluginId: string) => {
     try {

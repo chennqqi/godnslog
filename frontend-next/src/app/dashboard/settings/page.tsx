@@ -256,7 +256,7 @@ function NotificationSettings() {
     { id: 'payload_expire', name: 'Payload Expired', enabled: false, webhook_url: '', webhook_body: '{"event":"payload_expire","token":"{{token}}","timestamp":"{{timestamp}}"}' },
   ])
 
-  const updateNotification = (id: string, field: string, value: any) => {
+  const updateNotification = (id: string, field: string, value: unknown) => {
     setNotifications(notifications.map(n => n.id === id ? { ...n, [field]: value } : n))
   }
 

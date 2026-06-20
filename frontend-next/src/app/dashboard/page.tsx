@@ -125,7 +125,7 @@ export default function DashboardPage() {
   const httpCount = stats?.http_count ?? 0
   const smtpCount = stats?.smtp_count ?? 0
   const totalInteractions = stats?.total ?? 0
-  const activeCases = cases.filter((c: any) => c.status === 'active').length
+  const activeCases = cases.filter((c) => c.status === 'active').length
   const totalHitsToday = stats?.today ?? stats?.total ?? 0
   const activePayloads = payloadsResp?.data?.total || 0
   const systemOk = true

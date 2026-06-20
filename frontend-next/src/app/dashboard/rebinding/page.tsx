@@ -3,6 +3,14 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+interface RebindingStage {
+  id: number
+  name: string
+  target_ip: string
+  ttl: number
+  condition: string
+}
+
 export default function RebindingLabPage() {
   const router = useRouter()
 
@@ -12,11 +20,11 @@ export default function RebindingLabPage() {
       router.push('/login')
     }
   }, [router])
-  const [stages, setStages] = useState<any[]>([
+  const [stages, setStages] = useState<RebindingStage[]>([
     { id: 1, name: '首次解析', target_ip: '127.0.0.1', ttl: 10, condition: 'first_visit' },
     { id: 2, name: '后续解析', target_ip: '192.168.1.1', ttl: 60, condition: 'always' },
   ])
-  const [selectedStage, setSelectedStage] = useState<any | null>(null)
+  const [selectedStage, setSelectedStage] = useState<RebindingStage | null>(null)
 
   const scenarios = [
     { id: 'browser', name: '浏览器 DNS Rebinding', description: '利用浏览器DNS缓存绕过同源策略' },

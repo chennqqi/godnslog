@@ -23,7 +23,9 @@ export default function DashboardLayout({
       router.replace('/login')
       return
     }
-    setAuthChecked(true)
+    // Defer state update to avoid cascading renders
+    const timer = setTimeout(() => setAuthChecked(true), 0)
+    return () => clearTimeout(timer)
   }, [router, token])
 
   if (!authChecked) {

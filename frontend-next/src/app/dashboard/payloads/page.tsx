@@ -44,15 +44,6 @@ export default function PayloadsPage() {
   const [variables, setVariables] = useState<Record<string, string>>({})
   const [batchCount, setBatchCount] = useState(1)
 
-  useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      router.push('/login')
-      return
-    }
-    loadPayloads()
-  }, [router])
-
   const loadPayloads = async () => {
     try {
       const response = await payloadApi.list({ page: 1, page_size: 100 })
@@ -65,6 +56,29 @@ export default function PayloadsPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/login')
+      return
+    }
+    const timer = setTimeout(() => loadPayloads(), 0)
+    return () => clearTimeout(timer)
+  }, [router])
+
+  const updatePreview = () => {
+    let preview = selectedTemplate.template
+    Object.entries(variables).forEach(([key, value]) => {
+      preview = preview.replace(`{{.${key}}}`, value)
+    })
+    setPreviewPayload(preview)
+  }
+
+  useEffect(() => {
+    const timer = setTimeout(() => updatePreview(), 0)
+    return () => clearTimeout(timer)
+  }, [selectedTemplate, variables])
 
   const handleCreatePayload = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -101,18 +115,6 @@ export default function PayloadsPage() {
       console.error('Failed to batch create payloads:', error)
     }
   }
-
-  const updatePreview = () => {
-    let preview = selectedTemplate.template
-    Object.entries(variables).forEach(([key, value]) => {
-      preview = preview.replace(`{{.${key}}}`, value)
-    })
-    setPreviewPayload(preview)
-  }
-
-  useEffect(() => {
-    updatePreview()
-  }, [selectedTemplate, variables])
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)

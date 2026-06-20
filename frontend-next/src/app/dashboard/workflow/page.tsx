@@ -27,7 +27,7 @@ interface Condition {
 interface Action {
   id: string
   type: string
-  config: Record<string, any>
+  config: Record<string, unknown>
 }
 
 export default function WorkflowBuilderPage() {
@@ -67,10 +67,6 @@ export default function WorkflowBuilderPage() {
     { id: 'call_api', label: '调用外部API' },
   ]
 
-  useEffect(() => {
-    loadRules()
-  }, [])
-
   const loadRules = async () => {
     try {
       const response = await rulesApi.list()
@@ -83,6 +79,11 @@ export default function WorkflowBuilderPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    const timer = setTimeout(() => loadRules(), 0)
+    return () => clearTimeout(timer)
+  }, [])
 
   const addRule = async () => {
     const newRule: Partial<Rule> = {
@@ -104,7 +105,7 @@ export default function WorkflowBuilderPage() {
     }
   }
 
-  const updateRule = async (ruleId: string, field: string, value: any) => {
+  const updateRule = async (ruleId: string, field: string, value: unknown) => {
     const ruleIndex = rules.findIndex(r => r.id === ruleId)
     if (ruleIndex === -1) return
 

@@ -55,7 +55,8 @@ export function AppShell({ children }: AppShellProps) {
 
   // Close mobile drawer when route changes
   useEffect(() => {
-    setMobileSidebarOpen(false)
+    const timer = setTimeout(() => setMobileSidebarOpen(false), 0)
+    return () => clearTimeout(timer)
   }, [pathname])
 
   const pageTitleKey = resolvePageTitleKey(pathname)

@@ -81,8 +81,9 @@ export default function LoginPage() {
       } else {
         setError(response.message || t('login.error'))
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || t('login.error'))
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } }, message?: string }
+      setError(error.response?.data?.message || error.message || t('login.error'))
     } finally {
       setLoading(false)
     }

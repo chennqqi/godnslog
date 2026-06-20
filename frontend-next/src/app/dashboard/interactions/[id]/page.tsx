@@ -12,12 +12,6 @@ export default function InteractionDetailPage() {
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
 
-  useEffect(() => {
-    if (params.id) {
-      loadInteraction()
-    }
-  }, [params.id])
-
   const loadInteraction = async () => {
     try {
       const response = await interactionApi.get(params.id as string)
@@ -33,6 +27,13 @@ export default function InteractionDetailPage() {
     }
   }
 
+  useEffect(() => {
+    if (params.id) {
+      const timer = setTimeout(() => loadInteraction(), 0)
+      return () => clearTimeout(timer)
+    }
+  }, [params.id])
+
   const handleExport = async (format: string) => {
     setExporting(true)
     try {
@@ -42,7 +43,7 @@ export default function InteractionDetailPage() {
         include_raw: true,
       })
       // Handle nested response structure
-      const responseData = response.data as any
+      const responseData = response.data as unknown
       const exportData = responseData && typeof responseData === 'object' && 'data' in responseData ? responseData.data : responseData
       if (exportData) {
         const blob = new Blob([typeof exportData === 'string' ? exportData : JSON.stringify(exportData)], { type: 'text/plain' })
