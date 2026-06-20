@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { QueryProvider } from '@/components/query-provider'
 
 export const metadata: Metadata = {
   title: 'GODNSLOG 2.0 - OAST Interaction Verification Platform',
-  description: 'OAST交互验证与证据平台',
+  description: 'OAST interaction verification and evidence platform',
 }
 
 export default function RootLayout({
@@ -12,8 +13,17 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="zh-CN">
-      <body className="font-sans antialiased">{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('godnslog-theme');var m=t?JSON.parse(t).state.theme:'system';var d=m==='dark'||(m==='system'&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(d)document.documentElement.classList.add('dark');}catch(e){}})();`,
+          }}
+        />
+      </head>
+      <body className="font-sans antialiased">
+        <QueryProvider>{children}</QueryProvider>
+      </body>
     </html>
   )
 }

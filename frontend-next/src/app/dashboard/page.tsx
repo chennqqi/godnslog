@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { caseApi, payloadApi } from '@/lib/api-client'
-import { interactionsApi } from '@/features/interactions/api'
+import { useCases } from '@/features/cases/hooks/use-cases'
+import { usePayloads } from '@/features/payloads/hooks/use-payloads'
+import { useInteractions, useInteractionStats } from '@/features/interactions/hooks/use-interactions'
 import type { Interaction } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -29,17 +29,6 @@ const STATUS_COLORS: Record<string, string> = {
   archived: 'bg-gray-100 text-gray-600 border-gray-200',
   completed: 'bg-cyan-100 text-cyan-700 border-cyan-200',
   expired: 'bg-red-100 text-red-700 border-red-200',
-}
-
-interface DashboardStats {
-  activeCases: number
-  totalHitsToday: number
-  activePayloads: number
-  systemOk: boolean
-  dnsCount: number
-  httpCount: number
-  smtpCount: number
-  totalInteractions: number
 }
 
 /** Stat card with title, value, and optional sub-text */
@@ -81,20 +70,22 @@ function StatCardSkeleton() {
 }
 
 /** Protocol distribution mini-bar */
-function ProtocolBar({ dns, http, other }: { dns: number; http: number; other: number }) {
-  const total = dns + http + other || 1
+function ProtocolBar({ dns, http, smtp, other }: { dns: number; http: number; smtp: number; other: number }) {
+  const total = dns + http + smtp + other || 1
   const dnsPct = Math.round((dns / total) * 100)
   const httpPct = Math.round((http / total) * 100)
-  const otherPct = 100 - dnsPct - httpPct
+  const smtpPct = Math.round((smtp / total) * 100)
+  const otherPct = 100 - dnsPct - httpPct - smtpPct
 
   return (
     <div className="space-y-2">
       <div className="flex rounded-full overflow-hidden h-3">
         <div className="bg-purple-500" style={{ width: `${dnsPct}%` }} title={`DNS ${dnsPct}%`} />
         <div className="bg-blue-500" style={{ width: `${httpPct}%` }} title={`HTTP ${httpPct}%`} />
+        <div className="bg-emerald-500" style={{ width: `${smtpPct}%` }} title={`SMTP ${smtpPct}%`} />
         <div className="bg-gray-300 dark:bg-gray-600" style={{ width: `${otherPct}%` }} title={`Other ${otherPct}%`} />
       </div>
-      <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
+      <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-purple-500 inline-block" />
           DNS {dnsPct}%
@@ -102,6 +93,10 @@ function ProtocolBar({ dns, http, other }: { dns: number; http: number; other: n
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
           HTTP {httpPct}%
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+          SMTP {smtpPct}%
         </span>
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 inline-block" />
@@ -115,59 +110,31 @@ function ProtocolBar({ dns, http, other }: { dns: number; http: number; other: n
 /** Dashboard Command Center page */
 export default function DashboardPage() {
   const router = useRouter()
-  const [stats, setStats] = useState<DashboardStats>({
-    activeCases: 0,
-    totalHitsToday: 0,
-    activePayloads: 0,
-    systemOk: true,
-    dnsCount: 0,
-    httpCount: 0,
-    smtpCount: 0,
-    totalInteractions: 0,
-  })
-  const [recentInteractions, setRecentInteractions] = useState<Interaction[]>([])
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      router.push('/login')
-      return
-    }
-    loadData()
-  }, [router])
+  const { data: casesResp, isLoading: casesLoading } = useCases({ page: 1, page_size: 5 })
+  const { data: interactionsResp, isLoading: interactionsLoading } = useInteractions({ page: 1, page_size: 10 })
+  const { data: statsResp, isLoading: statsLoading } = useInteractionStats()
+  const { data: payloadsResp, isLoading: payloadsLoading } = usePayloads({ status: 'deployed', page: 1, page_size: 1 })
 
-  const loadData = async () => {
-    try {
-      const [casesResp, interactionsResp, statsData, payloadsResp] = await Promise.all([
-        caseApi.list({ page: 1, page_size: 5 }),
-        interactionsApi.list({ page: 1, page_size: 10 }),
-        interactionsApi.getStats(),
-        payloadApi.list({ status: 'deployed', page: 1, page_size: 1 }),
-      ])
+  const loading = casesLoading || interactionsLoading || statsLoading || payloadsLoading
 
-      const interactions = interactionsResp?.items || []
-      const cases = casesResp.data?.items || []
+  const cases = casesResp?.data?.items || []
+  const recentInteractions: Interaction[] = interactionsResp?.data?.items || []
+  const stats = statsResp?.data
+  const dnsCount = stats?.dns_count ?? 0
+  const httpCount = stats?.http_count ?? 0
+  const smtpCount = stats?.smtp_count ?? 0
+  const totalInteractions = stats?.total ?? 0
+  const activeCases = cases.filter((c: any) => c.status === 'active').length
+  const totalHitsToday = stats?.today ?? stats?.total ?? 0
+  const activePayloads = payloadsResp?.data?.total || 0
+  const systemOk = true
 
-      setStats({
-        activeCases: cases.filter((c: any) => c.status === 'active').length,
-        totalHitsToday: statsData?.today || 0,
-        activePayloads: payloadsResp.data?.total || 0,
-        systemOk: true,
-        dnsCount: 0,
-        httpCount: 0,
-        smtpCount: 0,
-        totalInteractions: statsData?.total || 0,
-      })
-      setRecentInteractions(interactions)
-    } catch (err) {
-      console.error('Failed to load dashboard data:', err)
-    } finally {
-      setLoading(false)
-    }
+  const otherCount = totalInteractions - dnsCount - httpCount - smtpCount
+
+  const loadData = () => {
+    window.location.reload()
   }
-
-  const otherCount = stats.totalInteractions - stats.dnsCount - stats.httpCount
 
   return (
     <div className="space-y-6">
@@ -193,26 +160,26 @@ export default function DashboardPage() {
           <>
             <StatCard
               title="Active Cases"
-              value={stats.activeCases}
+              value={activeCases}
               valueClass="text-emerald-600"
               sub="Currently active"
             />
             <StatCard
               title="Hits Today"
-              value={stats.totalHitsToday}
+              value={totalHitsToday}
               valueClass="text-indigo-600"
               sub="Across all protocols"
             />
             <StatCard
               title="Active Payloads"
-              value={stats.activePayloads}
+              value={activePayloads}
               sub="Deployed &amp; watching"
             />
             <StatCard
               title="System Status"
-              value={stats.systemOk ? '✓ OK' : '✗ Error'}
-              valueClass={stats.systemOk ? 'text-emerald-600 text-2xl' : 'text-red-600 text-2xl'}
-              sub={stats.systemOk ? 'All services healthy' : 'Check system logs'}
+              value={systemOk ? '✓ OK' : '✗ Error'}
+              valueClass={systemOk ? 'text-emerald-600 text-2xl' : 'text-red-600 text-2xl'}
+              sub={systemOk ? 'All services healthy' : 'Check system logs'}
             />
           </>
         )}
@@ -232,8 +199,9 @@ export default function DashboardPage() {
               <Skeleton className="h-8 w-full" />
             ) : (
               <ProtocolBar
-                dns={stats.dnsCount}
-                http={stats.httpCount}
+                dns={dnsCount}
+                http={httpCount}
+                smtp={smtpCount}
                 other={otherCount > 0 ? otherCount : 0}
               />
             )}
