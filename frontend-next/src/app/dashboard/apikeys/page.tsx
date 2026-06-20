@@ -4,9 +4,12 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { agentPolicyApi, apiKeyApi } from '@/lib/api-client'
 import type { AgentScopeCatalog, AgentScopePolicy, APIKey } from '@/types'
+import { LoadingState } from '@/components/loading-state'
+import { useConfirmDialog } from '@/components/ui/alert-dialog'
 
 export default function APIKeysPage() {
   const router = useRouter()
+  const { confirm, dialogElement } = useConfirmDialog()
   const [apiKeys, setApiKeys] = useState<APIKey[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -116,7 +119,13 @@ export default function APIKeysPage() {
   }
 
   const handleDeleteKey = async (id: string) => {
-    if (!confirm('确定要删除此 API Key 吗？')) return
+    const ok = await confirm({
+      title: 'Delete API Key',
+      description: 'Are you sure you want to delete this API key? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'destructive',
+    })
+    if (!ok) return
     try {
       const response = await apiKeyApi.delete(id)
       if (response.code === 0) {
@@ -191,10 +200,11 @@ export default function APIKeysPage() {
   ]
 
   if (loading) {
-    return <div className="text-center py-12">加载中...</div>
+    return <LoadingState />
   }
 
   return (
+    <>
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900">API Keys 管理</h2>
@@ -518,6 +528,8 @@ export default function APIKeysPage() {
         </div>
       )}
     </div>
+    {dialogElement}
+    </>
   )
 }
 

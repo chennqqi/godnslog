@@ -8,6 +8,7 @@ import { payloadApi, caseApi } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { LoadingState } from '@/components/loading-state'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { payloadSchema, type PayloadFormValues } from '@/features/payloads/schemas/payload-schema'
@@ -365,6 +366,7 @@ function NewPayloadContent() {
   const presetCaseId = searchParams.get('case_id') || ''
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [submitError, setSubmitError] = useState('')
   const [cases, setCases] = useState<Array<{ id: string; title: string }>>([])
   const [selectedCase, setSelectedCase] = useState<{ id: string; title: string } | null>(null)
 
@@ -437,7 +439,7 @@ function NewPayloadContent() {
       router.push('/dashboard/payloads')
     } catch (err) {
       console.error('Failed to create payload:', err)
-      alert('Failed to create payload')
+      setSubmitError('Failed to create payload. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -519,6 +521,11 @@ function NewPayloadContent() {
               </Button>
             )}
           </div>
+          {submitError && (
+            <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
+              <span className="text-sm">{submitError}</span>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -528,7 +535,7 @@ function NewPayloadContent() {
 /** Multi-step Payload creation wizard */
 export default function NewPayloadPage() {
   return (
-    <Suspense fallback={<div className="text-center py-12 text-gray-500">Loading...</div>}>
+    <Suspense fallback={<LoadingState />}>
       <NewPayloadContent />
     </Suspense>
   )

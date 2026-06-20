@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dialog'
 import { useInteractionStream } from '@/features/interactions/hooks/use-interaction-stream'
 import { useI18n } from '@/lib/i18n-context'
+import { LoadingState } from '@/components/loading-state'
 
 /** Radix SelectItem cannot use value="" for "all types" */
 const TYPE_FILTER_ALL = 'all'
@@ -143,7 +144,7 @@ function InteractionsPageContent() {
   }, {} as Record<string, Interaction[]>)
 
   if (loading) {
-    return <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading...</div>
+    return <LoadingState />
   }
 
   return (
@@ -538,7 +539,7 @@ function InteractionsPageContent() {
 
 export default function InteractionsPage() {
   return (
-    <Suspense fallback={<div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading...</div>}>
+    <Suspense fallback={<LoadingState />}>
       <InteractionsPageContent />
     </Suspense>
   )

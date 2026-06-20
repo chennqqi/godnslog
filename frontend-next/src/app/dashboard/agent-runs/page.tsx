@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { agentRunApi } from '@/lib/api-client'
+import { LoadingState } from '@/components/loading-state'
 import type { AgentRunDetail, AgentRunReviewQueueItem, ReviewState, EvidenceStrength, AgentRunStatus } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -256,7 +257,7 @@ export default function AgentRunsPage() {
       )}
 
       {loading ? (
-        <div className="text-center py-8">Loading...</div>
+        <LoadingState />
       ) : viewMode === 'all' && agentRuns.length === 0 ? (
         <Card>
           <CardContent className="text-center py-8">

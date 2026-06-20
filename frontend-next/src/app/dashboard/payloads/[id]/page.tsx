@@ -6,6 +6,8 @@ import { payloadApi, caseApi, interactionApi } from '@/lib/api-client'
 import type { Payload, Case, Interaction } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { LoadingState } from '@/components/loading-state'
+import { useConfirmDialog } from '@/components/ui/alert-dialog'
 
 export default function PayloadDetailPage() {
   const params = useParams()
@@ -18,6 +20,7 @@ export default function PayloadDetailPage() {
   const [previewData, setPreviewData] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [revoking, setRevoking] = useState(false)
+  const { confirm, dialogElement } = useConfirmDialog()
 
   const loadPayload = useCallback(async () => {
     try {
@@ -100,7 +103,13 @@ export default function PayloadDetailPage() {
 
   const handleRevoke = async () => {
     if (!payload) return
-    if (!confirm('Are you sure you want to revoke this payload? This action cannot be undone.')) return
+    const ok = await confirm({
+      title: 'Revoke Payload',
+      description: 'Are you sure you want to revoke this payload? This action cannot be undone.',
+      confirmLabel: 'Revoke',
+      variant: 'destructive',
+    })
+    if (!ok) return
     setRevoking(true)
     try {
       await payloadApi.revoke(payload.id)
@@ -113,7 +122,7 @@ export default function PayloadDetailPage() {
   }
 
   if (loading) {
-    return <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading...</div>
+    return <LoadingState />
   }
 
   if (!payload) {
@@ -121,6 +130,7 @@ export default function PayloadDetailPage() {
   }
 
   return (
+    <>
     <div className="space-y-6">
       <button
         onClick={() => router.back()}
@@ -277,5 +287,7 @@ export default function PayloadDetailPage() {
         </div>
       </div>
     </div>
+    {dialogElement}
+    </>
   )
 }
