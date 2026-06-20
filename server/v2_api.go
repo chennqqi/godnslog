@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -106,6 +107,9 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		users := v2.Group("/users", self.authHandler)
 		{
 			users.GET("", self.v2ListUsers)
+			users.POST("", self.v2CreateUser)
+			users.PUT("/:id", self.v2UpdateUser)
+			users.DELETE("/:id", self.v2DeleteUser)
 		}
 
 		// Marketplace
@@ -164,6 +168,18 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			rebinding.DELETE("/rules/:id", self.v2DeleteRebindingRule)
 			rebinding.GET("/rules/:id/sessions", self.v2ListRebindingSessions)
 		}
+
+		// DNS Records
+		dnsRecords := v2.Group("/dns/records", self.authHandler)
+		{
+			dnsRecords.GET("", self.v2ListDNSRecords)
+			dnsRecords.POST("", self.v2CreateDNSRecord)
+			dnsRecords.PUT("/:id", self.v2UpdateDNSRecord)
+			dnsRecords.DELETE("/:id", self.v2DeleteDNSRecord)
+		}
+
+		// XIP encoding query
+		v2.GET("/dns/xip/:ip", self.authHandler, self.v2QueryXip)
 
 		// Listeners
 		listeners := v2.Group("/listeners", self.authHandler)
@@ -3860,6 +3876,441 @@ func (self *WebServer) v2ListReviewQueue(c *gin.Context) {
 		"message": "success",
 		"data":    resp,
 	})
+}
+
+// v2ListDNSRecords lists DNS resolve records with pagination
+func (self *WebServer) v2ListDNSRecords(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	total, err := self.orm.Count(&models.TblResolve{})
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2ListDNSRecords] count error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "server internal error"})
+		return
+	}
+
+	var records []models.TblResolve
+	err = self.orm.Desc("id").Limit(pageSize, (page-1)*pageSize).Find(&records)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2ListDNSRecords] find error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "server internal error"})
+		return
+	}
+
+	items := make([]map[string]interface{}, len(records))
+	for i, r := range records {
+		items[i] = map[string]interface{}{
+			"id":         strconv.FormatInt(r.Id, 10),
+			"host":       r.Host,
+			"type":       r.Type,
+			"value":      r.Value,
+			"ttl":        r.Ttl,
+			"created_at": r.Ctime.Format(time.RFC3339),
+			"updated_at": r.Utime.Format(time.RFC3339),
+		}
+	}
+
+	totalPages := int(total) / pageSize
+	if int(total)%pageSize > 0 {
+		totalPages++
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"items":       items,
+			"total":       int(total),
+			"page":        page,
+			"page_size":   pageSize,
+			"total_pages": totalPages,
+		},
+	})
+}
+
+// v2CreateDNSRecord creates a new DNS resolve record
+func (self *WebServer) v2CreateDNSRecord(c *gin.Context) {
+	var req struct {
+		Host  string `json:"host" binding:"required"`
+		Type  string `json:"type" binding:"required"`
+		Value string `json:"value" binding:"required"`
+		Ttl   uint32 `json:"ttl"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request: " + err.Error()})
+		return
+	}
+	if req.Ttl == 0 {
+		req.Ttl = 300
+	}
+
+	record := models.TblResolve{
+		Host:  req.Host,
+		Type:  req.Type,
+		Value: req.Value,
+		Ttl:   req.Ttl,
+	}
+
+	_, err := self.orm.Insert(&record)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2CreateDNSRecord] insert error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to create DNS record"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"id":         strconv.FormatInt(record.Id, 10),
+			"host":       record.Host,
+			"type":       record.Type,
+			"value":      record.Value,
+			"ttl":        record.Ttl,
+			"created_at": record.Ctime.Format(time.RFC3339),
+			"updated_at": record.Utime.Format(time.RFC3339),
+		},
+	})
+}
+
+// v2UpdateDNSRecord updates an existing DNS resolve record
+func (self *WebServer) v2UpdateDNSRecord(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid id"})
+		return
+	}
+
+	var record models.TblResolve
+	has, err := self.orm.ID(id).Get(&record)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2UpdateDNSRecord] get error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "server internal error"})
+		return
+	}
+	if !has {
+		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "DNS record not found"})
+		return
+	}
+
+	var req struct {
+		Host  *string `json:"host"`
+		Type  *string `json:"type"`
+		Value *string `json:"value"`
+		Ttl   *uint32 `json:"ttl"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request: " + err.Error()})
+		return
+	}
+
+	if req.Host != nil {
+		record.Host = *req.Host
+	}
+	if req.Type != nil {
+		record.Type = *req.Type
+	}
+	if req.Value != nil {
+		record.Value = *req.Value
+	}
+	if req.Ttl != nil {
+		record.Ttl = *req.Ttl
+	}
+
+	_, err = self.orm.ID(id).Update(&record)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2UpdateDNSRecord] update error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to update DNS record"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"id":         strconv.FormatInt(record.Id, 10),
+			"host":       record.Host,
+			"type":       record.Type,
+			"value":      record.Value,
+			"ttl":        record.Ttl,
+			"created_at": record.Ctime.Format(time.RFC3339),
+			"updated_at": record.Utime.Format(time.RFC3339),
+		},
+	})
+}
+
+// v2DeleteDNSRecord deletes a DNS resolve record
+func (self *WebServer) v2DeleteDNSRecord(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid id"})
+		return
+	}
+
+	var record models.TblResolve
+	has, err := self.orm.ID(id).Get(&record)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2DeleteDNSRecord] get error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "server internal error"})
+		return
+	}
+	if !has {
+		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "DNS record not found"})
+		return
+	}
+
+	_, err = self.orm.ID(id).Delete(&models.TblResolve{})
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2DeleteDNSRecord] delete error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to delete DNS record"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success"})
+}
+
+// v2QueryXip returns xip encoding formats for a given IPv4 address
+func (self *WebServer) v2QueryXip(c *gin.Context) {
+	ipStr := c.Param("ip")
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid IP address"})
+		return
+	}
+	ip4 := ip.To4()
+	if ip4 == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "only IPv4 addresses are supported"})
+		return
+	}
+
+	dotted := fmt.Sprintf("%d.%d.%d.%d", ip4[0], ip4[1], ip4[2], ip4[3])
+	hex := fmt.Sprintf("%02x%02x%02x%02x", ip4[0], ip4[1], ip4[2], ip4[3])
+	binary := fmt.Sprintf("0b%08b%08b%08b%08b", ip4[0], ip4[1], ip4[2], ip4[3])
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"dotted": dotted,
+			"hex":    hex,
+			"binary": binary,
+			"examples": gin.H{
+				"dotted_decimal": dotted + ".example.com",
+				"hex":            hex + ".example.com",
+				"binary":         binary + ".example.com",
+			},
+		},
+	})
+}
+
+// v2CreateUser creates a new user (admin only)
+func (self *WebServer) v2CreateUser(c *gin.Context) {
+	role := c.GetInt("role")
+	if role != roleSuper && role != roleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "admin access required"})
+		return
+	}
+
+	var req struct {
+		Username string `json:"username" binding:"required"`
+		Email    string `json:"email" binding:"required"`
+		Password string `json:"password" binding:"required"`
+		Role     int    `json:"role"`
+		Lang     string `json:"lang"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request: " + err.Error()})
+		return
+	}
+	if len(req.Password) < 8 {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "password must be at least 8 characters"})
+		return
+	}
+	if req.Role == roleSuper {
+		c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "cannot create super user"})
+		return
+	}
+
+	// Check for duplicate username
+	existing, _ := self.orm.Where("name = ?", req.Username).Exist(&models.TblUser{})
+	if existing {
+		c.JSON(http.StatusConflict, gin.H{"code": 409, "message": "username already exists"})
+		return
+	}
+
+	lang := req.Lang
+	if lang == "" {
+		lang = self.DefaultLanguage
+	}
+
+	user := models.TblUser{
+		Name:          req.Username,
+		Email:         req.Email,
+		Role:          req.Role,
+		Token:         genRandomToken(),
+		ShortId:       genShortId(),
+		Lang:          lang,
+		Pass:          makePassword(req.Password),
+		CleanInterval: self.DefaultCleanInterval,
+	}
+
+	_, err := self.orm.Insert(&user)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2CreateUser] insert error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to create user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"id":         strconv.FormatInt(user.Id, 10),
+			"username":   user.Name,
+			"email":      user.Email,
+			"role":       user.Role,
+			"created_at": user.Atime.Format(time.RFC3339),
+		},
+	})
+}
+
+// v2UpdateUser updates an existing user
+func (self *WebServer) v2UpdateUser(c *gin.Context) {
+	role := c.GetInt("role")
+	if role != roleSuper && role != roleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "admin access required"})
+		return
+	}
+
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid id"})
+		return
+	}
+
+	var user models.TblUser
+	has, err := self.orm.ID(id).Get(&user)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2UpdateUser] get error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "server internal error"})
+		return
+	}
+	if !has {
+		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "user not found"})
+		return
+	}
+
+	// Prevent demoting super user
+	if user.Role == roleSuper {
+		c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "cannot modify super user"})
+		return
+	}
+
+	var req struct {
+		Email    *string `json:"email"`
+		Password *string `json:"password"`
+		Role     *int    `json:"role"`
+		Lang     *string `json:"lang"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request: " + err.Error()})
+		return
+	}
+
+	if req.Email != nil {
+		user.Email = *req.Email
+	}
+	if req.Role != nil {
+		if *req.Role == roleSuper {
+			c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "cannot promote to super user"})
+			return
+		}
+		user.Role = *req.Role
+	}
+	if req.Lang != nil {
+		user.Lang = *req.Lang
+	}
+	if req.Password != nil {
+		if len(*req.Password) < 8 {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "password must be at least 8 characters"})
+			return
+		}
+		user.Pass = makePassword(*req.Password)
+	}
+
+	_, err = self.orm.ID(id).Update(&user)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2UpdateUser] update error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to update user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"id":       strconv.FormatInt(user.Id, 10),
+			"username": user.Name,
+			"email":    user.Email,
+			"role":     user.Role,
+		},
+	})
+}
+
+// v2DeleteUser deletes a user
+func (self *WebServer) v2DeleteUser(c *gin.Context) {
+	role := c.GetInt("role")
+	if role != roleSuper && role != roleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "admin access required"})
+		return
+	}
+
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid id"})
+		return
+	}
+
+	var user models.TblUser
+	has, err := self.orm.ID(id).Get(&user)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2DeleteUser] get error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "server internal error"})
+		return
+	}
+	if !has {
+		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "user not found"})
+		return
+	}
+
+	// Prevent deleting super user
+	if user.Role == roleSuper {
+		c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "cannot delete super user"})
+		return
+	}
+
+	_, err = self.orm.ID(id).Delete(&models.TblUser{})
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2DeleteUser] delete error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to delete user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success"})
 }
 
 // v2ListFollowupHistory lists the follow-up history for an agent run
