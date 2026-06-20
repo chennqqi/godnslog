@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/chennqqi/godnslog/internal/models"
+	_ "modernc.org/sqlite"
+	"xorm.io/xorm"
 )
 
 // TestGenerateAPIKey tests API key generation
@@ -94,4 +96,135 @@ func TestAPIKeyIsValid(t *testing.T) {
 // timePtr is a helper to get a pointer to time.Time
 func timePtr(t time.Time) *time.Time {
 	return &t
+}
+
+// setupAuthTestEngine creates an in-memory SQLite engine for auth tests
+func setupAuthTestEngine(t *testing.T) *xorm.Engine {
+	t.Helper()
+	engine, err := xorm.NewEngine("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("failed to create engine: %v", err)
+	}
+	if err := engine.Sync2(new(models.APIKey)); err != nil {
+		t.Fatalf("failed to sync APIKey table: %v", err)
+	}
+	return engine
+}
+
+func TestAPIKeyBcryptMigration_NewKey(t *testing.T) {
+	engine := setupAuthTestEngine(t)
+	service := NewService(engine)
+
+	req := &models.APIKeyCreateRequest{
+		Name:   "test-bcrypt-key",
+		Scopes: []string{"case:read"},
+	}
+	apiKey, err := service.CreateAPIKey(req, "test-user")
+	if err != nil {
+		t.Fatalf("CreateAPIKey failed: %v", err)
+	}
+
+	if len(apiKey.KeyHash) == 0 {
+		t.Fatal("KeyHash should be non-empty for new keys")
+	}
+	if apiKey.KeyHash == apiKey.Key {
+		t.Fatal("KeyHash should not equal plaintext key")
+	}
+
+	// Validate the key works
+	validated, err := service.ValidateAPIKey(apiKey.Key)
+	if err != nil {
+		t.Fatalf("ValidateAPIKey failed: %v", err)
+	}
+	if validated.ID != apiKey.ID {
+		t.Fatal("validated key ID mismatch")
+	}
+}
+
+func TestAPIKeyBcryptMigration_LegacyPlaintext(t *testing.T) {
+	engine := setupAuthTestEngine(t)
+	service := NewService(engine)
+
+	// Insert a legacy key with empty KeyHash
+	legacyKey := &models.APIKey{
+		ID:        generateID(),
+		Key:       "legacykey1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+		KeyHash:   "",
+		KeyPrefix: "legacyke",
+		Name:      "legacy-key",
+		Scopes:    models.Scopes{"case:read"},
+		CreatedBy: "test-user",
+	}
+	_, err := engine.Insert(legacyKey)
+	if err != nil {
+		t.Fatalf("failed to insert legacy key: %v", err)
+	}
+
+	// Validate — should succeed and auto-migrate
+	validated, err := service.ValidateAPIKey(legacyKey.Key)
+	if err != nil {
+		t.Fatalf("ValidateAPIKey for legacy key failed: %v", err)
+	}
+	if validated.ID != legacyKey.ID {
+		t.Fatal("validated key ID mismatch")
+	}
+
+	// Verify KeyHash was backfilled
+	var updated models.APIKey
+	engine.ID(legacyKey.ID).Get(&updated)
+	if len(updated.KeyHash) == 0 {
+		t.Fatal("KeyHash should be backfilled after migration")
+	}
+	if updated.Key != "" {
+		t.Fatal("plaintext Key should be cleared after migration")
+	}
+
+	// Validate again using bcrypt — should still work
+	_, err = service.ValidateAPIKey(legacyKey.Key)
+	if err != nil {
+		t.Fatalf("ValidateAPIKey after migration failed: %v", err)
+	}
+}
+
+func TestAPIKeyRotation(t *testing.T) {
+	engine := setupAuthTestEngine(t)
+	service := NewService(engine)
+
+	req := &models.APIKeyCreateRequest{
+		Name:   "test-rotate-key",
+		Scopes: []string{"case:read"},
+	}
+	apiKey, err := service.CreateAPIKey(req, "test-user")
+	if err != nil {
+		t.Fatalf("CreateAPIKey failed: %v", err)
+	}
+
+	originalKey := apiKey.Key
+
+	// Rotate
+	newKey, err := service.RotateAPIKey(apiKey.ID)
+	if err != nil {
+		t.Fatalf("RotateAPIKey failed: %v", err)
+	}
+	if newKey == "" {
+		t.Fatal("rotated key should not be empty")
+	}
+	if newKey == originalKey {
+		t.Fatal("new key should differ from original")
+	}
+
+	// Old key should fail validation
+	_, err = service.ValidateAPIKey(originalKey)
+	if err == nil {
+		t.Fatal("old key should fail validation after rotation")
+	}
+
+	// New key should pass validation
+	validated, err := service.ValidateAPIKey(newKey)
+	if err != nil {
+		t.Fatalf("new key validation failed: %v", err)
+	}
+	if validated.ID != apiKey.ID {
+		t.Fatal("rotated key ID should match original")
+	}
 }
