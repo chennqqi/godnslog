@@ -26,6 +26,13 @@ export function useInteraction(id: string) {
   })
 }
 
+export function useInteractionStats(params?: { case_id?: string; payload_id?: string }) {
+  return useQuery({
+    queryKey: ['interactions', 'stats', params],
+    queryFn: () => interactionApi.stats(params),
+  })
+}
+
 export function useDeleteInteractions() {
   const queryClient = useQueryClient()
   return useMutation({

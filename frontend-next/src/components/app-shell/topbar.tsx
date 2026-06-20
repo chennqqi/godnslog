@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
+import { useThemeStore } from '@/stores/theme-store'
+import { initTheme } from '@/stores/theme-store'
 
 /** Props for TopBar component */
 interface TopBarProps {
@@ -51,30 +53,14 @@ const UserCircleIcon = () => (
 
 type ThemeMode = 'light' | 'dark' | 'system'
 
-/** Applies or removes the 'dark' class on <html> according to mode */
-function applyTheme(mode: ThemeMode) {
-  const root = document.documentElement
-  if (mode === 'dark') {
-    root.classList.add('dark')
-  } else if (mode === 'light') {
-    root.classList.remove('dark')
-  } else {
-    // system: follow prefers-color-scheme
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    root.classList.toggle('dark', prefersDark)
-  }
-}
-
 /** Enterprise top bar with sidebar toggle, breadcrumb, theme switcher, and user menu */
 export function TopBar({ onToggleSidebar, pageTitle }: TopBarProps) {
   const router = useRouter()
-  const [theme, setTheme] = useState<ThemeMode>('system')
+  const { theme, setTheme } = useThemeStore()
   const [username, setUsername] = useState<string>('Admin')
 
   useEffect(() => {
-    const savedTheme = (localStorage.getItem('theme') as ThemeMode) || 'system'
-    setTheme(savedTheme)
-    applyTheme(savedTheme)
+    initTheme()
 
     try {
       const userStr = localStorage.getItem('user')
@@ -89,8 +75,6 @@ export function TopBar({ onToggleSidebar, pageTitle }: TopBarProps) {
 
   const handleThemeChange = (mode: ThemeMode) => {
     setTheme(mode)
-    localStorage.setItem('theme', mode)
-    applyTheme(mode)
   }
 
   const handleLogout = () => {
