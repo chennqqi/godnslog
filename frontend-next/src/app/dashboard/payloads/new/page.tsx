@@ -2,12 +2,15 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { payloadApi, caseApi } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { payloadSchema, type PayloadFormValues } from '@/features/payloads/schemas/payload-schema'
 
 /** Available payload templates per design spec */
 const TEMPLATES = [
@@ -163,12 +166,14 @@ function StepVariables({
   cases,
   expiresIn,
   onChange,
+  errors,
 }: {
   vars: Record<string, string>
   caseId: string
   cases: Array<{ id: string; title: string }>
   expiresIn: number
   onChange: (field: string, value: string | number) => void
+  errors?: Record<string, { message?: string }>
 }) {
   return (
     <div>
@@ -206,6 +211,9 @@ function StepVariables({
             value={vars.scenario || ''}
             onChange={(e) => onChange('scenario', e.target.value)}
           />
+          {errors?.scenario?.message && (
+            <p className="text-xs text-red-500 mt-1">{errors.scenario.message}</p>
+          )}
         </div>
 
         {/* Associate case */}
@@ -359,13 +367,19 @@ function NewPayloadContent() {
   const [loading, setLoading] = useState(false)
   const [cases, setCases] = useState<Array<{ id: string; title: string }>>([])
   const [selectedCase, setSelectedCase] = useState<{ id: string; title: string } | null>(null)
-  const [formData, setFormData] = useState({
-    template: 'ssrf_http',
-    scenario: '',
-    case_id: presetCaseId,
-    expires_in: 86400,
+
+  const form = useForm<PayloadFormValues>({
+    resolver: zodResolver(payloadSchema),
+    defaultValues: {
+      template: 'ssrf_http',
+      scenario: '',
+      case_id: presetCaseId,
+      expires_in: 86400,
+    },
   })
-  const [vars, setVars] = useState<Record<string, string>>({ token: 'gdl_xxxxxxxx' })
+
+  const formData = form.watch()
+  const vars = { token: 'gdl_xxxxxxxx', scenario: formData.scenario || '' }
 
   useEffect(() => {
     caseApi
@@ -385,8 +399,8 @@ function NewPayloadContent() {
       })
   }, [presetCaseId])
 
-  const handleFieldChange = (field: string, value: string | number) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+  const handleFieldChange = (field: keyof PayloadFormValues, value: string | number) => {
+    form.setValue(field, value as never, { shouldValidate: true })
     if (field === 'case_id') {
       const found = cases.find((c) => c.id === value)
       setSelectedCase(found || null)
@@ -394,21 +408,21 @@ function NewPayloadContent() {
   }
 
   const handleVarChange = (field: string, value: string) => {
-    setVars((prev) => ({ ...prev, [field]: value }))
     if (field === 'scenario') handleFieldChange('scenario', value)
   }
 
   const handleSubmit = async () => {
+    const data = form.getValues()
     setLoading(true)
     try {
       // Convert seconds-from-now to ISO timestamp
-      const expiresAt = new Date(Date.now() + formData.expires_in * 1000).toISOString()
+      const expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString()
 
       const createReq: import('@/types').PayloadCreateRequest = {
-        case_id: formData.case_id || '',
-        template: formData.template,
+        case_id: data.case_id || '',
+        template: data.template,
         expires_at: expiresAt,
-        variables: formData.scenario ? { scenario: formData.scenario } : undefined,
+        variables: data.scenario ? { scenario: data.scenario } : undefined,
       }
 
       const response = await payloadApi.create(createReq)
@@ -430,6 +444,8 @@ function NewPayloadContent() {
   }
 
   const canProceed = step === 1 ? !!formData.template : true
+
+  const errors = form.formState.errors
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -467,9 +483,10 @@ function NewPayloadContent() {
               caseId={formData.case_id}
               cases={cases}
               expiresIn={formData.expires_in}
+              errors={errors}
               onChange={(field, value) => {
                 if (field === 'scenario') handleVarChange('scenario', String(value))
-                else handleFieldChange(field, value)
+                else handleFieldChange(field as keyof PayloadFormValues, value)
               }}
             />
           )}

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,6 +17,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  generalSettingsSchema,
+  domainSettingsSchema,
+  listenerSettingsSchema,
+  type GeneralSettingsFormValues,
+  type DomainSettingsFormValues,
+  type ListenerSettingsFormValues,
+} from '@/features/settings/schemas/settings-schema'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -64,20 +74,37 @@ export default function SettingsPage() {
 }
 
 function GeneralSettings() {
+  const form = useForm<GeneralSettingsFormValues>({
+    resolver: zodResolver(generalSettingsSchema),
+    defaultValues: {
+      system_name: 'GODNSLOG 2.0',
+      language: 'en-US',
+      timezone: 'UTC',
+    },
+  })
+
+  const onSubmit = (data: GeneralSettingsFormValues) => {
+    console.log('General settings saved:', data)
+  }
+
   return (
     <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
       <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">General</h3>
-      <div className="space-y-4">
+      <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
         <div>
           <Label htmlFor="system-name">System Name</Label>
           <Input
             id="system-name"
-            defaultValue="GODNSLOG 2.0"
+            className="mt-1"
+            {...form.register('system_name')}
           />
+          {form.formState.errors.system_name && (
+            <p className="text-xs text-red-500 mt-1">{form.formState.errors.system_name.message}</p>
+          )}
         </div>
         <div>
           <Label htmlFor="language">Language</Label>
-          <Select defaultValue="en-US">
+          <Select defaultValue="en-US" onValueChange={(v) => form.setValue('language', v as 'en-US' | 'zh-CN')}>
             <SelectTrigger id="language">
               <SelectValue />
             </SelectTrigger>
@@ -86,10 +113,13 @@ function GeneralSettings() {
               <SelectItem value="zh-CN">简体中文</SelectItem>
             </SelectContent>
           </Select>
+          {form.formState.errors.language && (
+            <p className="text-xs text-red-500 mt-1">{form.formState.errors.language.message}</p>
+          )}
         </div>
         <div>
           <Label htmlFor="timezone">Timezone</Label>
-          <Select defaultValue="UTC">
+          <Select defaultValue="UTC" onValueChange={(v) => form.setValue('timezone', v)}>
             <SelectTrigger id="timezone">
               <SelectValue />
             </SelectTrigger>
@@ -98,73 +128,120 @@ function GeneralSettings() {
               <SelectItem value="Asia/Shanghai">Asia/Shanghai</SelectItem>
             </SelectContent>
           </Select>
+          {form.formState.errors.timezone && (
+            <p className="text-xs text-red-500 mt-1">{form.formState.errors.timezone.message}</p>
+          )}
         </div>
-        <Button>Save Settings</Button>
-      </div>
+        <Button type="submit">Save Settings</Button>
+      </form>
     </div>
   )
 }
 
 function DomainSettings() {
+  const form = useForm<DomainSettingsFormValues>({
+    resolver: zodResolver(domainSettingsSchema),
+    defaultValues: {
+      main_domain: '',
+      dns_domain: '',
+      http_domain: '',
+    },
+  })
+
+  const onSubmit = (data: DomainSettingsFormValues) => {
+    console.log('Domain settings saved:', data)
+  }
+
   return (
     <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
       <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Domain</h3>
-      <div className="space-y-4">
+      <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
         <div>
           <Label htmlFor="main-domain">Main Domain</Label>
           <Input
             id="main-domain"
+            className="mt-1"
             placeholder="example.com"
+            {...form.register('main_domain')}
           />
+          {form.formState.errors.main_domain && (
+            <p className="text-xs text-red-500 mt-1">{form.formState.errors.main_domain.message}</p>
+          )}
         </div>
         <div>
           <Label htmlFor="dns-domain">DNS Domain</Label>
           <Input
             id="dns-domain"
+            className="mt-1"
             placeholder="dns.example.com"
+            {...form.register('dns_domain')}
           />
         </div>
         <div>
           <Label htmlFor="http-domain">HTTP Domain</Label>
           <Input
             id="http-domain"
+            className="mt-1"
             placeholder="http.example.com"
+            {...form.register('http_domain')}
           />
         </div>
-        <Button>Save Settings</Button>
-      </div>
+        <Button type="submit">Save Settings</Button>
+      </form>
     </div>
   )
 }
 
 function ListenerSettings() {
+  const form = useForm<ListenerSettingsFormValues>({
+    resolver: zodResolver(listenerSettingsSchema),
+    defaultValues: {
+      dns_listen: ':53',
+      http_listen: ':8080',
+      https_listen: ':8443',
+    },
+  })
+
+  const onSubmit = (data: ListenerSettingsFormValues) => {
+    console.log('Listener settings saved:', data)
+  }
+
   return (
     <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
       <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Listener</h3>
-      <div className="space-y-4">
+      <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
         <div>
           <Label htmlFor="dns-listen">DNS Listen Address</Label>
           <Input
             id="dns-listen"
-            defaultValue=":53"
+            className="mt-1"
+            {...form.register('dns_listen')}
           />
+          {form.formState.errors.dns_listen && (
+            <p className="text-xs text-red-500 mt-1">{form.formState.errors.dns_listen.message}</p>
+          )}
         </div>
         <div>
           <Label htmlFor="http-listen">HTTP Listen Address</Label>
           <Input
             id="http-listen"
-            defaultValue=":8080"
+            className="mt-1"
+            {...form.register('http_listen')}
           />
+          {form.formState.errors.http_listen && (
+            <p className="text-xs text-red-500 mt-1">{form.formState.errors.http_listen.message}</p>
+          )}
         </div>
         <div>
           <Label htmlFor="https-listen">HTTPS Listen Address</Label>
           <Input
             id="https-listen"
-            defaultValue=":8443"
+            className="mt-1"
+            {...form.register('https_listen')}
           />
         </div>
-        <Button>Save Settings</Button>
-      </div>
+        <Button type="submit">Save Settings</Button>
+      </form>
     </div>
   )
 }
