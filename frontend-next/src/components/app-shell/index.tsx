@@ -5,27 +5,31 @@ import { usePathname } from 'next/navigation'
 import { Sidebar } from './sidebar'
 import { TopBar } from './topbar'
 import { cn } from '@/lib/utils'
+import { useI18n, type TranslationKey } from '@/lib/i18n-context'
 
 /** Page title map keyed by route prefix */
-const PAGE_TITLES: Record<string, string> = {
-  '/dashboard/cases': 'Cases / Case Board',
-  '/dashboard/payloads/new': 'Payloads / New Payload',
-  '/dashboard/payloads': 'Payloads / Payload Studio',
-  '/dashboard/interactions': 'Interactions / Timeline',
-  '/dashboard/evidence-summary': 'Evidence / Summary',
-  '/dashboard/canary': 'Monitor / Canary Tokens',
-  '/dashboard/rebinding': 'Monitor / Rebinding Lab',
-  '/dashboard/workflow': 'Monitor / Workflow',
-  '/dashboard/settings': 'System / Settings',
-  '/dashboard/users': 'System / Users',
-  '/dashboard/apikeys': 'System / API Keys',
-  '/dashboard/audit': 'System / Audit Log',
-  '/dashboard/docs': 'System / Docs',
-  '/dashboard': 'Dashboard / Command Center',
+const PAGE_TITLES: Record<string, TranslationKey> = {
+  '/dashboard/cases': 'page.cases',
+  '/dashboard/payloads/new': 'page.payloads.new',
+  '/dashboard/payloads': 'page.payloads',
+  '/dashboard/agent-runs': 'page.agent-runs',
+  '/dashboard/interactions': 'page.interactions',
+  '/dashboard/evidence-summary': 'page.evidence-summary',
+  '/dashboard/canary': 'page.canary',
+  '/dashboard/rebinding': 'page.rebinding',
+  '/dashboard/workflow': 'page.workflow',
+  '/dashboard/scanner-hub': 'page.scanner-hub',
+  '/dashboard/marketplace': 'page.marketplace',
+  '/dashboard/settings': 'page.settings',
+  '/dashboard/users': 'page.users',
+  '/dashboard/apikeys': 'page.apikeys',
+  '/dashboard/audit': 'page.audit',
+  '/dashboard/docs': 'page.docs',
+  '/dashboard': 'page.dashboard',
 }
 
 /** Resolves the current page title from pathname */
-function resolvePageTitle(pathname: string): string {
+function resolvePageTitleKey(pathname: string): TranslationKey | null {
   // Longest prefix match
   const sorted = Object.keys(PAGE_TITLES).sort((a, b) => b.length - a.length)
   for (const key of sorted) {
@@ -33,7 +37,7 @@ function resolvePageTitle(pathname: string): string {
       return PAGE_TITLES[key]
     }
   }
-  return 'GODNSLOG'
+  return null
 }
 
 /** Props for the top-level AppShell wrapper */
@@ -44,6 +48,7 @@ interface AppShellProps {
 /** Enterprise AppShell: sidebar + topbar + main content area with responsive collapse */
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname()
+  const { t } = useI18n()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
@@ -53,7 +58,8 @@ export function AppShell({ children }: AppShellProps) {
     setMobileSidebarOpen(false)
   }, [pathname])
 
-  const pageTitle = resolvePageTitle(pathname)
+  const pageTitleKey = resolvePageTitleKey(pathname)
+  const pageTitle = pageTitleKey ? t(pageTitleKey) : 'GODNSLOG'
 
   const handleToggleSidebar = () => {
     // On mobile, toggle drawer; on desktop, toggle collapse

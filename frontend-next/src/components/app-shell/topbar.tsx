@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { useThemeStore } from '@/stores/theme-store'
 import { initTheme } from '@/stores/theme-store'
+import { useI18n, type TranslationKey } from '@/lib/i18n-context'
 
 /** Props for TopBar component */
 interface TopBarProps {
@@ -57,6 +58,7 @@ type ThemeMode = 'light' | 'dark' | 'system'
 export function TopBar({ onToggleSidebar, pageTitle }: TopBarProps) {
   const router = useRouter()
   const { theme, setTheme } = useThemeStore()
+  const { t } = useI18n()
   const [username, setUsername] = useState<string>('Admin')
 
   useEffect(() => {
@@ -83,10 +85,10 @@ export function TopBar({ onToggleSidebar, pageTitle }: TopBarProps) {
     router.push('/login')
   }
 
-  const themeLabel: Record<ThemeMode, string> = {
-    light: 'Light',
-    dark: 'Dark',
-    system: 'System',
+  const themeLabel: Record<ThemeMode, TranslationKey> = {
+    light: 'topbar.theme.light',
+    dark: 'topbar.theme.dark',
+    system: 'topbar.theme.system',
   }
 
   return (
@@ -116,20 +118,20 @@ export function TopBar({ onToggleSidebar, pageTitle }: TopBarProps) {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="gap-1 text-xs text-gray-500 dark:text-gray-400">
               {theme === 'dark' ? <MoonIcon /> : <SunIcon />}
-              <span className="hidden sm:inline">{themeLabel[theme]}</span>
+              <span className="hidden sm:inline">{t(themeLabel[theme])}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => handleThemeChange('light')}>
               <SunIcon />
-              <span className="ml-2">Light</span>
+              <span className="ml-2">{t('topbar.theme.light')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleThemeChange('dark')}>
               <MoonIcon />
-              <span className="ml-2">Dark</span>
+              <span className="ml-2">{t('topbar.theme.dark')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleThemeChange('system')}>
-              <span className="ml-2">System</span>
+              <span className="ml-2">{t('topbar.theme.system')}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -155,14 +157,14 @@ export function TopBar({ onToggleSidebar, pageTitle }: TopBarProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem onClick={() => router.push('/dashboard/settings')}>
-              Profile &amp; Settings
+              {t('topbar.profile')}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push('/dashboard/apikeys')}>
-              API Keys
+              {t('topbar.apikeys')}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="text-red-600">
-              Sign Out
+              {t('topbar.signout')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

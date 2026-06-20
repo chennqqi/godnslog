@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { QueryProvider } from '@/components/query-provider'
+import { I18nProvider } from '@/lib/i18n-context'
 
 export const metadata: Metadata = {
   title: 'GODNSLOG 2.0 - OAST Interaction Verification Platform',
@@ -22,7 +23,9 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans antialiased">
-        <QueryProvider>{children}</QueryProvider>
+        <I18nProvider>
+          <QueryProvider>{children}</QueryProvider>
+        </I18nProvider>
       </body>
     </html>
   )
