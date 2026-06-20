@@ -181,6 +181,7 @@ func (s *Server) Run(ctx context.Context) error {
 		{Name: "explain_evidence", Description: "Generate a detailed AI-powered evidence explanation with findings and remediation steps", Execute: s.explainEvidence},
 		{Name: "list_agent_runs", Description: "List agent runs with optional filtering", Execute: s.listAgentRuns},
 		{Name: "get_agent_run", Description: "Get detailed information about a specific agent run", Execute: s.getAgentRun},
+		{Name: "complete_agent_run", Description: "Complete an agent run: generate review, export evidence, record decision, and update status to completed", Execute: s.completeAgentRun},
 		{Name: "revoke_token", Description: "Revoke API token", Execute: s.revokeToken},
 	}
 
@@ -915,6 +916,62 @@ func (s *Server) getAgentRun(ctx context.Context, args map[string]interface{}) (
 	result, err := s.apiCall("GET", fmt.Sprintf("/api/v2/agent-runs/%s", runID), nil)
 	if err != nil {
 		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	if resp, ok := result.(map[string]interface{}); ok {
+		if data, ok := resp["data"].(map[string]interface{}); ok {
+			return ToolResult{Success: true, Data: data}, nil
+		}
+	}
+
+	return ToolResult{Success: true, Data: result}, nil
+}
+
+// completeAgentRun orchestrates the full agent run completion loop via the v2 API.
+func (s *Server) completeAgentRun(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	if err := s.checkToolPermission(ctx, "complete_agent_run"); err != nil {
+		return ToolResult{Success: false, Error: err.Error()}, nil
+	}
+
+	agentRunID, _ := args["agent_run_id"].(string)
+	if len(agentRunID) == 0 {
+		return ToolResult{Success: false, Error: "agent_run_id is required"}, nil
+	}
+
+	format := "json"
+	if f, ok := args["format"].(string); ok && f != "" {
+		format = f
+	}
+
+	decision := ""
+	if d, ok := args["decision"].(string); ok {
+		decision = d
+	}
+
+	decisionReason := ""
+	if r, ok := args["decision_reason"].(string); ok {
+		decisionReason = r
+	}
+
+	includeAudit := false
+	if a, ok := args["include_audit"].(bool); ok {
+		includeAudit = a
+	}
+
+	reqBody := map[string]interface{}{
+		"format":        format,
+		"include_audit": includeAudit,
+	}
+	if decision != "" {
+		reqBody["decision"] = decision
+	}
+	if decisionReason != "" {
+		reqBody["decision_reason"] = decisionReason
+	}
+
+	result, err := s.apiCall("POST", fmt.Sprintf("/api/v2/agent-runs/%s/complete", agentRunID), reqBody)
+	if err != nil {
+		return ToolResult{Success: false, Error: fmt.Sprintf("failed to complete agent run: %v", err)}, nil
 	}
 
 	if resp, ok := result.(map[string]interface{}); ok {

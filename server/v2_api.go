@@ -235,6 +235,7 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			agentRuns.GET("/review-package-trace", self.v2TraceReviewPackage)
 			agentRuns.GET("/review-queue", self.v2ListReviewQueue)
 			agentRuns.GET("/:id/followups", self.v2ListFollowupHistory)
+			agentRuns.POST("/:id/complete", self.v2CompleteAgentRun)
 		}
 	}
 }
@@ -4045,6 +4046,47 @@ func (self *WebServer) v2ListReviewQueue(c *gin.Context) {
 		"message": "success",
 		"data":    resp,
 	})
+}
+
+// v2CompleteAgentRun orchestrates the full agent run completion loop
+func (self *WebServer) v2CompleteAgentRun(c *gin.Context) {
+	id := c.Param("id")
+
+	var req agentrun.CompleteAgentRunRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "Invalid request body"})
+		return
+	}
+
+	user := c.MustGet("user").(*models.TblUser)
+	userID := strconv.FormatInt(user.Id, 10)
+
+	authService := auth.NewService(self.orm)
+	agentRunService := agentrun.NewService(self.orm, authService)
+	interactionService := interaction.NewService(self.orm)
+	evidenceService := interaction.NewEvidenceService(interactionService)
+	reviewService := agentrun.NewReviewService(self.orm, agentRunService, authService, evidenceService, interactionService)
+
+	resp, err := reviewService.CompleteAgentRun(id, &req, userID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "Agent run not found"})
+			return
+		}
+		if strings.Contains(err.Error(), "already in terminal status") {
+			c.JSON(http.StatusConflict, gin.H{"code": 409, "message": err.Error()})
+			return
+		}
+		if strings.Contains(err.Error(), "invalid format") || strings.Contains(err.Error(), "invalid decision") {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+			return
+		}
+		logrus.Errorf("[v2_api.go::v2CompleteAgentRun] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to complete agent run"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": resp})
 }
 
 // v2ListDNSRecords lists DNS resolve records with pagination
