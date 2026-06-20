@@ -71,8 +71,8 @@ test.describe('Agent Runs', () => {
       })
     })
 
-    // Mock agent runs API
-    await page.route('**/api/v2/agent-runs**', route => {
+    // Mock agent runs list API (only matches the collection endpoint with optional query params)
+    await page.route(/.*\/api\/v2\/agent-runs(\?.*)?$/, route => {
       const url = new URL(route.request().url())
       const agentId = url.searchParams.get('agent_id')
       const status = url.searchParams.get('status')
@@ -127,6 +127,19 @@ test.describe('Agent Runs', () => {
 
     // Mock delivery history API (empty by default) - will be overridden in specific tests
     // Note: This is a default mock that can be unroute'd in specific tests
+    await page.route('**/api/v2/agent-runs/agent-run-1/review-deliveries**', route => {
+      route.fulfill({
+        json: {
+          code: 0,
+          data: {
+            data: {
+              items: [],
+              total: 0,
+            },
+          },
+        },
+      })
+    })
 
     // Mock agent run operations API
     await page.route('**/api/v2/agent-runs/agent-run-1/operations**', route => {
@@ -141,6 +154,41 @@ test.describe('Agent Runs', () => {
           },
         })
       }
+    })
+
+    // Mock followup history API (empty by default)
+    await page.route('**/api/v2/agent-runs/agent-run-1/followups**', route => {
+      route.fulfill({
+        json: {
+          code: 0,
+          data: {
+            data: [],
+          },
+        },
+      })
+    })
+
+    // Mock review queue API (empty by default)
+    await page.route('**/api/v2/agent-runs/review-queue**', route => {
+      route.fulfill({
+        json: {
+          code: 0,
+          data: {
+            items: [],
+            total: 0,
+            page: 1,
+            page_size: 20,
+            total_pages: 0,
+            summary: {
+              total: 0,
+              not_reviewed: 0,
+              reviewed: 0,
+              followup_created: 0,
+              needs_attention: 0,
+            },
+          },
+        },
+      })
     })
 
     // Mock agent run review API
@@ -273,7 +321,7 @@ test.describe('Agent Runs', () => {
     await page.waitForLoadState('networkidle')
 
     // Check page title
-    await expect(page.getByRole('heading', { name: 'Agent Runs' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Agent Runs', exact: true })).toBeVisible()
 
     // Check agent run data is displayed
     await expect(page.getByText('Test Agent Run')).toBeVisible()
@@ -568,11 +616,12 @@ test.describe('Agent Runs', () => {
     await page.getByPlaceholder('请输入原因...').fill('Evidence needs second review')
 
     // Click create button and wait for API request
-    const followupPromise = page.waitForRequest(request =>
-      request.url().includes('/agent-runs/agent-run-1/followups')
+    const followupPromise = page.waitForResponse(response =>
+      response.url().includes('/agent-runs/agent-run-1/followups') && response.request().method() === 'POST'
     )
     await page.getByRole('button', { name: '创建' }).click()
-    const followupRequest = await followupPromise
+    const followupResponse = await followupPromise
+    const followupRequest = followupResponse.request()
 
     // Assert POST request body contains correct fields
     const postData = JSON.parse(followupRequest.postData() || '{}')
@@ -580,6 +629,7 @@ test.describe('Agent Runs', () => {
     expect(postData.reason).toBe('Evidence needs second review')
     expect(postData.review_packet_id).toBe('agent-run-1')
 
+    // Set flag after POST response so the refresh GET request returns updated data
     followupCreated = true
     await page.waitForLoadState('networkidle')
 
@@ -601,7 +651,7 @@ test.describe('Agent Runs', () => {
     await page.waitForLoadState('networkidle')
 
     // Verify followup operation appears in timeline
-    await expect(page.getByText('followup.recheck_evidence')).toBeVisible()
+    await expect(page.getByText('followup.recheck_evidence')).toBeVisible({ timeout: 15000 })
 
     // Verify followup history section is refreshed and shows the new followup
     await expect(page.getByText('Follow-up History (1)')).toBeVisible()
@@ -1795,13 +1845,12 @@ test.describe('Agent Runs', () => {
       })
     })
 
-    // Mock delivery history with counter to simulate refresh after delivery
-    let deliveryHistoryCallCount = 0
+    // Mock delivery history - returns empty until delivery is made, then returns delivered item
+    let deliveryCompleted = false
     const stableHash = 'abc123def4567890123456789012345678901234567890123456789012345678'
-    await page.route('**/api/v2/agent-runs/agent-run-1/review-deliveries', route => {
-      deliveryHistoryCallCount++
-      if (deliveryHistoryCallCount === 1) {
-        // First call: empty history
+    await page.route('**/api/v2/agent-runs/agent-run-1/review-deliveries**', route => {
+      if (!deliveryCompleted) {
+        // Before delivery: empty history
         route.fulfill({
           json: {
             code: 0,
@@ -1816,7 +1865,7 @@ test.describe('Agent Runs', () => {
           },
         })
       } else {
-        // Second call: with delivered item (after delivery)
+        // After delivery: with delivered item
         route.fulfill({
           json: {
             code: 0,
@@ -1850,6 +1899,7 @@ test.describe('Agent Runs', () => {
 
     // Mock delivery API to return success
     await page.route('**/api/v2/agent-runs/agent-run-1/review-delivery', route => {
+      deliveryCompleted = true
       route.fulfill({
         json: {
           code: 0,

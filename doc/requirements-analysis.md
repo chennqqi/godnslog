@@ -271,3 +271,27 @@ Sprint X 验收完成后，Evidence Summary API 已就绪但 MCP 工具缺失，
 3. 添加 4 个测试：success、scanner_run_id、missing params、permission denied
 4. 更新 MCP_SERVER_USAGE.md、verification.md
 5. 创建 acceptance 文档并提交
+
+## 2026-06-20
+
+Reviewed `docs/superpowers/specs/2026-06-20-mvp-to-production-design.md` and produced a review document at `docs/superpowers/reviews/2026-06-20-mvp-to-production-design-review.md`.
+
+Analysis:
+- The spec is a well-structured recovery plan with correct bottom-up phasing and accurate diagnosis of backend stubs, 1.0 feature loss, and frontend quality gaps.
+- Found contradictions: status line says "Approved (pending spec review)", and §3.4 duplicates §4.6.
+- Under-specified areas: APIKey bcrypt migration algorithm, outbound-action allowlist configuration, 1.0-to-2.0 upgrade path, and testing coverage targets.
+- Phase 4 vs. Phase 3 sequencing needs clarification because both have frontend UI work.
+- Phase 5 effort estimate (4-6 weeks) is optimistic for real protocol listeners + HA; recommend splitting or adding buffer.
+
+Verdict: Conditionally approved. Recommended resolving the listed issues before using the spec as the implementation baseline.
+
+## 2026-06-20 (re-review)
+
+Re-reviewed the updated `docs/superpowers/specs/2026-06-20-mvp-to-production-design.md` and updated the review document at `docs/superpowers/reviews/2026-06-20-mvp-to-production-design-review.md`.
+
+Analysis:
+- All 10 blockers from the first review have been addressed in the updated spec.
+- Status wording fixed, §3.4/§4.6 deduplicated, APIKey migration algorithm concretized, outbound security detailed, Phase 4/Phase 3 sequencing clarified, Phase 5 split into 5a/5b, MCP decomposed into 3 deliverables, testing strategy added, 1.0→2.0 upgrade path added, and decisions table/risk assessment strengthened.
+- The updated spec is coherent, consistent, and sufficiently detailed for implementation.
+
+Verdict: Approved. The spec is ready to serve as the engineering baseline.

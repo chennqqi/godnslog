@@ -327,7 +327,7 @@ test.describe('Scanner Hub', () => {
 
   test('should load scanner hub workspace', async ({ page }) => {
     await openScannerHub(page)
-    await expect(page.getByRole('heading', { name: 'Scanner Hub' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Scanner Hub', exact: true })).toBeVisible()
     await expect(page.getByText('多工具 OAST 适配器工作台')).toBeVisible()
     await expect(page.getByRole('heading', { name: '选择 Scanner Adapter' })).toBeVisible()
     await expect(page.getByText('Burp Suite')).toBeVisible()
