@@ -38,6 +38,13 @@ var caseDeleteCmd = &cobra.Command{
 	RunE:  runCaseDelete,
 }
 
+var caseCloseCmd = &cobra.Command{
+	Use:   "close [case-id]",
+	Short: "Close a case",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runCaseClose,
+}
+
 var (
 	caseTitle       string
 	caseDescription string
@@ -50,6 +57,7 @@ func init() {
 	caseCmd.AddCommand(caseListCmd)
 	caseCmd.AddCommand(caseGetCmd)
 	caseCmd.AddCommand(caseDeleteCmd)
+	caseCmd.AddCommand(caseCloseCmd)
 
 	caseCreateCmd.Flags().StringVar(&caseTitle, "title", "", "Case title (required)")
 	caseCreateCmd.Flags().StringVar(&caseDescription, "description", "", "Case description")
@@ -175,6 +183,32 @@ func runCaseGet(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Tags: %v\n", resp.Data.Tags)
 	fmt.Printf("Created: %s\n", resp.Data.CreatedAt)
 	fmt.Printf("Updated: %s\n", resp.Data.UpdatedAt)
+
+	return nil
+}
+
+func runCaseClose(cmd *cobra.Command, args []string) error {
+	caseID := args[0]
+
+	req := map[string]string{"status": "closed"}
+	body, err := apiRequest("PUT", "/cases/"+caseID+"/status", req)
+	if err != nil {
+		return fmt.Errorf("failed to close case: %w", err)
+	}
+
+	var resp struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if resp.Code != 0 {
+		return fmt.Errorf("API error: %s", resp.Message)
+	}
+
+	fmt.Printf("Case %s closed successfully\n", caseID)
 
 	return nil
 }

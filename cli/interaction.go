@@ -95,6 +95,15 @@ func runInteractionList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("API error: %s", resp.Message)
 	}
 
+	if outputFormat == "json" {
+		jsonBytes, err := json.MarshalIndent(resp.Data, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal JSON: %w", err)
+		}
+		fmt.Println(string(jsonBytes))
+		return nil
+	}
+
 	fmt.Printf("Total interactions: %d\n\n", resp.Data.Total)
 	for _, i := range resp.Data.Items {
 		fmt.Printf("ID: %s\n", i.ID)

@@ -24,6 +24,20 @@ var payloadListCmd = &cobra.Command{
 	RunE:  runPayloadList,
 }
 
+var payloadRevokeCmd = &cobra.Command{
+	Use:   "revoke [payload-id]",
+	Short: "Revoke a payload",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runPayloadRevoke,
+}
+
+var payloadPreviewCmd = &cobra.Command{
+	Use:   "preview [payload-id]",
+	Short: "Preview payload details and rendered output",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runPayloadPreview,
+}
+
 var (
 	payloadTemplate string
 	payloadCaseID   string
@@ -34,6 +48,8 @@ var (
 func init() {
 	payloadCmd.AddCommand(payloadCreateCmd)
 	payloadCmd.AddCommand(payloadListCmd)
+	payloadCmd.AddCommand(payloadRevokeCmd)
+	payloadCmd.AddCommand(payloadPreviewCmd)
 
 	payloadCreateCmd.Flags().StringVar(&payloadTemplate, "template", "", "Payload template (required)")
 	payloadCreateCmd.Flags().StringVar(&payloadCaseID, "case-id", "", "Case ID to bind payload to")
@@ -130,6 +146,66 @@ func runPayloadList(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Created: %s\n", p.CreatedAt)
 		fmt.Println()
 	}
+
+	return nil
+}
+
+func runPayloadRevoke(cmd *cobra.Command, args []string) error {
+	payloadID := args[0]
+
+	req := map[string]string{"status": "revoked"}
+	body, err := apiRequest("PUT", "/payloads/"+payloadID+"/status", req)
+	if err != nil {
+		return fmt.Errorf("failed to revoke payload: %w", err)
+	}
+
+	var resp struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if resp.Code != 0 {
+		return fmt.Errorf("API error: %s", resp.Message)
+	}
+
+	fmt.Printf("Payload %s revoked successfully\n", payloadID)
+
+	return nil
+}
+
+func runPayloadPreview(cmd *cobra.Command, args []string) error {
+	payloadID := args[0]
+
+	body, err := apiRequest("GET", "/payloads/"+payloadID, nil)
+	if err != nil {
+		return fmt.Errorf("failed to get payload: %w", err)
+	}
+
+	var resp struct {
+		Code    int      `json:"code"`
+		Message string   `json:"message"`
+		Data    *Payload `json:"data"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if resp.Code != 0 {
+		return fmt.Errorf("API error: %s", resp.Message)
+	}
+
+	fmt.Printf("ID: %s\n", resp.Data.ID)
+	fmt.Printf("Token: %s\n", resp.Data.Token)
+	fmt.Printf("Template: %s\n", resp.Data.Template)
+	fmt.Printf("Case ID: %s\n", resp.Data.CaseID)
+	fmt.Printf("Status: %s\n", resp.Data.Status)
+	fmt.Printf("Rendered Payload: %s\n", resp.Data.RenderedPayload)
+	fmt.Printf("Variables: %v\n", resp.Data.Variables)
+	fmt.Printf("Expires At: %s\n", resp.Data.ExpiresAt)
+	fmt.Printf("Created At: %s\n", resp.Data.CreatedAt)
 
 	return nil
 }
