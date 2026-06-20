@@ -3,6 +3,7 @@ package rule
 import (
 	"context"
 	"fmt"
+	"net"
 	"regexp"
 	"strings"
 	"time"
@@ -260,11 +261,17 @@ func parseTime(t string) int {
 	return hour*60 + minute
 }
 
-// matchCIDR checks if an IP matches a CIDR range
+// matchCIDR checks if an IP matches a CIDR range using net.ParseCIDR
 func matchCIDR(cidr, ip string) bool {
-	// Simplified CIDR matching - in production use net.ParseCIDR
-	// This is a placeholder for proper CIDR matching
-	return strings.HasPrefix(ip, strings.TrimSuffix(cidr, "/32"))
+	_, network, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return false
+	}
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return false
+	}
+	return network.Contains(parsedIP)
 }
 
 // contains checks if a string is in a slice

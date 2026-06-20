@@ -30,8 +30,7 @@ func (e *Executor) Execute(ctx context.Context, rule *Rule, inter map[string]int
 
 	// Discard noise action
 	if actions.DiscardNoise {
-		// Mark interaction as noise (implementation depends on storage)
-		// This is a placeholder for noise filtering
+		inter["_noise"] = true
 	}
 
 	// Execute notifications
@@ -216,18 +215,49 @@ func (e *Executor) sendWebhookNotification(ctx context.Context, notif Notificati
 	return e.sendHTTP(ctx, webhookURL, "POST", nil, payload)
 }
 
-// executeTagAction executes tag actions
+// executeTagAction executes tag actions by updating the interaction's tags in-memory.
+// The caller is responsible for persisting the updated tags to the database.
 func (e *Executor) executeTagAction(ctx context.Context, tag TagAction, inter map[string]interface{}) error {
-	// Tag actions require interaction with the interaction storage
-	// This is a placeholder for tag action implementation
-	// In production, this would update the interaction's tags in the database
+	existingTags, _ := inter["_tags"].([]string)
+	tags := append([]string{}, existingTags...)
+
+	// Add tags (deduplicate)
+	for _, addTag := range tag.Add {
+		exists := false
+		for _, t := range tags {
+			if t == addTag {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			tags = append(tags, addTag)
+		}
+	}
+
+	// Remove tags
+	if len(tag.Remove) > 0 {
+		removeSet := make(map[string]bool, len(tag.Remove))
+		for _, r := range tag.Remove {
+			removeSet[r] = true
+		}
+		filtered := tags[:0]
+		for _, t := range tags {
+			if !removeSet[t] {
+				filtered = append(filtered, t)
+			}
+		}
+		tags = filtered
+	}
+
+	inter["_tags"] = tags
 	return nil
 }
 
 // executeWebhook executes a webhook forwarding action
 func (e *Executor) executeWebhook(ctx context.Context, webhook Webhook, inter map[string]interface{}) error {
 	body := e.renderTemplate(webhook.Body, inter)
-	
+
 	var payload interface{}
 	if err := json.Unmarshal([]byte(body), &payload); err != nil {
 		// If not JSON, send as plain text
@@ -237,10 +267,17 @@ func (e *Executor) executeWebhook(ctx context.Context, webhook Webhook, inter ma
 	return e.sendHTTP(ctx, webhook.URL, webhook.Method, webhook.Headers, payload)
 }
 
-// executeReport executes a report generation action
+// executeReport generates a report from the interaction data and stores it in-memory.
+// The caller is responsible for persisting the report to the evidence system.
 func (e *Executor) executeReport(ctx context.Context, report Report, inter map[string]interface{}) error {
-	// Report generation requires interaction with the evidence export system
-	// This is a placeholder for report generation
+	reportData := map[string]interface{}{
+		"title":          report.Title,
+		"format":         report.Format,
+		"interaction_id": inter["id"],
+		"source_ip":      inter["source_ip"],
+		"type":           inter["type"],
+	}
+	inter["_report"] = reportData
 	return nil
 }
 
