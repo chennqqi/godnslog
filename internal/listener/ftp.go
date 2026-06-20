@@ -39,9 +39,11 @@ func NewFTPListener(config *ListenerConfig, store Store, listener *Listener) *FT
 // DefaultFTPConfig returns default FTP configuration
 func DefaultFTPConfig() *ListenerConfig {
 	return &ListenerConfig{
-		MaxConnections: 10,
-		Timeout:        30 * time.Second,
-		BufferSize:     4096,
+		MaxConnections:           500,
+		Timeout:                  30 * time.Second,
+		BufferSize:               4096,
+		RateLimitMax:             500,
+		MaxConcurrentConnections: 200,
 	}
 }
 

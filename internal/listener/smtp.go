@@ -37,10 +37,12 @@ func NewSMTPListener(listener *Listener, config *ListenerConfig, store Store, lo
 // DefaultSMTPConfig returns default SMTP configuration
 func DefaultSMTPConfig() *ListenerConfig {
 	return &ListenerConfig{
-		MaxConnections: 100,
-		Timeout:        30 * time.Second,
-		BufferSize:     4096,
-		EnableTLS:      false,
+		MaxConnections:           1000,
+		Timeout:                  30 * time.Second,
+		BufferSize:               4096,
+		EnableTLS:                false,
+		RateLimitMax:             1000,
+		MaxConcurrentConnections: 500,
 	}
 }
 

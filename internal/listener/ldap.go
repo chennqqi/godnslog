@@ -36,10 +36,12 @@ func NewLDAPListener(listener *Listener, config *ListenerConfig, store Store, lo
 // DefaultLDAPConfig returns default LDAP configuration
 func DefaultLDAPConfig() *ListenerConfig {
 	return &ListenerConfig{
-		MaxConnections: 100,
-		Timeout:        30 * time.Second,
-		BufferSize:     4096,
-		EnableTLS:      false,
+		MaxConnections:           1000,
+		Timeout:                  30 * time.Second,
+		BufferSize:               4096,
+		EnableTLS:                false,
+		RateLimitMax:             1000,
+		MaxConcurrentConnections: 500,
 	}
 }
 

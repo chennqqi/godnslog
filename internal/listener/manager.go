@@ -152,12 +152,23 @@ func (m *Manager) ActiveCount() int {
 func (m *Manager) startListener(ctx context.Context, l *Listener) error {
 	cfg := m.getConfigForProtocol(l.Protocol)
 
-	// Create rate and connection limiters
-	rateLim := NewRateLimiter(1*time.Minute, cfg.MaxConnections)
-	connLim := NewConnLimiter(cfg.MaxConnections)
+	// Determine rate limit and concurrent connection limits
+	rateMax := cfg.RateLimitMax
+	if rateMax == 0 {
+		rateMax = cfg.MaxConnections
+	}
+	concurrentMax := cfg.MaxConcurrentConnections
+	if concurrentMax == 0 {
+		concurrentMax = cfg.MaxConnections
+	}
 
-	// Register security context so listeners can check limits in accept loop
-	sc := NewSecurityContext(rateLim, connLim)
+	// Create rate and connection limiters with independent limits
+	rateLim := NewRateLimiter(1*time.Minute, rateMax)
+	connLim := NewConnLimiter(concurrentMax)
+
+	// Register security context so listeners can check limits in accept loop.
+	// The store is passed so rejected connections can be recorded as interactions.
+	sc := NewSecurityContext(rateLim, connLim, cfg.WhitelistCIDRs, m.store, l.ID, l.Protocol, m.logger)
 	SetSecurityContext(l.ID, sc)
 
 	// Create the store wrapper with rate limiting
