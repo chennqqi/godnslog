@@ -33,14 +33,44 @@ test.describe('Payloads Page', () => {
     await expect(page.getByPlaceholder('Search by token or template...')).toBeVisible();
   });
 
-  test('should display payload detail from API', async ({ page }) => {
-    await page.route('**/api/v2/payloads/payload-1', route => route.fulfill({
-      json: { code: 0, data: { id: 'payload-1', token: 'tok-1', value: 'https://tok-1.example.com' } }
-    }))
-    await page.goto('/dashboard/payloads/payload-1')
-    await page.waitForLoadState('domcontentloaded')
-    await page.waitForTimeout(2000)
-    // Detail page may not exist yet, skip for now
-    test.skip()
+  test('should display payload detail from API', async ({ page, context }) => {
+    await context.addInitScript(() => {
+      localStorage.setItem('token', 'mock-token');
+      localStorage.setItem('user', JSON.stringify({ id: 1, username: 'admin', email: 'admin@godnslog.com', role: 0, lang: 'en-US' }));
+    });
+
+    await page.route('**/api/**', route => {
+      const url = route.request().url();
+      if (url.match(/\/payloads\/payload-1$/)) {
+        return route.fulfill({
+          json: {
+            code: 0,
+            data: {
+              id: 'payload-1',
+              token: 'tok-1',
+              template: 'ssrf_http',
+              rendered_payload: 'https://tok-1.example.com/test',
+              status: 'deployed',
+              created_at: new Date().toISOString(),
+            }
+          }
+        });
+      }
+      if (url.includes('/interactions')) {
+        return route.fulfill({
+          json: { code: 0, data: { items: [], total: 0, page: 1, page_size: 5, total_pages: 0 } }
+        });
+      }
+      return route.fulfill({ json: { code: 0, data: {} } });
+    });
+
+    await page.goto('/dashboard/payloads/payload-1');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+
+    // Verify payload detail page displays key elements
+    await expect(page.locator('h2').first()).toContainText('ssrf_http');
+    await expect(page.locator('text=tok-1').first()).toBeVisible();
+    await expect(page.locator('text=https://tok-1.example.com/test').first()).toBeVisible();
   });
 });

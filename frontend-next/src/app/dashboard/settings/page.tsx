@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { settingsApi } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -74,6 +75,7 @@ export default function SettingsPage() {
 }
 
 function GeneralSettings() {
+  const [saving, setSaving] = useState(false)
   const form = useForm<GeneralSettingsFormValues>({
     resolver: zodResolver(generalSettingsSchema),
     defaultValues: {
@@ -83,8 +85,27 @@ function GeneralSettings() {
     },
   })
 
-  const onSubmit = (data: GeneralSettingsFormValues) => {
-    console.log('General settings saved:', data)
+  useEffect(() => {
+    settingsApi.get().then((resp) => {
+      const data = resp.data as Record<string, unknown> | undefined
+      if (data) {
+        const settings = (data as { data?: Record<string, unknown> }).data || data
+        if (settings.system_name) form.reset({ ...form.getValues(), system_name: settings.system_name as string })
+        if (settings.language) form.setValue('language', settings.language as 'en-US' | 'zh-CN')
+        if (settings.timezone) form.setValue('timezone', settings.timezone as string)
+      }
+    }).catch(() => {})
+  }, [form])
+
+  const onSubmit = async (data: GeneralSettingsFormValues) => {
+    setSaving(true)
+    try {
+      await settingsApi.update({ general: data })
+    } catch (error) {
+      console.error('Failed to save general settings:', error)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -132,13 +153,14 @@ function GeneralSettings() {
             <p className="text-xs text-red-500 mt-1">{form.formState.errors.timezone.message}</p>
           )}
         </div>
-        <Button type="submit">Save Settings</Button>
+        <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Settings'}</Button>
       </form>
     </div>
   )
 }
 
 function DomainSettings() {
+  const [saving, setSaving] = useState(false)
   const form = useForm<DomainSettingsFormValues>({
     resolver: zodResolver(domainSettingsSchema),
     defaultValues: {
@@ -148,8 +170,27 @@ function DomainSettings() {
     },
   })
 
-  const onSubmit = (data: DomainSettingsFormValues) => {
-    console.log('Domain settings saved:', data)
+  useEffect(() => {
+    settingsApi.get().then((resp) => {
+      const data = resp.data as Record<string, unknown> | undefined
+      if (data) {
+        const settings = (data as { data?: Record<string, unknown> }).data || data
+        if (settings.main_domain) form.setValue('main_domain', settings.main_domain as string)
+        if (settings.dns_domain) form.setValue('dns_domain', settings.dns_domain as string)
+        if (settings.http_domain) form.setValue('http_domain', settings.http_domain as string)
+      }
+    }).catch(() => {})
+  }, [form])
+
+  const onSubmit = async (data: DomainSettingsFormValues) => {
+    setSaving(true)
+    try {
+      await settingsApi.update({ domain: data })
+    } catch (error) {
+      console.error('Failed to save domain settings:', error)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -186,13 +227,14 @@ function DomainSettings() {
             {...form.register('http_domain')}
           />
         </div>
-        <Button type="submit">Save Settings</Button>
+        <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Settings'}</Button>
       </form>
     </div>
   )
 }
 
 function ListenerSettings() {
+  const [saving, setSaving] = useState(false)
   const form = useForm<ListenerSettingsFormValues>({
     resolver: zodResolver(listenerSettingsSchema),
     defaultValues: {
@@ -202,8 +244,27 @@ function ListenerSettings() {
     },
   })
 
-  const onSubmit = (data: ListenerSettingsFormValues) => {
-    console.log('Listener settings saved:', data)
+  useEffect(() => {
+    settingsApi.get().then((resp) => {
+      const data = resp.data as Record<string, unknown> | undefined
+      if (data) {
+        const settings = (data as { data?: Record<string, unknown> }).data || data
+        if (settings.dns_listen) form.setValue('dns_listen', settings.dns_listen as string)
+        if (settings.http_listen) form.setValue('http_listen', settings.http_listen as string)
+        if (settings.https_listen) form.setValue('https_listen', settings.https_listen as string)
+      }
+    }).catch(() => {})
+  }, [form])
+
+  const onSubmit = async (data: ListenerSettingsFormValues) => {
+    setSaving(true)
+    try {
+      await settingsApi.update({ listener: data })
+    } catch (error) {
+      console.error('Failed to save listener settings:', error)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -240,7 +301,7 @@ function ListenerSettings() {
             {...form.register('https_listen')}
           />
         </div>
-        <Button type="submit">Save Settings</Button>
+        <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Settings'}</Button>
       </form>
     </div>
   )

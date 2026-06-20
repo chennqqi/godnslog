@@ -18,6 +18,7 @@ function EvidenceReportContent() {
   const [evidence, setEvidence] = useState<Evidence | null>(null)
   const [reportContent, setReportContent] = useState('')
   const [error, setError] = useState<string>('')
+  const [redactSensitive, setRedactSensitive] = useState(false)
 
   // Get scope from URL
   const caseId = searchParams.get('case_id')
@@ -44,7 +45,7 @@ function EvidenceReportContent() {
     setEvidence(null)
     setReportContent('')
     try {
-      const params: { format: 'json' | 'markdown'; case_id?: string; payload_id?: string } = { format }
+      const params: { format: 'json' | 'markdown'; case_id?: string; payload_id?: string; redact_sensitive?: boolean } = { format, redact_sensitive: redactSensitive }
       if (scope === 'case') {
         params.case_id = id
       } else {
@@ -72,7 +73,7 @@ function EvidenceReportContent() {
     } finally {
       setGenerating(false)
     }
-  }, [format])
+  }, [format, redactSensitive])
 
   // Set format from URL param if present
   useEffect(() => {
@@ -110,6 +111,7 @@ function EvidenceReportContent() {
       const response = await evidenceApi.generate({
         case_id: selectedCase,
         format: format,
+        redact_sensitive: redactSensitive,
       })
       if (response.code === 0 && response.data) {
         setEvidence(response.data.evidence)
@@ -251,6 +253,18 @@ function EvidenceReportContent() {
                   <option value="markdown">Markdown</option>
                   <option value="json">JSON</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={redactSensitive}
+                    onChange={(e) => setRedactSensitive(e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  Redact sensitive data (IPs, tokens, headers)
+                </label>
               </div>
 
               <div className="flex space-x-2">

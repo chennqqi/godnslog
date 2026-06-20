@@ -302,3 +302,21 @@ Verdict: Approved. The spec is ready to serve as the engineering baseline.
 - 实际验证：`go build`/`go test` 通过，但 `go vet`、`gofmt`、前端 lint、E2E 均失败。
 - 与 ROADMAP 对照：MVP 雏形存在，2.1-2.3 大量功能仍为 stub 或测试缺失。
 - 结论：不满足生产可用，需按已批准 spec 分阶段补齐后端实现、前端质量与部署工程。
+
+## 2026-06-20 (Phase 1 acceptance)
+
+执行 Phase 1 后端验收。
+- 5 个子计划均实现并通过测试；核心 stub 已清理，`go vet`/`gofmt` 通过，前端 lint/E2E 回归通过。
+- 覆盖率：`internal/workflow` 75.7%，其余相关包仍低于 60%，需持续补齐。
+- 阻塞项：`Dockerfile` 因 `CGO_ENABLED=1` 缺少 `gcc`、引用不存在的 `public` 目录、UID 冲突导致构建失败，已一并修复并验证构建通过；容器运行架构和 docker-compose 端口暴露仍需同步调整。
+
+## 2026-06-20 (Phase 2 analysis)
+
+Phase 2 评估发现大部分功能已在之前 sprint 中实现，剩余缺口：
+- 4.1 Case Management: edit form with RHF+Zod, stats display, associated payloads/interactions — 已完整
+- 4.2 Payload Management: detail/preview/revoke 已实现，E2E test.skip 已移除并替换为功能测试
+- 4.3 Interaction: detail drawer 已实现，新增 export CSV/JSON 按钮和时间范围筛选
+- 4.4 Evidence Export: format selection 已有，新增 redaction checkbox 选项
+- 4.5 User Management: 从 placeholder 改为真实 API 调用 (create/update/delete)，Settings 页面 wire 到 v2 API
+- 4.6 Data Model Unification: dual-write 已在 Phase 1 中实现
+- 验证: go test ./... 全部通过，前端 lint 0 errors，E2E 116 passed (1 pre-existing agent-runs failure)
