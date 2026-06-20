@@ -3,13 +3,14 @@ package listener
 import (
 	"net"
 	"testing"
+	"time"
 )
 
 func TestSecurityContext_CheckConnection(t *testing.T) {
 	// Use a reasonable window for rate test: 1 minute, max 2 per IP
-	rateLim := NewRateLimiter(1000000000*60, 2)
+	rateLim := NewRateLimiter(time.Minute, 2)
 	connLim := NewConnLimiter(2)
-	sc := NewSecurityContext(rateLim, connLim)
+	sc := NewSecurityContext(rateLim, connLim, nil, nil, "test-listener", ProtocolSMTP, nil)
 
 	addr1 := &net.TCPAddr{IP: net.ParseIP("1.2.3.4"), Port: 1234}
 	addr2 := &net.TCPAddr{IP: net.ParseIP("1.2.3.4"), Port: 1235}
@@ -34,8 +35,8 @@ func TestSecurityContext_CheckConnection(t *testing.T) {
 
 	// Different IP should still be allowed
 	addrOther := &net.TCPAddr{IP: net.ParseIP("5.6.7.8"), Port: 1234}
-	// But rate limit is per-IP, so different IP is fine for rate
-	// However conn limiter is global — we released 1, so 1 slot available
+	// Rate limit is per-IP, so different IP is fine for rate.
+	// Conn limiter is global — we released 1, so 1 slot available.
 	if !sc.CheckConnection(addrOther) {
 		t.Fatal("connection from different IP should be allowed after release")
 	}
@@ -65,6 +66,63 @@ func TestSecurityContext_NoopContext(t *testing.T) {
 	}
 }
 
+func TestSecurityContext_Whitelist(t *testing.T) {
+	rateLim := NewRateLimiter(time.Minute, 1) // very strict: 1 per IP per minute
+	connLim := NewConnLimiter(1)              // very strict: 1 concurrent
+	sc := NewSecurityContext(
+		rateLim, connLim,
+		[]string{"10.0.0.0/8", "192.168.1.0/24"},
+		nil, "test-wl", ProtocolSMTP, nil,
+	)
+
+	// Whitelisted IP should bypass rate limit
+	wlAddr1 := &net.TCPAddr{IP: net.ParseIP("10.1.2.3"), Port: 1234}
+	wlAddr2 := &net.TCPAddr{IP: net.ParseIP("10.1.2.3"), Port: 1235}
+	if !sc.CheckConnection(wlAddr1) {
+		t.Fatal("whitelisted IP first connection should be allowed")
+	}
+	sc.ReleaseConnection()
+	if !sc.CheckConnection(wlAddr2) {
+		t.Fatal("whitelisted IP second connection should bypass rate limit")
+	}
+	sc.ReleaseConnection()
+
+	// Another whitelisted IP in different CIDR
+	wlAddr3 := &net.TCPAddr{IP: net.ParseIP("192.168.1.50"), Port: 1234}
+	if !sc.CheckConnection(wlAddr3) {
+		t.Fatal("whitelisted IP in 192.168.1.0/24 should be allowed")
+	}
+	sc.ReleaseConnection()
+
+	// Non-whitelisted IP should be rate limited
+	nonWl1 := &net.TCPAddr{IP: net.ParseIP("1.2.3.4"), Port: 1234}
+	nonWl2 := &net.TCPAddr{IP: net.ParseIP("1.2.3.4"), Port: 1235}
+	if !sc.CheckConnection(nonWl1) {
+		t.Fatal("non-whitelisted IP first connection should be allowed")
+	}
+	if sc.CheckConnection(nonWl2) {
+		t.Fatal("non-whitelisted IP second connection should be rate limited")
+	}
+	// Release the first non-whitelisted connection
+	sc.ReleaseConnection()
+}
+
+func TestSecurityContext_InvalidWhitelistCIDR(t *testing.T) {
+	// Invalid CIDR should be silently skipped, not crash
+	sc := NewSecurityContext(
+		NewRateLimiter(time.Minute, 10),
+		NewConnLimiter(10),
+		[]string{"not-a-cidr", "10.0.0.0/8"},
+		nil, "test-invalid-cidr", ProtocolSMTP, nil,
+	)
+
+	// Valid CIDR should still work
+	if !sc.CheckConnection(&net.TCPAddr{IP: net.ParseIP("10.1.1.1"), Port: 1234}) {
+		t.Fatal("valid whitelist CIDR should work")
+	}
+	sc.ReleaseConnection()
+}
+
 func TestSecurityContext_GetSetClear(t *testing.T) {
 	// Get for nonexistent ID should return noop
 	sc := GetSecurityContext("nonexistent-listener")
@@ -73,9 +131,9 @@ func TestSecurityContext_GetSetClear(t *testing.T) {
 	}
 
 	// Set and get
-	rateLim := NewRateLimiter(1000000000*60, 10)
+	rateLim := NewRateLimiter(time.Minute, 10)
 	connLim := NewConnLimiter(10)
-	customSc := NewSecurityContext(rateLim, connLim)
+	customSc := NewSecurityContext(rateLim, connLim, nil, nil, "test-listener-sc", ProtocolSMTP, nil)
 	SetSecurityContext("test-listener-sc", customSc)
 
 	retrieved := GetSecurityContext("test-listener-sc")

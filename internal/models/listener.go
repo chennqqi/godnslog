@@ -30,14 +30,14 @@ type Listener struct {
 
 // ListenerInteraction represents an interaction from a listener
 type ListenerInteraction struct {
-	ID          string            `json:"id" xorm:"'id' pk varchar(36) notnull"`
-	ListenerID  string            `json:"listener_id" xorm:"varchar(36) notnull index"`
-	Protocol    Protocol          `json:"protocol" xorm:"varchar(16) notnull"`
-	SourceIP    string            `json:"source_ip" xorm:"varchar(64) notnull"`
-	SourcePort  int               `json:"source_port" xorm:"int notnull"`
-	Data        string            `json:"data" xorm:"mediumtext"`
-	Metadata    Metadata          `json:"metadata" xorm:"json"`
-	Timestamp   time.Time         `json:"timestamp" xorm:"datetime notnull created"`
+	ID         string    `json:"id" xorm:"'id' pk varchar(36) notnull"`
+	ListenerID string    `json:"listener_id" xorm:"varchar(36) notnull index"`
+	Protocol   Protocol  `json:"protocol" xorm:"varchar(16) notnull"`
+	SourceIP   string    `json:"source_ip" xorm:"varchar(64) notnull"`
+	SourcePort int       `json:"source_port" xorm:"int notnull"`
+	Data       string    `json:"data" xorm:"mediumtext"`
+	Metadata   Metadata  `json:"metadata" xorm:"json"`
+	Timestamp  time.Time `json:"timestamp" xorm:"datetime notnull created"`
 }
 
 // Metadata represents metadata as a JSON map
@@ -82,7 +82,7 @@ type LDAPQuery struct {
 	ListenerID string    `json:"listener_id" xorm:"varchar(36) notnull index"`
 	BaseDN     string    `json:"base_dn" xorm:"text"`
 	Filter     string    `json:"filter" xorm:"text"`
-	Attributes string   `json:"attributes" xorm:"mediumtext"` // JSON string
+	Attributes string    `json:"attributes" xorm:"mediumtext"` // JSON string
 	BindDN     string    `json:"bind_dn" xorm:"varchar(255)"`
 	SourceIP   string    `json:"source_ip" xorm:"varchar(64) notnull"`
 	Timestamp  time.Time `json:"timestamp" xorm:"datetime notnull created"`
@@ -98,7 +98,7 @@ type SMBRequest struct {
 	Username   string    `json:"username" xorm:"varchar(255)"`
 	Data       string    `json:"data" xorm:"mediumtext"` // JSON string
 	SourceIP   string    `json:"source_ip" xorm:"varchar(64) notnull"`
-	SourcePort int      `json:"source_port" xorm:"int notnull"`
+	SourcePort int       `json:"source_port" xorm:"int notnull"`
 	Timestamp  time.Time `json:"timestamp" xorm:"datetime notnull created"`
 }
 
@@ -111,7 +111,7 @@ type FTPCommand struct {
 	Username   string    `json:"username" xorm:"varchar(255)"`
 	Data       string    `json:"data" xorm:"mediumtext"` // For STOR/APPE commands
 	SourceIP   string    `json:"source_ip" xorm:"varchar(64) notnull"`
-	SourcePort int      `json:"source_port" xorm:"int notnull"`
+	SourcePort int       `json:"source_port" xorm:"int notnull"`
 	Timestamp  time.Time `json:"timestamp" xorm:"datetime notnull created"`
 }
 
@@ -123,6 +123,18 @@ type ListenerConfig struct {
 	EnableTLS      bool          `json:"enable_tls"`
 	TLSCertFile    string        `json:"tls_cert_file"`
 	TLSKeyFile     string        `json:"tls_key_file"`
+
+	// RateLimitMax is the max connections per IP within the rate limit window.
+	// 0 means use MaxConnections as fallback. Default is high to avoid false negatives.
+	RateLimitMax int `json:"rate_limit_max"`
+
+	// MaxConcurrentConnections is the max simultaneous connections across all IPs.
+	// 0 means use MaxConnections as fallback.
+	MaxConcurrentConnections int `json:"max_concurrent_connections"`
+
+	// WhitelistCIDRs is a list of CIDR ranges that bypass rate and connection limits.
+	// e.g. ["10.0.0.0/8", "192.168.0.0/16"]
+	WhitelistCIDRs []string `json:"whitelist_cidrs"`
 }
 
 // TableName returns the table name for Listener

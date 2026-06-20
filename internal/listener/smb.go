@@ -39,9 +39,11 @@ func NewSMBListener(config *ListenerConfig, store Store, listener *Listener) *SM
 // DefaultSMBConfig returns default SMB configuration
 func DefaultSMBConfig() *ListenerConfig {
 	return &ListenerConfig{
-		MaxConnections: 10,
-		Timeout:        30 * time.Second,
-		BufferSize:     4096,
+		MaxConnections:           500,
+		Timeout:                  30 * time.Second,
+		BufferSize:               4096,
+		RateLimitMax:             500,
+		MaxConcurrentConnections: 200,
 	}
 }
 
