@@ -191,3 +191,48 @@ func TestExtractPattern(t *testing.T) {
 		}
 	}
 }
+
+func TestBatchImportInteractions(t *testing.T) {
+	engine, err := MockEngine()
+	assert.NoError(t, err)
+
+	service := NewService(engine)
+	ts := time.Now()
+
+	token1 := "token1"
+	token2 := "token2"
+	token3 := "token3"
+
+	interactions := []*models.Interaction{
+		{ID: models.GenerateID(), Type: "dns", Token: &token1, Timestamp: ts, SourceIP: "10.0.0.1"},
+		{ID: models.GenerateID(), Type: "dns", Token: &token2, Timestamp: ts, SourceIP: "10.0.0.2"},
+		{ID: models.GenerateID(), Type: "dns", Token: &token3, Timestamp: ts, SourceIP: "10.0.0.3"},
+	}
+
+	// First import — all 3 should be inserted
+	count, err := service.BatchImport(interactions)
+	assert.NoError(t, err)
+	assert.Equal(t, 3, count)
+
+	// Second import with same records — 0 should be inserted (idempotent)
+	count, err = service.BatchImport(interactions)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, count)
+
+	// Import 2 new + 1 duplicate — 2 should be inserted
+	token4 := "token4"
+	token5 := "token5"
+	mixed := []*models.Interaction{
+		{ID: models.GenerateID(), Type: "dns", Token: &token4, Timestamp: ts, SourceIP: "10.0.0.4"},
+		{ID: models.GenerateID(), Type: "dns", Token: &token5, Timestamp: ts, SourceIP: "10.0.0.5"},
+		interactions[0], // duplicate
+	}
+	count, err = service.BatchImport(mixed)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, count)
+
+	// Verify total count in DB
+	total, err := engine.Count(&models.Interaction{})
+	assert.NoError(t, err)
+	assert.Equal(t, int64(5), total)
+}

@@ -122,6 +122,128 @@ func (m *Migrator) MigrateAll() error {
 	return nil
 }
 
+// MigrationStats holds statistics from a migration run
+type MigrationStats struct {
+	DNSCount     int64
+	HTTPCount    int64
+	DNSMigrated  int64
+	HTTPMigrated int64
+	DNSSkipped   int64
+	HTTPSkipped  int64
+}
+
+// MigrateDNSWithFlags migrates TblDns records to Interaction with dry-run and idempotency support.
+func (m *Migrator) MigrateDNSWithFlags(batchSize int, dryRun bool) (*MigrationStats, error) {
+	stats := &MigrationStats{}
+
+	dnsCount, err := m.engine.Count(&oldmodels.TblDns{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to count TblDns: %w", err)
+	}
+	stats.DNSCount = dnsCount
+
+	if dryRun {
+		log.Printf("[dry-run] DNS migration: %d records would be migrated", dnsCount)
+		stats.DNSMigrated = dnsCount
+		return stats, nil
+	}
+
+	offset := 0
+	for {
+		var dnsRecords []oldmodels.TblDns
+		err := m.engine.Limit(batchSize, offset).Find(&dnsRecords)
+		if err != nil {
+			return stats, fmt.Errorf("failed to fetch DNS records: %w", err)
+		}
+		if len(dnsRecords) == 0 {
+			break
+		}
+
+		for _, dns := range dnsRecords {
+			interaction := models.FromTblDns(&dns)
+			if interaction.Token != nil && *interaction.Token != "" {
+				tsStr := interaction.Timestamp.UTC().Format("2006-01-02 15:04:05")
+				exists, err := m.engine.Where("token = ? AND strftime('%Y-%m-%d %H:%M:%S', timestamp) = ?",
+					*interaction.Token, tsStr).Exist(&models.Interaction{})
+				if err != nil {
+					return stats, fmt.Errorf("failed to check existing interaction: %w", err)
+				}
+				if exists {
+					stats.DNSSkipped++
+					continue
+				}
+			}
+			_, err := m.engine.Insert(interaction)
+			if err != nil {
+				return stats, fmt.Errorf("failed to insert interaction: %w", err)
+			}
+			stats.DNSMigrated++
+		}
+
+		offset += batchSize
+		log.Printf("DNS migration progress: %d migrated, %d skipped", stats.DNSMigrated, stats.DNSSkipped)
+	}
+
+	log.Printf("DNS migration completed: %d migrated, %d skipped", stats.DNSMigrated, stats.DNSSkipped)
+	return stats, nil
+}
+
+// MigrateHTTPWithFlags migrates TblHttp records to Interaction with dry-run and idempotency support.
+func (m *Migrator) MigrateHTTPWithFlags(batchSize int, dryRun bool) (*MigrationStats, error) {
+	stats := &MigrationStats{}
+
+	httpCount, err := m.engine.Count(&oldmodels.TblHttp{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to count TblHttp: %w", err)
+	}
+	stats.HTTPCount = httpCount
+
+	if dryRun {
+		log.Printf("[dry-run] HTTP migration: %d records would be migrated", httpCount)
+		stats.HTTPMigrated = httpCount
+		return stats, nil
+	}
+
+	offset := 0
+	for {
+		var httpRecords []oldmodels.TblHttp
+		err := m.engine.Limit(batchSize, offset).Find(&httpRecords)
+		if err != nil {
+			return stats, fmt.Errorf("failed to fetch HTTP records: %w", err)
+		}
+		if len(httpRecords) == 0 {
+			break
+		}
+
+		for _, httpRec := range httpRecords {
+			interaction := models.FromTblHttp(&httpRec)
+			if interaction.Token != nil && *interaction.Token != "" {
+				tsStr := interaction.Timestamp.UTC().Format("2006-01-02 15:04:05")
+				exists, err := m.engine.Where("token = ? AND strftime('%Y-%m-%d %H:%M:%S', timestamp) = ?",
+					*interaction.Token, tsStr).Exist(&models.Interaction{})
+				if err != nil {
+					return stats, fmt.Errorf("failed to check existing interaction: %w", err)
+				}
+				if exists {
+					stats.HTTPSkipped++
+					continue
+				}
+			}
+			_, err := m.engine.Insert(interaction)
+			if err != nil {
+				return stats, fmt.Errorf("failed to insert interaction: %w", err)
+			}
+			stats.HTTPMigrated++
+		}
+
+		offset += batchSize
+		log.Printf("HTTP migration progress: %d migrated, %d skipped", stats.HTTPMigrated, stats.HTTPSkipped)
+	}
+
+	log.Printf("HTTP migration completed: %d migrated, %d skipped", stats.HTTPMigrated, stats.HTTPSkipped)
+	return stats, nil
+}
+
 // RollbackDNS removes migrated DNS interactions
 func (m *Migrator) RollbackDNS() error {
 	log.Println("Rolling back DNS migration...")
