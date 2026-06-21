@@ -8,6 +8,12 @@ test.describe('Rebinding Page', () => {
     });
 
     await page.route('**/api/**', route => {
+      const url = route.request().url();
+      if (url.includes('/rebinding/scenarios')) {
+        return route.fulfill({
+          json: { code: 0, data: [] }
+        });
+      }
       return route.fulfill({ json: { code: 0, data: { items: [], total: 0, page: 1, page_size: 20, total_pages: 0 } } });
     });
 
