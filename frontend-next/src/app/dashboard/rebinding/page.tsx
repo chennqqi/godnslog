@@ -54,7 +54,8 @@ export default function RebindingLabPage() {
     try {
       const response = await rebindingApi.listScenarios()
       if (response.data) {
-        setScenarios(response.data || [])
+        const data = response.data as unknown
+        setScenarios(Array.isArray(data) ? data : (data as { items?: RebindingScenario[] })?.items || [])
       }
     } catch (err) {
       console.error('Failed to load scenarios:', err)
