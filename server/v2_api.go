@@ -4928,7 +4928,7 @@ func (self *WebServer) v2MCPHandler(c *gin.Context) {
 	// Get registered tools and tool map
 	tools, toolMap := mcpServer.GetTools()
 
-	handler := mcp.NewMCPHandler(mcpServer, toolMap, tools)
+	handler := mcp.NewMCPHandlerWithRedis(mcpServer, toolMap, tools, self.redisClient)
 	handler.ServeHTTP(c.Writer, c.Request)
 }
 

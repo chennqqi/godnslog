@@ -25,6 +25,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-sql-driver/mysql"
 	"github.com/hashicorp/go-retryablehttp"
+	redis "github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -41,6 +42,10 @@ type WebServerConfig struct {
 	Swagger   bool
 	WithGuest bool
 	TestMode  bool
+
+	// RedisAddr is an optional Redis address for HA session sharing.
+	// If empty, MCP sessions use in-memory storage.
+	RedisAddr string
 
 	AuthExpire                   time.Duration
 	DefaultCleanInterval         int64
@@ -71,6 +76,7 @@ type WebServer struct {
 	haSvc       *ha.Service
 	haNodeID    string
 	haCancel    context.CancelFunc
+	redisClient *redis.Client
 }
 
 func NewWebServer(cfg *WebServerConfig, store *cache.Cache) (*WebServer, error) {
@@ -296,6 +302,17 @@ func (self *WebServer) Run() error {
 	// Register v2 API
 	self.registerV2API(r)
 
+	// Initialize Redis client for HA session sharing if configured
+	if len(self.RedisAddr) > 0 {
+		self.redisClient = redis.NewClient(&redis.Options{Addr: self.RedisAddr})
+		if err := self.redisClient.Ping(context.Background()).Err(); err != nil {
+			logrus.Warnf("[webserver.go::Run] Redis ping failed, falling back to in-memory sessions: %v", err)
+			self.redisClient = nil
+		} else {
+			logrus.Info("[webserver.go::Run] Redis client connected for MCP session sharing")
+		}
+	}
+
 	// Initialize workflow service and async action queue
 	self.workflowSvc = workflow.NewService(self.orm)
 	ctx := context.Background()
@@ -376,6 +393,9 @@ func (self *WebServer) Shutdown(ctx context.Context) error {
 		self.listenerMgr.Stop()
 	}
 	self.shutdownHA()
+	if self.redisClient != nil {
+		self.redisClient.Close()
+	}
 	if self.s != nil {
 		err = self.s.Shutdown(ctx)
 	}
