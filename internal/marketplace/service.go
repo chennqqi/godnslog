@@ -254,6 +254,13 @@ func (s *Service) recalculateTemplateRating(ctx context.Context, templateID stri
 
 // InstallPlugin installs a plugin
 func (s *Service) InstallPlugin(ctx context.Context, pluginID string, version string, config string) (*PluginInstallation, error) {
+	// Check if the plugin is already installed
+	existing, err := s.store.GetPluginInstallationByPluginID(ctx, pluginID)
+	if err == nil && existing != nil && existing.ID != "" {
+		// Plugin already installed; return the existing installation
+		return existing, nil
+	}
+
 	installation := &PluginInstallation{
 		ID:            generateInstallationID(),
 		PluginID:      pluginID,
@@ -344,6 +351,7 @@ type Store interface {
 	// Plugin installation operations
 	CreatePluginInstallation(ctx context.Context, installation *PluginInstallation) error
 	GetPluginInstallation(ctx context.Context, id string) (*PluginInstallation, error)
+	GetPluginInstallationByPluginID(ctx context.Context, pluginID string) (*PluginInstallation, error)
 	ListPluginInstallations(ctx context.Context) ([]PluginInstallation, error)
 	DeletePluginInstallation(ctx context.Context, id string) error
 }

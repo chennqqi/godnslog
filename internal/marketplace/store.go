@@ -190,6 +190,16 @@ func (s *XormStore) ListPluginInstallations(ctx context.Context) ([]PluginInstal
 	return installations, err
 }
 
+// GetPluginInstallationByPluginID retrieves an installed plugin by its plugin_id
+func (s *XormStore) GetPluginInstallationByPluginID(ctx context.Context, pluginID string) (*PluginInstallation, error) {
+	var installation PluginInstallation
+	_, err := s.engine.Where("plugin_id = ?", pluginID).Get(&installation)
+	if err != nil {
+		return nil, err
+	}
+	return &installation, nil
+}
+
 // DeletePluginInstallation deletes a plugin installation
 func (s *XormStore) DeletePluginInstallation(ctx context.Context, id string) error {
 	_, err := s.engine.ID(id).Delete(&PluginInstallation{})

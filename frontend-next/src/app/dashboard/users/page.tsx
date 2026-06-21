@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { useI18n } from '@/lib/i18n-context'
 
 interface User {
   id: string
@@ -50,6 +51,7 @@ function roleLabel(role: number): string {
 
 export default function UsersPage() {
   const router = useRouter()
+  const { t } = useI18n()
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -114,9 +116,9 @@ export default function UsersPage() {
 
   const handleDeleteUser = async (user: User) => {
     const ok = await confirm({
-      title: 'Delete User',
-      description: `Are you sure you want to delete user "${user.username}"? This action cannot be undone.`,
-      confirmLabel: 'Delete',
+      title: t('users.delete_title'),
+      description: t('users.delete_confirm_msg').replace('{username}', user.username),
+      confirmLabel: t('users.delete'),
       variant: 'destructive',
     })
     if (!ok) return
@@ -130,39 +132,39 @@ export default function UsersPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-gray-500">Loading...</p>
+        <p className="text-gray-500">{t('users.loading')}</p>
       </div>
     )
   }
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">User Management</h2>
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">{t('users.title')}</h2>
 
       <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
         <div className="px-4 py-5 sm:p-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">User List</h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">{t('users.user_list')}</h3>
             <Button onClick={() => setShowCreateModal(true)}>
-              Create User
+              {t('users.create')}
             </Button>
           </div>
 
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Username</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>{t('users.username')}</TableHead>
+                <TableHead>{t('users.email')}</TableHead>
+                <TableHead>{t('users.role')}</TableHead>
+                <TableHead>{t('users.created_at')}</TableHead>
+                <TableHead>{t('users.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {users.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-gray-500">
-                    No users
+                    {t('users.no_data')}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -178,10 +180,10 @@ export default function UsersPage() {
                     <TableCell>{new Date(user.created_at).toLocaleString()}</TableCell>
                     <TableCell>
                       <Button variant="ghost" size="sm" className="mr-2" onClick={() => handleEditUser(user)}>
-                        Edit
+                        {t('users.edit')}
                       </Button>
                       <Button variant="destructive" size="sm" onClick={() => handleDeleteUser(user)}>
-                        Delete
+                        {t('users.delete')}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -196,11 +198,11 @@ export default function UsersPage() {
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create User</DialogTitle>
+            <DialogTitle>{t('users.create')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">{t('users.username')}</Label>
               <Input
                 id="username"
                 value={newUser.username}
@@ -208,7 +210,7 @@ export default function UsersPage() {
               />
             </div>
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('users.email')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -217,7 +219,7 @@ export default function UsersPage() {
               />
             </div>
             <div>
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('users.password')}</Label>
               <Input
                 id="password"
                 type="password"
@@ -226,25 +228,25 @@ export default function UsersPage() {
               />
             </div>
             <div>
-              <Label htmlFor="role">Role</Label>
+              <Label htmlFor="role">{t('users.role')}</Label>
               <Select value={String(newUser.role)} onValueChange={(value) => setNewUser({ ...newUser, role: parseInt(value) })}>
                 <SelectTrigger id="role">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="2">User</SelectItem>
-                  <SelectItem value="1">Admin</SelectItem>
-                  <SelectItem value="3">Guest</SelectItem>
+                  <SelectItem value="2">{t('users.role.user')}</SelectItem>
+                  <SelectItem value="1">{t('users.role.admin')}</SelectItem>
+                  <SelectItem value="3">{t('users.role.guest')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
             <Button onClick={handleCreateUser} disabled={submitting}>
-              {submitting ? 'Creating...' : 'Create'}
+              {submitting ? t('users.creating') : t('common.create')}
             </Button>
             <Button variant="outline" onClick={() => setShowCreateModal(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -254,11 +256,11 @@ export default function UsersPage() {
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit User{editingUser ? `: ${editingUser.username}` : ''}</DialogTitle>
+            <DialogTitle>{t('users.edit_title')}{editingUser ? `: ${editingUser.username}` : ''}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="edit-email">Email</Label>
+              <Label htmlFor="edit-email">{t('users.email')}</Label>
               <Input
                 id="edit-email"
                 type="email"
@@ -267,21 +269,21 @@ export default function UsersPage() {
               />
             </div>
             <div>
-              <Label htmlFor="edit-role">Role</Label>
+              <Label htmlFor="edit-role">{t('users.role')}</Label>
               <Select value={String(editForm.role)} onValueChange={(value) => setEditForm({ ...editForm, role: parseInt(value) })}>
                 <SelectTrigger id="edit-role">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="0">Super admin</SelectItem>
-                  <SelectItem value="1">Admin</SelectItem>
-                  <SelectItem value="2">User</SelectItem>
-                  <SelectItem value="3">Guest</SelectItem>
+                  <SelectItem value="0">{t('users.role.super_admin')}</SelectItem>
+                  <SelectItem value="1">{t('users.role.admin')}</SelectItem>
+                  <SelectItem value="2">{t('users.role.user')}</SelectItem>
+                  <SelectItem value="3">{t('users.role.guest')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label htmlFor="edit-password">New Password (leave blank to keep current)</Label>
+              <Label htmlFor="edit-password">{t('users.new_password_hint')}</Label>
               <Input
                 id="edit-password"
                 type="password"
@@ -292,10 +294,10 @@ export default function UsersPage() {
           </div>
           <DialogFooter>
             <Button onClick={handleUpdateUser} disabled={submitting}>
-              {submitting ? 'Saving...' : 'Save'}
+              {submitting ? t('users.saving') : t('common.save')}
             </Button>
             <Button variant="outline" onClick={() => setShowEditModal(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </DialogFooter>
         </DialogContent>

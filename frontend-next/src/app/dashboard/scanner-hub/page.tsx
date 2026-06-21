@@ -18,9 +18,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { useI18n } from '@/lib/i18n-context'
 
 export default function ScannerHubPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [cases, setCases] = useState<Case[]>([])
   const [selectedCase, setSelectedCase] = useState<string>('')
   const [target, setTarget] = useState('')
@@ -45,7 +47,7 @@ export default function ScannerHubPage() {
       }
     } catch (error) {
       console.error('Failed to load cases:', error)
-      setError('加载Case列表失败')
+      setError(t('scanner_hub.load_cases_failed'))
     } finally {
       setLoading(false)
     }
@@ -90,7 +92,7 @@ export default function ScannerHubPage() {
       }
     } catch (error) {
       console.error('Failed to load scanner adapters:', error)
-      setError('加载Scanner适配器失败')
+        setError(t('scanner_hub.load_adapters_failed'))
     }
   }, [selectedScanner])
 
@@ -113,7 +115,7 @@ export default function ScannerHubPage() {
 
   const handleCreatePayload = async () => {
     if (!selectedCase || !template) {
-      setError('请选择Case和Template')
+      setError(t('scanner_hub.select_case_template'))
       return
     }
     setGenerating(true)
@@ -131,7 +133,7 @@ export default function ScannerHubPage() {
       }
     } catch (error: unknown) {
       console.error('Failed to create payload:', error)
-      setError('创建Payload失败')
+      setError(t('scanner_hub.create_payload_failed'))
     } finally {
       setGenerating(false)
     }
@@ -139,13 +141,13 @@ export default function ScannerHubPage() {
 
   const handleGenerateScannerRun = async () => {
     if (!selectedCase || !selectedPayload || !target) {
-      setError('请选择Case、Payload并输入Target')
+      setError(t('scanner_hub.select_case_payload_target'))
       return
     }
 
     const payload = payloads.find(p => p.id === selectedPayload)
     if (!payload) {
-      setError('未找到选中的Payload')
+      setError(t('scanner_hub.payload_not_found'))
       return
     }
 
@@ -168,7 +170,7 @@ export default function ScannerHubPage() {
       loadRecentScannerRuns()
     } catch (error: unknown) {
       console.error('Failed to create scanner run:', error)
-      setError('创建Scanner Run失败')
+      setError(t('scanner_hub.create_run_failed'))
     } finally {
       setGenerating(false)
     }
@@ -200,27 +202,27 @@ export default function ScannerHubPage() {
   }) : null
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen">加载中...</div>
+    return <div className="flex items-center justify-center h-screen">{t('common.loading')}</div>
   }
 
   return (
     <div className="container mx-auto p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold">Scanner Hub</h1>
-        <p className="text-muted-foreground">多工具 OAST 适配器工作台</p>
+        <h1 className="text-3xl font-bold">{t('scanner_hub.title')}</h1>
+        <p className="text-muted-foreground">{t('scanner_hub.subtitle')}</p>
       </div>
 
       <div className="grid gap-6">
         {/* Recent Scanner Runs */}
         <Card>
           <CardHeader>
-            <CardTitle>最近的 Scanner Runs</CardTitle>
+            <CardTitle>{t('scanner_hub.recent_runs')}</CardTitle>
           </CardHeader>
           <CardContent>
             {loadingRuns ? (
-              <div className="text-sm text-muted-foreground">加载中...</div>
+              <div className="text-sm text-muted-foreground">{t('common.loading')}</div>
             ) : recentScannerRuns.length === 0 ? (
-              <div className="text-sm text-muted-foreground">暂无 Scanner Runs</div>
+              <div className="text-sm text-muted-foreground">{t('scanner_hub.no_runs')}</div>
             ) : (
               <div className="space-y-2">
                 {recentScannerRuns.map(run => (
@@ -241,7 +243,7 @@ export default function ScannerHubPage() {
                       </div>
                     </div>
                     <Button size="sm" variant="ghost">
-                      查看详情
+                      {t('scanner_hub.view_detail')}
                     </Button>
                   </div>
                 ))}
@@ -253,12 +255,12 @@ export default function ScannerHubPage() {
         {/* Scanner Adapter Selection */}
         <Card>
           <CardHeader>
-            <CardTitle>选择 Scanner Adapter</CardTitle>
+            <CardTitle>{t('scanner_hub.select_scanner')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <Select value={selectedScanner} onValueChange={(value: ScannerKind) => handleScannerChange(value)}>
               <SelectTrigger>
-                <SelectValue placeholder="选择 Scanner" />
+                <SelectValue placeholder={t('scanner_hub.select_scanner_placeholder')} />
               </SelectTrigger>
               <SelectContent>
                 {adapters.map(adapter => (
@@ -278,7 +280,7 @@ export default function ScannerHubPage() {
                 <div className="mt-3">
                   <Select value={selectedDeliveryMethod} onValueChange={(value: ScannerDeliveryMethod) => setSelectedDeliveryMethod(value)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="选择 Delivery Method" />
+                      <SelectValue placeholder={t('scanner_hub.select_delivery')} />
                     </SelectTrigger>
                     <SelectContent>
                       {selectedAdapter.supported_methods.map(method => (
@@ -305,12 +307,12 @@ export default function ScannerHubPage() {
         {/* Case Selection */}
         <Card>
           <CardHeader>
-            <CardTitle>选择 Case</CardTitle>
+            <CardTitle>{t('scanner_hub.select_case')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Select value={selectedCase} onValueChange={setSelectedCase}>
               <SelectTrigger>
-                <SelectValue placeholder={cases.length === 0 ? '暂无可用 Case' : '选择 Case'} />
+                <SelectValue placeholder={cases.length === 0 ? t('scanner_hub.no_case') : t('scanner_hub.select_case_placeholder')} />
               </SelectTrigger>
               <SelectContent>
                 {cases.map(c => (
@@ -322,9 +324,9 @@ export default function ScannerHubPage() {
             </Select>
             {cases.length === 0 && (
               <div className="mt-3 text-sm text-muted-foreground">
-                没有可选择的 Case，需要先创建 Case 才能使用 Scanner Hub。
+                {t('scanner_hub.no_case_hint')}
                 <Button variant="link" className="px-0" onClick={() => router.push('/dashboard/cases')}>
-                  前往 Case Board 创建
+                  {t('scanner_hub.go_to_cases')}
                 </Button>
               </div>
             )}
@@ -334,7 +336,7 @@ export default function ScannerHubPage() {
         {/* Target Input */}
         <Card>
           <CardHeader>
-            <CardTitle>输入 Target</CardTitle>
+            <CardTitle>{t('scanner_hub.input_target')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Input
@@ -348,7 +350,7 @@ export default function ScannerHubPage() {
         {/* Template Selection */}
         <Card>
           <CardHeader>
-            <CardTitle>选择 Template</CardTitle>
+            <CardTitle>{t('scanner_hub.select_template')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Select value={template} onValueChange={(value: 'ssrf-basic' | 'xxe-basic' | 'rce-callback') => setTemplate(value)}>
@@ -367,12 +369,12 @@ export default function ScannerHubPage() {
         {/* Payload Selection */}
         <Card>
           <CardHeader>
-            <CardTitle>选择或创建 Payload</CardTitle>
+            <CardTitle>{t('scanner_hub.select_payload')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <Select value={selectedPayload} onValueChange={setSelectedPayload}>
               <SelectTrigger>
-                <SelectValue placeholder="选择 Payload" />
+                <SelectValue placeholder={t('scanner_hub.select_payload_placeholder')} />
               </SelectTrigger>
               <SelectContent>
                 {payloads.map(p => (
@@ -383,14 +385,14 @@ export default function ScannerHubPage() {
               </SelectContent>
             </Select>
             <Button onClick={handleCreatePayload} disabled={generating}>
-              {generating ? '创建中...' : '创建新 Payload'}
+              {generating ? t('scanner_hub.creating') : t('scanner_hub.create_payload')}
             </Button>
           </CardContent>
         </Card>
 
         {/* Generate Button */}
         <Button onClick={handleGenerateScannerRun} className="w-full" size="lg" disabled={generating}>
-          {generating ? '生成中...' : '生成 Scanner Run'}
+          {generating ? t('scanner_hub.generating') : t('scanner_hub.generate_run')}
         </Button>
 
         {error && (
@@ -408,7 +410,7 @@ export default function ScannerHubPage() {
                 <div className="flex gap-2">
                   <Input value={scannerRun.jsonl ? JSON.parse(scannerRun.jsonl).token : ''} readOnly />
                   <Button onClick={() => handleCopy(JSON.parse(scannerRun.jsonl).token)}>
-                    复制
+                    {t('scanner_hub.copy')}
                   </Button>
                 </div>
               </CardContent>
@@ -422,7 +424,7 @@ export default function ScannerHubPage() {
                 <div className="flex gap-2">
                   <Input value={JSON.parse(scannerRun.jsonl).rendered_payload} readOnly />
                   <Button onClick={() => handleCopy(JSON.parse(scannerRun.jsonl).rendered_payload)}>
-                    复制
+                    {t('scanner_hub.copy')}
                   </Button>
                 </div>
               </CardContent>
@@ -436,7 +438,7 @@ export default function ScannerHubPage() {
                 <div className="flex gap-2">
                   <Input value={scannerRun.command} readOnly />
                   <Button onClick={() => handleCopy(scannerRun.command)}>
-                    复制
+                    {t('scanner_hub.copy')}
                   </Button>
                 </div>
               </CardContent>
@@ -450,7 +452,7 @@ export default function ScannerHubPage() {
                 <div className="flex gap-2">
                   <Input value={scannerRun.package_hash || ''} readOnly className="font-mono text-sm" />
                   <Button onClick={() => handleCopy(scannerRun.package_hash || '')}>
-                    复制
+                    {t('scanner_hub.copy')}
                   </Button>
                 </div>
               </CardContent>
@@ -492,7 +494,7 @@ export default function ScannerHubPage() {
                 <div className="flex gap-2">
                   <Textarea value={scannerRun.jsonl} readOnly className="font-mono text-sm" />
                   <Button onClick={() => handleCopy(scannerRun.jsonl)}>
-                    复制
+                    {t('scanner_hub.copy')}
                   </Button>
                 </div>
               </CardContent>
@@ -501,7 +503,7 @@ export default function ScannerHubPage() {
             {/* Scope Info */}
             <Card>
               <CardHeader>
-                <CardTitle>当前 Scope</CardTitle>
+                <CardTitle>{t('scanner_hub.current_scope')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex items-center gap-2">
@@ -519,7 +521,7 @@ export default function ScannerHubPage() {
             {webUrls && (
               <Card>
                 <CardHeader>
-                  <CardTitle>查看结果</CardTitle>
+                  <CardTitle>{t('scanner_hub.view_results')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <Button
@@ -527,14 +529,14 @@ export default function ScannerHubPage() {
                     className="w-full"
                     variant="outline"
                   >
-                    查看 Interactions
+                    {t('scanner_hub.view_interactions')}
                   </Button>
                   <Button
                     onClick={() => router.push(webUrls.evidenceUrl)}
                     className="w-full"
                     variant="outline"
                   >
-                    查看 Evidence
+                    {t('scanner_hub.view_evidence')}
                   </Button>
                 </CardContent>
               </Card>

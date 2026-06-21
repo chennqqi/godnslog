@@ -17,11 +17,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useI18n } from '@/lib/i18n-context'
 
 type ViewMode = 'all' | 'review-queue'
 
 export default function AgentRunsPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [viewMode, setViewMode] = useState<ViewMode>('all')
   const [agentRuns, setAgentRuns] = useState<AgentRunDetail[]>([])
   const [reviewQueue, setReviewQueue] = useState<AgentRunReviewQueueItem[]>([])
@@ -153,35 +155,35 @@ export default function AgentRunsPage() {
   return (
     <div className="container mx-auto p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold">Agent Runs</h1>
-        <p className="text-muted-foreground">View and manage AI agent execution runs</p>
+        <h1 className="text-3xl font-bold">{t('agent_runs.title')}</h1>
+        <p className="text-muted-foreground">{t('agent_runs.subtitle')}</p>
       </div>
 
       <Tabs value={viewMode} onValueChange={(val) => setViewMode(val as ViewMode)} className="mb-6">
         <TabsList>
-          <TabsTrigger value="all">All Runs</TabsTrigger>
-          <TabsTrigger value="review-queue">Review Queue</TabsTrigger>
+          <TabsTrigger value="all">{t('agent_runs.all_runs')}</TabsTrigger>
+          <TabsTrigger value="review-queue">{t('agent_runs.review_queue')}</TabsTrigger>
         </TabsList>
       </Tabs>
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Filters</CardTitle>
+          <CardTitle>{t('agent_runs.filters')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4">
             <Input
-              placeholder="Filter by Agent ID"
+              placeholder={t('agent_runs.filter_agent_id')}
               value={filterAgentId}
               onChange={(e) => setFilterAgentId(e.target.value)}
               className="max-w-xs"
             />
             <Select value={filterStatus || 'all'} onValueChange={(val) => setFilterStatus(val === 'all' ? '' : val)}>
               <SelectTrigger className="max-w-xs">
-                <SelectValue placeholder="Filter by Status" />
+                <SelectValue placeholder={t('agent_runs.filter_status')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="all">{t('agent_runs.all_statuses')}</SelectItem>
                 <SelectItem value="created">Created</SelectItem>
                 <SelectItem value="running">Running</SelectItem>
                 <SelectItem value="waiting">Waiting</SelectItem>
@@ -195,10 +197,10 @@ export default function AgentRunsPage() {
               <>
                 <Select value={filterReviewState || 'all'} onValueChange={(val) => setFilterReviewState(val === 'all' ? '' : val as ReviewState)}>
                   <SelectTrigger className="max-w-xs">
-                    <SelectValue placeholder="Filter by Review State" />
+                    <SelectValue placeholder={t('agent_runs.filter_review_state')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All States</SelectItem>
+                    <SelectItem value="all">{t('agent_runs.all_states')}</SelectItem>
                     <SelectItem value="not_reviewed">Not Reviewed</SelectItem>
                     <SelectItem value="reviewed">Reviewed</SelectItem>
                     <SelectItem value="followup_created">Followup Created</SelectItem>
@@ -207,10 +209,10 @@ export default function AgentRunsPage() {
                 </Select>
                 <Select value={filterEvidenceStrength || 'all'} onValueChange={(val) => setFilterEvidenceStrength(val === 'all' ? '' : val as EvidenceStrength)}>
                   <SelectTrigger className="max-w-xs">
-                    <SelectValue placeholder="Filter by Evidence Strength" />
+                    <SelectValue placeholder={t('agent_runs.filter_evidence')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Strengths</SelectItem>
+                    <SelectItem value="all">{t('agent_runs.all_strengths')}</SelectItem>
                     <SelectItem value="none">None</SelectItem>
                     <SelectItem value="low">Low</SelectItem>
                     <SelectItem value="medium">Medium</SelectItem>
@@ -219,7 +221,7 @@ export default function AgentRunsPage() {
                 </Select>
               </>
             )}
-            <Button onClick={handleApplyFilters}>Apply Filters</Button>
+            <Button onClick={handleApplyFilters}>{t('agent_runs.apply_filters')}</Button>
           </div>
         </CardContent>
       </Card>
@@ -227,7 +229,7 @@ export default function AgentRunsPage() {
       {viewMode === 'review-queue' && (
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Review Queue Summary</CardTitle>
+            <CardTitle>{t('agent_runs.review_summary')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -261,13 +263,13 @@ export default function AgentRunsPage() {
       ) : viewMode === 'all' && agentRuns.length === 0 ? (
         <Card>
           <CardContent className="text-center py-8">
-            <p className="text-muted-foreground">No agent runs found</p>
+            <p className="text-muted-foreground">{t('agent_runs.no_runs')}</p>
           </CardContent>
         </Card>
       ) : viewMode === 'review-queue' && reviewQueue.length === 0 ? (
         <Card>
           <CardContent className="text-center py-8">
-            <p className="text-muted-foreground">No items in review queue</p>
+            <p className="text-muted-foreground">{t('agent_runs.no_queue')}</p>
           </CardContent>
         </Card>
       ) : (
@@ -295,11 +297,11 @@ export default function AgentRunsPage() {
                         {run.status}
                       </Badge>
                       <div className="text-sm text-muted-foreground">
-                        {run.interaction_count} interactions
+                        {run.interaction_count} {t('agent_runs.interactions')}
                       </div>
                       {run.operations.length > 0 && (
                         <div className="text-xs text-muted-foreground">
-                          {run.operations.length} operations
+                          {run.operations.length} {t('agent_runs.operations')}
                         </div>
                       )}
                     </div>
@@ -349,7 +351,7 @@ export default function AgentRunsPage() {
                         </div>
                       )}
                       {item.needs_attention && (
-                        <Badge variant="destructive">Needs Attention</Badge>
+                        <Badge variant="destructive">{t('agent_runs.needs_attention')}</Badge>
                       )}
                     </div>
                   </div>
@@ -365,17 +367,17 @@ export default function AgentRunsPage() {
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
               >
-                Previous
+                {t('agent_runs.previous')}
               </Button>
               <span className="flex items-center">
-                Page {page} of {totalPages}
+                {t('agent_runs.page')} {page} {t('agent_runs.of')} {totalPages}
               </span>
               <Button
                 variant="outline"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
               >
-                Next
+                {t('agent_runs.next')}
               </Button>
             </div>
           )}

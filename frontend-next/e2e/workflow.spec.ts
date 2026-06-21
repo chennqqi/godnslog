@@ -22,10 +22,10 @@ test.describe('Workflow Page', () => {
   });
 
   test('should display condition list', async ({ page }) => {
-    await expect(page.locator('text=规则列表').first()).toBeVisible();
+    await expect(page.locator('text=Rule List').first()).toBeVisible();
   });
 
   test('should display action list', async ({ page }) => {
-    await expect(page.locator('text=选择一个规则进行编辑').or(page.locator('text=新建')).first()).toBeVisible();
+    await expect(page.locator('text=Select a rule to edit').or(page.locator('text=+ New')).first()).toBeVisible();
   });
 });

@@ -303,7 +303,7 @@ async function generateScannerRun(page: Page) {
   await page.getByPlaceholder('example.com').fill('https://target.example')
   await page.getByRole('combobox').nth(4).click()
   await page.getByRole('option', { name: 'tok-abc123' }).click()
-  await page.getByRole('button', { name: '生成 Scanner Run' }).click()
+  await page.getByRole('button', { name: 'Generate Scanner Run' }).click()
 }
 
 async function selectScanner(page: Page, name: string) {
@@ -328,8 +328,8 @@ test.describe('Scanner Hub', () => {
   test('should load scanner hub workspace', async ({ page }) => {
     await openScannerHub(page)
     await expect(page.getByRole('heading', { name: 'Scanner Hub', exact: true })).toBeVisible()
-    await expect(page.getByText('多工具 OAST 适配器工作台')).toBeVisible()
-    await expect(page.getByRole('heading', { name: '选择 Scanner Adapter' })).toBeVisible()
+    await expect(page.getByText('Multi-tool OAST adapter workbench')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Select Scanner Adapter' })).toBeVisible()
     await expect(page.getByText('Burp Suite')).toBeVisible()
     await expect(page.getByText('Yakit/Yak')).toBeVisible()
     await expect(page.getByText('ZAP', { exact: true })).toBeVisible()
@@ -337,8 +337,8 @@ test.describe('Scanner Hub', () => {
     await expect(page.getByText('rad', { exact: true })).toBeVisible()
     await expect(page.getByText('Postman', { exact: true })).toBeVisible()
     await expect(page.getByText('Apifox', { exact: true })).toBeVisible()
-    await expect(page.getByRole('heading', { name: '选择 Case' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: '输入 Target' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Select Case' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Input Target' })).toBeVisible()
   })
 
   test('should create payload through the unified payload API', async ({ page }) => {
@@ -351,7 +351,7 @@ test.describe('Scanner Hub', () => {
 
     await page.getByRole('combobox').nth(2).click()
     await page.getByRole('option', { name: 'Nuclei SSRF Scan' }).click()
-    await page.getByRole('button', { name: '创建新 Payload' }).click()
+    await page.getByRole('button', { name: 'Create New Payload' }).click()
     await createRequest
 
     await page.getByRole('combobox').nth(4).click()
@@ -408,7 +408,7 @@ test.describe('Scanner Hub', () => {
     await page.getByPlaceholder('example.com').fill('https://target.example')
     await page.getByRole('combobox').nth(4).click()
     await page.getByRole('option', { name: 'tok-abc123' }).click()
-    await page.getByRole('button', { name: '生成 Scanner Run' }).click()
+    await page.getByRole('button', { name: 'Generate Scanner Run' }).click()
     await scannerRunRequest
   })
 
@@ -446,9 +446,9 @@ test.describe('Scanner Hub', () => {
 
   test('should display recent scanner runs list', async ({ page }) => {
     await openScannerHub(page)
-    await expect(page.getByText('最近的 Scanner Runs')).toBeVisible()
+    await expect(page.getByText('Recent Scanner Runs')).toBeVisible()
     // The empty state message may vary, just check the section exists
-    await expect(page.locator('text=最近的 Scanner Runs')).toBeVisible()
+    await expect(page.locator('text=Recent Scanner Runs')).toBeVisible()
   })
 
   test('should navigate to scanner run detail page', async ({ page }) => {
@@ -458,11 +458,11 @@ test.describe('Scanner Hub', () => {
     await page.getByPlaceholder('example.com').fill('https://target.example')
     await page.getByRole('combobox').nth(4).click()
     await page.getByRole('option', { name: 'tok-abc123' }).click()
-    await page.getByRole('button', { name: '生成 Scanner Run' }).click()
+    await page.getByRole('button', { name: 'Generate Scanner Run' }).click()
 
     // Wait for scanner run to be created and navigate to detail
     await page.waitForTimeout(1000)
-    await page.getByRole('button', { name: '查看详情' }).click()
+    await page.getByRole('button', { name: 'View Detail' }).click()
     await page.waitForURL('**/dashboard/scanner-hub/**')
     expect(page.url()).toContain('/dashboard/scanner-hub/')
   })
@@ -551,7 +551,7 @@ test.describe('Scanner Hub', () => {
   test('should expose copy controls for payload command and JSONL', async ({ page }) => {
     await openScannerHub(page)
     await generateScannerRun(page)
-    await expect(page.getByRole('button', { name: '复制' })).toHaveCount(5)
+    await expect(page.getByRole('button', { name: 'Copy' })).toHaveCount(5)
     await expect(page.getByText('Rendered Payload')).toBeVisible()
     await expect(page.getByText('JSONL Preview')).toBeVisible()
   })
@@ -559,7 +559,7 @@ test.describe('Scanner Hub', () => {
   test('should show current case and payload scope', async ({ page }) => {
     await openScannerHub(page)
     await generateScannerRun(page)
-    await expect(page.getByText('当前 Scope')).toBeVisible()
+    await expect(page.getByText('Current Scope')).toBeVisible()
     await expect(page.getByText('case-1', { exact: true })).toBeVisible()
     await expect(page.getByText('payload-1', { exact: true })).toBeVisible()
   })
@@ -568,7 +568,7 @@ test.describe('Scanner Hub', () => {
     await openScannerHub(page)
     await generateScannerRun(page)
 
-    await page.getByRole('button', { name: '查看 Interactions' }).click()
+    await page.getByRole('button', { name: 'View Interactions' }).click()
     await page.waitForURL('**/dashboard/interactions?payload_id=payload-1')
     expect(page.url()).toContain('payload_id=payload-1')
   })
@@ -576,7 +576,7 @@ test.describe('Scanner Hub', () => {
   test('should navigate to payload scoped evidence', async ({ page }) => {
     await openScannerHub(page)
     await generateScannerRun(page)
-    await page.getByRole('button', { name: '查看 Evidence' }).click()
+    await page.getByRole('button', { name: 'View Evidence' }).click()
     await page.waitForURL('**/dashboard/evidence?payload_id=payload-1')
     expect(page.url()).toContain('payload_id=payload-1')
   })
@@ -589,14 +589,14 @@ test.describe('Scanner Hub', () => {
       const body = request.postDataJSON() as { payload_id?: string; format?: string }
       return body.payload_id === 'payload-1' && body.format === 'markdown'
     })
-    await page.getByRole('button', { name: '查看 Evidence' }).click()
+    await page.getByRole('button', { name: 'View Evidence' }).click()
     await evidenceRequest
   })
 
   test('should show validation and API error states', async ({ page }) => {
     await openScannerHub(page)
-    await page.getByRole('button', { name: '生成 Scanner Run' }).click()
-    await expect(page.getByText('请选择Case、Payload并输入Target')).toBeVisible()
+    await page.getByRole('button', { name: 'Generate Scanner Run' }).click()
+    await expect(page.getByText('Please select Case, Payload and input Target')).toBeVisible()
 
     await page.route('**/api/v2/payloads**', route => {
       if (route.request().method() === 'POST') {
@@ -609,7 +609,7 @@ test.describe('Scanner Hub', () => {
 
     await page.getByRole('combobox').nth(2).click()
     await page.getByRole('option', { name: 'Nuclei SSRF Scan' }).click()
-    await page.getByRole('button', { name: '创建新 Payload' }).click()
-    await expect(page.getByText('创建Payload失败')).toBeVisible()
+    await page.getByRole('button', { name: 'Create New Payload' }).click()
+    await expect(page.getByText('Failed to create Payload')).toBeVisible()
   })
 })
