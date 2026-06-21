@@ -389,3 +389,45 @@ Phase 2 评估发现大部分功能已在之前 sprint 中实现，剩余缺口�
 - 当日新增代码：`internal/workflow/service.go` SMTP 动作与强制 STARTTLS、`internal/mcp/redis_session.go` Redis session store、`internal/workflow/persistent_log.go` 持久化日志模型。
 - 生产前仍需完成：协议监听器独立安全审计、HA 多实例+Redis 验证、HEALTHCHECK 在 OCI 格式下的兼容或改用编排层 probe。
 - 验收报告：`docs/superpowers/acceptance/roadmap2.0-production-readiness-report.md`。
+
+## 2026-06-21 (docker-compose 启动服务)
+
+分析：用户要求在 docker-compose 中启动服务。执行后暴露三个真实问题：
+- 数据库初始化 (`server/webui.go::initDatabase`) 仅同步了部分 1.0/2.0 模型，容器首次启动时 `listener_manager`、`haSvc`、`workflowQueue` 因缺少表而失败。`db/init.go` 虽然包含更完整列表但未被 `server` 包调用，存在重复与死代码问题。
+- `v2models.User` / `v2models.Resolve` 的 `TableName` 与 legacy `tbl_user`/`tbl_resolve` 相同，导致 `Sync2` 在已有表上尝试新增主键/唯一索引而失败（SQLite 限制）。
+- Dockerfile 仅复制 `dist`/`package.json`/`node_modules`，未复制 `next.config.js`，容器内 `next start` 按默认 `distDir: '.next'` 找不到构建输出。
+- rootless podman 下 `docker-compose` 默认绑定 53/8080 会因特权端口与已有服务冲突失败。
+
+处理：完整扩展 `server/webui.go` 的 `Sync2` 列表；移除 `v2models.User`/`v2models.Resolve`；在 Dockerfile 中复制 `next.config.js`；调整 `docker-compose.yml` 端口为 `8053:53`、`8000:8080`、`3000:3000`。
+
+验证：容器启动成功，`/api/v2/health` 返回 alive，`/login` 返回 200。复测 `go build/test/vet/fmt` 均通过。
+
+## 2026-06-21 (修复登录 404 与重复登录入口)
+
+分析：前端 `api.ts` 的 `baseURL` 默认为 `/api/v2`，但容器部署时前后端不在同一端口，必须配置代理或指定完整后端地址。`next.config.js` 此前没有 rewrites，导致浏览器请求 `/api/v2/...` 被 Next.js 服务直接返回 404。同时根路径 `/` 的 landing page 含“登录”按钮，给用户造成两个登录入口的错觉。
+
+处理：在 `next.config.js` 中增加 `rewrites` 把 `/api/v2/:path*` 和 `/api/v1/:path*` 转发到容器内的 Go 后端（`http://localhost:8080`）；将 `src/app/page.tsx` 改为 `redirect('/login')`。重新构建镜像并强制重建容器。
+
+验证：`/` 307 到 `/login`；`/api/v2/auth/login` 代理成功，返回 200（正确密码）或 401（错误密码），不再是 404。
+
+## 2026-06-21 (修复国际化语言切换不生效)
+
+分析：登录页左侧品牌面板的文案全部硬编码英文，虽然表单字段使用了 `useI18n`，但切换后左侧仍显示英文，给用户造成国际化未生效的印象。`I18nProvider` 用 `setTimeout` 延迟初始化，且 settings 页 language 下拉为 uncontrolled 的 `defaultValue="en-US"`，既无法反映当前语言，也不会调用 `setLang` 更新上下文。
+
+处理：在 `i18n-context.tsx` 扩展翻译键；登录页改为 `t()` 调用；`I18nProvider` 去掉 `setTimeout` 直接同步初始化；settings 页 language 下拉使用 `value={form.watch('language')}` 并调用 `setLang()`。
+
+验证：重新构建镜像后服务启动正常，登录页 `/login` 返回 200，根路径 `/` 仍正确 307 到 `/login`。
+
+## 2026-06-21 (修复 Rebinding Lab / Marketplace / Scanner Hub 功能不可用)
+
+分析：
+- Marketplace 返回 500，原因是 `marketplace` 相关表没有在 `initDatabase` 中同步；`v2_api.go` 也只注册了列表和安装接口，没有注册 `POST /plugins` / `POST /templates`，前端页面因此没有创建入口。
+- Rebinding Lab 的预定义场景接口正常返回 5 个场景，但前端 `listScenarios` 的类型声明为 `ApiResponse<{ data: RebindingScenario[] }>`，实际后端把数组直接放在 `data` 中，导致页面取到 `response.data.data` 为 `undefined`，左侧场景列表为空，无法点击创建规则。
+- Scanner Hub 的 Case 下拉依赖 `GET /cases`，当数据库中没有 Case 时返回空列表，用户自然无法选择；页面缺少空状态引导。
+
+处理：
+- 在 `server/webui.go` 同步 6 个 marketplace 表，并新增 `initMarketplaceSeed` 在首次启动时插入示例插件/模板；在 `server/v2_api.go` 增加创建端点；在前端 marketplace 页面增加创建按钮和表单；在 `api-client.ts` 增加 `createPlugin` / `createTemplate`。
+- 修正 Rebinding Lab 前端场景列表的响应解析，改为 `api.get<RebindingScenario[]>()` 和 `setScenarios(response.data || [])`。
+- 在 Scanner Hub 的 Case 选择器增加空状态提示和跳转到 Case Board 的按钮。
+
+验证：容器重建后，Marketplace 插件/模板列表和创建接口均正常；Rebinding Lab 能列出场景并创建规则；Scanner Hub 在创建 Case 后可选择并继续生成 Payload。
