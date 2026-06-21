@@ -7,7 +7,7 @@ type Workspace struct {
 	ID          string    `json:"id" xorm:"'id' pk"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
-	OwnerID     string    `json:"owner_id"`
+	OwnerID     string    `json:"owner_id" xorm:"'owner_id'"`
 	IsEnabled   bool      `json:"is_enabled"`
 	CreatedAt   time.Time `json:"created_at" xorm:"created"`
 	UpdatedAt   time.Time `json:"updated_at" xorm:"updated"`
@@ -16,8 +16,8 @@ type Workspace struct {
 // WorkspaceMember represents a workspace member
 type WorkspaceMember struct {
 	ID          string    `json:"id" xorm:"'id' pk"`
-	WorkspaceID string    `json:"workspace_id"`
-	UserID      string    `json:"user_id"`
+	WorkspaceID string    `json:"workspace_id" xorm:"'workspace_id'"`
+	UserID      string    `json:"user_id" xorm:"'user_id'"`
 	Role        string    `json:"role"` // owner, admin, member, viewer
 	JoinedAt    time.Time `json:"joined_at" xorm:"created"`
 }
@@ -25,7 +25,7 @@ type WorkspaceMember struct {
 // WorkspaceDomain represents a domain associated with a workspace
 type WorkspaceDomain struct {
 	ID          string    `json:"id" xorm:"'id' pk"`
-	WorkspaceID string    `json:"workspace_id"`
+	WorkspaceID string    `json:"workspace_id" xorm:"'workspace_id'"`
 	Domain      string    `json:"domain"`
 	IsPrimary   bool      `json:"is_primary"`
 	CreatedAt   time.Time `json:"created_at" xorm:"created"`

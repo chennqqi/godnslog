@@ -56,7 +56,7 @@ func (s *XormStore) ListPlugins(ctx context.Context, filters PluginFilters) ([]P
 
 // UpdatePlugin updates a plugin
 func (s *XormStore) UpdatePlugin(ctx context.Context, plugin *Plugin) error {
-	_, err := s.engine.ID(plugin.ID).Update(plugin)
+	_, err := s.engine.ID(plugin.ID).UseBool("is_published", "is_official").Update(plugin)
 	return err
 }
 
@@ -138,7 +138,7 @@ func (s *XormStore) ListTemplates(ctx context.Context, filters TemplateFilters) 
 
 // UpdateTemplate updates a template
 func (s *XormStore) UpdateTemplate(ctx context.Context, template *Template) error {
-	_, err := s.engine.ID(template.ID).Update(template)
+	_, err := s.engine.ID(template.ID).UseBool("is_published", "is_official").Update(template)
 	return err
 }
 
