@@ -28,6 +28,7 @@ type servePwCmd struct {
 	defaultLanguage string
 	httpListen string
 	upstream   string
+	redisAddr  string
 }
 
 func (*servePwCmd) Name() string     { return "serve" }
@@ -54,6 +55,7 @@ func (p *servePwCmd) SetFlags(f *flag.FlagSet) {
 
 	f.StringVar(&p.defaultLanguage, "lang", DefaultLanguage, "set default language, [en-US/zh-CN], option")
 	f.StringVar(&p.httpListen, "http", ":8080", "set http listen, option")
+	f.StringVar(&p.redisAddr, "redis", "", "set Redis address for HA session sharing, option")
 }
 
 func (p *servePwCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
@@ -88,6 +90,7 @@ func (p *servePwCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 		DefaultQueryApiMaxItem:       DefaultQueryApiMaxItem,
 		DefaultMaxCallbackErrorCount: DefaultMaxCallbackErrorCount,
 		DefaultLanguage:              DefaultLanguage,
+		RedisAddr:                    p.redisAddr,
 	}, store)
 	if err != nil {
 		logrus.Fatalf("[main.go::main] NewWebServer: %v", err)

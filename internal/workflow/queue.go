@@ -61,11 +61,77 @@ func NewQueue(ctx context.Context, service *Service, workers, maxRetries int, en
 	}
 }
 
-// Start launches the queue workers
+// Start launches the queue workers and recovers pending jobs from the database.
 func (q *Queue) Start() {
+	// Recover pending jobs from database before starting workers
+	q.recoverPendingJobs()
+
 	for i := 0; i < q.workers; i++ {
 		q.wg.Add(1)
 		go q.worker()
+	}
+}
+
+// recoverPendingJobs loads pending or running jobs from the database and re-enqueues them.
+// This ensures workflow actions survive process restarts.
+func (q *Queue) recoverPendingJobs() {
+	if q.engine == nil {
+		return
+	}
+
+	var pendingLogs []PersistentActionLog
+	if err := q.engine.Where("status = ? OR status = ?", "pending", "running").Find(&pendingLogs); err != nil {
+		log.Printf("[workflow-queue] failed to load pending jobs for recovery: %v", err)
+		return
+	}
+
+	if len(pendingLogs) == 0 {
+		return
+	}
+
+	log.Printf("[workflow-queue] recovering %d pending jobs from database", len(pendingLogs))
+
+	for _, plog := range pendingLogs {
+		// Load the workflow to get the action definition
+		workflow, err := q.service.GetWorkflowByID(plog.WorkflowID)
+		if err != nil {
+			log.Printf("[workflow-queue] failed to load workflow %s for recovery: %v", plog.WorkflowID, err)
+			// Mark as failed since we can't recover without the workflow definition
+			q.engine.ID(plog.ID).Update(&PersistentActionLog{
+				Status:     "failed",
+				Error:      "workflow not found during recovery",
+				FinishedAt: time.Now(),
+			})
+			continue
+		}
+
+		// Find the matching action in the workflow
+		var matchedAction *models.Action
+		for i := range workflow.Actions {
+			if workflow.Actions[i].ID == plog.ActionID {
+				matchedAction = &workflow.Actions[i]
+				break
+			}
+		}
+		if matchedAction == nil {
+			log.Printf("[workflow-queue] action %s not found in workflow %s, marking as failed", plog.ActionID, plog.WorkflowID)
+			q.engine.ID(plog.ID).Update(&PersistentActionLog{
+				Status:     "failed",
+				Error:      "action not found in workflow during recovery",
+				FinishedAt: time.Now(),
+			})
+			continue
+		}
+
+		// Re-enqueue the job with the recovered attempt count
+		job := &QueueJob{
+			WorkflowID: plog.WorkflowID,
+			Action:     *matchedAction,
+			Attempt:    plog.Attempt,
+		}
+		if err := q.Enqueue(job); err != nil {
+			log.Printf("[workflow-queue] failed to re-enqueue recovered job %s: %v", plog.ID, err)
+		}
 	}
 }
 
