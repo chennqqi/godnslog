@@ -18,7 +18,7 @@ type Canary struct {
 // CanaryHit represents a hit on a canary token
 type CanaryHit struct {
 	ID           string    `json:"id" xorm:"'id' pk varchar(36) notnull"`
-	CanaryID     string    `json:"canary_id" xorm:"varchar(36) notnull index"`
+	CanaryID     string    `json:"canary_id" xorm:"'canary_id' varchar(36) notnull index"`
 	SourceIP     string    `json:"source_ip" xorm:"varchar(64) notnull"`
 	UserAgent    string    `json:"user_agent" xorm:"text"`
 	Headers      string    `json:"headers" xorm:"mediumtext"` // JSON string
