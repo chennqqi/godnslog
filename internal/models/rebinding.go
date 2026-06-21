@@ -59,7 +59,7 @@ type RebindingConfig struct {
 // RebindingSession represents an active rebinding session
 type RebindingSession struct {
 	ID           string    `json:"id" xorm:"'id' pk varchar(36) notnull"`
-	RuleID       string    `json:"rule_id" xorm:"varchar(36) notnull index"`
+	RuleID       string    `json:"rule_id" xorm:"'rule_id' varchar(36) notnull index"`
 	SourceIP     string    `json:"source_ip" xorm:"varchar(64) notnull"`
 	CurrentStage int       `json:"current_stage" xorm:"int notnull default 0"`
 	HitCount     int       `json:"hit_count" xorm:"int notnull default 0"`
