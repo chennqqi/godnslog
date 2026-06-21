@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 
 export type Language = 'en-US' | 'zh-CN'
 
@@ -278,6 +278,120 @@ const translations = {
     'agent_runs.deliver_webhook': 'Deliver to Webhook',
     'agent_runs.history': 'Operation History',
     'agent_runs.quick_links': 'Quick Links',
+
+    // Dashboard
+    'dashboard.command_center': 'Command Center',
+    'dashboard.subtitle': 'OAST interaction monitoring overview',
+    'dashboard.active_cases': 'Active Cases',
+    'dashboard.currently_active': 'Currently active',
+    'dashboard.hits_today': 'Hits Today',
+    'dashboard.across_protocols': 'Across all protocols',
+    'dashboard.active_payloads': 'Active Payloads',
+    'dashboard.deployed_watching': 'Deployed & watching',
+    'dashboard.system_status': 'System Status',
+    'dashboard.status_ok': '✓ OK',
+    'dashboard.status_error': '✗ Error',
+    'dashboard.all_services_healthy': 'All services healthy',
+    'dashboard.check_system_logs': 'Check system logs',
+    'dashboard.protocol_distribution': 'Protocol Distribution',
+    'dashboard.quick_actions': 'Quick Actions',
+    'dashboard.new_case': 'New Case',
+    'dashboard.new_payload': 'New Payload',
+    'dashboard.view_timeline': 'View Timeline',
+    'dashboard.canary_tokens': 'Canary Tokens',
+    'dashboard.live_hit_stream': 'Live Hit Stream',
+    'dashboard.view_all': 'View all',
+    'dashboard.no_interactions': 'No interactions yet',
+    'dashboard.waiting_payloads': 'Waiting for payloads to be triggered',
+
+    // Agent Runs list
+    'agent_runs.title': 'Agent Runs',
+    'agent_runs.subtitle': 'View and manage AI agent execution runs',
+    'agent_runs.all_runs': 'All Runs',
+    'agent_runs.review_queue': 'Review Queue',
+    'agent_runs.filters': 'Filters',
+    'agent_runs.filter_agent_id': 'Filter by Agent ID',
+    'agent_runs.filter_status': 'Filter by Status',
+    'agent_runs.filter_review_state': 'Filter by Review State',
+    'agent_runs.filter_evidence': 'Filter by Evidence Strength',
+    'agent_runs.all_statuses': 'All Statuses',
+    'agent_runs.all_states': 'All States',
+    'agent_runs.all_strengths': 'All Strengths',
+    'agent_runs.apply_filters': 'Apply Filters',
+    'agent_runs.review_summary': 'Review Queue Summary',
+    'agent_runs.no_runs': 'No agent runs found',
+    'agent_runs.no_queue': 'No items in review queue',
+    'agent_runs.previous': 'Previous',
+    'agent_runs.next': 'Next',
+    'agent_runs.page': 'Page',
+    'agent_runs.of': 'of',
+    'agent_runs.interactions': 'interactions',
+    'agent_runs.operations': 'operations',
+    'agent_runs.followups': 'followups',
+    'agent_runs.needs_attention': 'Needs Attention',
+
+    // Scanner Hub
+    'scanner_hub.title': 'Scanner Hub',
+    'scanner_hub.subtitle': 'Multi-tool OAST adapter workbench',
+    'scanner_hub.recent_runs': 'Recent Scanner Runs',
+    'scanner_hub.no_runs': 'No Scanner Runs',
+    'scanner_hub.select_scanner': 'Select Scanner Adapter',
+    'scanner_hub.select_scanner_placeholder': 'Select Scanner',
+    'scanner_hub.select_delivery': 'Select Delivery Method',
+    'scanner_hub.select_case': 'Select Case',
+    'scanner_hub.no_case': 'No available Case',
+    'scanner_hub.select_case_placeholder': 'Select Case',
+    'scanner_hub.no_case_hint': 'No Case available. Create a Case first to use Scanner Hub.',
+    'scanner_hub.go_to_cases': 'Go to Case Board',
+    'scanner_hub.input_target': 'Input Target',
+    'scanner_hub.select_template': 'Select Template',
+    'scanner_hub.select_payload': 'Select or Create Payload',
+    'scanner_hub.select_payload_placeholder': 'Select Payload',
+    'scanner_hub.create_payload': 'Create New Payload',
+    'scanner_hub.generate_run': 'Generate Scanner Run',
+    'scanner_hub.generating': 'Generating...',
+    'scanner_hub.creating': 'Creating...',
+    'scanner_hub.copy': 'Copy',
+    'scanner_hub.current_scope': 'Current Scope',
+    'scanner_hub.view_results': 'View Results',
+    'scanner_hub.view_interactions': 'View Interactions',
+    'scanner_hub.view_evidence': 'View Evidence',
+    'scanner_hub.view_detail': 'View Detail',
+    'scanner_hub.select_case_template': 'Please select Case and Template',
+    'scanner_hub.select_case_payload_target': 'Please select Case, Payload and input Target',
+    'scanner_hub.payload_not_found': 'Selected Payload not found',
+    'scanner_hub.load_cases_failed': 'Failed to load Case list',
+    'scanner_hub.load_adapters_failed': 'Failed to load Scanner adapters',
+    'scanner_hub.create_payload_failed': 'Failed to create Payload',
+    'scanner_hub.create_run_failed': 'Failed to create Scanner Run',
+
+    // Workflow
+    'workflow.title': 'Workflow Builder',
+    'workflow.rule_list': 'Rule List',
+    'workflow.new_rule': '+ New',
+    'workflow.no_rules': 'No rules',
+    'workflow.rule_name': 'Rule Name',
+    'workflow.description': 'Description',
+    'workflow.conditions': 'Conditions',
+    'workflow.add_condition': '+ Add Condition',
+    'workflow.no_conditions': 'No conditions',
+    'workflow.actions': 'Actions',
+    'workflow.add_action': '+ Add Action',
+    'workflow.no_actions': 'No actions',
+    'workflow.disable_rule': 'Disable Rule',
+    'workflow.enable_rule': 'Enable Rule',
+    'workflow.delete_rule': 'Delete Rule',
+    'workflow.select_rule': 'Select a rule to edit',
+    'workflow.condition_count': 'conditions',
+    'workflow.action_count': 'actions',
+
+    // Users extended
+    'users.user_list': 'User List',
+    'users.no_users': 'No users',
+    'users.creating': 'Creating...',
+    'users.saving': 'Saving...',
+    'users.new_password_hint': 'New Password (leave blank to keep current)',
+    'users.delete_confirm_msg': 'Are you sure you want to delete user "{username}"? This action cannot be undone.',
   },
   'zh-CN': {
     // Login
@@ -551,6 +665,120 @@ const translations = {
     'agent_runs.deliver_webhook': '发送到 Webhook',
     'agent_runs.history': '操作历史',
     'agent_runs.quick_links': '快速链接',
+
+    // Dashboard
+    'dashboard.command_center': '指挥中心',
+    'dashboard.subtitle': 'OAST 交互监控概览',
+    'dashboard.active_cases': '活跃案例',
+    'dashboard.currently_active': '当前进行中',
+    'dashboard.hits_today': '今日命中',
+    'dashboard.across_protocols': '跨所有协议',
+    'dashboard.active_payloads': '活跃 Payload',
+    'dashboard.deployed_watching': '已部署 & 监控中',
+    'dashboard.system_status': '系统状态',
+    'dashboard.status_ok': '✓ 正常',
+    'dashboard.status_error': '✗ 错误',
+    'dashboard.all_services_healthy': '所有服务正常',
+    'dashboard.check_system_logs': '请检查系统日志',
+    'dashboard.protocol_distribution': '协议分布',
+    'dashboard.quick_actions': '快捷操作',
+    'dashboard.new_case': '新建案例',
+    'dashboard.new_payload': '新建 Payload',
+    'dashboard.view_timeline': '查看时间线',
+    'dashboard.canary_tokens': '金丝雀令牌',
+    'dashboard.live_hit_stream': '实时命中流',
+    'dashboard.view_all': '查看全部',
+    'dashboard.no_interactions': '暂无交互记录',
+    'dashboard.waiting_payloads': '等待 Payload 被触发',
+
+    // Agent Runs list
+    'agent_runs.title': 'Agent 运行',
+    'agent_runs.subtitle': '查看和管理 AI Agent 执行记录',
+    'agent_runs.all_runs': '全部运行',
+    'agent_runs.review_queue': '审核队列',
+    'agent_runs.filters': '筛选',
+    'agent_runs.filter_agent_id': '按 Agent ID 筛选',
+    'agent_runs.filter_status': '按状态筛选',
+    'agent_runs.filter_review_state': '按审核状态筛选',
+    'agent_runs.filter_evidence': '按证据强度筛选',
+    'agent_runs.all_statuses': '全部状态',
+    'agent_runs.all_states': '全部状态',
+    'agent_runs.all_strengths': '全部强度',
+    'agent_runs.apply_filters': '应用筛选',
+    'agent_runs.review_summary': '审核队列摘要',
+    'agent_runs.no_runs': '未找到 Agent 运行记录',
+    'agent_runs.no_queue': '审核队列中无项目',
+    'agent_runs.previous': '上一页',
+    'agent_runs.next': '下一页',
+    'agent_runs.page': '第',
+    'agent_runs.of': '页，共',
+    'agent_runs.interactions': '条交互',
+    'agent_runs.operations': '个操作',
+    'agent_runs.followups': '个后续',
+    'agent_runs.needs_attention': '需要关注',
+
+    // Scanner Hub
+    'scanner_hub.title': '扫描器中心',
+    'scanner_hub.subtitle': '多工具 OAST 适配器工作台',
+    'scanner_hub.recent_runs': '最近的 Scanner Runs',
+    'scanner_hub.no_runs': '暂无 Scanner Runs',
+    'scanner_hub.select_scanner': '选择 Scanner Adapter',
+    'scanner_hub.select_scanner_placeholder': '选择 Scanner',
+    'scanner_hub.select_delivery': '选择 Delivery Method',
+    'scanner_hub.select_case': '选择 Case',
+    'scanner_hub.no_case': '暂无可用 Case',
+    'scanner_hub.select_case_placeholder': '选择 Case',
+    'scanner_hub.no_case_hint': '没有可选择的 Case，需要先创建 Case 才能使用 Scanner Hub。',
+    'scanner_hub.go_to_cases': '前往 Case Board 创建',
+    'scanner_hub.input_target': '输入 Target',
+    'scanner_hub.select_template': '选择 Template',
+    'scanner_hub.select_payload': '选择或创建 Payload',
+    'scanner_hub.select_payload_placeholder': '选择 Payload',
+    'scanner_hub.create_payload': '创建新 Payload',
+    'scanner_hub.generate_run': '生成 Scanner Run',
+    'scanner_hub.generating': '生成中...',
+    'scanner_hub.creating': '创建中...',
+    'scanner_hub.copy': '复制',
+    'scanner_hub.current_scope': '当前 Scope',
+    'scanner_hub.view_results': '查看结果',
+    'scanner_hub.view_interactions': '查看 Interactions',
+    'scanner_hub.view_evidence': '查看 Evidence',
+    'scanner_hub.view_detail': '查看详情',
+    'scanner_hub.select_case_template': '请选择 Case 和 Template',
+    'scanner_hub.select_case_payload_target': '请选择 Case、Payload 并输入 Target',
+    'scanner_hub.payload_not_found': '未找到选中的 Payload',
+    'scanner_hub.load_cases_failed': '加载 Case 列表失败',
+    'scanner_hub.load_adapters_failed': '加载 Scanner 适配器失败',
+    'scanner_hub.create_payload_failed': '创建 Payload 失败',
+    'scanner_hub.create_run_failed': '创建 Scanner Run 失败',
+
+    // Workflow
+    'workflow.title': '工作流构建器',
+    'workflow.rule_list': '规则列表',
+    'workflow.new_rule': '+ 新建',
+    'workflow.no_rules': '暂无规则',
+    'workflow.rule_name': '规则名称',
+    'workflow.description': '描述',
+    'workflow.conditions': '条件',
+    'workflow.add_condition': '+ 添加条件',
+    'workflow.no_conditions': '暂无条件',
+    'workflow.actions': '动作',
+    'workflow.add_action': '+ 添加动作',
+    'workflow.no_actions': '暂无动作',
+    'workflow.disable_rule': '禁用规则',
+    'workflow.enable_rule': '启用规则',
+    'workflow.delete_rule': '删除规则',
+    'workflow.select_rule': '选择一个规则进行编辑',
+    'workflow.condition_count': '条件',
+    'workflow.action_count': '动作',
+
+    // Users extended
+    'users.user_list': '用户列表',
+    'users.no_users': '暂无用户',
+    'users.creating': '创建中...',
+    'users.saving': '保存中...',
+    'users.new_password_hint': '新密码（留空则保持原密码）',
+    'users.delete_confirm_msg': '确定要删除用户「{username}」吗？此操作不可撤销。',
   },
 } as const
 
@@ -565,16 +793,15 @@ interface I18nContextValue {
 const I18nContext = createContext<I18nContextValue | null>(null)
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Language>('en-US')
-
-  useEffect(() => {
+  const [lang, setLangState] = useState<Language>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('language') as Language
       if (saved === 'en-US' || saved === 'zh-CN') {
-        setLangState(saved)
+        return saved
       }
     }
-  }, [])
+    return 'en-US'
+  })
 
   const setLang = useCallback((newLang: Language) => {
     setLangState(newLang)

@@ -6,6 +6,7 @@ import { rulesApi } from '@/lib/api-client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { useI18n } from '@/lib/i18n-context'
 
 interface Rule {
   id: string
@@ -32,6 +33,7 @@ interface Action {
 
 export default function WorkflowBuilderPage() {
   const router = useRouter()
+  const { t } = useI18n()
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -64,7 +66,7 @@ export default function WorkflowBuilderPage() {
 
   const addRule = async () => {
     const newRule: Partial<Rule> = {
-      name: `规则 ${rules.length + 1}`,
+      name: `Rule ${rules.length + 1}`,
       description: '',
       enabled: true,
       priority: rules.length + 1,
@@ -116,14 +118,14 @@ export default function WorkflowBuilderPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-gray-500">加载中...</p>
+        <p className="text-gray-500">{t('common.loading')}</p>
       </div>
     )
   }
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Workflow Builder</h2>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">{t('workflow.title')}</h2>
 
       <div className="grid grid-cols-3 gap-6">
         {/* 规则列表 */}
@@ -131,16 +133,16 @@ export default function WorkflowBuilderPage() {
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle>规则列表</CardTitle>
+                <CardTitle>{t('workflow.rule_list')}</CardTitle>
                 <Button onClick={addRule} size="sm">
-                  + 新建
+                  {t('workflow.new_rule')}
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 {rules.length === 0 ? (
-                  <p className="text-gray-500 text-sm">暂无规则</p>
+                  <p className="text-gray-500 text-sm">{t('workflow.no_rules')}</p>
                 ) : (
                   rules.map((rule) => (
                     <div
@@ -162,7 +164,7 @@ export default function WorkflowBuilderPage() {
                         </label>
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        {rule.conditions.length} 条件, {rule.actions.length} 动作
+                        {rule.conditions.length} {t('workflow.condition_count')}, {rule.actions.length} {t('workflow.action_count')}
                       </p>
                     </div>
                   ))
@@ -179,7 +181,7 @@ export default function WorkflowBuilderPage() {
               <CardContent className="pt-6">
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    规则名称
+                    {t('workflow.rule_name')}
                   </label>
                   <Input
                     type="text"
@@ -190,7 +192,7 @@ export default function WorkflowBuilderPage() {
 
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    描述
+                    {t('workflow.description')}
                   </label>
                   <textarea
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -202,13 +204,13 @@ export default function WorkflowBuilderPage() {
 
                 <div className="mb-6">
                   <div className="flex justify-between items-center mb-3">
-                    <h3 className="text-lg font-medium text-gray-900">条件</h3>
+                    <h3 className="text-lg font-medium text-gray-900">{t('workflow.conditions')}</h3>
                     <button className="text-indigo-600 hover:text-indigo-800 text-sm">
-                      + 添加条件
+                      {t('workflow.add_condition')}
                     </button>
                   </div>
                   {selectedRule.conditions.length === 0 ? (
-                    <p className="text-gray-500 text-sm mb-4">暂无条件</p>
+                    <p className="text-gray-500 text-sm mb-4">{t('workflow.no_conditions')}</p>
                   ) : (
                     <div className="space-y-2 mb-4">
                       {selectedRule.conditions.map((condition, idx) => (
@@ -222,13 +224,13 @@ export default function WorkflowBuilderPage() {
 
                 <div className="mb-6">
                   <div className="flex justify-between items-center mb-3">
-                    <h3 className="text-lg font-medium text-gray-900">动作</h3>
+                    <h3 className="text-lg font-medium text-gray-900">{t('workflow.actions')}</h3>
                     <button className="text-indigo-600 hover:text-indigo-800 text-sm">
-                      + 添加动作
+                      {t('workflow.add_action')}
                     </button>
                   </div>
                   {selectedRule.actions.length === 0 ? (
-                    <p className="text-gray-500 text-sm mb-4">暂无动作</p>
+                    <p className="text-gray-500 text-sm mb-4">{t('workflow.no_actions')}</p>
                   ) : (
                     <div className="space-y-2 mb-4">
                       {selectedRule.actions.map((action, idx) => (
@@ -244,13 +246,13 @@ export default function WorkflowBuilderPage() {
                   <Button 
                     onClick={() => updateRule(selectedRule.id, 'enabled', !selectedRule.enabled)}
                   >
-                    {selectedRule.enabled ? '禁用规则' : '启用规则'}
+                    {selectedRule.enabled ? t('workflow.disable_rule') : t('workflow.enable_rule')}
                   </Button>
                   <Button 
                     onClick={() => deleteRule(selectedRule.id)}
                     variant="destructive"
                   >
-                    删除规则
+                    {t('workflow.delete_rule')}
                   </Button>
                 </div>
               </CardContent>
@@ -258,7 +260,7 @@ export default function WorkflowBuilderPage() {
           ) : (
             <Card>
               <CardContent className="pt-6">
-                <p className="text-gray-500 text-center">选择一个规则进行编辑</p>
+                <p className="text-gray-500 text-center">{t('workflow.select_rule')}</p>
               </CardContent>
             </Card>
           )}

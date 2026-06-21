@@ -9,6 +9,7 @@ import type { Interaction } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useI18n } from '@/lib/i18n-context'
 
 /** Protocol color mapping per design spec */
 const PROTOCOL_COLORS: Record<string, string> = {
@@ -99,6 +100,7 @@ function ProtocolBar({ dns, http, smtp, other }: { dns: number; http: number; sm
 /** Dashboard Command Center page */
 export default function DashboardPage() {
   const router = useRouter()
+  const { t } = useI18n()
 
   const { data: casesResp, isLoading: casesLoading } = useCases({ page: 1, page_size: 5 })
   const { data: interactionsResp, isLoading: interactionsLoading } = useInteractions({ page: 1, page_size: 10 })
@@ -130,14 +132,14 @@ export default function DashboardPage() {
       {/* Section header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Command Center</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">OAST interaction monitoring overview</p>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('dashboard.command_center')}</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{t('dashboard.subtitle')}</p>
         </div>
         <Button variant="outline" size="sm" onClick={loadData}>
           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
-          Refresh
+          {t('common.refresh')}
         </Button>
       </div>
 
@@ -148,27 +150,27 @@ export default function DashboardPage() {
         ) : (
           <>
             <StatCard
-              title="Active Cases"
+              title={t('dashboard.active_cases')}
               value={activeCases}
               valueClass="text-emerald-600"
-              sub="Currently active"
+              sub={t('dashboard.currently_active')}
             />
             <StatCard
-              title="Hits Today"
+              title={t('dashboard.hits_today')}
               value={totalHitsToday}
               valueClass="text-indigo-600"
-              sub="Across all protocols"
+              sub={t('dashboard.across_protocols')}
             />
             <StatCard
-              title="Active Payloads"
+              title={t('dashboard.active_payloads')}
               value={activePayloads}
-              sub="Deployed &amp; watching"
+              sub={t('dashboard.deployed_watching')}
             />
             <StatCard
-              title="System Status"
-              value={systemOk ? '✓ OK' : '✗ Error'}
+              title={t('dashboard.system_status')}
+              value={systemOk ? t('dashboard.status_ok') : t('dashboard.status_error')}
               valueClass={systemOk ? 'text-emerald-600 text-2xl' : 'text-red-600 text-2xl'}
-              sub={systemOk ? 'All services healthy' : 'Check system logs'}
+              sub={systemOk ? t('dashboard.all_services_healthy') : t('dashboard.check_system_logs')}
             />
           </>
         )}
@@ -180,7 +182,7 @@ export default function DashboardPage() {
         <Card className="dark:bg-gray-800 dark:border-gray-700">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Protocol Distribution
+              {t('dashboard.protocol_distribution')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -201,16 +203,16 @@ export default function DashboardPage() {
         <Card className="dark:bg-gray-800 dark:border-gray-700">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Quick Actions
+              {t('dashboard.quick_actions')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: 'New Case', href: '/dashboard/cases', color: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400' },
-                { label: 'New Payload', href: '/dashboard/payloads/new', color: 'bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400' },
-                { label: 'View Timeline', href: '/dashboard/interactions', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400' },
-                { label: 'Canary Tokens', href: '/dashboard/canary', color: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400' },
+                { label: t('dashboard.new_case'), href: '/dashboard/cases', color: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400' },
+                { label: t('dashboard.new_payload'), href: '/dashboard/payloads/new', color: 'bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400' },
+                { label: t('dashboard.view_timeline'), href: '/dashboard/interactions', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400' },
+                { label: t('dashboard.canary_tokens'), href: '/dashboard/canary', color: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400' },
               ].map((action) => (
                 <Link
                   key={action.href}
@@ -230,13 +232,13 @@ export default function DashboardPage() {
         <CardHeader className="pb-0 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Live Hit Stream
+            {t('dashboard.live_hit_stream')}
           </CardTitle>
           <Link
             href="/dashboard/interactions"
             className="text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 font-medium"
           >
-            View all →
+            {t('dashboard.view_all')} →
           </Link>
         </CardHeader>
         <CardContent className="pt-4">
@@ -254,8 +256,8 @@ export default function DashboardPage() {
           ) : recentInteractions.length === 0 ? (
             <div className="text-center py-10">
               <div className="text-4xl mb-3">⏱</div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No interactions yet</p>
-              <p className="text-xs text-gray-400 mt-1">Waiting for payloads to be triggered</p>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('dashboard.no_interactions')}</p>
+              <p className="text-xs text-gray-400 mt-1">{t('dashboard.waiting_payloads')}</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-100 dark:divide-gray-700">
