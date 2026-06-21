@@ -34,6 +34,7 @@ RUN mkdir -p /app/frontend /app
 COPY --from=backend-builder /go/bin/godnslog /app/godnslog
 COPY --from=frontend-builder /app/dist /app/frontend/dist
 COPY --from=frontend-builder /app/package.json /app/frontend/package.json
+COPY --from=frontend-builder /app/next.config.js /app/frontend/next.config.js
 COPY --from=frontend-builder /app/node_modules /app/frontend/node_modules
 
 ARG UID=1001

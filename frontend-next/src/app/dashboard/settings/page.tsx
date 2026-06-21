@@ -26,6 +26,7 @@ import {
   type DomainSettingsFormValues,
   type ListenerSettingsFormValues,
 } from '@/features/settings/schemas/settings-schema'
+import { useI18n, type Language } from '@/lib/i18n-context'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -76,11 +77,12 @@ export default function SettingsPage() {
 
 function GeneralSettings() {
   const [saving, setSaving] = useState(false)
+  const { lang, setLang } = useI18n()
   const form = useForm<GeneralSettingsFormValues>({
     resolver: zodResolver(generalSettingsSchema),
     defaultValues: {
       system_name: 'GODNSLOG 2.0',
-      language: 'en-US',
+      language: lang,
       timezone: 'UTC',
     },
   })
@@ -91,11 +93,15 @@ function GeneralSettings() {
       if (data) {
         const settings = (data as { data?: Record<string, unknown> }).data || data
         if (settings.system_name) form.reset({ ...form.getValues(), system_name: settings.system_name as string })
-        if (settings.language) form.setValue('language', settings.language as 'en-US' | 'zh-CN')
+        if (settings.language) {
+          const language = settings.language as Language
+          form.setValue('language', language)
+          setLang(language)
+        }
         if (settings.timezone) form.setValue('timezone', settings.timezone as string)
       }
     }).catch(() => {})
-  }, [form])
+  }, [form, setLang])
 
   const onSubmit = async (data: GeneralSettingsFormValues) => {
     setSaving(true)
@@ -125,7 +131,11 @@ function GeneralSettings() {
         </div>
         <div>
           <Label htmlFor="language">Language</Label>
-          <Select defaultValue="en-US" onValueChange={(v) => form.setValue('language', v as 'en-US' | 'zh-CN')}>
+          <Select value={form.watch('language')} onValueChange={(v) => {
+            const language = v as Language
+            form.setValue('language', language)
+            setLang(language)
+          }}>
             <SelectTrigger id="language">
               <SelectValue />
             </SelectTrigger>
