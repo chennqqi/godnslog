@@ -45,7 +45,7 @@ func (Plugin) TableName() string {
 // PluginVersion represents a version of a plugin
 type PluginVersion struct {
 	ID        string `json:"id" xorm:"'id' pk"`
-	PluginID  string `json:"plugin_id"`
+	PluginID  string `json:"plugin_id" xorm:"'plugin_id'"`
 	Version   string `json:"version"`
 	Code      string `json:"code"`
 	Changelog string `json:"changelog"`
@@ -61,8 +61,8 @@ func (PluginVersion) TableName() string {
 // PluginReview represents a plugin review
 type PluginReview struct {
 	ID       string `json:"id" xorm:"'id' pk"`
-	PluginID string `json:"plugin_id"`
-	UserID   string `json:"user_id"`
+	PluginID string `json:"plugin_id" xorm:"'plugin_id'"`
+	UserID   string `json:"user_id" xorm:"'user_id'"`
 	UserName string `json:"user_name"`
 	Rating   int    `json:"rating"` // 1-5
 	Comment  string `json:"comment"`
@@ -113,8 +113,8 @@ func (Template) TableName() string {
 // TemplateReview represents a template review
 type TemplateReview struct {
 	ID         string `json:"id" xorm:"'id' pk"`
-	TemplateID string `json:"template_id"`
-	UserID     string `json:"user_id"`
+	TemplateID string `json:"template_id" xorm:"'template_id'"`
+	UserID     string `json:"user_id" xorm:"'user_id'"`
 	UserName   string `json:"user_name"`
 	Rating     int    `json:"rating"` // 1-5
 	Comment    string `json:"comment"`
@@ -130,7 +130,7 @@ func (TemplateReview) TableName() string {
 // PluginInstallation represents an installed plugin
 type PluginInstallation struct {
 	ID            string `json:"id" xorm:"'id' pk"`
-	PluginID      string `json:"plugin_id"`
+	PluginID      string `json:"plugin_id" xorm:"'plugin_id'"`
 	PluginVersion string `json:"plugin_version"`
 
 	// Installation status
