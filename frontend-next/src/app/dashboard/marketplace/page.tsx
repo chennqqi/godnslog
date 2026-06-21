@@ -4,6 +4,11 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { marketplaceApi } from '@/lib/api-client'
 import { useI18n } from '@/lib/i18n-context'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 interface Plugin {
   id: string
@@ -42,6 +47,26 @@ export default function MarketplacePage() {
   const [installedPlugins, setInstalledPlugins] = useState<Plugin[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [createMode, setCreateMode] = useState<'plugin' | 'template'>('plugin')
+  const [createName, setCreateName] = useState('')
+  const [createDescription, setCreateDescription] = useState('')
+  const [createCategory, setCreateCategory] = useState('')
+  const [createType, setCreateType] = useState('')
+  const [createContent, setCreateContent] = useState('')
+  const [createVersion, setCreateVersion] = useState('1.0.0')
+  const [createAuthor, setCreateAuthor] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  const resetCreateForm = () => {
+    setCreateName('')
+    setCreateDescription('')
+    setCreateCategory('')
+    setCreateType('')
+    setCreateContent('')
+    setCreateVersion('1.0.0')
+    setCreateAuthor('')
+  }
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -99,14 +124,58 @@ export default function MarketplacePage() {
     }
   }
 
+  const handleCreate = async () => {
+    if (!createName.trim()) return
+    setCreating(true)
+    try {
+      if (createMode === 'plugin') {
+        await marketplaceApi.createPlugin({
+          name: createName,
+          description: createDescription,
+          version: createVersion,
+          author: createAuthor,
+          type: createType || 'processor',
+          category: createCategory || 'general',
+          code: createContent,
+          language: 'javascript',
+          is_official: false,
+        })
+      } else {
+        await marketplaceApi.createTemplate({
+          name: createName,
+          description: createDescription,
+          type: createType || 'payload',
+          category: createCategory || 'general',
+          content: createContent,
+          format: 'yaml',
+          is_official: false,
+        })
+      }
+      resetCreateForm()
+      setCreateDialogOpen(false)
+      loadData()
+    } catch (error) {
+      console.error('Failed to create marketplace item:', error)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const openCreateDialog = () => {
+    setCreateMode(activeTab === 'templates' ? 'template' : 'plugin')
+    resetCreateForm()
+    setCreateDialogOpen(true)
+  }
+
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">{t('marketplace.title')}</h2>
 
       {/* Tab Navigation */}
       <div className="mb-6">
-        <div className="flex space-x-4">
-          <button
+        <div className="flex items-center justify-between">
+          <div className="flex space-x-4">
+            <button
             onClick={() => setActiveTab('plugins')}
             className={`px-4 py-2 rounded-lg ${
               activeTab === 'plugins'
@@ -136,6 +205,12 @@ export default function MarketplacePage() {
           >
             {t('marketplace.installed')}
           </button>
+          </div>
+          {activeTab !== 'installed' && (
+            <Button onClick={openCreateDialog}>
+              {activeTab === 'plugins' ? t('marketplace.create_plugin') : t('marketplace.create_template')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -149,6 +224,96 @@ export default function MarketplacePage() {
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
         />
       </div>
+
+      {/* Create Dialog */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {createMode === 'plugin' ? t('marketplace.create_plugin') : t('marketplace.create_template')}
+            </DialogTitle>
+            <DialogDescription>{t('marketplace.create_description')}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="create-name">{t('marketplace.create_name')}</Label>
+              <Input
+                id="create-name"
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                placeholder={t('marketplace.create_name')}
+              />
+            </div>
+            <div>
+              <Label htmlFor="create-description">{t('marketplace.create_description')}</Label>
+              <Textarea
+                id="create-description"
+                value={createDescription}
+                onChange={(e) => setCreateDescription(e.target.value)}
+                placeholder={t('marketplace.create_description')}
+              />
+            </div>
+            <div>
+              <Label htmlFor="create-category">{t('marketplace.create_category')}</Label>
+              <Input
+                id="create-category"
+                value={createCategory}
+                onChange={(e) => setCreateCategory(e.target.value)}
+                placeholder={t('marketplace.create_category')}
+              />
+            </div>
+            <div>
+              <Label htmlFor="create-type">{t('marketplace.create_type')}</Label>
+              <Input
+                id="create-type"
+                value={createType}
+                onChange={(e) => setCreateType(e.target.value)}
+                placeholder={createMode === 'plugin' ? 'processor / notifier / exporter' : 'payload / workflow / rule'}
+              />
+            </div>
+            {createMode === 'plugin' && (
+              <>
+                <div>
+                  <Label htmlFor="create-version">{t('marketplace.create_version')}</Label>
+                  <Input
+                    id="create-version"
+                    value={createVersion}
+                    onChange={(e) => setCreateVersion(e.target.value)}
+                    placeholder="1.0.0"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="create-author">{t('marketplace.create_author')}</Label>
+                  <Input
+                    id="create-author"
+                    value={createAuthor}
+                    onChange={(e) => setCreateAuthor(e.target.value)}
+                    placeholder={t('marketplace.create_author')}
+                  />
+                </div>
+              </>
+            )}
+            <div>
+              <Label htmlFor="create-content">{t('marketplace.create_content')}</Label>
+              <Textarea
+                id="create-content"
+                value={createContent}
+                onChange={(e) => setCreateContent(e.target.value)}
+                placeholder={createMode === 'plugin' ? 'plugin code / implementation' : 'template content (YAML/JSON)'}
+                rows={6}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateDialogOpen(false)} disabled={creating}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleCreate} disabled={creating || !createName.trim()}>
+              {creating ? t('common.saving') : t('common.create')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Content */}
       {loading ? (

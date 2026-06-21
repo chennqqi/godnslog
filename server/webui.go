@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sort"
@@ -8,7 +9,10 @@ import (
 	"time"
 
 	"github.com/chennqqi/godnslog/cache"
+	"github.com/chennqqi/godnslog/internal/ha"
+	"github.com/chennqqi/godnslog/internal/marketplace"
 	v2models "github.com/chennqqi/godnslog/internal/models"
+	"github.com/chennqqi/godnslog/internal/workflow"
 	"github.com/chennqqi/godnslog/models"
 
 	"github.com/chennqqi/goutils/ginutils"
@@ -44,7 +48,9 @@ func (self *WebServer) initDatabase() error {
 	orm.SetTZDatabase(time.Local)
 	orm.SetTZLocation(time.Local)
 
-	err := orm.Sync2(&models.TblDns{},
+	err := orm.Sync2(
+		// 1.0 legacy models
+		&models.TblDns{},
 		&models.TblHttp{},
 		&models.TblUser{},
 		&models.TblResolve{},
@@ -52,12 +58,49 @@ func (self *WebServer) initDatabase() error {
 		&models.TblPayload{},
 		&models.TblInteraction{},
 		&models.TblAPIKey{},
+		// 2.0 core models
+		// Note: User/Resolve are wrappers around legacy tbl_user/tbl_resolve;
+		// do not sync them as separate tables.
 		&v2models.Interaction{},
+		&v2models.Case{},
+		&v2models.Payload{},
+		&v2models.APIKey{},
 		&v2models.Workflow{},
-		&v2models.AuditLog{})
+		&v2models.Response{},
+		&v2models.Canary{},
+		&v2models.RebindingRule{},
+		&v2models.Listener{},
+		&v2models.ListenerInteraction{},
+		&v2models.SMTPMessage{},
+		&v2models.LDAPQuery{},
+		&v2models.SMBRequest{},
+		&v2models.FTPCommand{},
+		&v2models.ScannerRun{},
+		&v2models.AuditLog{},
+		&v2models.AgentRun{},
+		&v2models.AgentOperation{},
+		&v2models.Settings{},
+		// HA models
+		&ha.ClusterNode{},
+		&ha.ClusterConfig{},
+		&ha.HealthCheck{},
+		// Workflow persistent action log
+		&workflow.PersistentActionLog{},
+		// Marketplace models
+		&marketplace.Plugin{},
+		&marketplace.PluginVersion{},
+		&marketplace.PluginReview{},
+		&marketplace.Template{},
+		&marketplace.TemplateReview{},
+		&marketplace.PluginInstallation{},
+	)
 	if err != nil {
 		logrus.Errorf("[webui.go::initDatabase] orm.Sync: %v", err)
 		return err
+	}
+
+	if err := self.initMarketplaceSeed(); err != nil {
+		logrus.Errorf("[webui.go::initDatabase] initMarketplaceSeed: %v", err)
 	}
 
 	// check superUser
@@ -158,6 +201,58 @@ func (self *WebServer) initDatabase() error {
 		self.updateResolveCache(hosts[i], "", all)
 	}
 
+	return nil
+}
+
+// initMarketplaceSeed inserts sample marketplace entries if the store is empty.
+func (self *WebServer) initMarketplaceSeed() error {
+	store := marketplace.NewXormStore(self.orm)
+	svc := marketplace.NewService(store)
+	ctx := context.Background()
+
+	plugins, err := svc.ListPlugins(ctx, marketplace.PluginFilters{})
+	if err != nil {
+		return err
+	}
+	if len(plugins) == 0 {
+		sample := &marketplace.Plugin{
+			ID:          v2models.GenerateID(),
+			Name:        "Sample DNS Logger",
+			Description: "A sample processor plugin that logs DNS interactions to a webhook.",
+			Version:     "1.0.0",
+			Author:      "GODNSLOG Team",
+			Type:        "processor",
+			Category:    "dns",
+			Code:        "// sample plugin code\nfunction process(interaction) {\n  console.log(interaction);\n}",
+			Language:    "javascript",
+			IsPublished: true,
+			IsOfficial:  true,
+		}
+		if err := svc.CreatePlugin(ctx, sample); err != nil {
+			return err
+		}
+	}
+
+	templates, err := svc.ListTemplates(ctx, marketplace.TemplateFilters{})
+	if err != nil {
+		return err
+	}
+	if len(templates) == 0 {
+		sample := &marketplace.Template{
+			ID:          v2models.GenerateID(),
+			Name:        "SSRF Basic Payload",
+			Description: "Basic SSRF OAST payload template for scanner integration.",
+			Type:        "payload",
+			Category:    "ssrf",
+			Content:     "id: ssrf-basic\ninfo:\n  name: SSRF Basic OAST\n  author: GODNSLOG Team\n  severity: high",
+			Format:      "yaml",
+			IsPublished: true,
+			IsOfficial:  true,
+		}
+		if err := svc.CreateTemplate(ctx, sample); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

@@ -15,6 +15,18 @@ const translations = {
     'login.button': 'Sign In',
     'login.button.loading': 'Signing in...',
     'login.error': 'Login failed, please check your username and password',
+    'login.hero.title': 'OAST Evidence\nVerification Platform',
+    'login.hero.subtitle': 'Self-hosted interaction monitoring for security teams, scanners, and AI agents.',
+    'login.feature.oast.title': 'OAST Verification',
+    'login.feature.oast.desc': 'DNS/HTTP/SMTP interaction capture & evidence',
+    'login.feature.payload.title': 'Payload Studio',
+    'login.feature.payload.desc': 'Trackable payloads with auto-attribution',
+    'login.feature.evidence.title': 'Evidence Chain',
+    'login.feature.evidence.desc': 'Auditable reports with full provenance',
+    'login.feature.scanner.title': 'Scanner Hub',
+    'login.feature.scanner.desc': 'Nuclei, Burp, ZAP, Yak integration ready',
+    'login.footer.version': 'v2.0',
+    'login.footer.tagline': 'Self-hosted & Secure',
 
     // Sidebar groups
     'nav.group.oast': 'OAST CORE',
@@ -212,6 +224,16 @@ const translations = {
     'marketplace.no_plugins': 'No plugins available',
     'marketplace.no_templates': 'No templates available',
     'marketplace.no_installed': 'No installed plugins',
+    'marketplace.create_plugin': 'Create Plugin',
+    'marketplace.create_template': 'Create Template',
+    'marketplace.create_description': 'Publish a new plugin or template to the marketplace.',
+    'marketplace.create_name': 'Name',
+    'marketplace.create_category': 'Category',
+    'marketplace.create_type': 'Type',
+    'marketplace.create_version': 'Version',
+    'marketplace.create_author': 'Author',
+    'marketplace.create_content': 'Content',
+    'common.saving': 'Saving...',
 
     // Rebinding
     'rebinding.title': 'Rebinding Lab',
@@ -266,6 +288,18 @@ const translations = {
     'login.button': '登录',
     'login.button.loading': '登录中...',
     'login.error': '登录失败，请检查用户名和密码',
+    'login.hero.title': 'OAST 证据\n验证平台',
+    'login.hero.subtitle': '面向安全团队、扫描器和 AI Agent 的自托管交互监控平台',
+    'login.feature.oast.title': 'OAST 验证',
+    'login.feature.oast.desc': 'DNS/HTTP/SMTP 交互捕获与证据',
+    'login.feature.payload.title': 'Payload 工作室',
+    'login.feature.payload.desc': '可追踪的 Payload，自动归因',
+    'login.feature.evidence.title': '证据链',
+    'login.feature.evidence.desc': '具有完整溯源的可审计报告',
+    'login.feature.scanner.title': '扫描器中心',
+    'login.feature.scanner.desc': 'Nuclei、Burp、ZAP、Yak 集成就绪',
+    'login.footer.version': 'v2.0',
+    'login.footer.tagline': '自托管 & 安全',
 
     // Sidebar groups
     'nav.group.oast': 'OAST 核心',
@@ -463,6 +497,16 @@ const translations = {
     'marketplace.no_plugins': '暂无插件',
     'marketplace.no_templates': '暂无模板',
     'marketplace.no_installed': '暂无已安装的插件',
+    'marketplace.create_plugin': '创建插件',
+    'marketplace.create_template': '创建模板',
+    'marketplace.create_description': '在市场中发布新的插件或模板。',
+    'marketplace.create_name': '名称',
+    'marketplace.create_category': '分类',
+    'marketplace.create_type': '类型',
+    'marketplace.create_version': '版本',
+    'marketplace.create_author': '作者',
+    'marketplace.create_content': '内容',
+    'common.saving': '保存中...',
 
     // Rebinding
     'rebinding.title': '重绑定实验室',
@@ -527,8 +571,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('language') as Language
       if (saved === 'en-US' || saved === 'zh-CN') {
-        const timer = setTimeout(() => setLangState(saved), 0)
-        return () => clearTimeout(timer)
+        setLangState(saved)
       }
     }
   }, [])

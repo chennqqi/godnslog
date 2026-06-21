@@ -121,9 +121,11 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		marketplaceRoutes := v2.Group("/marketplace", self.authHandler)
 		{
 			marketplaceRoutes.GET("/plugins", self.v2ListPlugins)
+			marketplaceRoutes.POST("/plugins", self.v2CreatePlugin)
 			marketplaceRoutes.GET("/plugins/:id", self.v2GetPlugin)
 			marketplaceRoutes.POST("/plugins/:id/install", self.v2InstallPlugin)
 			marketplaceRoutes.GET("/templates", self.v2ListTemplates)
+			marketplaceRoutes.POST("/templates", self.v2CreateTemplate)
 			marketplaceRoutes.GET("/templates/:id", self.v2GetTemplate)
 			marketplaceRoutes.GET("/installed", self.v2ListInstalledPlugins)
 			marketplaceRoutes.DELETE("/installed/:id", self.v2UninstallPlugin)
@@ -2324,6 +2326,29 @@ func (self *WebServer) v2ListPlugins(c *gin.Context) {
 	})
 }
 
+// v2CreatePlugin creates a new marketplace plugin
+func (self *WebServer) v2CreatePlugin(c *gin.Context) {
+	var plugin marketplace.Plugin
+	if err := c.ShouldBindJSON(&plugin); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": fmt.Sprintf("invalid request: %v", err)})
+		return
+	}
+	if plugin.ID == "" {
+		plugin.ID = v2models.GenerateID()
+	}
+	plugin.IsPublished = true
+
+	store := marketplace.NewXormStore(self.orm)
+	svc := marketplace.NewService(store)
+	if err := svc.CreatePlugin(c, &plugin); err != nil {
+		logrus.Errorf("[v2_api.go::v2CreatePlugin] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to create plugin"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": plugin})
+}
+
 // v2GetPlugin gets a specific plugin
 func (self *WebServer) v2GetPlugin(c *gin.Context) {
 	id := c.Param("id")
@@ -2371,6 +2396,29 @@ func (self *WebServer) v2ListTemplates(c *gin.Context) {
 			"total": len(templates),
 		},
 	})
+}
+
+// v2CreateTemplate creates a new marketplace template
+func (self *WebServer) v2CreateTemplate(c *gin.Context) {
+	var template marketplace.Template
+	if err := c.ShouldBindJSON(&template); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": fmt.Sprintf("invalid request: %v", err)})
+		return
+	}
+	if template.ID == "" {
+		template.ID = v2models.GenerateID()
+	}
+	template.IsPublished = true
+
+	store := marketplace.NewXormStore(self.orm)
+	svc := marketplace.NewService(store)
+	if err := svc.CreateTemplate(c, &template); err != nil {
+		logrus.Errorf("[v2_api.go::v2CreateTemplate] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to create template"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": template})
 }
 
 // v2GetTemplate gets a specific template

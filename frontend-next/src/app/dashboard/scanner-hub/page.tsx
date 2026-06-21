@@ -310,7 +310,7 @@ export default function ScannerHubPage() {
           <CardContent>
             <Select value={selectedCase} onValueChange={setSelectedCase}>
               <SelectTrigger>
-                <SelectValue placeholder="选择 Case" />
+                <SelectValue placeholder={cases.length === 0 ? '暂无可用 Case' : '选择 Case'} />
               </SelectTrigger>
               <SelectContent>
                 {cases.map(c => (
@@ -320,6 +320,14 @@ export default function ScannerHubPage() {
                 ))}
               </SelectContent>
             </Select>
+            {cases.length === 0 && (
+              <div className="mt-3 text-sm text-muted-foreground">
+                没有可选择的 Case，需要先创建 Case 才能使用 Scanner Hub。
+                <Button variant="link" className="px-0" onClick={() => router.push('/dashboard/cases')}>
+                  前往 Case Board 创建
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
