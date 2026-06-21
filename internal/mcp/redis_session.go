@@ -13,8 +13,8 @@ import (
 // RedisSessionStore implements SessionStore-like functionality using Redis as the backend.
 // This enables session sharing across multiple MCP server instances in HA deployments.
 type RedisSessionStore struct {
-	client  *redis.Client
-	timeout time.Duration
+	client    *redis.Client
+	timeout   time.Duration
 	keyPrefix string
 }
 
