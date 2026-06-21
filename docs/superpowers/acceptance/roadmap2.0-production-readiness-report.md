@@ -19,6 +19,13 @@
 | 前端构建 | `npm --prefix ./frontend-next run build` | ✅ 通过 | 25 个页面静态化成功 |
 | 前端 E2E | `CI=1 npm --prefix ./frontend-next run test:e2e` | ✅ 117 passed，0 failed | 4.1m 完成 |
 | 容器构建 | `docker build -t godnslog .` | ✅ 通过 | 已修复 entrypoint 权限问题 |
+| 容器运行 | `docker compose up -d godnslog` | ✅ 运行中 | 后端 `/api/v2/health` 与前端 `/login` 均返回 200 |
+| docker-compose 启动 | `docker compose up -d --build godnslog` | ✅ 通过 | 已修复 rootless 端口与前端构建输出问题 |
+| 前端登录 | `curl -X POST http://localhost:3000/api/v2/auth/login` | ✅ 通过 | 已修复 next.config.js API 代理；`/login` 返回 200 |
+| 国际化切换 | 手动切换 EN/中 | ✅ 已修复 | 登录页品牌面板、settings 页 language 下拉接入 `useI18n` |
+| Marketplace | `GET/POST /api/v2/marketplace/plugins` / `templates` | ✅ 已修复 | 同步 marketplace 表、添加创建端点/入口、默认示例数据 |
+| Rebinding Lab | `GET /api/v2/rebinding/scenarios` + `POST /scenarios/:name/rules` | ✅ 已修复 | 修正前端场景列表响应解析，5 个预定义场景可正常创建规则 |
+| Scanner Hub | `GET /api/v2/cases` + 页面 Case 选择器 | ✅ 已修复 | 增加空 Case 提示与跳转到 Case Board 的入口 |
 
 ---
 
@@ -133,6 +140,15 @@
 | Workflow 缺少 SMTP 动作 | 新增 `ActionTypeSMTP` 分支 | `internal/workflow/service.go` |
 | 容器进程无法优雅退出 | Dockerfile 引入 `tini`，新增 `deploy/docker/entrypoint.sh` | `Dockerfile`、`deploy/docker/entrypoint.sh` |
 | 容器内 `chmod` 失败 | 移除 `RUN chmod`，在源码中设置 entrypoint 可执行权限 | `Dockerfile`、`deploy/docker/entrypoint.sh` |
+| 容器启动失败：缺少 `listeners` / `cluster_nodes` / `workflow_action_logs` 等表 | 在 `server/webui.go::initDatabase` 中完整同步所有 2.0 模型、HA 表、Workflow 持久化日志 | `server/webui.go` |
+| 容器内 `next start` 找不到生产构建 | 运行时复制 `next.config.js`（`distDir: 'dist'`），使 `next start` 能找到 `dist` 目录 | `Dockerfile` |
+| 容器数据库 schema 冲突 | 从 sync 列表中移除 `v2models.User` / `v2models.Resolve`（它们是 legacy 表的 wrapper） | `server/webui.go` |
+| 登录 404 | 在 `next.config.js` 增加 rewrites，将 `/api/v2/:path*` 和 `/api/v1/:path*` 代理到后端 | `frontend-next/next.config.js` |
+| 重复登录入口 | 根路径 `/` 直接 `redirect('/login')`，移除 landing 页登录按钮 | `frontend-next/src/app/page.tsx` |
+| 国际化切换失效 | 登录页品牌面板接入 `useI18n`；新增 `login.hero.*` / `login.feature.*` / `login.footer.*` 翻译键；settings 页 language 下拉受控并调用 `setLang`；`I18nProvider` 去掉 `setTimeout` | `frontend-next/src/lib/i18n-context.tsx`、`frontend-next/src/app/login/page.tsx`、`frontend-next/src/app/dashboard/settings/page.tsx` |
+| Marketplace 不可用 | 在 `server/webui.go` 同步 6 个 marketplace 表并新增 `initMarketplaceSeed` 默认示例；在 `server/v2_api.go` 注册 `POST /marketplace/plugins` / `templates`；前端 marketplace 页面增加创建按钮和 Dialog 表单；`api-client.ts` 增加 `createPlugin` / `createTemplate` | `server/webui.go`、`server/v2_api.go`、`frontend-next/src/app/dashboard/marketplace/page.tsx`、`frontend-next/src/lib/api-client.ts` |
+| Rebinding Lab 场景为空 | 修正 `api-client.ts` 中 `listScenarios` 返回类型为 `RebindingScenario[]`，并在 `rebinding/page.tsx` 中改为 `setScenarios(response.data || [])` | `frontend-next/src/lib/api-client.ts`、`frontend-next/src/app/dashboard/rebinding/page.tsx` |
+| Scanner Hub 无法选择 Case | 在 `scanner-hub/page.tsx` 的 Case 选择器增加空状态提示和跳转 Case Board 的按钮 | `frontend-next/src/app/dashboard/scanner-hub/page.tsx` |
 | MCP session 多实例共享 | 新增 `RedisSessionStore`（可选） | `internal/mcp/redis_session.go` |
 | Workflow 队列持久化 | 新增 `PersistentActionLog` 模型 | `internal/workflow/persistent_log.go` |
 
@@ -144,7 +160,7 @@
 |---|---|---|---|
 | **P0** | 协议监听器安全审计 | SMTP/LDAP/SMB/FTP 监听真实端口，存在横向/反射风险 | 完成独立安全审计报告，默认禁用，提供网络隔离配置 |
 | **P0** | HA 真实集群验证 | `internal/ha` 已实现但缺少与 WebServer 启动流程的集成验证 | 在 2+ 实例 + Redis 环境验证 leader 选举与状态同步 |
-| **P1** | 容器 HEALTHCHECK | 当前 OCI 格式忽略 HEALTHCHECK | 切换到 docker 镜像格式或在编排层配置 probe |
+| **P1** | 容器 HEALTHCHECK | 镜像内 HEALTHCHECK 被 OCI 格式忽略；compose 中已用 healthcheck 配置兜底 | 切换到 docker 镜像格式或在编排层配置 probe |
 | **P1** | Workflow 持久化收尾 | `PersistentActionLog` 尚未接入 queue 恢复 | 启动时加载 pending 任务，重放失败后动作 |
 | **P1** | MCP Redis 集成 | `newSessionStore` 未在 `v2MCPHandler` 中调用 | 根据 Redis 配置选择 store |
 | **P2** | 前端 lint warnings | 仅剩 2 个 React Hook Form 兼容性警告 | 通过受控组件或 `useController` 规避 |
@@ -155,7 +171,7 @@
 
 ## 7. 结论
 
-**当前项目满足 RoadMap 2.0 的功能完整性目标，质量门禁全部通过，可作为 2.0 RC 发布。剩余 3 项 P0 工作（协议监听器安全审计、HA 集群验证、容器 HEALTHCHECK 兼容）属于生产部署前的安全与运维收尾，建议完成后标记为 GA。**
+**当前项目满足 RoadMap 2.0 的功能完整性目标，质量门禁全部通过，容器构建与运行均成功，可作为 2.0 RC 发布。剩余 2 项 P0 工作（协议监听器安全审计、HA 集群验证）与 1 项 P1 容器 HEALTHCHECK 兼容属于生产部署前的安全与运维收尾，建议完成后标记为 GA。**
 
 ---
 
@@ -175,6 +191,15 @@ CI=1 npm --prefix ./frontend-next run test:e2e
 
 # 容器
 docker build -t godnslog .
+docker compose up -d --build godnslog
+
+# 验证
+curl -s http://localhost:8000/api/v2/health
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/login
+curl -s -o /dev/null -w "%{http_code}" -L http://localhost:3000/  # 307 -> /login
+curl -s -X POST http://localhost:3000/api/v2/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"<password>"}'
 ```
 
 ---

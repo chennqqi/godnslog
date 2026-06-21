@@ -612,3 +612,50 @@ Phase 4/5 验收完成，结果保存至 `docs/superpowers/acceptance/phase4-5-a
 - 2.0/2.2/2.3 功能目标基本达成：MCP、AgentRun、Workflow 通知/队列/自定义响应、Scanner Hub、多协议 Listener、Canary、Rebinding、Retention、HA、Marketplace 均实现。
 - 当日修复：SMTP 工作流动作、Email STARTTLS 强制、Docker 进程监管（tini + entrypoint.sh）、Docker build 权限问题、新增 MCP Redis session 与 Workflow 持久化日志模型。
 - 生产前仍需完成：协议监听器安全审计、HA 真实集群验证、容器 HEALTHCHECK 格式兼容。
+
+## 2026-06-21 (docker-compose 启动服务)
+
+在 docker-compose 中启动 GODNSLOG 服务。
+- 命令：`docker compose up -d --build godnslog`
+- 验证：`curl http://localhost:8000/api/v2/health` 返回 alive，`curl http://localhost:3000/login` 返回 200。
+- 修复问题：
+  - `server/webui.go` 初始 schema 不完整，导致 `listeners` / `cluster_nodes` / `workflow_action_logs` 等表缺失，容器启动失败；已完整同步所有 2.0 模型、HA 表与 Workflow 持久化日志。
+  - `v2models.User` / `v2models.Resolve` 是 legacy 表的 wrapper，同步时与旧表冲突，已从 sync 列表移除。
+  - Dockerfile 缺少 `next.config.js`，导致容器内 `next start` 找不到 `dist` 生产构建；已补充复制 `next.config.js`。
+  - docker-compose 默认绑定 53/8080，在 rootless podman 下因权限/端口冲突失败；已改为 `8053:53`、`8000:8080`、`3000:3000`。
+- 质量门禁复测：`go build ./...`、`go test ./...`、`go vet ./...`、`gofmt -l .` 均通过。
+
+## 2026-06-21 (修复登录 404 与重复登录入口)
+
+用户反馈：前端登录返回 404，且 `/` 存在旧版登录入口，点击后才进入 `/login` 新登录页。
+- 原因 1：`frontend-next/src/lib/api.ts` 默认 `baseURL: '/api/v2'`，但 `next.config.js` 没有配置 API 代理，浏览器直接访问 `/api/v2/...` 时 Next.js 服务返回 404。
+- 修复 1：在 `frontend-next/next.config.js` 中增加 `rewrites`，将 `/api/v2/:path*` 和 `/api/v1/:path*` 代理到后端 `http://localhost:8080`。
+- 原因 2：`frontend-next/src/app/page.tsx` 是一个独立的 landing 页，包含“登录”按钮，导致用户看到两个入口。
+- 修复 2：将 `/` 直接 `redirect('/login')`。
+- 验证：`curl http://localhost:3000/` 返回 307 到 `/login`；`curl http://localhost:3000/api/v2/auth/login` 返回 200/401（说明已正确代理到后端）。
+
+## 2026-06-21 (修复国际化语言切换不生效)
+
+用户反馈：切换到中文后界面仍显示英文。
+- 原因 1：登录页左侧品牌面板（hero 标题、副标题、feature 卡片、footer）以及 settings 页标签等文本为硬编码英文，未接入 `useI18n`。
+- 修复 1：在 `i18n-context.tsx` 中新增 `login.hero.*`、`login.feature.*`、`login.footer.*` 等翻译键的中英文文案；登录页 `page.tsx` 改为使用 `t()` 调用，左侧面板完整随语言切换。
+- 原因 2：`I18nProvider` 初始化语言时使用 `setTimeout` 延迟设置，且部分组件硬编码默认语言，导致切换响应不可靠。
+- 修复 2：移除 `setTimeout`，直接同步设置；settings 页的 language 下拉改为受控组件并调用 `setLang()` 更新上下文，使设置页切换语言也能即时生效。
+- 重新构建容器并验证服务正常启动。
+
+## 2026-06-21 (修复 Rebinding Lab / Marketplace / Scanner Hub 功能不可用)
+
+用户反馈：Rebinding Lab 功能不可用，Marketplace 为空且没有创建入口，Scanner Hub 无法选择 Case。
+- 原因 1：Marketplace 数据库表未同步，查询插件/模板返回 500；且缺少创建 plugin/template 的 API 端点和前端入口。
+- 修复 1：在 `server/webui.go` 的 `initDatabase` 中同步 `marketplace.Plugin`、`PluginVersion`、`PluginReview`、`Template`、`TemplateReview`、`PluginInstallation` 表；在 `server/v2_api.go` 注册 `POST /marketplace/plugins` 和 `POST /marketplace/templates`；在 `frontend-next/src/app/dashboard/marketplace/page.tsx` 增加创建按钮和 Dialog 表单；在 `frontend-next/src/lib/api-client.ts` 增加 `createPlugin` / `createTemplate`。
+- 原因 2：Marketplace 首次启动没有示例数据，用户打开页面为空。
+- 修复 2：在 `server/webui.go` 中增加 `initMarketplaceSeed`，首次启动时自动插入一个示例插件和一个示例模板。
+- 原因 3：Rebinding Lab 前端 `loadScenarios` 对 `GET /rebinding/scenarios` 的响应结构处理错误，导致左侧预定义场景列表为空，无法创建规则。
+- 修复 3：修正 `frontend-next/src/lib/api-client.ts` 中 `listScenarios` 的返回类型为 `RebindingScenario[]`，并在 `frontend-next/src/app/dashboard/rebinding/page.tsx` 中改为 `setScenarios(response.data || [])`。
+- 原因 4：Scanner Hub 依赖已有的 Case，但用户尚未创建任何 Case，Case 下拉为空。
+- 修复 4：在 `frontend-next/src/app/dashboard/scanner-hub/page.tsx` 的 Case 选择器增加空状态提示，并提供“前往 Case Board 创建”的跳转按钮。
+- 验证：
+  - `GET /api/v2/marketplace/plugins` 返回 1 个示例插件和通过 API 创建的测试插件；`GET /api/v2/marketplace/templates` 返回 1 个示例模板和通过 API 创建的测试模板；`POST /api/v2/marketplace/plugins` / `templates` 返回 200。
+  - `GET /api/v2/rebinding/scenarios` 返回 5 个预定义场景；`POST /api/v2/rebinding/scenarios/browser-rebinding/rules` 创建规则成功；`GET /api/v2/rebinding/rules` 返回规则。
+  - `POST /api/v2/cases` 创建 Case 后，`GET /api/v2/cases` 返回该 Case，Scanner Hub 下拉可正常选择。
+- 重新构建容器并验证 `/login` 和 `/api/v2/health` 均返回 200。
