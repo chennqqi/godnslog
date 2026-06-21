@@ -9,13 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { useI18n } from '@/lib/i18n-context'
 import {
   Dialog,
   DialogContent,
@@ -46,6 +40,7 @@ const DEFAULT_FORM: Partial<RetentionPolicy> = {
 
 export default function RetentionPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [policies, setPolicies] = useState<RetentionPolicy[]>([])
   const [jobs, setJobs] = useState<RetentionJob[]>([])
   const [loading, setLoading] = useState(true)
@@ -115,7 +110,7 @@ export default function RetentionPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this retention policy?')) return
+    if (!confirm(t('retention.delete_confirm'))) return
     try {
       await retentionApi.deletePolicy(id)
       load()
@@ -146,18 +141,18 @@ export default function RetentionPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Data Retention</h2>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('retention.title')}</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Manage data lifecycle policies with automatic cleanup and archival
+            {t('retention.subtitle')}
           </p>
         </div>
-        <Button onClick={handleCreate}>Create Policy</Button>
+        <Button onClick={handleCreate}>{t('retention.create')}</Button>
       </div>
 
       {/* Policies */}
       <Card className="dark:bg-gray-800 dark:border-gray-700">
         <CardHeader>
-          <CardTitle className="text-sm font-semibold">Retention Policies</CardTitle>
+          <CardTitle className="text-sm font-semibold">{t('retention.policies')}</CardTitle>
           <CardDescription className="text-xs">
             {policies.length} polic{policies.length !== 1 ? 'ies' : 'y'} configured
           </CardDescription>
@@ -209,12 +204,12 @@ export default function RetentionPage() {
                       </div>
                     </div>
                     <div className="flex gap-2 shrink-0">
-                      <Button size="sm" variant="ghost" onClick={() => handleRun(policy.id)}>Run</Button>
+                      <Button size="sm" variant="ghost" onClick={() => handleRun(policy.id)}>{t('retention.run')}</Button>
                       <Button size="sm" variant="ghost" onClick={() => handleToggle(policy)}>
-                        {policy.is_enabled ? 'Disable' : 'Enable'}
+                        {policy.is_enabled ? t('retention.disable') : t('retention.enable')}
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleEdit(policy)}>Edit</Button>
-                      <Button size="sm" variant="ghost" className="text-red-600" onClick={() => handleDelete(policy.id)}>Delete</Button>
+                      <Button size="sm" variant="ghost" onClick={() => handleEdit(policy)}>{t('retention.edit')}</Button>
+                      <Button size="sm" variant="ghost" className="text-red-600" onClick={() => handleDelete(policy.id)}>{t('retention.delete')}</Button>
                     </div>
                   </div>
                 </div>
@@ -228,7 +223,7 @@ export default function RetentionPage() {
       {jobs.length > 0 && (
         <Card className="dark:bg-gray-800 dark:border-gray-700">
           <CardHeader>
-            <CardTitle className="text-sm font-semibold">Recent Jobs</CardTitle>
+            <CardTitle className="text-sm font-semibold">{t('retention.recent_jobs')}</CardTitle>
             <CardDescription className="text-xs">Last {jobs.length} retention executions</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
@@ -256,29 +251,29 @@ export default function RetentionPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Edit Policy' : 'Create Retention Policy'}</DialogTitle>
+            <DialogTitle>{editing ? t('retention.edit') : t('retention.create')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name">{t('retention.name')}</Label>
               <Input id="name" value={form.name || ''} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Default 90-day retention" />
             </div>
             <div>
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t('retention.description')}</Label>
               <Input id="description" value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Optional description" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="retention_days">Retention Days</Label>
+                <Label htmlFor="retention_days">{t('retention.retention_days')}</Label>
                 <Input id="retention_days" type="number" value={form.retention_days || 0} onChange={(e) => setForm({ ...form, retention_days: parseInt(e.target.value) || 0 })} />
               </div>
               <div>
-                <Label htmlFor="max_records">Max Records (0 = unlimited)</Label>
+                <Label htmlFor="max_records">{t('retention.max_records')}</Label>
                 <Input id="max_records" type="number" value={form.max_records || 0} onChange={(e) => setForm({ ...form, max_records: parseInt(e.target.value) || 0 })} />
               </div>
             </div>
             <div>
-              <Label>Apply To</Label>
+              <Label>{t('retention.apply_to')}</Label>
               <div className="flex gap-4 mt-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   <Checkbox id="apply_interactions" checked={form.apply_to_interactions} onCheckedChange={(v) => setForm({ ...form, apply_to_interactions: !!v })} />
@@ -295,7 +290,7 @@ export default function RetentionPage() {
               </div>
             </div>
             <div>
-              <Label>Schedule</Label>
+              <Label>{t('retention.schedule')}</Label>
               <div className="flex gap-4 mt-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   <Checkbox id="run_hourly" checked={form.run_hourly} onCheckedChange={(v) => setForm({ ...form, run_hourly: !!v })} />
@@ -317,13 +312,13 @@ export default function RetentionPage() {
             </div>
             <div className="flex items-center gap-2">
               <Checkbox id="is_enabled" checked={form.is_enabled} onCheckedChange={(v) => setForm({ ...form, is_enabled: !!v })} />
-              <Label htmlFor="is_enabled">Enable immediately</Label>
+              <Label htmlFor="is_enabled">{t('retention.enable_immediately')}</Label>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>{t('common.cancel')}</Button>
             <Button onClick={handleSave} disabled={saving || !form.name}>
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? t('retention.saving') : t('retention.save')}
             </Button>
           </DialogFooter>
         </DialogContent>

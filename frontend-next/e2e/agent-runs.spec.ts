@@ -628,6 +628,8 @@ test.describe('Agent Runs', () => {
       response.url().includes('/agent-runs/agent-run-1/followups') && response.request().method() === 'POST'
     )
     await page.getByRole('button', { name: '创建' }).click()
+    // Set flag immediately after click so the refresh GET requests return updated mock data
+    followupCreated = true
     const followupResponse = await followupPromise
     const followupRequest = followupResponse.request()
 
@@ -636,9 +638,6 @@ test.describe('Agent Runs', () => {
     expect(postData.action_type).toBe('recheck_evidence')
     expect(postData.reason).toBe('Evidence needs second review')
     expect(postData.review_packet_id).toBe('agent-run-1')
-
-    // Set flag after POST response so the refresh GET request returns updated data
-    followupCreated = true
     await page.waitForLoadState('networkidle')
 
     // Verify dialog is closed

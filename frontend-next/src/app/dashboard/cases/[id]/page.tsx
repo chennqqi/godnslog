@@ -86,7 +86,6 @@ export default function CaseDetailPage() {
 
   useEffect(() => {
     if (params.id) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadData()
     }
   }, [params.id, loadData])

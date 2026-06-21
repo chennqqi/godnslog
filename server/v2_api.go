@@ -122,8 +122,11 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		{
 			marketplaceRoutes.GET("/plugins", self.v2ListPlugins)
 			marketplaceRoutes.GET("/plugins/:id", self.v2GetPlugin)
+			marketplaceRoutes.POST("/plugins/:id/install", self.v2InstallPlugin)
 			marketplaceRoutes.GET("/templates", self.v2ListTemplates)
 			marketplaceRoutes.GET("/templates/:id", self.v2GetTemplate)
+			marketplaceRoutes.GET("/installed", self.v2ListInstalledPlugins)
+			marketplaceRoutes.DELETE("/installed/:id", self.v2UninstallPlugin)
 		}
 
 		// Rules/Workflow
@@ -2383,6 +2386,70 @@ func (self *WebServer) v2GetTemplate(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": template})
+}
+
+// v2InstallPlugin installs a marketplace plugin
+func (self *WebServer) v2InstallPlugin(c *gin.Context) {
+	pluginID := c.Param("id")
+
+	var req struct {
+		Version string `json:"version"`
+		Config  string `json:"config"`
+	}
+	// Body is optional; ignore decode errors
+	_ = c.ShouldBindJSON(&req)
+
+	store := marketplace.NewXormStore(self.orm)
+	svc := marketplace.NewService(store)
+
+	// Verify plugin exists
+	plugin, err := svc.GetPlugin(c, pluginID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "Plugin not found"})
+		return
+	}
+
+	version := req.Version
+	if version == "" {
+		version = plugin.Version
+	}
+
+	installation, err := svc.InstallPlugin(c, pluginID, version, req.Config)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to install plugin"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": installation})
+}
+
+// v2ListInstalledPlugins lists all installed plugins
+func (self *WebServer) v2ListInstalledPlugins(c *gin.Context) {
+	store := marketplace.NewXormStore(self.orm)
+	svc := marketplace.NewService(store)
+
+	installations, err := svc.ListPluginInstallations(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to list installed plugins"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": gin.H{"items": installations, "total": len(installations)}})
+}
+
+// v2UninstallPlugin uninstalls a plugin
+func (self *WebServer) v2UninstallPlugin(c *gin.Context) {
+	id := c.Param("id")
+
+	store := marketplace.NewXormStore(self.orm)
+	svc := marketplace.NewService(store)
+
+	if err := svc.UninstallPlugin(c, id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Failed to uninstall plugin"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success"})
 }
 
 // v2ListRules lists workflow rules

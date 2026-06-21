@@ -13,6 +13,8 @@ import (
 	"github.com/chennqqi/godnslog/cache"
 	"github.com/chennqqi/godnslog/internal/agentpolicy"
 	"github.com/chennqqi/godnslog/internal/evidencehub"
+	"github.com/chennqqi/godnslog/internal/ha"
+	"github.com/chennqqi/godnslog/internal/marketplace"
 	v2models "github.com/chennqqi/godnslog/internal/models"
 	"github.com/chennqqi/godnslog/internal/payload"
 	"github.com/chennqqi/godnslog/models"
@@ -266,6 +268,9 @@ func setupV2ScannerHubAPITest(t *testing.T) (*WebServer, *gin.Engine, string) {
 	}
 	if err := server.orm.Sync2(new(v2models.Case), new(v2models.Payload), new(v2models.ScannerRun), new(v2models.AuditLog)); err != nil {
 		t.Fatalf("failed to sync v2 scanner hub schema: %v", err)
+	}
+	if err := server.orm.Sync2(new(ha.ClusterNode), new(ha.ClusterConfig), new(ha.HealthCheck)); err != nil {
+		t.Fatalf("failed to sync HA schema: %v", err)
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
@@ -4446,5 +4451,239 @@ func TestV2UserManagement(t *testing.T) {
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusConflict {
 		t.Errorf("expected 409 for duplicate username, got %d", w.Code)
+	}
+}
+
+// --- HA Cluster Integration Tests ---
+
+func TestV2HAClusterListNodes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	_, r, token := setupV2ScannerHubAPITest(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/cluster/nodes", nil)
+	req.Header.Set("Access-Token", token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Code int `json:"code"`
+		Data struct {
+			Items []interface{} `json:"items"`
+			Total int           `json:"total"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.Code != 0 {
+		t.Fatalf("expected code 0, got %d", resp.Code)
+	}
+}
+
+func TestV2HAClusterCreateAndGetNode(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	_, r, token := setupV2ScannerHubAPITest(t)
+
+	// Create a node
+	body := strings.NewReader(`{"id":"test-node-1","name":"test-node","host":"127.0.0.1","port":8080,"role":"primary","is_enabled":true}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/cluster/nodes", body)
+	req.Header.Set("Access-Token", token)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var createResp struct {
+		Code int `json:"code"`
+		Data struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &createResp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if createResp.Data.ID != "test-node-1" {
+		t.Fatalf("expected node ID 'test-node-1', got '%s'", createResp.Data.ID)
+	}
+
+	// Get the node
+	req = httptest.NewRequest(http.MethodGet, "/api/v2/cluster/nodes/test-node-1", nil)
+	req.Header.Set("Access-Token", token)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var getResp struct {
+		Code int `json:"code"`
+		Data struct {
+			ID     string `json:"id"`
+			Status string `json:"status"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &getResp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if getResp.Data.ID != "test-node-1" {
+		t.Fatalf("expected node ID 'test-node-1', got '%s'", getResp.Data.ID)
+	}
+}
+
+func TestV2HAClusterGetConfig(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	_, r, token := setupV2ScannerHubAPITest(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/cluster/config", nil)
+	req.Header.Set("Access-Token", token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Code int `json:"code"`
+		Data struct {
+			ID               string `json:"id"`
+			EnableFailover   bool   `json:"enable_failover"`
+			BalanceAlgorithm string `json:"balance_algorithm"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.Code != 0 {
+		t.Fatalf("expected code 0, got %d", resp.Code)
+	}
+}
+
+func TestV2HealthCheck(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	_, r, _ := setupV2ScannerHubAPITest(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.Code != 0 {
+		t.Fatalf("expected code 0, got %d", resp.Code)
+	}
+	if resp.Message != "ok" {
+		t.Fatalf("expected message 'ok', got '%s'", resp.Message)
+	}
+}
+
+// --- Marketplace Install Integration Tests ---
+
+func TestV2MarketplaceInstallAndList(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	server, r, token := setupV2ScannerHubAPITest(t)
+
+	// Sync marketplace schema
+	if err := server.orm.Sync2(new(marketplace.Plugin), new(marketplace.PluginInstallation)); err != nil {
+		t.Fatalf("failed to sync marketplace schema: %v", err)
+	}
+
+	// First, create a plugin via the API (using create endpoint if available)
+	// Since there's no create endpoint in routes, insert directly
+	plugin := &marketplace.Plugin{
+		ID:          "test-plugin-1",
+		Name:        "Test Plugin",
+		Description: "A test plugin",
+		Version:     "1.0.0",
+		Author:      "test",
+		Downloads:   0,
+		Rating:      5,
+		IsPublished: true,
+	}
+	if _, err := server.orm.Insert(plugin); err != nil {
+		t.Fatalf("failed to create test plugin: %v", err)
+	}
+
+	// Install the plugin
+	body := strings.NewReader(`{"version":"1.0.0"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/marketplace/plugins/test-plugin-1/install", body)
+	req.Header.Set("Access-Token", token)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var installResp struct {
+		Code int `json:"code"`
+		Data struct {
+			ID       string `json:"id"`
+			PluginID string `json:"plugin_id"`
+			Status   string `json:"status"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &installResp); err != nil {
+		t.Fatalf("failed to parse install response: %v", err)
+	}
+	if installResp.Code != 0 {
+		t.Fatalf("expected code 0, got %d", installResp.Code)
+	}
+	if installResp.Data.PluginID != "test-plugin-1" {
+		t.Fatalf("expected plugin_id 'test-plugin-1', got '%s'", installResp.Data.PluginID)
+	}
+	if installResp.Data.Status != "installed" {
+		t.Fatalf("expected status 'installed', got '%s'", installResp.Data.Status)
+	}
+
+	// List installed plugins
+	req = httptest.NewRequest(http.MethodGet, "/api/v2/marketplace/installed", nil)
+	req.Header.Set("Access-Token", token)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var listResp struct {
+		Code int `json:"code"`
+		Data struct {
+			Items []interface{} `json:"items"`
+			Total int           `json:"total"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &listResp); err != nil {
+		t.Fatalf("failed to parse list response: %v", err)
+	}
+	if listResp.Code != 0 {
+		t.Fatalf("expected code 0, got %d", listResp.Code)
+	}
+	if listResp.Data.Total < 1 {
+		t.Fatalf("expected at least 1 installed plugin, got %d", listResp.Data.Total)
 	}
 }

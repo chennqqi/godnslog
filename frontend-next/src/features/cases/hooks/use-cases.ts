@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { caseApi } from '@/lib/api-client'
-import type { Case, CaseCreateRequest, CaseUpdateRequest } from '@/types'
+import type { CaseCreateRequest, CaseUpdateRequest } from '@/types'
 
 export function useCases(params?: { status?: string; search?: string; page?: number; page_size?: number }) {
   return useQuery({

@@ -376,7 +376,7 @@ function NotificationSettings() {
 }
 
 function TokenManagement() {
-  const [apiKeys, setApiKeys] = useState([
+  const [apiKeys] = useState([
     { id: '1', name: 'Development Key', key_prefix: 'gdl_', created_at: '2024-01-01' },
     { id: '2', name: 'Production Key', key_prefix: 'gdl_', created_at: '2024-01-15' },
   ])

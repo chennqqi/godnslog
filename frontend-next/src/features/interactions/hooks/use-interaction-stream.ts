@@ -105,7 +105,7 @@ export function useInteractionStream({
         if (enabledRef.current) connectRef.current()
       }, delay)
     }
-  }, [caseId, payloadId, type, enabled])
+  }, [caseId, payloadId, type])
 
   useEffect(() => {
     connectRef.current = connect

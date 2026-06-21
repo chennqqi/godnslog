@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { marketplaceApi } from '@/lib/api-client'
+import { useI18n } from '@/lib/i18n-context'
 
 interface Plugin {
   id: string
@@ -26,6 +27,7 @@ interface Template {
 
 export default function MarketplacePage() {
   const router = useRouter()
+  const { t } = useI18n()
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -55,9 +57,9 @@ export default function MarketplacePage() {
           setTemplates(response.data.items)
         }
       } else if (activeTab === 'installed') {
-        const response = await marketplaceApi.listPlugins()
+        const response = await marketplaceApi.listInstalled()
         if (response.data && response.data.items) {
-          setInstalledPlugins((response.data.items || []).filter((p: Plugin) => p.installed))
+          setInstalledPlugins(response.data.items || [])
         }
       }
     } catch (error) {
@@ -81,7 +83,7 @@ export default function MarketplacePage() {
 
   const installPlugin = async (pluginId: string) => {
     try {
-      await marketplaceApi.getPlugin(pluginId)
+      await marketplaceApi.installPlugin(pluginId)
       setPlugins(plugins.map(p => p.id === pluginId ? { ...p, installed: true } : p))
     } catch (error) {
       console.error('Failed to install plugin:', error)
@@ -99,7 +101,7 @@ export default function MarketplacePage() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Marketplace</h2>
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">{t('marketplace.title')}</h2>
 
       {/* Tab Navigation */}
       <div className="mb-6">
@@ -112,7 +114,7 @@ export default function MarketplacePage() {
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
-            Plugins
+            {t('marketplace.plugins')}
           </button>
           <button
             onClick={() => setActiveTab('templates')}
@@ -122,7 +124,7 @@ export default function MarketplacePage() {
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
-            Templates
+            {t('marketplace.templates')}
           </button>
           <button
             onClick={() => setActiveTab('installed')}
@@ -132,7 +134,7 @@ export default function MarketplacePage() {
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
-            Installed
+            {t('marketplace.installed')}
           </button>
         </div>
       </div>
@@ -141,7 +143,7 @@ export default function MarketplacePage() {
       <div className="mb-6">
         <input
           type="text"
-          placeholder="Search plugins or templates..."
+          placeholder={t('marketplace.search')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
@@ -159,7 +161,7 @@ export default function MarketplacePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {plugins.length === 0 ? (
                 <div className="col-span-full text-center py-12">
-                  <p className="text-gray-500">No plugins available</p>
+                  <p className="text-gray-500">{t('marketplace.no_plugins')}</p>
                 </div>
               ) : (
                 plugins
@@ -187,7 +189,7 @@ export default function MarketplacePage() {
                           : 'bg-indigo-600 text-white hover:bg-indigo-700'
                       }`}
                     >
-                      {plugin.installed ? 'Installed' : 'Install'}
+                      {plugin.installed ? t('marketplace.installed_badge') : t('marketplace.install')}
                     </button>
                   </div>
                 ))
@@ -199,7 +201,7 @@ export default function MarketplacePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {templates.length === 0 ? (
                 <div className="col-span-full text-center py-12">
-                  <p className="text-gray-500">No templates available</p>
+                  <p className="text-gray-500">{t('marketplace.no_templates')}</p>
                 </div>
               ) : (
                 templates
@@ -221,7 +223,7 @@ export default function MarketplacePage() {
                           : 'bg-indigo-600 text-white hover:bg-indigo-700'
                       }`}
                     >
-                      {template.installed ? 'Installed' : 'Install'}
+                      {template.installed ? t('marketplace.installed_badge') : t('marketplace.install')}
                     </button>
                   </div>
                 ))
@@ -233,7 +235,7 @@ export default function MarketplacePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {installedPlugins.length === 0 ? (
                 <div className="col-span-full text-center py-12">
-                  <p className="text-gray-500">No installed plugins</p>
+                  <p className="text-gray-500">{t('marketplace.no_installed')}</p>
                 </div>
               ) : (
                 installedPlugins.map((plugin) => (
@@ -254,7 +256,7 @@ export default function MarketplacePage() {
                       className="w-full py-2 rounded-lg bg-gray-300 text-gray-600 cursor-not-allowed"
                       disabled
                     >
-                      Installed
+                      {t('marketplace.installed_badge')}
                     </button>
                   </div>
                 ))

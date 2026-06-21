@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { useI18n } from '@/lib/i18n-context'
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ import {
 /** Rebinding Lab page — DNS rebinding rule management with predefined scenarios */
 export default function RebindingLabPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [rules, setRules] = useState<RebindingRule[]>([])
   const [scenarios, setScenarios] = useState<RebindingScenario[]>([])
   const [sessions, setSessions] = useState<Record<string, RebindingSession[]>>({})
@@ -89,7 +91,7 @@ export default function RebindingLabPage() {
   }
 
   const handleDeleteRule = async (id: string) => {
-    if (!confirm('Delete this rebinding rule?')) return
+    if (!confirm(t('rebinding.delete_confirm'))) return
     try {
       await rebindingApi.deleteRule(id)
       loadRules()
@@ -125,7 +127,7 @@ export default function RebindingLabPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Rebinding Lab</h2>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('rebinding.title')}</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             DNS rebinding rule management with predefined attack scenarios
           </p>
@@ -137,7 +139,7 @@ export default function RebindingLabPage() {
         <div className="lg:col-span-1">
           <Card className="dark:bg-gray-800 dark:border-gray-700">
             <CardHeader>
-              <CardTitle className="text-sm font-semibold">Predefined Scenarios</CardTitle>
+              <CardTitle className="text-sm font-semibold">{t('rebinding.scenarios')}</CardTitle>
               <CardDescription className="text-xs">
                 Click a scenario to create a rule
               </CardDescription>
@@ -175,7 +177,7 @@ export default function RebindingLabPage() {
         <div className="lg:col-span-2">
           <Card className="dark:bg-gray-800 dark:border-gray-700">
             <CardHeader>
-              <CardTitle className="text-sm font-semibold">Rebinding Rules</CardTitle>
+              <CardTitle className="text-sm font-semibold">{t('rebinding.rules')}</CardTitle>
               <CardDescription className="text-xs">
                 {rules.length} rule{rules.length !== 1 ? 's' : ''} configured
               </CardDescription>
@@ -187,7 +189,7 @@ export default function RebindingLabPage() {
                 </div>
               ) : rules.length === 0 ? (
                 <div className="text-center py-16">
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No rebinding rules yet</p>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('rebinding.no_rules')}</p>
                   <p className="text-xs text-gray-400 mt-1">Select a predefined scenario to create one</p>
                 </div>
               ) : (
@@ -199,7 +201,7 @@ export default function RebindingLabPage() {
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-mono text-sm text-gray-900 dark:text-gray-100">{rule.domain}</span>
                             <Badge variant={rule.is_enabled ? 'default' : 'secondary'}>
-                              {rule.is_enabled ? 'Enabled' : 'Disabled'}
+                              {rule.is_enabled ? t('rebinding.enabled') : t('rebinding.disabled')}
                             </Badge>
                           </div>
                           <div className="flex gap-1 flex-wrap mt-2">
@@ -218,14 +220,14 @@ export default function RebindingLabPage() {
                             variant="ghost"
                             onClick={() => handleViewSessions(rule)}
                           >
-                            Sessions
+                            {t('rebinding.sessions')}
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => handleToggleRule(rule)}
                           >
-                            {rule.is_enabled ? 'Disable' : 'Enable'}
+                            {rule.is_enabled ? t('rebinding.disable') : t('rebinding.enable')}
                           </Button>
                           <Button
                             size="sm"
@@ -243,7 +245,7 @@ export default function RebindingLabPage() {
                             Active Sessions ({sessions[rule.id].length})
                           </p>
                           {sessions[rule.id].length === 0 ? (
-                            <p className="text-xs text-gray-400">No active sessions</p>
+                            <p className="text-xs text-gray-400">{t('rebinding.no_sessions')}</p>
                           ) : (
                             <div className="space-y-1">
                               {sessions[rule.id].map((sess) => (

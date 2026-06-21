@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { interactionApi } from '@/lib/api-client'
 import type { Interaction } from '@/types'
@@ -12,10 +12,9 @@ export default function InteractionDetailPage() {
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
 
-  const loadInteraction = async () => {
+  const loadInteraction = useCallback(async () => {
     try {
       const response = await interactionApi.get(params.id as string)
-      // Handle nested response structure
       const interactionData = response.data && 'data' in response.data ? response.data.data : response.data
       if (interactionData) {
         setInteraction(interactionData as Interaction)
@@ -25,14 +24,14 @@ export default function InteractionDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id])
 
   useEffect(() => {
     if (params.id) {
       const timer = setTimeout(() => loadInteraction(), 0)
       return () => clearTimeout(timer)
     }
-  }, [params.id])
+  }, [params.id, loadInteraction])
 
   const handleExport = async (format: string) => {
     setExporting(true)

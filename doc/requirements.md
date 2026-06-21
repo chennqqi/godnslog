@@ -595,3 +595,12 @@ Phase 3 验收完成，结果保存至 `docs/superpowers/acceptance/phase3-accep
 - 前端 lint: 0 errors, 21 warnings
 - 前端 build: 通过
 - E2E: 117 passed, 0 failed
+
+## 2026-06-21 (Phase 4/5 acceptance verification)
+
+Phase 4/5 验收完成，结果保存至 `docs/superpowers/acceptance/phase4-5-acceptance-report.md`。
+- `go build/test/vet/fmt` 全部通过；前端 lint 0 errors，build 成功，E2E **117 passed / 0 failed**（修复了 3 个与 Phase 4/5 页面相关的 E2E 问题）。
+- Phase 4 通过：MCP、Workflow 通知/队列/自定义响应、Scanner Hub 完整流程、CLI 子命令、Agent Run 闭环均验证通过。
+- Phase 5 功能实现完成：SMTP/LDAP/SMB/FTP 监听器、Canary、Rebinding Lab、Retention、HA、Marketplace 均实现，前端页面与后端 API 对齐。
+- `docker build -t godnslog .` 通过。
+- 遗留项：Phase 5a 协议监听器安全审计、HA 真实集群验证、server 层集成覆盖率仍需后续补齐。

@@ -71,7 +71,7 @@ function InteractionsPageContent() {
   }, [typeParam])
 
   // SSE real-time stream
-  const handleNewInteraction = useCallback((interaction: Interaction) => {
+  const handleNewInteraction = useCallback(() => {
     setLiveCount((c) => c + 1)
   }, [])
 

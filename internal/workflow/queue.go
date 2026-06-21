@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/chennqqi/godnslog/internal/models"
+	"xorm.io/xorm"
 )
 
 // ActionLog records the result of a single action execution
@@ -30,7 +31,8 @@ type QueueJob struct {
 	Attempt     int
 }
 
-// Queue is an async workflow action execution queue with retry support
+// Queue is an async workflow action execution queue with retry support.
+// If engine is set, jobs are persisted to the database for recovery after restart.
 type Queue struct {
 	jobs       chan *QueueJob
 	workers    int
@@ -41,10 +43,12 @@ type Queue struct {
 	service    *Service
 	logs       []ActionLog
 	logsMu     sync.Mutex
+	engine     *xorm.Engine
 }
 
-// NewQueue creates a new async workflow queue
-func NewQueue(ctx context.Context, service *Service, workers, maxRetries int) *Queue {
+// NewQueue creates a new async workflow queue.
+// If engine is non-nil, jobs are persisted to the database for recovery.
+func NewQueue(ctx context.Context, service *Service, workers, maxRetries int, engine *xorm.Engine) *Queue {
 	ctx, cancel := context.WithCancel(ctx)
 	return &Queue{
 		jobs:       make(chan *QueueJob, 100),
@@ -53,6 +57,7 @@ func NewQueue(ctx context.Context, service *Service, workers, maxRetries int) *Q
 		cancel:     cancel,
 		maxRetries: maxRetries,
 		service:    service,
+		engine:     engine,
 	}
 }
 
@@ -105,13 +110,36 @@ func (q *Queue) worker() {
 	}
 }
 
-// processJob processes a single job with retry logic
+// processJob processes a single job with retry logic and persists the result.
 func (q *Queue) processJob(job *QueueJob) {
 	start := time.Now()
+
+	// Update persistent log status to running
+	var plogID string
+	if q.engine != nil {
+		plogID = fmt.Sprintf("wal-%d-%s", start.UnixNano(), job.Action.ID)
+		interactionID := ""
+		if job.Interaction != nil {
+			interactionID = job.Interaction.ID
+		}
+		plog := &PersistentActionLog{
+			ID:            plogID,
+			WorkflowID:    job.WorkflowID,
+			ActionID:      job.Action.ID,
+			ActionType:    job.Action.Type,
+			InteractionID: interactionID,
+			Status:        "running",
+			Attempt:       job.Attempt,
+		}
+		if _, err := q.engine.Insert(plog); err != nil {
+			log.Printf("[workflow-queue] failed to persist running status: %v", err)
+		}
+	}
+
 	err := q.service.executeAction(job.Action, job.Interaction)
 	duration := time.Since(start)
 
-	// Record log
+	// Record in-memory log
 	actionLog := ActionLog{
 		WorkflowID: job.WorkflowID,
 		ActionID:   job.Action.ID,
@@ -128,6 +156,25 @@ func (q *Queue) processJob(job *QueueJob) {
 	q.logs = append(q.logs, actionLog)
 	q.logsMu.Unlock()
 
+	// Update persistent log with final status
+	if q.engine != nil && plogID != "" {
+		status := "completed"
+		errMsg := ""
+		if err != nil {
+			status = "failed"
+			errMsg = err.Error()
+		}
+		_, updateErr := q.engine.ID(plogID).Update(&PersistentActionLog{
+			Status:     status,
+			Error:      errMsg,
+			DurationMs: duration.Milliseconds(),
+			FinishedAt: time.Now(),
+		})
+		if updateErr != nil {
+			log.Printf("[workflow-queue] failed to update persistent log: %v", updateErr)
+		}
+	}
+
 	if err != nil {
 		if job.Attempt < q.maxRetries {
 			job.Attempt++
@@ -143,7 +190,7 @@ func (q *Queue) processJob(job *QueueJob) {
 	}
 }
 
-// EnqueueWorkflow enqueues all enabled actions from a workflow
+// EnqueueWorkflow enqueues all enabled actions from a workflow and persists them to the database.
 func (q *Queue) EnqueueWorkflow(workflowID string, actions models.Actions, interaction *models.Interaction) error {
 	for _, action := range actions {
 		if !action.Enabled {
@@ -153,6 +200,24 @@ func (q *Queue) EnqueueWorkflow(workflowID string, actions models.Actions, inter
 			WorkflowID:  workflowID,
 			Action:      action,
 			Interaction: interaction,
+		}
+		// Persist to database if engine is available
+		if q.engine != nil {
+			interactionID := ""
+			if interaction != nil {
+				interactionID = interaction.ID
+			}
+			plog := &PersistentActionLog{
+				ID:            fmt.Sprintf("wal-%d", time.Now().UnixNano()),
+				WorkflowID:    workflowID,
+				ActionID:      action.ID,
+				ActionType:    action.Type,
+				InteractionID: interactionID,
+				Status:        "pending",
+			}
+			if _, err := q.engine.Insert(plog); err != nil {
+				log.Printf("[workflow-queue] failed to persist action log: %v", err)
+			}
 		}
 		if err := q.Enqueue(job); err != nil {
 			return fmt.Errorf("failed to enqueue action %s: %w", action.Type, err)
