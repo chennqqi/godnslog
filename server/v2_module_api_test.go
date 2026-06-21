@@ -688,3 +688,234 @@ func TestV2ListenerInteractionsListing(t *testing.T) {
 		t.Fatalf("list interactions expected 200 or 500, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+// --- Boundary Cases: Non-existent Resources ---
+
+func TestV2GetNonExistentCanary(t *testing.T) {
+	_, r, token := setupV2ModuleAPITest(t)
+
+	req := httptest.NewRequest("GET", "/api/v2/canary/nonexistent-id", nil)
+	req.Header.Set("Access-Token", token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	// GetCanary returns an empty struct (not error) for non-existent IDs - pre-existing behavior
+	// Accept 200 with empty data or 404 if fixed in future
+	if w.Code != http.StatusOK && w.Code != http.StatusNotFound {
+		t.Fatalf("expected 200 or 404 for non-existent canary, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestV2GetNonExistentRebindingRule(t *testing.T) {
+	_, r, token := setupV2ModuleAPITest(t)
+
+	req := httptest.NewRequest("GET", "/api/v2/rebinding/rules/nonexistent-id", nil)
+	req.Header.Set("Access-Token", token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for non-existent rebinding rule, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestV2GetNonExistentListener(t *testing.T) {
+	_, r, token := setupV2ModuleAPITest(t)
+
+	req := httptest.NewRequest("GET", "/api/v2/listeners/nonexistent-id", nil)
+	req.Header.Set("Access-Token", token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for non-existent listener, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestV2GetNonExistentRetentionPolicy(t *testing.T) {
+	_, r, token := setupV2ModuleAPITest(t)
+
+	req := httptest.NewRequest("GET", "/api/v2/retention/policies/nonexistent-id", nil)
+	req.Header.Set("Access-Token", token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	// GetPolicy returns an empty struct (not error) for non-existent IDs - pre-existing behavior
+	// Accept 200 with empty data or 404 if fixed in future
+	if w.Code != http.StatusOK && w.Code != http.StatusNotFound {
+		t.Fatalf("expected 200 or 404 for non-existent retention policy, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestV2GetNotificationChannelInvalidID(t *testing.T) {
+	_, r, token := setupV2ModuleAPITest(t)
+
+	req := httptest.NewRequest("GET", "/api/v2/notifications/channels/notanumber", nil)
+	req.Header.Set("Access-Token", token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid channel ID, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// --- Boundary Cases: Invalid JSON Body ---
+
+func TestV2CreateCanaryInvalidJSON(t *testing.T) {
+	_, r, token := setupV2ModuleAPITest(t)
+
+	body := strings.NewReader(`{invalid json}`)
+	req := httptest.NewRequest("POST", "/api/v2/canary", body)
+	req.Header.Set("Access-Token", token)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid JSON, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestV2CreateListenerInvalidJSON(t *testing.T) {
+	_, r, token := setupV2ModuleAPITest(t)
+
+	body := strings.NewReader(`{invalid json}`)
+	req := httptest.NewRequest("POST", "/api/v2/listeners", body)
+	req.Header.Set("Access-Token", token)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid JSON, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestV2CreateRetentionPolicyInvalidJSON(t *testing.T) {
+	_, r, token := setupV2ModuleAPITest(t)
+
+	body := strings.NewReader(`{invalid json}`)
+	req := httptest.NewRequest("POST", "/api/v2/retention/policies", body)
+	req.Header.Set("Access-Token", token)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid JSON, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// --- Boundary Cases: Empty List Responses ---
+
+func TestV2EmptyCanaryList(t *testing.T) {
+	_, r, token := setupV2ModuleAPITest(t)
+
+	req := httptest.NewRequest("GET", "/api/v2/canary?page=1&page_size=10", nil)
+	req.Header.Set("Access-Token", token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for empty list, got %d", w.Code)
+	}
+	var resp struct {
+		Code int `json:"code"`
+		Data struct {
+			Items []struct{} `json:"items"`
+			Total int        `json:"total"`
+		} `json:"data"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp.Code != 0 {
+		t.Fatalf("expected code 0, got %d", resp.Code)
+	}
+	if resp.Data.Total != 0 {
+		t.Fatalf("expected total 0 for empty list, got %d", resp.Data.Total)
+	}
+}
+
+func TestV2EmptyRebindingRulesList(t *testing.T) {
+	_, r, token := setupV2ModuleAPITest(t)
+
+	req := httptest.NewRequest("GET", "/api/v2/rebinding/rules?page=1&page_size=10", nil)
+	req.Header.Set("Access-Token", token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for empty list, got %d", w.Code)
+	}
+	var resp struct {
+		Code int `json:"code"`
+		Data struct {
+			Total int `json:"total"`
+		} `json:"data"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp.Data.Total != 0 {
+		t.Fatalf("expected total 0 for empty list, got %d", resp.Data.Total)
+	}
+}
+
+// --- Boundary Cases: Delete Non-existent Resource ---
+
+func TestV2DeleteNonExistentCanary(t *testing.T) {
+	_, r, token := setupV2ModuleAPITest(t)
+
+	req := httptest.NewRequest("DELETE", "/api/v2/canary/nonexistent-id", nil)
+	req.Header.Set("Access-Token", token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	// Delete on non-existent may return 200 (idempotent) or 500 (error), both acceptable
+	if w.Code != http.StatusOK && w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 200 or 500 for deleting non-existent canary, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestV2DeleteNonExistentListener(t *testing.T) {
+	_, r, token := setupV2ModuleAPITest(t)
+
+	req := httptest.NewRequest("DELETE", "/api/v2/listeners/nonexistent-id", nil)
+	req.Header.Set("Access-Token", token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK && w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 200 or 500 for deleting non-existent listener, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// --- Boundary Cases: Canary Hits for Non-existent Canary ---
+
+func TestV2CanaryHitsForNonExistentCanary(t *testing.T) {
+	_, r, token := setupV2ModuleAPITest(t)
+
+	req := httptest.NewRequest("GET", "/api/v2/canary/nonexistent-id/hits", nil)
+	req.Header.Set("Access-Token", token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	// Should return 200 with empty hits or 500, not 404
+	if w.Code != http.StatusOK && w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 200 or 500 for hits of non-existent canary, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// --- Boundary Cases: Rebinding Sessions for Non-existent Rule ---
+
+func TestV2RebindingSessionsForNonExistentRule(t *testing.T) {
+	_, r, token := setupV2ModuleAPITest(t)
+
+	req := httptest.NewRequest("GET", "/api/v2/rebinding/rules/nonexistent-id/sessions", nil)
+	req.Header.Set("Access-Token", token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	// Should return 200 with empty sessions or 500, not 404
+	if w.Code != http.StatusOK && w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 200 or 500 for sessions of non-existent rule, got %d: %s", w.Code, w.Body.String())
+	}
+}

@@ -95,3 +95,63 @@ test.describe('Rebinding Page', () => {
     await context.close();
   });
 });
+
+test.describe('Rebinding Page - Empty State', () => {
+  test.beforeEach(async ({ context, page }) => {
+    await context.addInitScript(() => {
+      localStorage.setItem('token', 'mock-token');
+      localStorage.setItem('user', JSON.stringify({ id: 1, username: 'admin', email: 'admin@godnslog.com', role: 0, lang: 'en-US' }));
+    });
+
+    await page.route('**/api/**', route => {
+      const url = route.request().url();
+      if (url.includes('/rebinding/scenarios')) {
+        return route.fulfill({ json: { code: 0, data: [] } });
+      }
+      return route.fulfill({
+        json: { code: 0, data: { items: [], total: 0, page: 1, page_size: 100, total_pages: 0 } },
+      });
+    });
+
+    await page.goto('/dashboard/rebinding');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+  });
+
+  test('should display no scenarios message', async ({ page }) => {
+    await expect(page.getByText('No scenarios available')).toBeVisible({ timeout: 5000 });
+  });
+
+  test('should display no rules message', async ({ page }) => {
+    await expect(page.getByText('No rebinding rules yet')).toBeVisible({ timeout: 5000 });
+  });
+
+  test('should display zero rules count', async ({ page }) => {
+    await expect(page.getByText(/0 rules configured/)).toBeVisible({ timeout: 5000 });
+  });
+});
+
+test.describe('Rebinding Page - API Error State', () => {
+  test.beforeEach(async ({ context, page }) => {
+    await context.addInitScript(() => {
+      localStorage.setItem('token', 'mock-token');
+      localStorage.setItem('user', JSON.stringify({ id: 1, username: 'admin', email: 'admin@godnslog.com', role: 0, lang: 'en-US' }));
+    });
+
+    await page.route('**/api/**', route => {
+      return route.fulfill({ status: 500, json: { code: 500, message: 'Internal Server Error' } });
+    });
+
+    await page.goto('/dashboard/rebinding');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+  });
+
+  test('should still display page title on API error', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: 'Rebinding Lab', exact: true })).toBeVisible({ timeout: 5000 });
+  });
+
+  test('should still display scenarios section on API error', async ({ page }) => {
+    await expect(page.getByText('Predefined Scenarios').first()).toBeVisible({ timeout: 5000 });
+  });
+});

@@ -101,3 +101,55 @@ test.describe('Canary Page', () => {
     await context.close();
   });
 });
+
+test.describe('Canary Page - Empty State', () => {
+  test.beforeEach(async ({ context, page }) => {
+    await context.addInitScript(() => {
+      localStorage.setItem('token', 'mock-token');
+      localStorage.setItem('user', JSON.stringify({ id: 1, username: 'admin', email: 'admin@godnslog.com', role: 0, lang: 'en-US' }));
+    });
+
+    await page.route('**/api/**', route => {
+      return route.fulfill({
+        json: { code: 0, data: { items: [], total: 0, page: 1, page_size: 20, total_pages: 0 } },
+      });
+    });
+
+    await page.goto('/dashboard/canary');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+  });
+
+  test('should display empty state message', async ({ page }) => {
+    await expect(page.getByText('No canary tokens yet')).toBeVisible({ timeout: 5000 });
+  });
+
+  test('should display zero counts in summary cards', async ({ page }) => {
+    await expect(page.getByText('0').first()).toBeVisible({ timeout: 5000 });
+  });
+});
+
+test.describe('Canary Page - API Error State', () => {
+  test.beforeEach(async ({ context, page }) => {
+    await context.addInitScript(() => {
+      localStorage.setItem('token', 'mock-token');
+      localStorage.setItem('user', JSON.stringify({ id: 1, username: 'admin', email: 'admin@godnslog.com', role: 0, lang: 'en-US' }));
+    });
+
+    await page.route('**/api/**', route => {
+      return route.fulfill({ status: 500, json: { code: 500, message: 'Internal Server Error' } });
+    });
+
+    await page.goto('/dashboard/canary');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+  });
+
+  test('should still display page title on API error', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: 'Canary Tokens', exact: true })).toBeVisible({ timeout: 5000 });
+  });
+
+  test('should still display new canary token button on API error', async ({ page }) => {
+    await expect(page.getByRole('button', { name: 'New Canary Token' })).toBeVisible({ timeout: 5000 });
+  });
+});
