@@ -5,10 +5,10 @@ import "time"
 // PersistentActionLog records the state and result of a workflow action execution in the database.
 // This enables recovery of pending jobs after process restart.
 type PersistentActionLog struct {
-	ID         string    `json:"id" xorm:"'id' pk varchar(36) notnull"`
-	WorkflowID string    `json:"workflow_id" xorm:"varchar(36) notnull index"`
-	ActionID   string    `json:"action_id" xorm:"varchar(36) notnull"`
-	ActionType string    `json:"action_type" xorm:"varchar(64) notnull"`
+	ID         string `json:"id" xorm:"'id' pk varchar(36) notnull"`
+	WorkflowID string `json:"workflow_id" xorm:"varchar(36) notnull index"`
+	ActionID   string `json:"action_id" xorm:"varchar(36) notnull"`
+	ActionType string `json:"action_type" xorm:"varchar(64) notnull"`
 
 	// InteractionID is the ID of the interaction that triggered this action (may be empty).
 	InteractionID string `json:"interaction_id" xorm:"varchar(36) index"`

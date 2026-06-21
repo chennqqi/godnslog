@@ -379,3 +379,13 @@ Phase 2 评估发现大部分功能已在之前 sprint 中实现，剩余缺口�
 - E2E 117/117 全部通过；验收过程中修复了 3 个测试与页面实现不匹配/竞态问题（agent-runs follow-up、marketplace tab 标签、rebinding 场景卡片）。
 - 遗留项：协议监听器安全审计、HA 真实集群验证、server 层集成测试覆盖率仍需后续补齐。
 - 验收报告：`docs/superpowers/acceptance/phase4-5-acceptance-report.md`。
+
+## 2026-06-21 (RoadMap 2.0 生产可用标准验收)
+
+按 `ROADMAP_2.0.md` 设计目标与核心能力进行生产可用标准验收。
+- 质量门禁全部通过：后端 build/test/vet/fmt、前端 lint（0 errors, 2 warnings）、build、E2E 117/117、`docker build` 通过。
+- 与设计原则（自托管、API 先行、证据优先、协同、权限、Agent 友好）高度对齐；2.0 MVP、2.2 Agent 赋能、2.3 平台化功能均已实现。
+- 验收过程中发现并协助修复：Dockerfile 中 entrypoint 权限错误导致容器构建失败；Playwright 浏览器缓存缺失导致 E2E 首次运行失败（已重新安装并复测）。
+- 当日新增代码：`internal/workflow/service.go` SMTP 动作与强制 STARTTLS、`internal/mcp/redis_session.go` Redis session store、`internal/workflow/persistent_log.go` 持久化日志模型。
+- 生产前仍需完成：协议监听器独立安全审计、HA 多实例+Redis 验证、HEALTHCHECK 在 OCI 格式下的兼容或改用编排层 probe。
+- 验收报告：`docs/superpowers/acceptance/roadmap2.0-production-readiness-report.md`。

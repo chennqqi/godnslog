@@ -604,3 +604,11 @@ Phase 4/5 验收完成，结果保存至 `docs/superpowers/acceptance/phase4-5-a
 - Phase 5 功能实现完成：SMTP/LDAP/SMB/FTP 监听器、Canary、Rebinding Lab、Retention、HA、Marketplace 均实现，前端页面与后端 API 对齐。
 - `docker build -t godnslog .` 通过。
 - 遗留项：Phase 5a 协议监听器安全审计、HA 真实集群验证、server 层集成覆盖率仍需后续补齐。
+
+## 2026-06-21 (RoadMap 2.0 生产可用标准验收)
+
+按 `ROADMAP_2.0.md` 设计目标执行生产可用标准验收，结果保存至 `docs/superpowers/acceptance/roadmap2.0-production-readiness-report.md`。
+- 质量门禁全部通过：`go build/test/vet/fmt`、前端 lint（0 errors, 2 warnings）、build、E2E（117 passed / 0 failed）、`docker build` 通过。
+- 2.0/2.2/2.3 功能目标基本达成：MCP、AgentRun、Workflow 通知/队列/自定义响应、Scanner Hub、多协议 Listener、Canary、Rebinding、Retention、HA、Marketplace 均实现。
+- 当日修复：SMTP 工作流动作、Email STARTTLS 强制、Docker 进程监管（tini + entrypoint.sh）、Docker build 权限问题、新增 MCP Redis session 与 Workflow 持久化日志模型。
+- 生产前仍需完成：协议监听器安全审计、HA 真实集群验证、容器 HEALTHCHECK 格式兼容。

@@ -55,9 +55,8 @@ EXPOSE 53/UDP 53/TCP
 HEALTHCHECK --interval=20s --timeout=3s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:8080/api/v2/health || exit 1
 
-# Copy entrypoint script
+# Copy entrypoint script (ensure executable bit is set in source)
 COPY deploy/docker/entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
 
 # Start Go backend and Next.js frontend with tini for proper signal handling
 ENTRYPOINT ["/sbin/tini", "--"]
