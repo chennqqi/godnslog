@@ -23,7 +23,7 @@ type Listener struct {
 	Host      string    `json:"host" xorm:"varchar(255) notnull"`
 	Port      int       `json:"port" xorm:"int notnull"`
 	Token     string    `json:"token" xorm:"varchar(64) notnull"`
-	IsEnabled bool      `json:"is_enabled" xorm:"bool notnull default true"`
+	IsEnabled bool      `json:"is_enabled" xorm:"bool notnull default false"`
 	CreatedAt time.Time `json:"created_at" xorm:"datetime created"`
 	UpdatedAt time.Time `json:"updated_at" xorm:"datetime updated"`
 }

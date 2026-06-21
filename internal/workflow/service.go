@@ -3,6 +3,7 @@ package workflow
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -549,6 +550,9 @@ func (s *Service) sendNotifyTelegram(action models.Action, message string) error
 		return errors.New("missing chat_id for telegram notify channel")
 	}
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
+	if err := s.validateNotifyURL(action.ID, url); err != nil {
+		return fmt.Errorf("telegram URL validation failed: %w", err)
+	}
 	payload, _ := json.Marshal(map[string]string{
 		"chat_id": chatID,
 		"text":    message,
@@ -558,7 +562,8 @@ func (s *Service) sendNotifyTelegram(action models.Action, message string) error
 
 // sendNotifyEmail sends an email notification via SMTP.
 // Config fields: smtp_host (required), smtp_port (default 587), username, password,
-// from (required), to (required, comma-separated), subject (default "OAST Alert").
+// from (required), to (required, comma-separated), subject (default "OAST Alert"),
+// use_tls (default true, set false to disable STARTTLS requirement).
 func (s *Service) sendNotifyEmail(action models.Action, message string) error {
 	smtpHost, _ := action.Config["smtp_host"].(string)
 	if len(smtpHost) == 0 {
@@ -592,6 +597,12 @@ func (s *Service) sendNotifyEmail(action models.Action, message string) error {
 	username, _ := action.Config["username"].(string)
 	password, _ := action.Config["password"].(string)
 
+	useTLS, _ := action.Config["use_tls"].(bool)
+	if !useTLS {
+		// Default to requiring TLS unless explicitly disabled
+		useTLS = true
+	}
+
 	body := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s\r\n",
 		from, toStr, subject, message)
 
@@ -601,11 +612,78 @@ func (s *Service) sendNotifyEmail(action models.Action, message string) error {
 		auth = smtp.PlainAuth("", username, password, smtpHost)
 	}
 
-	err := smtp.SendMail(addr, auth, from, toList, []byte(body))
-	if err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
+	if useTLS {
+		if err := s.sendEmailWithTLS(addr, auth, from, toList, []byte(body)); err != nil {
+			return fmt.Errorf("failed to send email via TLS: %w", err)
+		}
+	} else {
+		if err := smtp.SendMail(addr, auth, from, toList, []byte(body)); err != nil {
+			return fmt.Errorf("failed to send email: %w", err)
+		}
 	}
 	return nil
+}
+
+// sendEmailWithTLS sends an email with mandatory STARTTLS upgrade.
+// If the server does not support STARTTLS, the connection is aborted.
+func (s *Service) sendEmailWithTLS(addr string, auth smtp.Auth, from string, to []string, body []byte) error {
+	conn, err := net.DialTimeout("tcp", addr, 30*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to connect to SMTP server: %w", err)
+	}
+	defer conn.Close()
+
+	c, err := smtp.NewClient(conn, strings.Split(addr, ":")[0])
+	if err != nil {
+		return fmt.Errorf("failed to create SMTP client: %w", err)
+	}
+	defer c.Close()
+
+	if err = c.Hello("localhost"); err != nil {
+		return fmt.Errorf("HELO failed: %w", err)
+	}
+
+	// Check if STARTTLS is supported
+	if ok, _ := c.Extension("STARTTLS"); !ok {
+		return errors.New("SMTP server does not support STARTTLS, refusing to send without TLS")
+	}
+
+	if err = c.StartTLS(&tls.Config{
+		ServerName:         strings.Split(addr, ":")[0],
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: false,
+	}); err != nil {
+		return fmt.Errorf("STARTTLS failed: %w", err)
+	}
+
+	if auth != nil {
+		if err = c.Auth(auth); err != nil {
+			return fmt.Errorf("SMTP auth failed: %w", err)
+		}
+	}
+
+	if err = c.Mail(from); err != nil {
+		return fmt.Errorf("MAIL FROM failed: %w", err)
+	}
+
+	for _, addr := range to {
+		if err = c.Rcpt(addr); err != nil {
+			return fmt.Errorf("RCPT TO failed for %s: %w", addr, err)
+		}
+	}
+
+	w, err := c.Data()
+	if err != nil {
+		return fmt.Errorf("DATA command failed: %w", err)
+	}
+	if _, err = w.Write(body); err != nil {
+		return fmt.Errorf("failed to write email body: %w", err)
+	}
+	if err = w.Close(); err != nil {
+		return fmt.Errorf("failed to close DATA: %w", err)
+	}
+
+	return c.Quit()
 }
 
 // validateNotifyURL validates a URL against the outbound security policy

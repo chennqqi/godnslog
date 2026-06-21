@@ -8,12 +8,14 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/chennqqi/godnslog/cache"
 	"github.com/chennqqi/godnslog/internal/auth"
+	"github.com/chennqqi/godnslog/internal/ha"
 	"github.com/chennqqi/godnslog/internal/listener"
 	v2models "github.com/chennqqi/godnslog/internal/models"
 	"github.com/chennqqi/godnslog/internal/workflow"
@@ -66,6 +68,9 @@ type WebServer struct {
 	wg          sync.WaitGroup
 	verifyKey   string //random generate
 	listenerMgr *listener.Manager
+	haSvc       *ha.Service
+	haNodeID    string
+	haCancel    context.CancelFunc
 }
 
 func NewWebServer(cfg *WebServerConfig, store *cache.Cache) (*WebServer, error) {
@@ -294,7 +299,7 @@ func (self *WebServer) Run() error {
 	// Initialize workflow service and async action queue
 	self.workflowSvc = workflow.NewService(self.orm)
 	ctx := context.Background()
-	self.workflowQueue = workflow.NewQueue(ctx, self.workflowSvc, 3, 3)
+	self.workflowQueue = workflow.NewQueue(ctx, self.workflowSvc, 3, 3, self.orm)
 	self.workflowQueue.Start()
 	logrus.Info("[webserver.go::Run] workflow async queue started with 3 workers")
 
@@ -304,6 +309,9 @@ func (self *WebServer) Run() error {
 	if err := self.listenerMgr.Start(context.Background()); err != nil {
 		logrus.Errorf("[webserver.go::Run] failed to start listener manager: %v", err)
 	}
+
+	// Initialize HA service and register current node
+	self.initHA()
 
 	//data group
 	data := api.Group("/record", self.authHandler)
@@ -367,6 +375,7 @@ func (self *WebServer) Shutdown(ctx context.Context) error {
 	if self.listenerMgr != nil {
 		self.listenerMgr.Stop()
 	}
+	self.shutdownHA()
 	if self.s != nil {
 		err = self.s.Shutdown(ctx)
 	}
@@ -375,6 +384,95 @@ func (self *WebServer) Shutdown(ctx context.Context) error {
 	<-self.storeQuit
 	self.orm.Close()
 	return err
+}
+
+// initHA initializes the HA service, registers the current node, and starts a heartbeat goroutine.
+func (self *WebServer) initHA() {
+	store := ha.NewXormStore(self.orm)
+	self.haSvc = ha.NewService(store)
+
+	// Generate a unique node ID based on hostname and listen address
+	hostname, _ := os.Hostname()
+	if hostname == "" {
+		hostname = "node"
+	}
+	self.haNodeID = fmt.Sprintf("%s-%s", hostname, self.Listen)
+
+	// Register or update current node
+	node := &ha.ClusterNode{
+		ID:        self.haNodeID,
+		Name:      hostname,
+		Host:      self.IP,
+		Port:      0, // Will be parsed from Listen
+		Role:      "primary",
+		Status:    "online",
+		LastPing:  time.Now(),
+		IsEnabled: true,
+	}
+
+	// Parse port from Listen address
+	if _, portStr, err := net.SplitHostPort(self.Listen); err == nil {
+		if port, err := fmt.Sscanf(portStr, "%d", &node.Port); port != 1 || err != nil {
+			node.Port = 8080
+		}
+	}
+
+	// Try to create the node; if it already exists, update it
+	if err := self.haSvc.AddNode(context.Background(), node); err != nil {
+		// Node may already exist, try updating
+		if existing, err := self.haSvc.GetNode(context.Background(), self.haNodeID); err == nil {
+			existing.Status = "online"
+			existing.LastPing = time.Now()
+			existing.IsEnabled = true
+			self.haSvc.UpdateNode(context.Background(), existing)
+		}
+	}
+	logrus.Infof("[webserver.go::initHA] registered node %s as online", self.haNodeID)
+
+	// Start heartbeat goroutine
+	haCtx, cancel := context.WithCancel(context.Background())
+	self.haCancel = cancel
+	go self.haHeartbeat(haCtx)
+}
+
+// haHeartbeat periodically updates the node's last ping time.
+func (self *WebServer) haHeartbeat(ctx context.Context) {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			node, err := self.haSvc.GetNode(ctx, self.haNodeID)
+			if err != nil {
+				logrus.Errorf("[webserver.go::haHeartbeat] failed to get node: %v", err)
+				continue
+			}
+			node.LastPing = time.Now()
+			node.Status = "online"
+			if err := self.haSvc.UpdateNode(ctx, node); err != nil {
+				logrus.Errorf("[webserver.go::haHeartbeat] failed to update node: %v", err)
+			}
+		}
+	}
+}
+
+// shutdownHA marks the current node as offline and stops the heartbeat goroutine.
+func (self *WebServer) shutdownHA() {
+	if self.haCancel != nil {
+		self.haCancel()
+	}
+	if self.haSvc != nil && self.haNodeID != "" {
+		node, err := self.haSvc.GetNode(context.Background(), self.haNodeID)
+		if err == nil {
+			node.Status = "offline"
+			node.LastPing = time.Now()
+			self.haSvc.UpdateNode(context.Background(), node)
+			logrus.Infof("[webserver.go::shutdownHA] marked node %s as offline", self.haNodeID)
+		}
+	}
 }
 
 func (self *WebServer) IsDuplicate(err error) bool {

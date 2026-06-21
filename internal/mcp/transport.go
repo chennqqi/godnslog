@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 )
 
 // Session represents an MCP session with state tracking
@@ -159,16 +160,27 @@ const (
 // MCPHandler handles MCP protocol requests over Streamable HTTP transport
 type MCPHandler struct {
 	server   *Server
-	sessions *SessionStore
+	sessions sessionStoreInterface
 	toolMap  map[string]Tool
 	tools    []Tool
 }
 
-// NewMCPHandler creates a new MCP protocol handler
+// NewMCPHandler creates a new MCP protocol handler with in-memory session store.
 func NewMCPHandler(server *Server, toolMap map[string]Tool, tools []Tool) *MCPHandler {
 	return &MCPHandler{
 		server:   server,
 		sessions: NewSessionStore(30 * time.Minute),
+		toolMap:  toolMap,
+		tools:    tools,
+	}
+}
+
+// NewMCPHandlerWithRedis creates a new MCP protocol handler with Redis-backed session store.
+// If redisClient is nil, falls back to in-memory session store.
+func NewMCPHandlerWithRedis(server *Server, toolMap map[string]Tool, tools []Tool, redisClient *redis.Client) *MCPHandler {
+	return &MCPHandler{
+		server:   server,
+		sessions: newSessionStore(30*time.Minute, redisClient),
 		toolMap:  toolMap,
 		tools:    tools,
 	}

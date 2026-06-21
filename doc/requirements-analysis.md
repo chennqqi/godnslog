@@ -370,3 +370,12 @@ Phase 2 评估发现大部分功能已在之前 sprint 中实现，剩余缺口�
 - go build/test: 全部通过
 - 前端 lint: 0 errors, build 通过
 - E2E: 117 passed, 0 failed
+
+## 2026-06-21 (Phase 4/5 acceptance verification)
+
+执行 Phase 4/5 验收。
+- Phase 4 通过：MCP 主服务集成、Workflow 异步队列与 8 种通知渠道、Custom HTTP Response、Scanner Hub 完整闭环、CLI 子命令注册测试、Agent Run lifecycle/review queue/follow-up/evidence export 全部验证通过。
+- Phase 5 功能实现完成：多协议监听器（SMTP/LDAP/SMB/FTP）、Canary 检测、Rebinding Lab 可视化、Retention 策略、HA 服务、Marketplace 插件/模板市场均到位，前端页面与后端 API 对齐。
+- E2E 117/117 全部通过；验收过程中修复了 3 个测试与页面实现不匹配/竞态问题（agent-runs follow-up、marketplace tab 标签、rebinding 场景卡片）。
+- 遗留项：协议监听器安全审计、HA 真实集群验证、server 层集成测试覆盖率仍需后续补齐。
+- 验收报告：`docs/superpowers/acceptance/phase4-5-acceptance-report.md`。

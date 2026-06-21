@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { usePayloads, useCreatePayload } from '@/features/payloads/hooks/use-payloads'
 import { payloadApi } from '@/lib/api-client'
@@ -46,18 +46,18 @@ export default function PayloadsPage() {
   const [variables, setVariables] = useState<Record<string, string>>({})
   const [batchCount, setBatchCount] = useState(1)
 
-  const updatePreview = () => {
+  const updatePreview = useCallback(() => {
     let preview = selectedTemplate.template
     Object.entries(variables).forEach(([key, value]) => {
       preview = preview.replace(`{{.${key}}}`, value)
     })
     setPreviewPayload(preview)
-  }
+  }, [selectedTemplate, variables])
 
   useEffect(() => {
     const timer = setTimeout(() => updatePreview(), 0)
     return () => clearTimeout(timer)
-  }, [selectedTemplate, variables])
+  }, [selectedTemplate, variables, updatePreview])
 
   const handleCreatePayload = async (e: React.FormEvent) => {
     e.preventDefault()

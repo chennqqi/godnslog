@@ -44,29 +44,6 @@ export default function WorkflowBuilderPage() {
   const [selectedRule, setSelectedRule] = useState<Rule | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const conditions = [
-    { id: 'protocol', label: '协议', type: 'select', options: ['DNS', 'HTTP', 'SMTP', 'LDAP', 'SMB', 'FTP'] },
-    { id: 'source_ip', label: '来源IP', type: 'text' },
-    { id: 'token', label: 'Token', type: 'text' },
-    { id: 'path', label: '路径', type: 'text' },
-    { id: 'header', label: 'Header', type: 'text' },
-    { id: 'body', label: 'Body', type: 'text' },
-    { id: 'keyword', label: '关键词', type: 'text' },
-    { id: 'case', label: 'Case', type: 'text' },
-    { id: 'risk_level', label: '风险等级', type: 'select', options: ['low', 'medium', 'high', 'critical'] },
-  ]
-
-  const actions = [
-    { id: 'notify', label: '发送通知' },
-    { id: 'tag', label: '打标签' },
-    { id: 'webhook', label: '转发Webhook' },
-    { id: 'modify_response', label: '修改响应' },
-    { id: 'save_attachment', label: '保存附件' },
-    { id: 'discard', label: '丢弃噪声' },
-    { id: 'create_report', label: '创建报告' },
-    { id: 'call_api', label: '调用外部API' },
-  ]
-
   const loadRules = async () => {
     try {
       const response = await rulesApi.list()

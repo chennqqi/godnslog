@@ -19,7 +19,7 @@ func TestQueue_NewQueue(t *testing.T) {
 
 	ctx := context.Background()
 
-	q := NewQueue(ctx, service, 2, 3)
+	q := NewQueue(ctx, service, 2, 3, nil)
 	assert.NotNil(t, q)
 	assert.Equal(t, 2, q.workers)
 	assert.Equal(t, 3, q.maxRetries)
@@ -31,7 +31,7 @@ func TestQueue_StartStop(t *testing.T) {
 	service := NewService(engine)
 
 	ctx := context.Background()
-	q := NewQueue(ctx, service, 2, 3)
+	q := NewQueue(ctx, service, 2, 3, nil)
 	q.Start()
 
 	// Give workers time to start
@@ -57,7 +57,7 @@ func TestQueue_EnqueueAndProcess(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	q := NewQueue(ctx, service, 2, 1)
+	q := NewQueue(ctx, service, 2, 1, nil)
 	q.Start()
 	defer q.Stop()
 
@@ -114,7 +114,7 @@ func TestQueue_RetryOnFailure(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	q := NewQueue(ctx, service, 1, 3)
+	q := NewQueue(ctx, service, 1, 3, nil)
 	q.Start()
 	defer q.Stop()
 
@@ -166,7 +166,7 @@ func TestQueue_EnqueueWorkflow_SkipsDisabled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	q := NewQueue(ctx, service, 1, 1)
+	q := NewQueue(ctx, service, 1, 1, nil)
 	q.Start()
 	defer q.Stop()
 
@@ -200,7 +200,7 @@ func TestQueue_EnqueueFull(t *testing.T) {
 	defer cancel()
 
 	// Create queue with small buffer, don't start workers
-	q := NewQueue(ctx, service, 1, 1)
+	q := NewQueue(ctx, service, 1, 1, nil)
 
 	token := "test-token"
 	interaction := &models.Interaction{ID: models.GenerateID(), Type: "dns", Token: &token}

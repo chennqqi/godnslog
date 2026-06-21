@@ -160,9 +160,15 @@ export const marketplaceApi = {
   listPlugins: (params?: { page?: number; page_size?: number }) =>
     api.get<UnknownItemListResponse>('/marketplace/plugins', params),
   getPlugin: (id: string) => api.get<unknown>(`/marketplace/plugins/${id}`),
+  installPlugin: (id: string, body?: { version?: string; config?: string }) =>
+    api.post<unknown>(`/marketplace/plugins/${id}/install`, body),
   listTemplates: (params?: { page?: number; page_size?: number }) =>
     api.get<UnknownItemListResponse>('/marketplace/templates', params),
   getTemplate: (id: string) => api.get<unknown>(`/marketplace/templates/${id}`),
+  listInstalled: () =>
+    api.get<UnknownItemListResponse>('/marketplace/installed'),
+  uninstallPlugin: (id: string) =>
+    api.delete<unknown>(`/marketplace/installed/${id}`),
 }
 
 // Rules/Workflow API

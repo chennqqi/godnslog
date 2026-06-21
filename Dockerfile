@@ -26,7 +26,7 @@ RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflag
 # final image: Node runtime for Next.js + Go binary
 FROM node:24.13.0-alpine
 
-RUN apk add --no-cache -U tzdata ca-certificates libcap wget && \
+RUN apk add --no-cache -U tzdata ca-certificates libcap wget tini && \
 	update-ca-certificates
 
 RUN mkdir -p /app/frontend /app
@@ -55,5 +55,10 @@ EXPOSE 53/UDP 53/TCP
 HEALTHCHECK --interval=20s --timeout=3s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:8080/api/v2/health || exit 1
 
-# Start Go backend and Next.js frontend
-CMD ["sh", "-c", "/app/godnslog serve -domain ${DOMAIN:-example.com} -4 ${DNS_IP:-0.0.0.0} & cd /app/frontend && npx next start -p 3000"]
+# Copy entrypoint script
+COPY deploy/docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Start Go backend and Next.js frontend with tini for proper signal handling
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["/app/entrypoint.sh"]

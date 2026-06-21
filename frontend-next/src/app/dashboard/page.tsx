@@ -8,7 +8,6 @@ import { useInteractions, useInteractionStats } from '@/features/interactions/ho
 import type { Interaction } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 
 /** Protocol color mapping per design spec */
@@ -19,16 +18,6 @@ const PROTOCOL_COLORS: Record<string, string> = {
   ldap: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
   smb: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
   ftp: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-}
-
-/** Status color mapping */
-const STATUS_COLORS: Record<string, string> = {
-  active: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  deployed: 'bg-blue-100 text-blue-700 border-blue-200',
-  hit: 'bg-purple-100 text-purple-700 border-purple-200',
-  archived: 'bg-gray-100 text-gray-600 border-gray-200',
-  completed: 'bg-cyan-100 text-cyan-700 border-cyan-200',
-  expired: 'bg-red-100 text-red-700 border-red-200',
 }
 
 /** Stat card with title, value, and optional sub-text */
