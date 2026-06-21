@@ -159,11 +159,15 @@ export const usersApi = {
 export const marketplaceApi = {
   listPlugins: (params?: { page?: number; page_size?: number }) =>
     api.get<UnknownItemListResponse>('/marketplace/plugins', params),
+  createPlugin: (data: Record<string, unknown>) =>
+    api.post<{ data: unknown }>('/marketplace/plugins', data),
   getPlugin: (id: string) => api.get<unknown>(`/marketplace/plugins/${id}`),
   installPlugin: (id: string, body?: { version?: string; config?: string }) =>
     api.post<unknown>(`/marketplace/plugins/${id}/install`, body),
   listTemplates: (params?: { page?: number; page_size?: number }) =>
     api.get<UnknownItemListResponse>('/marketplace/templates', params),
+  createTemplate: (data: Record<string, unknown>) =>
+    api.post<{ data: unknown }>('/marketplace/templates', data),
   getTemplate: (id: string) => api.get<unknown>(`/marketplace/templates/${id}`),
   listInstalled: () =>
     api.get<UnknownItemListResponse>('/marketplace/installed'),
@@ -355,7 +359,7 @@ export const rebindingApi = {
   updateRule: (id: string, data: Partial<RebindingRule>) => api.put<{ data: RebindingRule }>(`/rebinding/rules/${id}`, data),
   deleteRule: (id: string) => api.delete(`/rebinding/rules/${id}`),
   listSessions: (id: string) => api.get<{ data: { rule_id: string; sessions: RebindingSession[]; total: number } }>(`/rebinding/rules/${id}/sessions`),
-  listScenarios: () => api.get<{ data: RebindingScenario[] }>('/rebinding/scenarios'),
+  listScenarios: () => api.get<RebindingScenario[]>('/rebinding/scenarios'),
   createFromScenario: (name: string, data: { domain: string }) =>
     api.post<{ data: RebindingRule }>(`/rebinding/scenarios/${name}/rules`, data),
 }
