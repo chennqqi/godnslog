@@ -11,12 +11,12 @@ import { Spinner } from '@/components/ui/spinner'
 import { useAuthStore } from '@/features/auth/store'
 import { loginSchema, type LoginFormValues } from '@/features/auth/schemas/login-schema'
 
-/** Feature highlights shown on the brand panel */
-const FEATURES = [
-  { icon: 'shield', title: 'OAST Verification', desc: 'DNS/HTTP/SMTP interaction capture & evidence' },
-  { icon: 'beaker', title: 'Payload Studio', desc: 'Trackable payloads with auto-attribution' },
-  { icon: 'clipboard', title: 'Evidence Chain', desc: 'Auditable reports with full provenance' },
-  { icon: 'workflow', title: 'Scanner Hub', desc: 'Nuclei, Burp, ZAP, Yak integration ready' },
+/** Feature key identifiers for the brand panel */
+const FEATURE_KEYS = [
+  { icon: 'shield', key: 'oast' },
+  { icon: 'beaker', key: 'payload' },
+  { icon: 'clipboard', key: 'evidence' },
+  { icon: 'workflow', key: 'scanner' },
 ] as const
 
 /** Icon renderer for feature highlights */
@@ -60,6 +60,12 @@ export default function LoginPage() {
   const handleLanguageChange = (newLang: 'en-US' | 'zh-CN') => {
     setLang(newLang)
   }
+
+  const features = FEATURE_KEYS.map((f) => ({
+    ...f,
+    title: t(`login.feature.${f.key}.title`),
+    desc: t(`login.feature.${f.key}.desc`),
+  }))
 
   const onSubmit = async (data: LoginFormValues) => {
     setLoading(true)
@@ -114,19 +120,19 @@ export default function LoginPage() {
           {/* Hero text */}
           <div className="space-y-6">
             <div>
-              <h1 className="text-4xl font-bold leading-tight">
-                OAST Evidence<br />Verification Platform
+              <h1 className="text-4xl font-bold leading-tight whitespace-pre-line">
+                {t('login.hero.title')}
               </h1>
               <p className="mt-4 text-lg text-indigo-200 max-w-md">
-                Self-hosted interaction monitoring for security teams, scanners, and AI agents.
+                {t('login.hero.subtitle')}
               </p>
             </div>
 
             {/* Feature highlights */}
             <div className="grid grid-cols-2 gap-4 max-w-md">
-              {FEATURES.map((f) => (
+              {features.map((f) => (
                 <div
-                  key={f.title}
+                  key={f.key}
                   className="flex items-start gap-3 p-3 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10"
                 >
                   <span className="text-indigo-300 shrink-0 mt-0.5">
@@ -143,9 +149,9 @@ export default function LoginPage() {
 
           {/* Footer */}
           <div className="flex items-center gap-4 text-sm text-indigo-300/60">
-            <span>v2.0</span>
+            <span>{t('login.footer.version')}</span>
             <span>·</span>
-            <span>Self-hosted &amp; Secure</span>
+            <span>{t('login.footer.tagline')}</span>
           </div>
         </div>
       </div>
