@@ -22,32 +22,32 @@ export default function DocsPage() {
     {
       titleKey: 'docs.quick_start' as TranslationKey,
       descKey: 'docs.quick_start_desc' as TranslationKey,
-      link: '/docs/quick-start',
+      link: '/dashboard/docs/quick-start',
     },
     {
       titleKey: 'docs.api' as TranslationKey,
       descKey: 'docs.api_desc' as TranslationKey,
-      link: '/docs/api',
+      link: '/dashboard/docs/api',
     },
     {
       titleKey: 'docs.user_guide' as TranslationKey,
       descKey: 'docs.user_guide_desc' as TranslationKey,
-      link: '/docs/user-guide',
+      link: '/dashboard/docs/user-guide',
     },
     {
       titleKey: 'docs.config' as TranslationKey,
       descKey: 'docs.config_desc' as TranslationKey,
-      link: '/docs/config',
+      link: '/dashboard/docs/config',
     },
     {
       titleKey: 'docs.faq' as TranslationKey,
       descKey: 'docs.faq_desc' as TranslationKey,
-      link: '/docs/faq',
+      link: '/dashboard/docs/faq',
     },
     {
       titleKey: 'docs.security' as TranslationKey,
       descKey: 'docs.security_desc' as TranslationKey,
-      link: '/docs/security',
+      link: '/dashboard/docs/security',
     },
   ]
 
@@ -63,7 +63,7 @@ export default function DocsPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-gray-500 mb-4">{t(doc.descKey)}</p>
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full" onClick={() => router.push(doc.link)}>
                 {t('docs.view')}
               </Button>
             </CardContent>

@@ -48,6 +48,7 @@ func setupV2ModuleAPITest(t *testing.T) (*WebServer, *gin.Engine, string) {
 		new(v2models.RebindingRule),
 		new(v2models.RebindingSession),
 		new(v2models.Listener),
+		new(v2models.ListenerInteraction),
 		new(models.TblNotificationChannel),
 		new(models.TblNotificationLog),
 		new(retention.RetentionPolicy),
@@ -676,16 +677,14 @@ func TestV2ListenerInteractionsListing(t *testing.T) {
 		t.Fatalf("failed to create listener: %v", err)
 	}
 
-	// List interactions - returns 500 due to pre-existing bug: ListListenerInteractions
-	// queries Interaction table for 'listener_id' column which does not exist in the model
+	// List interactions - should return 200 with empty list for new listener
 	req := httptest.NewRequest("GET", "/api/v2/listeners/listener-int-1/interactions", nil)
 	req.Header.Set("Access-Token", token)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	// Accept either 200 (if fixed) or 500 (pre-existing bug)
-	if w.Code != http.StatusOK && w.Code != http.StatusInternalServerError {
-		t.Fatalf("list interactions expected 200 or 500, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("list interactions expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
