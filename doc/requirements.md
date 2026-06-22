@@ -659,3 +659,9 @@ Phase 4/5 验收完成，结果保存至 `docs/superpowers/acceptance/phase4-5-a
   - `GET /api/v2/rebinding/scenarios` 返回 5 个预定义场景；`POST /api/v2/rebinding/scenarios/browser-rebinding/rules` 创建规则成功；`GET /api/v2/rebinding/rules` 返回规则。
   - `POST /api/v2/cases` 创建 Case 后，`GET /api/v2/cases` 返回该 Case，Scanner Hub 下拉可正常选择。
 - 重新构建容器并验证 `/login` 和 `/api/v2/health` 均返回 200。
+
+## 2026-06-22 全面梳理
+- 对项目进行全面梳理，生成 doc/2.0-project-status.md
+- 梳理范围：后端23个模块、26个前端页面、21个E2E测试、121个v2 API端点、13个MCP工具
+- 识别9个已知bug、16项待完成事项（P0/P1/P2分级）
+

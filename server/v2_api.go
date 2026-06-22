@@ -3235,6 +3235,7 @@ func (self *WebServer) v2ListListenerInteractions(c *gin.Context) {
 	listenerService := listener.NewService(self.orm)
 	interactions, err := listenerService.ListListenerInteractions(id)
 	if err != nil {
+		logrus.Errorf("[v2_api.go::v2ListListenerInteractions] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "Failed to list listener interactions",

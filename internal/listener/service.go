@@ -84,8 +84,8 @@ func (s *Service) DeleteListener(id string) error {
 }
 
 // ListListenerInteractions retrieves interactions for a specific listener
-func (s *Service) ListListenerInteractions(listenerID string) ([]models.Interaction, error) {
-	var interactions []models.Interaction
-	err := s.engine.Where("listener_id = ?", listenerID).Find(&interactions)
+func (s *Service) ListListenerInteractions(listenerID string) ([]models.ListenerInteraction, error) {
+	var interactions []models.ListenerInteraction
+	err := s.engine.Where("listener_id = ?", listenerID).Desc("timestamp").Find(&interactions)
 	return interactions, err
 }

@@ -31,7 +31,7 @@ type Listener struct {
 // ListenerInteraction represents an interaction from a listener
 type ListenerInteraction struct {
 	ID         string    `json:"id" xorm:"'id' pk varchar(36) notnull"`
-	ListenerID string    `json:"listener_id" xorm:"varchar(36) notnull index"`
+	ListenerID string    `json:"listener_id" xorm:"'listener_id' varchar(36) notnull index"`
 	Protocol   Protocol  `json:"protocol" xorm:"varchar(16) notnull"`
 	SourceIP   string    `json:"source_ip" xorm:"varchar(64) notnull"`
 	SourcePort int       `json:"source_port" xorm:"int notnull"`
@@ -66,7 +66,7 @@ func (m Metadata) Value() (driver.Value, error) {
 // SMTPMessage represents an SMTP message interaction
 type SMTPMessage struct {
 	ID         string    `json:"id" xorm:"'id' pk varchar(36) notnull"`
-	ListenerID string    `json:"listener_id" xorm:"varchar(36) notnull index"`
+	ListenerID string    `json:"listener_id" xorm:"'listener_id' varchar(36) notnull index"`
 	From       string    `json:"from" xorm:"varchar(255) notnull"`
 	To         string    `json:"to" xorm:"text"` // JSON array
 	Subject    string    `json:"subject" xorm:"text"`
@@ -79,7 +79,7 @@ type SMTPMessage struct {
 // LDAPQuery represents an LDAP query interaction
 type LDAPQuery struct {
 	ID         string    `json:"id" xorm:"'id' pk varchar(36) notnull"`
-	ListenerID string    `json:"listener_id" xorm:"varchar(36) notnull index"`
+	ListenerID string    `json:"listener_id" xorm:"'listener_id' varchar(36) notnull index"`
 	BaseDN     string    `json:"base_dn" xorm:"text"`
 	Filter     string    `json:"filter" xorm:"text"`
 	Attributes string    `json:"attributes" xorm:"mediumtext"` // JSON string
@@ -91,7 +91,7 @@ type LDAPQuery struct {
 // SMBRequest represents an SMB request interaction
 type SMBRequest struct {
 	ID         string    `json:"id" xorm:"'id' pk varchar(36) notnull"`
-	ListenerID string    `json:"listener_id" xorm:"varchar(36) notnull index"`
+	ListenerID string    `json:"listener_id" xorm:"'listener_id' varchar(36) notnull index"`
 	Command    string    `json:"command" xorm:"varchar(64) notnull"` // SMB command
 	ShareName  string    `json:"share_name" xorm:"varchar(255)"`
 	FilePath   string    `json:"file_path" xorm:"text"`
@@ -105,7 +105,7 @@ type SMBRequest struct {
 // FTPCommand represents an FTP command interaction
 type FTPCommand struct {
 	ID         string    `json:"id" xorm:"'id' pk varchar(36) notnull"`
-	ListenerID string    `json:"listener_id" xorm:"varchar(36) notnull index"`
+	ListenerID string    `json:"listener_id" xorm:"'listener_id' varchar(36) notnull index"`
 	Command    string    `json:"command" xorm:"varchar(64) notnull"` // FTP command
 	Argument   string    `json:"argument" xorm:"text"`
 	Username   string    `json:"username" xorm:"varchar(255)"`
