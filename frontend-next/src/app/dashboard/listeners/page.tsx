@@ -22,9 +22,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { useI18n } from '@/lib/i18n-context'
 
 export default function ListenersPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [listeners, setListeners] = useState<ProtocolListener[]>([])
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
@@ -48,11 +50,11 @@ export default function ListenersPage() {
       }
     } catch (err) {
       console.error('Failed to load listeners:', err)
-      setError('Failed to load listeners')
+      setError(t('listeners.error_load'))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -103,20 +105,20 @@ export default function ListenersPage() {
       loadListeners()
     } catch (err) {
       console.error('Failed to save listener:', err)
-      setError('Failed to save listener')
+      setError(t('listeners.error_save'))
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this listener?')) return
+    if (!confirm(t('listeners.delete_confirm'))) return
     try {
       await listenerApi.delete(id)
       loadListeners()
     } catch (err) {
       console.error('Failed to delete listener:', err)
-      setError('Failed to delete listener')
+      setError(t('listeners.error_delete'))
     }
   }
 
@@ -126,7 +128,7 @@ export default function ListenersPage() {
       loadListeners()
     } catch (err) {
       console.error('Failed to toggle listener:', err)
-      setError('Failed to toggle listener')
+      setError(t('listeners.error_toggle'))
     }
   }
 
@@ -151,14 +153,14 @@ export default function ListenersPage() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>
+    return <div className="flex items-center justify-center h-screen">{t('listeners.loading')}</div>
   }
 
   return (
     <div className="container mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Protocol Listeners</h1>
-        <Button onClick={handleCreate}>Create Listener</Button>
+        <h1 className="text-3xl font-bold">{t('listeners.title')}</h1>
+        <Button onClick={handleCreate}>{t('listeners.create')}</Button>
       </div>
 
       {error && (
@@ -169,7 +171,7 @@ export default function ListenersPage() {
         {listeners.length === 0 && (
           <Card>
             <CardContent className="py-8 text-center text-muted-foreground">
-              No listeners configured. Click &quot;Create Listener&quot; to add one.
+              {t('listeners.no_listeners')}
             </CardContent>
           </Card>
         )}
@@ -189,7 +191,7 @@ export default function ListenersPage() {
                   </div>
                 </div>
                 <Badge variant={listener.is_enabled ? 'default' : 'secondary'}>
-                  {listener.is_enabled ? 'Running' : 'Stopped'}
+                  {listener.is_enabled ? t('listeners.running') : t('listeners.stopped')}
                 </Badge>
               </div>
               <div className="flex gap-2">
@@ -198,21 +200,21 @@ export default function ListenersPage() {
                   variant="outline"
                   onClick={() => handleToggle(listener)}
                 >
-                  {listener.is_enabled ? 'Stop' : 'Start'}
+                  {listener.is_enabled ? t('listeners.stop') : t('listeners.start')}
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => handleEdit(listener)}
                 >
-                  Edit
+                  {t('listeners.edit')}
                 </Button>
                 <Button
                   size="sm"
                   variant="destructive"
                   onClick={() => handleDelete(listener.id)}
                 >
-                  Delete
+                  {t('listeners.delete')}
                 </Button>
               </div>
             </CardContent>
@@ -223,11 +225,11 @@ export default function ListenersPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? 'Edit Listener' : 'Create Listener'}</DialogTitle>
+            <DialogTitle>{editing ? t('listeners.edit_title') : t('listeners.create_title')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Protocol</Label>
+              <Label>{t('listeners.protocol')}</Label>
               <Select
                 value={form.protocol}
                 onValueChange={(v: 'smtp' | 'ldap' | 'smb' | 'ftp') => {
@@ -247,7 +249,7 @@ export default function ListenersPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Host</Label>
+              <Label>{t('listeners.host')}</Label>
               <Input
                 value={form.host}
                 onChange={(e) => setForm({ ...form, host: e.target.value })}
@@ -255,7 +257,7 @@ export default function ListenersPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Port</Label>
+              <Label>{t('listeners.port')}</Label>
               <Input
                 type="number"
                 value={form.port}
@@ -263,11 +265,11 @@ export default function ListenersPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Token</Label>
+              <Label>{t('listeners.token')}</Label>
               <Input
                 value={form.token}
                 onChange={(e) => setForm({ ...form, token: e.target.value })}
-                placeholder="Auto-generated if empty"
+                placeholder={t('listeners.token_placeholder')}
               />
             </div>
             <div className="flex items-center gap-2">
@@ -277,15 +279,15 @@ export default function ListenersPage() {
                 checked={form.is_enabled}
                 onChange={(e) => setForm({ ...form, is_enabled: e.target.checked })}
               />
-              <Label htmlFor="is_enabled">Enable immediately</Label>
+              <Label htmlFor="is_enabled">{t('listeners.enable_immediately')}</Label>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
-              Cancel
+              {t('listeners.cancel')}
             </Button>
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? t('common.saving') : t('listeners.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
