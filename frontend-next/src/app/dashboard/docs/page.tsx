@@ -4,9 +4,12 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { useI18n } from '@/lib/i18n-context'
+import type { TranslationKey } from '@/lib/i18n-context'
 
 export default function DocsPage() {
   const router = useRouter()
+  const { t } = useI18n()
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -17,51 +20,51 @@ export default function DocsPage() {
 
   const docs = [
     {
-      title: '快速开始',
-      description: '了解如何快速开始使用GODNSLOG 2.0',
+      titleKey: 'docs.quick_start' as TranslationKey,
+      descKey: 'docs.quick_start_desc' as TranslationKey,
       link: '/docs/quick-start',
     },
     {
-      title: 'API文档',
-      description: '查看完整的API参考文档',
+      titleKey: 'docs.api' as TranslationKey,
+      descKey: 'docs.api_desc' as TranslationKey,
       link: '/docs/api',
     },
     {
-      title: '用户指南',
-      description: '详细的使用指南和最佳实践',
+      titleKey: 'docs.user_guide' as TranslationKey,
+      descKey: 'docs.user_guide_desc' as TranslationKey,
       link: '/docs/user-guide',
     },
     {
-      title: '配置参考',
-      description: '系统配置选项的详细说明',
+      titleKey: 'docs.config' as TranslationKey,
+      descKey: 'docs.config_desc' as TranslationKey,
       link: '/docs/config',
     },
     {
-      title: '常见问题',
-      description: '常见问题的解答和故障排除',
+      titleKey: 'docs.faq' as TranslationKey,
+      descKey: 'docs.faq_desc' as TranslationKey,
       link: '/docs/faq',
     },
     {
-      title: '安全指南',
-      description: '安全最佳实践和注意事项',
+      titleKey: 'docs.security' as TranslationKey,
+      descKey: 'docs.security_desc' as TranslationKey,
       link: '/docs/security',
     },
   ]
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">文档中心</h2>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">{t('docs.title')}</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {docs.map((doc, index) => (
           <Card key={index} className="hover:shadow-lg transition-shadow">
             <CardHeader>
-              <CardTitle>{doc.title}</CardTitle>
+              <CardTitle>{t(doc.titleKey)}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-500 mb-4">{doc.description}</p>
+              <p className="text-sm text-gray-500 mb-4">{t(doc.descKey)}</p>
               <Button variant="outline" className="w-full">
-                查看文档
+                {t('docs.view')}
               </Button>
             </CardContent>
           </Card>
@@ -70,26 +73,26 @@ export default function DocsPage() {
 
       <Card className="mt-8">
         <CardHeader>
-          <CardTitle>获取帮助</CardTitle>
+          <CardTitle>{t('docs.get_help')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div>
-              <h3 className="font-medium text-gray-900 mb-2">GitHub Issues</h3>
+              <h3 className="font-medium text-gray-900 mb-2">{t('docs.github_issues')}</h3>
               <p className="text-sm text-gray-500 mb-2">
-                在GitHub上提交问题或功能请求
+                {t('docs.github_issues_desc')}
               </p>
               <Button variant="outline" size="sm">
-                访问GitHub
+                {t('docs.visit_github')}
               </Button>
             </div>
             <div>
-              <h3 className="font-medium text-gray-900 mb-2">社区支持</h3>
+              <h3 className="font-medium text-gray-900 mb-2">{t('docs.community')}</h3>
               <p className="text-sm text-gray-500 mb-2">
-                加入社区讨论和获取帮助
+                {t('docs.community_desc')}
               </p>
               <Button variant="outline" size="sm">
-                加入社区
+                {t('docs.join_community')}
               </Button>
             </div>
           </div>
