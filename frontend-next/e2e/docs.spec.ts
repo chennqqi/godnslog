@@ -27,7 +27,7 @@ test.describe('Docs Page', () => {
 
   test('should display doc cards', async ({ page }) => {
     await expect(page.getByRole('heading', { name: '快速开始' })).toBeVisible({ timeout: 5000 });
-    await expect(page.getByRole('heading', { name: 'API文档' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'API 文档' })).toBeVisible();
     await expect(page.getByRole('heading', { name: '用户指南' })).toBeVisible();
   });
 
@@ -63,7 +63,7 @@ test.describe('Docs Page', () => {
     await page.goto('/dashboard/docs/user-guide');
     await page.waitForLoadState('networkidle');
     await expect(page.getByRole('heading', { name: '用户指南' })).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('Cases')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: 'Cases', exact: true })).toBeVisible({ timeout: 5000 });
   });
 
   test('should display content on config subpage', async ({ page }) => {
