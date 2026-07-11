@@ -88,7 +88,7 @@ func (HealthCheck) TableName() string {
 // LeaderElection represents a leader election record for HA failover.
 type LeaderElection struct {
 	ID        string    `json:"id" xorm:"'id' varchar(64) pk notnull"`
-	LeaderID  string    `json:"leader_id" xorm:"varchar(64) notnull"`
+	LeaderID  string    `json:"leader_id" xorm:"'leader_id' varchar(64) notnull"`
 	Term      int64     `json:"term" xorm:"bigint notnull default 0"`
 	LeaseEnd  time.Time `json:"lease_end" xorm:"datetime notnull"`
 	CreatedAt time.Time `json:"created_at" xorm:"datetime created"`

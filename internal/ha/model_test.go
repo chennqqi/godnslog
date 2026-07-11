@@ -107,3 +107,11 @@ func TestTableName(t *testing.T) {
 		t.Fatalf("Expected 'health_checks', got '%s'", check.TableName())
 	}
 }
+
+// TestLeaderElectionTableName tests the LeaderElection table name
+func TestLeaderElectionTableName(t *testing.T) {
+	le := LeaderElection{}
+	if name := le.TableName(); name != "ha_leader_election" {
+		t.Errorf("expected 'ha_leader_election', got '%s'", name)
+	}
+}
