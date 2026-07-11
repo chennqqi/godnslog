@@ -244,6 +244,17 @@ func (q *Queue) processJob(job *QueueJob) {
 	if err != nil {
 		if job.Attempt < q.maxRetries {
 			job.Attempt++
+
+			// Update retry_count in DB if engine is available
+			if q.engine != nil && plogID != "" {
+				q.engine.ID(plogID).Update(&PersistentActionLog{
+					Status:     "pending",
+					Attempt:    job.Attempt,
+					Error:      err.Error(),
+					FinishedAt: time.Now(),
+				})
+			}
+
 			backoff := time.Duration(job.Attempt*job.Attempt) * time.Second
 			log.Printf("[workflow-queue] Job failed (attempt %d), retrying in %v: %v", job.Attempt, backoff, err)
 			time.Sleep(backoff)
@@ -251,7 +262,15 @@ func (q *Queue) processJob(job *QueueJob) {
 				log.Printf("[workflow-queue] Failed to re-enqueue job: %v", enqueueErr)
 			}
 		} else {
+			// Mark as dead after max retries
 			log.Printf("[workflow-queue] Job failed after %d attempts, giving up: %v", job.Attempt+1, err)
+			if q.engine != nil && plogID != "" {
+				q.engine.ID(plogID).Update(&PersistentActionLog{
+					Status:     "dead",
+					Error:      err.Error(),
+					FinishedAt: time.Now(),
+				})
+			}
 		}
 	}
 }
