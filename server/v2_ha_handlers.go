@@ -227,3 +227,16 @@ func (self *WebServer) v2ClusterStatus(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": status})
 }
+
+// v2GetLeader returns the current leader node ID.
+func (self *WebServer) v2GetLeader(c *gin.Context) {
+	store := ha.NewXormStore(self.orm)
+	svc := ha.NewService(store)
+
+	leaderID, err := svc.GetLeaderID(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": gin.H{"leader_id": leaderID}})
+}

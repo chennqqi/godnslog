@@ -168,4 +168,9 @@ type Store interface {
 	// Health check operations
 	CreateHealthCheck(ctx context.Context, check *HealthCheck) error
 	ListHealthChecks(ctx context.Context, nodeID string) ([]HealthCheck, error)
+
+	// Leader election operations
+	TryAcquireLock(ctx context.Context, leaderID string, leaseDuration time.Duration) (bool, error)
+	ReleaseLock(ctx context.Context, leaderID string) error
+	GetLeader(ctx context.Context) (*LeaderElection, error)
 }

@@ -455,14 +455,20 @@ func (self *WebServer) initHA() {
 	go self.haHeartbeat(haCtx)
 }
 
-// haHeartbeat periodically updates the node's last ping time.
+// haHeartbeat periodically updates the node's last ping time and participates in leader election.
 func (self *WebServer) haHeartbeat(ctx context.Context) {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
+	var isLeader bool
 
 	for {
 		select {
 		case <-ctx.Done():
+			if isLeader {
+				if err := self.haSvc.Resign(ctx, self.haNodeID); err != nil {
+					logrus.Errorf("[webserver.go::haHeartbeat] failed to resign: %v", err)
+				}
+			}
 			return
 		case <-ticker.C:
 			node, err := self.haSvc.GetNode(ctx, self.haNodeID)
@@ -474,6 +480,20 @@ func (self *WebServer) haHeartbeat(ctx context.Context) {
 			node.Status = "online"
 			if err := self.haSvc.UpdateNode(ctx, node); err != nil {
 				logrus.Errorf("[webserver.go::haHeartbeat] failed to update node: %v", err)
+			}
+
+			if self.redisClient != nil {
+				becameLeader, err := self.haSvc.ElectLeader(ctx, self.haNodeID)
+				if err != nil {
+					logrus.Errorf("[webserver.go::haHeartbeat] leader election failed: %v", err)
+					continue
+				}
+				if becameLeader && !isLeader {
+					logrus.Infof("[webserver.go::haHeartbeat] node %s became leader", self.haNodeID)
+				} else if !becameLeader && isLeader {
+					logrus.Warnf("[webserver.go::haHeartbeat] node %s lost leader status", self.haNodeID)
+				}
+				isLeader = becameLeader
 			}
 		}
 	}

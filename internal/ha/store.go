@@ -2,6 +2,7 @@ package ha
 
 import (
 	"context"
+	"time"
 
 	"xorm.io/xorm"
 )
@@ -91,4 +92,65 @@ func (s *XormStore) ListHealthChecks(ctx context.Context, nodeID string) ([]Heal
 	var checks []HealthCheck
 	err := s.engine.Where("node_id = ?", nodeID).Desc("timestamp").Find(&checks)
 	return checks, err
+}
+
+// TryAcquireLock attempts to acquire the leader lock using optimistic locking.
+func (s *XormStore) TryAcquireLock(ctx context.Context, leaderID string, leaseDuration time.Duration) (bool, error) {
+	var current LeaderElection
+	has, err := s.engine.Context(ctx).ID("leader").Get(&current)
+	if err != nil {
+		return false, err
+	}
+
+	now := time.Now()
+	if has && current.LeaseEnd.After(now) && current.LeaderID != leaderID {
+		return false, nil
+	}
+
+	if has {
+		affected, err := s.engine.Context(ctx).Where("id = ? AND term = ?", "leader", current.Term).Update(&LeaderElection{
+			LeaderID:  leaderID,
+			Term:      current.Term + 1,
+			LeaseEnd:  now.Add(leaseDuration),
+			UpdatedAt: now,
+		})
+		if err != nil {
+			return false, err
+		}
+		if affected == 0 {
+			return false, nil
+		}
+	} else {
+		_, err := s.engine.Context(ctx).Insert(&LeaderElection{
+			ID:        "leader",
+			LeaderID:  leaderID,
+			Term:      1,
+			LeaseEnd:  now.Add(leaseDuration),
+			CreatedAt: now,
+			UpdatedAt: now,
+		})
+		if err != nil {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+// ReleaseLock releases the leader lock if held by the given leaderID.
+func (s *XormStore) ReleaseLock(ctx context.Context, leaderID string) error {
+	_, err := s.engine.Context(ctx).Where("id = ? AND leader_id = ?", "leader", leaderID).Delete(&LeaderElection{})
+	return err
+}
+
+// GetLeader retrieves the current leader election record.
+func (s *XormStore) GetLeader(ctx context.Context) (*LeaderElection, error) {
+	var le LeaderElection
+	has, err := s.engine.Context(ctx).ID("leader").Get(&le)
+	if err != nil {
+		return nil, err
+	}
+	if !has {
+		return nil, nil
+	}
+	return &le, nil
 }

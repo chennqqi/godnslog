@@ -84,6 +84,7 @@ func (self *WebServer) initDatabase() error {
 		&ha.ClusterNode{},
 		&ha.ClusterConfig{},
 		&ha.HealthCheck{},
+		&ha.LeaderElection{},
 		// Workflow persistent action log
 		&workflow.PersistentActionLog{},
 		// Marketplace models

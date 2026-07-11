@@ -274,6 +274,7 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			haCluster.GET("/config", self.v2GetClusterConfig)
 			haCluster.PUT("/config", self.v2UpdateClusterConfig)
 			haCluster.GET("/status", self.v2ClusterStatus)
+			haCluster.GET("/leader", self.v2GetLeader)
 		}
 	}
 
