@@ -345,6 +345,76 @@ docs/                    # 2.0 API、部署、插件、MCP 文档
 - internal/marketplace/README.md - 市场文档
 - doc/phase16-summary.md - Phase 16总结文档
 
+### Phase 17：智能增强 — 攻击链、解码与标注 🔜 计划中
+
+> 对应 ROADMAP 2.4，整合参考分析中识别的高价值产品特性。
+
+**目标**：
+- 实现攻击链时间线，将多协议跨类型的 Interaction 按 token 聚合为攻击链。
+- 实现外带数据自动解码（DNS base32/hex、HTTP base64）。
+- 实现利用类型自动标注（基于规则/特征匹配）。
+- 实现 WebSocket 实时推送。
+- 实现反弹 Shell 命令生成器。
+- 补充通知渠道（Bark、钉钉、飞书、Server酱）。
+- 实现 Payload 速查表。
+
+**技术要点**：
+- 攻击链聚合：在现有 interaction 模块上新增 `AttackChain` 聚合层，按 `domain token` 分组 + 时间排序，跨协议关联。
+- 解码引擎：`internal/interaction/decoder/` — 独立解码包，支持 base32/hex/base64 自动检测和解码，作为 evidence 的增强字段。
+- 类型标注：`internal/interaction/classifier/` — 基于规则引擎的利用类型分类器，匹配 Payload 特征、路径、Header 特征。
+- WebSocket：在现有 Gin 基础上集成 `gorilla/websocket`，Interaction 写入后通过 Hub 广播到前端。
+- 反弹 Shell：在 Payload Studio 的模板引擎中新增反弹 Shell 模板类，支持变量填充和多种格式生成。
+
+**交付物**：
+- internal/interaction/attackchain.go - 攻击链聚合模型和服务
+- internal/interaction/decoder/ - 解码引擎
+- internal/interaction/classifier/ - 利用类型分类器
+- internal/interaction/websocket/ - WebSocket Hub
+- server/websocket.go - WebSocket 端点注册
+- internal/payload/shellgen.go - 反弹 Shell 生成器
+- internal/notification/channels/ - 新增通知渠道
+- frontend-next/ 相应 UI 更新
+
+### Phase 18：工具链深度集成 🔜 计划中
+
+> 对应 ROADMAP 2.5。
+
+**目标**：
+- 实现来源指纹归属（扫描器/云厂商/真实目标）。
+- 实现 Burp 风格轮询 API（游标增量拉取）。
+- 完善 Workflow 的自定义 HTTP Response 控制。
+- 实现 HTTP 请求回显。
+- 实现 RMI 协议监听。
+- 完善现有 Scanner Hub 集成。
+
+**技术要点**：
+- 来源指纹：`internal/interaction/fingerprint/` — 基于 GeoIP/ASN 库 + 已知扫描器 IP 范围 + 行为特征规则。
+- 轮询 API：`GET /api/v1/poll?cursor={timestamp}&limit={n}`，返回增量 Interaction 列表及新游标。
+- RMI Listener：在 `internal/listener/` 中新增 `rmi.go`，实现 RMI 协议解析。
+
+**交付物**：
+- internal/interaction/fingerprint/ - 来源指纹模块
+- server/poll.go - 轮询 API 端点
+- internal/listener/rmi.go - RMI 监听器
+- server/echo.go - 请求回显中间件
+- internal/rule/actions/http_response.go - 自定义 HTTP Response 动作
+
+### Phase 19：可扩展平台 🔜 计划中
+
+> 对应 ROADMAP 2.6。
+
+**目标**：
+- 实现 Template 插件化组件系统（参考 Antenna 设计）。
+- 实现匿名使用模式。
+- 实现搜索引擎集成（ZoomEye/Shodan/Fofa）。
+- 优化 Case 模型以支持任务化批量检测场景。
+
+**交付物**：
+- internal/template/ - Template 插件系统
+- internal/config/anonymous.go - 匿名模式配置
+- internal/scannerhub/search/ - 搜索引擎集成
+- 相关前端页面更新
+
 ## MVP 验收标准
 
 - 新前端不依赖旧 Vue 代码，可独立构建。

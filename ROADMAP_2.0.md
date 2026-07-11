@@ -36,18 +36,25 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全团队、扫
 - 支持延迟回连，数小时或数天后仍可关联到原始 Payload。
 - 记录来源 IP、协议、Token、原始报文、解析结果、Case 和时间线。
 - 自动识别仅 DNS 查询、DNS+HTTP、敏感 Header、云元数据路径、代理访问等风险特征。
+- 支持 **RMI 协议监听**，补齐 JNDI 注入检测场景的协议覆盖。
+- 支持 **WebSocket 实时推送**，事件发生即推送至前端，提升交互式体验（参考 Hyuga / 商业平台）。
+- HTTP 服务支持**请求回显**：在响应体中回显收到的完整请求（请求行+Header+Body），便于调试排查（参考商业平台）。
 
 ### 2. Payload Studio
 
 - 内置 SSRF、XXE、RFI、RCE、Blind SQLi、SSTI、反序列化、CORS/JSONP、SMTP injection、PDF/HTML 渲染、Webhook、CI/CD、云元数据探测等模板。
+- **反弹 Shell 命令生成器**：支持 bash/sh/nc/python/awk/telnet 等多种反弹 Shell 命令模板，自动填充 IP 和端口（参考 Alphalog）。
 - 支持变量：`{token}`、`{case}`、`{domain}`、`{callback_url}`、`{base32_context}`。
 - 支持批量生成、独立追踪 Token、过期时间、场景说明和期望回连协议。
 - 支持 Payload 生命周期：草稿、已投放、已命中、已归档、已过期。
 
-### 3. 证据链与自动归因
+### 3. 证据链、增强分析与自动归因
 
 - 自动把 Interaction 关联到 Payload、Case、目标、测试人和投放时间。
-- 生成证据时间线：Payload 创建、投放、DNS 查询、HTTP 请求、通知发送、人工备注。
+- **攻击链时间线**：按子域名 token 将 DNS/HTTP/LDAP/RMI 等多协议命中聚合成攻击链，时间轴展示完整攻击过程（DNS 解析 → HTTP 回连 → LDAP/JNDI 回连），每条命中附带利用类型标签和解码数据（参考商业平台）。
+- **外带数据自动解码**：DNS 标签中的 base32/hex 自动识别并还原明文，HTTP body 中的 base64 自动解码并展示解码结果，消除手动解码环节（参考商业平台）。
+- **利用类型自动标注**：根据 Payload 特征、路径、Header 等内容自动识别并标记 Log4Shell/JNDI、Fastjson、SSRF、XXE、SQLi 盲注等利用类型（参考商业平台/Alphalog）。
+- **来源指纹归属**：自动判别请求来自扫描器、云厂商还是真实目标 IP，辅助判断漏洞真实性（参考商业平台）。
 - 自动分类命中类型：可疑出网、SSRF、外部资源加载、异步任务执行、扫描器噪声。
 - 提供 Evidence Score：按 DNS-only、DNS+HTTP、敏感 Header、云元数据路径、内部来源、延迟命中等维度评估证据强度。
 - 生成 Explainable Evidence：解释命中意味着什么、置信度、误报线索和建议的下一步验证。
@@ -97,9 +104,9 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全团队、扫
 
 ## 前端产品形态
 
-- **Command Center**：活跃 Case、最近命中、高风险交互、系统状态。
+- **Command Center**：活跃 Case、最近命中、高风险交互、系统状态，以及 **Payload 速查表**（常用 Payload 复制即用）。
 - **Payload Studio**：像 IDE 一样编辑、预览、复制和批量生成 Payload。
-- **Interaction Timeline**：按时间线展示 DNS、HTTP、后续动作和备注。
+- **Interaction Timeline / 攻击链视图**：按时间线展示 DNS、HTTP、后续动作和备注；支持按 token **聚合为攻击链视图**，展示跨协议关联。
 - **Case Board**：按目标、漏洞类型或项目管理验证任务。
 - **Workflow Builder**：配置命中后的条件和动作。
 - **Evidence Report**：从命中记录直接生成报告草稿。
@@ -146,10 +153,68 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全团队、扫
 - 企业级数据保留、归档和高可用部署。
 - 插件市场或模板市场。
 
+### 2.4：智能增强版（参考项目特性整合）
+
+- **攻击链时间线**：按 token 将多协议命中聚合为攻击链时间轴，支持展开查看各节点详情。
+- **外带数据自动解码**：DNS base32/hex、HTTP base64 自动识别和还原，UI 直接展示解码结果。
+- **利用类型自动标注**：基于规则/特征匹配自动标记 Log4Shell/Fastjson/SSRF/XXE/SQLi 等利用类型。
+- **WebSocket 实时推送**：Interaction 命中即时推送至前端，替代轮询刷新。
+- **反弹 Shell 命令生成器**：Payload Studio 新增反弹 Shell 卡片，支持多种命令格式。
+- **补充通知渠道**：Bark、钉钉、飞书、Server酱 通知器支持。
+- **Payload 速查表**：Command Center 集成常用 Payload 速查面板。
+
+### 2.5：工具链深度集成
+
+- **来源指纹归属**：基于 IP 库和行为特征自动识别扫描器/云厂商/真实目标。
+- **Burp 风格轮询 API**：`/api/v1/poll` 游标增量拉取，工具链无感对接。
+- **自定义 HTTP Response**：Workflow 完善自定义状态码/Header/Body/重定向控制。
+- **请求回显**：HTTP Listener 可选在响应体中回显完整请求报文。
+- **RMI 协议监听**：补齐 JNDI 注入检测的 RMI 协议支持。
+- 现有 Scanner Hub 集成完善。
+
+### 2.6：可扩展平台
+
+- **Template 插件化组件**：参考 Antenna 设计，用户可编写轻量检测组件（Template）并注册到平台。
+- **匿名模式**：提供完全匿名选项，日志自动过期，不记录请求来源和用户身份。
+- **搜索引擎集成**：ZoomEye/Shodan/Fofa 批量目标搜索，与 scannerhub 结合。
+- **任务化 Case 模型优化**：参考 Antenna 任务驱动设计，支持批量检测场景聚合。
+
 ## 参考方向
 
 - PortSwigger OAST / Burp Collaborator：强调不可见漏洞检测和请求归因。
 - ProjectDiscovery Interactsh / Nuclei：强调多协议 OOB、模板化和扫描器集成。
 - Webhook.site：强调请求触发后的工作流、变量、转发、重放和响应控制。
 - Canarytokens：强调长期诱饵、上下文编码和触发告警。
+- [Hyuga](https://github.com/ac0d3r/Hyuga)：WebSocket 实时推送、第三方通知集成（Bark/Lark/钉钉/飞书/Server酱）、DNS Rebinding。
+- [Antenna](https://github.com/wuba/Antenna)（58同城）：Template 插件化组件系统、任务驱动检测模型、OAST 全协议覆盖。
+- [Alphalog](https://github.com/AlphabugX/Alphalog)：反弹 Shell 一键生成、匿名设计模式、纯 Redis 轻量部署。
+- [Bridge](https://github.com/SPuerBRead/Bridge)：自定义 HTTP Response（状态码/Header/Body）、三层域名架构设计。
+- [商业 dnslog 平台](https://mp.weixin.qq.com/s/8YovEBZq2VKNx4lRGfCccA)：攻击链时间线、外带数据自动解码、利用类型自动标注、来源指纹归属、Burp 风格轮询 API。
 - https://github.com/ZackSecurity/Zack-AI-Scanner
+
+## 参考项目特性映射
+
+以下将参考资料分析中识别的高价值特性映射到现有路线图中，标注纳入位置：
+
+| 参考来源 | 特性 | 纳入路线图位置 | 优先级 |
+|----------|------|---------------|--------|
+| 商业平台 | 攻击链时间线（跨协议聚合） | 核心能力 §3 证据链 | P1 |
+| 商业平台 | 外带数据自动解码（base32/hex/base64） | 核心能力 §3 证据链 | P1 |
+| 商业平台 | 利用类型自动标注 | 核心能力 §3 证据链 | P1 |
+| Hyuga | WebSocket 实时推送 | 核心能力 §1 OAST 中枢 | P1 |
+| Alphalog | 反弹 Shell 命令生成 | 核心能力 §2 Payload Studio | P1 |
+| 商业平台/Hyuga | 第三方通知渠道（Bark/Lark/钉钉/飞书/Server酱） | 核心能力 §6 Workflow（已有企微/飞书，补充其余） | P1 |
+| 商业平台 | 来源指纹归属（扫描器/云厂商/真实目标） | 核心能力 §3 证据链 | P2 |
+| 商业平台 | Burp 风格轮询 API（游标增量拉取） | 核心能力 §4 Scanner Hub | P2 |
+| Bridge | 自定义 HTTP Response | 核心能力 §6 Workflow（已有基础能力） | P2 |
+| 商业平台 | 请求回显（HTTP 响应回显请求报文） | 核心能力 §1 OAST 中枢 | P2 |
+| 商业平台 | Payload 速查表 | 前端 Command Center | P2 |
+| RMI | RMI 协议监听 | 核心能力 §1 OAST 中枢 | P2 |
+| Antenna | Template 插件化组件系统 | 核心能力 §6 Workflow（参考设计） | P3 |
+| Antenna | 任务驱动模型 | 已有 Case 模块，可优化 | P3 |
+| Alphalog | 匿名模式 | 系统设置 | P3 |
+| POC-S | 搜索引擎集成（ZoomEye/Shodan） | 核心能力 §4 Scanner Hub | P3 |
+
+> P1=高优先级（2.4），P2=中优先级（2.5），P3=低优先级（2.6）
+
+注：WEB-INF/web.xml 等自定义映射、参考项目通过 DNS 传递大文件等技术细节作为能力备选，不纳入正式路线图。
