@@ -13,7 +13,7 @@ type PersistentActionLog struct {
 	// InteractionID is the ID of the interaction that triggered this action (may be empty).
 	InteractionID string `json:"interaction_id" xorm:"varchar(36) index"`
 
-	// Status: pending, running, completed, failed
+	// Status: pending, running, completed, failed, dead
 	Status string `json:"status" xorm:"varchar(16) notnull default 'pending'"`
 
 	// Attempt is the current retry attempt (0-based).

@@ -124,6 +124,10 @@ type ListenerConfig struct {
 	TLSCertFile    string        `json:"tls_cert_file"`
 	TLSKeyFile     string        `json:"tls_key_file"`
 
+	// AllowPrivateIPs allows connections from RFC 1918 private IP ranges.
+	// Default false — private IP connections are rejected.
+	AllowPrivateIPs bool `json:"allow_private_ips"`
+
 	// RateLimitMax is the max connections per IP within the rate limit window.
 	// 0 means use MaxConnections as fallback. Default is high to avoid false negatives.
 	RateLimitMax int `json:"rate_limit_max"`
