@@ -63,7 +63,7 @@ All four listeners share the same security infrastructure:
 - Sliding-window per-IP rate limiter using `RateLimiter`
 - Window: 1 minute
 - Max connections per window: configured per protocol (default: 500-1000)
-- Lock-free reads via `sync.Mutex`; cleanup runs every 5 minutes
+- Thread-safe via `sync.Mutex`; cleanup runs every 5 minutes
 
 ### Connection Limiting (`internal/listener/ratelimit.go`)
 
@@ -130,10 +130,10 @@ All four listeners share the same security infrastructure:
 - Response is a hardcoded success message; no sensitive data leaked
 
 **Concerns:**
-- The ASN.1 BER parser is a best-effort implementation with minimal validation.
-  Malformed input with crafted long-form length fields could cause out-of-bounds
-  reads within the connection goroutine. This would terminate only the affected
-  goroutine, not the listener.
+- The LDAP parser uses raw byte indexing and string searching on the input
+  buffer rather than a full ASN.1/BER decoder. Malformed or unexpected input
+  may produce incorrect extractions but the bounded read buffer limits the
+  blast radius to the connection goroutine only.
 - No LDAP StartTLS or SASL authentication paths implemented (reduces surface).
 
 ### SMB Listener (`internal/listener/smb.go`)
@@ -149,7 +149,7 @@ All four listeners share the same security infrastructure:
 - SecurityContext rate/conn limiting on accept
 - Timeout on connection read/write
 - Minimal parsing: only the SMB magic bytes (`\xFFSMB`) and command byte are
-  interpreted; all remaining data is hex-encoded before storage
+  interpreted; the raw packet bytes are JSON-encoded before storage
 - No SMB dialect negotiation or session setup (no authentication material
   accepted beyond what is logged)
 
