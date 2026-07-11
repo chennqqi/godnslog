@@ -8,7 +8,11 @@ set -e
 trap 'kill -TERM $BACKEND_PID $FRONTEND_PID 2>/dev/null; wait; exit 0' TERM INT
 
 # Start Go backend
-/app/godnslog serve -domain "${DOMAIN:-example.com}" -4 "${DNS_IP:-0.0.0.0}" &
+if [ -n "$REDIS_URL" ]; then
+  /app/godnslog serve -domain "${DOMAIN:-example.com}" -4 "${DNS_IP:-0.0.0.0}" -redis "$REDIS_URL" &
+else
+  /app/godnslog serve -domain "${DOMAIN:-example.com}" -4 "${DNS_IP:-0.0.0.0}" &
+fi
 BACKEND_PID=$!
 
 # Start Next.js frontend

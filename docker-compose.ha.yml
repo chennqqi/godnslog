@@ -1,9 +1,32 @@
 version: "3.8"
 
 # Docker Compose template for GoDNSLog HA deployment
-# Includes: 2 GoDNSLog instances, Redis cache, Nginx load balancer
+# Includes: 2 GoDNSLog instances, MySQL database, Redis cache, Nginx load balancer
 
 services:
+  # MySQL database cluster shared state
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: godnslog
+      MYSQL_DATABASE: godnslog
+      MYSQL_USER: godnslog
+      MYSQL_PASSWORD: godnslog
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --max-connections=200
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pgodnslog"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
   # Redis cache for shared state between instances
   redis:
     image: redis:7-alpine
@@ -31,6 +54,8 @@ services:
       - REDIS_URL=redis:6379
       - GODNSLOG_API_URL=http://localhost:8080
     depends_on:
+      mysql:
+        condition: service_healthy
       redis:
         condition: service_healthy
     ports:
@@ -38,6 +63,13 @@ services:
       - "3001:3000"
       - "5301:53/udp"
       - "5301:53/tcp"
+    entrypoint: >
+      /sbin/tini -- /app/godnslog serve
+      -domain example.com
+      -4 0.0.0.0
+      -redis redis:6379
+      -driver mysql
+      -dsn "godnslog:godnslog@tcp(mysql:3306)/godnslog?charset=utf8mb4&parseTime=True&loc=Local"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v2/health"]
       interval: 20s
@@ -57,6 +89,8 @@ services:
       - REDIS_URL=redis:6379
       - GODNSLOG_API_URL=http://localhost:8080
     depends_on:
+      mysql:
+        condition: service_healthy
       redis:
         condition: service_healthy
     ports:
@@ -64,6 +98,13 @@ services:
       - "3002:3000"
       - "5302:53/udp"
       - "5302:53/tcp"
+    entrypoint: >
+      /sbin/tini -- /app/godnslog serve
+      -domain example.com
+      -4 0.0.0.0
+      -redis redis:6379
+      -driver mysql
+      -dsn "godnslog:godnslog@tcp(mysql:3306)/godnslog?charset=utf8mb4&parseTime=True&loc=Local"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v2/health"]
       interval: 20s
@@ -91,3 +132,4 @@ services:
 
 volumes:
   redis-data:
+  mysql-data:
