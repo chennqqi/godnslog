@@ -465,7 +465,7 @@ func (self *WebServer) haHeartbeat(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			if isLeader {
-			if err := self.haSvc.Resign(context.Background(), self.haNodeID); err != nil {
+				if err := self.haSvc.Resign(context.Background(), self.haNodeID); err != nil {
 					logrus.Errorf("[webserver.go::haHeartbeat] failed to resign: %v", err)
 				}
 			}
