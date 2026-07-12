@@ -429,3 +429,32 @@ export const retentionApi = {
   listJobs: () => api.get<{ items: RetentionJob[]; total: number }>('/retention/jobs'),
   listArchives: () => api.get<{ items: RetentionArchive[]; total: number }>('/retention/archives'),
 }
+
+/**
+ * Raw API client that auto-unwraps response data.
+ * Accepts full API paths including /api/v2 prefix.
+ * Strips the /api/v2 prefix internally since the underlying api has it as baseURL.
+ */
+export const apiClient = {
+  async get<T>(url: string): Promise<T> {
+    // Strip /api/v2 prefix since api already has it as baseURL
+    const path = url.startsWith('/api/v2') ? url.slice(7) : url
+    const response = await api.get<T>(path)
+    return response.data as T
+  },
+  async post<T>(url: string, data?: unknown): Promise<T> {
+    const path = url.startsWith('/api/v2') ? url.slice(7) : url
+    const response = await api.post<T>(path, data)
+    return response.data as T
+  },
+  async put<T>(url: string, data?: unknown): Promise<T> {
+    const path = url.startsWith('/api/v2') ? url.slice(7) : url
+    const response = await api.put<T>(path, data)
+    return response.data as T
+  },
+  async delete<T>(url: string): Promise<T> {
+    const path = url.startsWith('/api/v2') ? url.slice(7) : url
+    const response = await api.delete<T>(path)
+    return response.data as T
+  },
+}
