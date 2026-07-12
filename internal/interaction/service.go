@@ -25,15 +25,21 @@ type Service struct {
 	engine        *xorm.Engine
 	wsHub         *websocket.Hub // WebSocket hub for real-time push, nil to disable
 	fingerprinter *fingerprint.Fingerprinter // source fingerprint, nil to disable
+	anonymousMode bool // when true, mask source IP for privacy
 }
 
 // NewService creates a new interaction service
-func NewService(engine *xorm.Engine, wsHub *websocket.Hub, fp *fingerprint.Fingerprinter) *Service {
-	return &Service{engine: engine, wsHub: wsHub, fingerprinter: fp}
+func NewService(engine *xorm.Engine, wsHub *websocket.Hub, fp *fingerprint.Fingerprinter, anonymousMode bool) *Service {
+	return &Service{engine: engine, wsHub: wsHub, fingerprinter: fp, anonymousMode: anonymousMode}
 }
 
 // CreateInteraction creates a new interaction record
 func (s *Service) CreateInteraction(interaction *models.Interaction) error {
+	// Anonymous mode: mask source IP for privacy
+	if s.anonymousMode {
+		interaction.SourceIP = "0.0.0.0"
+	}
+
 	if interaction.ID == "" {
 		interaction.ID = models.GenerateID()
 	}

@@ -52,6 +52,7 @@ type WebServerConfig struct {
 	DefaultQueryApiMaxItem       int
 	DefaultMaxCallbackErrorCount int64
 	DefaultLanguage              string
+	AnonymousMode                bool   `json:"anonymous_mode"` // when true, don't record real source IPs
 }
 
 type WebServer struct {

