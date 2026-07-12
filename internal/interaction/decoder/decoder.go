@@ -25,7 +25,7 @@ func Decode(input string) Result {
 			return result
 		}
 	}
-	return Result{Original: input, Decoded: input, Encoding: "", Confident: false}
+	return Result{Original: input, Decoded: "", Encoding: "", Confident: false}
 }
 
 // DecodeAll attempts to auto-detect and decode all candidate
@@ -60,7 +60,7 @@ func tryDecoders(input string) Result {
 	if decoded, ok := decodeHex(input); ok {
 		return Result{Original: input, Decoded: decoded, Encoding: "hex", Confident: true}
 	}
-	return Result{Original: input, Decoded: input, Encoding: "", Confident: false}
+	return Result{Original: input, Decoded: "", Encoding: "", Confident: false}
 }
 
 // extractCandidates collects substrings from input that could be

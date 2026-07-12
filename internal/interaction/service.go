@@ -276,7 +276,7 @@ func (s *Service) exportToCSV(interactions []models.Interaction, includeRaw bool
 func (s *Service) exportToMarkdown(interactions []models.Interaction, includeRaw bool) (string, error) {
 	md := "# Interactions Report\n\n"
 	md += "Generated at: " + time.Now().Format(time.RFC3339) + "\n\n"
-	md += "Total: " + string(rune(len(interactions))) + " interactions\n\n"
+	md += "Total: " + fmt.Sprintf("%d", len(interactions)) + " interactions\n\n"
 
 	for _, i := range interactions {
 		md += "## " + i.Type + " Interaction\n"

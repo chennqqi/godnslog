@@ -107,6 +107,16 @@ func TestClassifyAll(t *testing.T) {
 	if len(results) < 2 {
 		t.Errorf("expected multiple results, got %d", len(results))
 	}
+
+	// Verify results are ordered by priority (high first, then medium, then low)
+	priorityOrder := map[string]int{"high": 0, "medium": 1, "low": 2}
+	for i := 1; i < len(results); i++ {
+		if priorityOrder[results[i-1].Confidence] > priorityOrder[results[i].Confidence] {
+			t.Errorf("results not in priority order: %s (prio=%d) before %s (prio=%d)",
+				results[i-1].RuleID, priorityOrder[results[i-1].Confidence],
+				results[i].RuleID, priorityOrder[results[i].Confidence])
+		}
+	}
 }
 
 func TestClassifySqlInject(t *testing.T) {

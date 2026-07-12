@@ -50,7 +50,7 @@ func defaultRules() []Rule {
 					return true, "body:" + truncate(*i.Body, 100)
 				}
 				for k, v := range i.Headers {
-					if strings.Contains(v, "${jndi:") {
+					if strings.Contains(k, "${jndi:") || strings.Contains(v, "${jndi:") {
 						return true, "header:" + k
 					}
 				}
@@ -78,7 +78,7 @@ func defaultRules() []Rule {
 					return false, ""
 				}
 				p := *i.Path
-				if p == "/xxe" || strings.HasPrefix(p, "/xxe/") || strings.HasPrefix(p, "/xml") {
+				if p == "/xxe" || strings.HasPrefix(p, "/xxe/") || p == "/xml" || strings.HasPrefix(p, "/xml/") {
 					return true, p
 				}
 				return false, ""
@@ -92,7 +92,7 @@ func defaultRules() []Rule {
 					return false, ""
 				}
 				p := *i.Path
-				if p == "/cmd" || strings.HasPrefix(p, "/cmd/") || strings.HasPrefix(p, "/exec") {
+				if p == "/cmd" || strings.HasPrefix(p, "/cmd/") || p == "/exec" || strings.HasPrefix(p, "/exec/") {
 					return true, p
 				}
 				return false, ""
