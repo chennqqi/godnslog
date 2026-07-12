@@ -59,6 +59,12 @@ type Interaction struct {
 	// Common fields
 	RawData   string    `json:"raw_data" xorm:"'raw_data' mediumtext"`
 	CreatedAt time.Time `json:"created_at" xorm:"'created_at' datetime created"`
+
+	// Enrichment fields (set by data enhancement pipeline)
+	DecodedData *string `json:"decoded_data,omitempty" xorm:"'decoded_data' mediumtext"`
+	Encoding    *string `json:"encoding,omitempty" xorm:"'encoding' varchar(32)"`
+	ExploitType *string `json:"exploit_type,omitempty" xorm:"'exploit_type' varchar(64) index"`
+	Confidence  *string `json:"confidence,omitempty" xorm:"'confidence' varchar(16)"`
 }
 
 // MarshalJSON implements json.Marshaler interface for Interaction
