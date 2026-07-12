@@ -39,6 +39,10 @@ type Case struct {
 	Description string    `json:"description" xorm:"text"`
 	Status      string    `json:"status" xorm:"varchar(32) notnull default('active') index"` // active, completed, archived
 	Tags        Tags      `json:"tags" xorm:"json"`                                          // Stored as JSON array
+	Type        string    `xorm:"varchar(32) default('single')" json:"type"`
+	Progress    int       `xorm:"int default(0)" json:"progress"`
+	TotalTargets int      `xorm:"int default(0)" json:"total_targets"`
+	HitTargets  int       `xorm:"int default(0)" json:"hit_targets"`
 	CreatedBy   string    `json:"created_by" xorm:"varchar(36) notnull index"`               // User ID
 	CreatedAt   time.Time `json:"created_at" xorm:"datetime created"`
 	UpdatedAt   time.Time `json:"updated_at" xorm:"datetime updated"`

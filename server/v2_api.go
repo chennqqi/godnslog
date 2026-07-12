@@ -58,7 +58,8 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		{
 			cases.GET("", self.v2ListCases)
 			cases.POST("", self.v2CreateCase)
-			cases.GET("/:id", self.v2GetCase)
+				cases.GET("/stats", self.v2CaseStats)
+				cases.GET("/:id", self.v2GetCase)
 			cases.PUT("/:id", self.v2UpdateCase)
 			cases.DELETE("/:id", self.v2DeleteCase)
 			cases.GET("/:id/stats", self.v2GetCaseStats)
@@ -889,6 +890,22 @@ func (self *WebServer) v2GetCaseStats(c *gin.Context) {
 			"hit_payload_count": hitCount,
 		},
 	})
+}
+
+// v2CaseStats returns aggregate case statistics across all cases
+func (self *WebServer) v2CaseStats(c *gin.Context) {
+	type CaseStats struct {
+		Total    int64 `json:"total"`
+		Active   int64 `json:"active"`
+		Archived int64 `json:"archived"`
+		Batch    int64 `json:"batch"`
+	}
+	var stats CaseStats
+	stats.Total, _ = self.orm.Count(&v2models.Case{})
+	stats.Active, _ = self.orm.Where("status = 'active'").Count(&v2models.Case{})
+	stats.Archived, _ = self.orm.Where("status = 'archived'").Count(&v2models.Case{})
+	stats.Batch, _ = self.orm.Where("type = 'batch' OR type = 'scan'").Count(&v2models.Case{})
+	c.JSON(200, gin.H{"code": 0, "data": stats})
 }
 
 // v2GetCasePayloads gets payloads associated with a case
