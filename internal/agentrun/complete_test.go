@@ -34,7 +34,7 @@ func TestCompleteAgentRun(t *testing.T) {
 
 	authService := auth.NewService(engine)
 	agentRunService := NewService(engine, authService)
-	interactionService := interaction.NewService(engine, nil)
+	interactionService := interaction.NewService(engine, nil, nil)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := NewReviewService(engine, agentRunService, authService, evidenceService, interactionService)
 
@@ -253,7 +253,7 @@ func TestCompleteAgentRunJSON(t *testing.T) {
 
 	authService := auth.NewService(engine)
 	agentRunService := NewService(engine, authService)
-	interactionService := interaction.NewService(engine, nil)
+	interactionService := interaction.NewService(engine, nil, nil)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := NewReviewService(engine, agentRunService, authService, evidenceService, interactionService)
 

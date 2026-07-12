@@ -55,7 +55,7 @@ func (s *Service) BuildSummary(req *SummaryRequest, baseURL string) (*SummaryRes
 		return nil, err
 	}
 
-	interactionService := interaction.NewService(s.engine, nil)
+	interactionService := interaction.NewService(s.engine, nil, nil)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	evidenceResp, err := evidenceService.GenerateEvidence(scope.CaseID, scope.PayloadID, "json")
 	if err != nil {

@@ -16,7 +16,7 @@ func TestCalculateEvidenceScore(t *testing.T) {
 	}
 	defer engine.Close()
 
-	service := NewEvidenceService(NewService(engine, nil))
+	service := NewEvidenceService(NewService(engine, nil, nil))
 
 	interactions := []models.Interaction{
 		{
@@ -51,7 +51,7 @@ func TestCalculateEvidenceStrength_NoInteractions(t *testing.T) {
 	}
 	defer engine.Close()
 
-	service := NewEvidenceService(NewService(engine, nil))
+	service := NewEvidenceService(NewService(engine, nil, nil))
 
 	interactions := []models.Interaction{}
 	strength, confidence := service.calculateEvidenceStrength(interactions)
@@ -71,7 +71,7 @@ func TestCalculateEvidenceStrength_Low(t *testing.T) {
 	}
 	defer engine.Close()
 
-	service := NewEvidenceService(NewService(engine, nil))
+	service := NewEvidenceService(NewService(engine, nil, nil))
 
 	interactions := []models.Interaction{
 		{
@@ -103,7 +103,7 @@ func TestCalculateEvidenceStrength_Medium(t *testing.T) {
 	}
 	defer engine.Close()
 
-	service := NewEvidenceService(NewService(engine, nil))
+	service := NewEvidenceService(NewService(engine, nil, nil))
 
 	interactions := []models.Interaction{
 		{
@@ -140,7 +140,7 @@ func TestCalculateEvidenceStrength_High(t *testing.T) {
 	}
 	defer engine.Close()
 
-	service := NewEvidenceService(NewService(engine, nil))
+	service := NewEvidenceService(NewService(engine, nil, nil))
 
 	interactions := []models.Interaction{
 		{
@@ -192,7 +192,7 @@ func TestCountUniqueSources(t *testing.T) {
 	}
 	defer engine.Close()
 
-	service := NewEvidenceService(NewService(engine, nil))
+	service := NewEvidenceService(NewService(engine, nil, nil))
 
 	interactions := []models.Interaction{
 		{
@@ -231,7 +231,7 @@ func TestGenerateExplainability(t *testing.T) {
 	}
 	defer engine.Close()
 
-	service := NewEvidenceService(NewService(engine, nil))
+	service := NewEvidenceService(NewService(engine, nil, nil))
 
 	interactions := []models.Interaction{
 		{
@@ -274,7 +274,7 @@ func TestGenerateEvidence_ErrEvidenceNotFound(t *testing.T) {
 		t.Fatalf("Failed to sync interactions table: %v", err)
 	}
 
-	service := NewEvidenceService(NewService(engine, nil))
+	service := NewEvidenceService(NewService(engine, nil, nil))
 
 	// Test with non-existent case_id
 	_, err = service.GenerateEvidence("nonexistent-case", "", "json")
@@ -296,7 +296,7 @@ func TestGenerateEvidence_TimelineChronological(t *testing.T) {
 	}
 	defer engine.Close()
 
-	service := NewEvidenceService(NewService(engine, nil))
+	service := NewEvidenceService(NewService(engine, nil, nil))
 
 	// Create interactions with specific timestamps
 	baseTime := time.Now()
@@ -345,7 +345,7 @@ func TestGenerateEvidence_JSONExportStructure(t *testing.T) {
 	}
 	defer engine.Close()
 
-	service := NewEvidenceService(NewService(engine, nil))
+	service := NewEvidenceService(NewService(engine, nil, nil))
 
 	interactions := []models.Interaction{
 		{
@@ -390,7 +390,7 @@ func TestGenerateEvidence_MarkdownExportContent(t *testing.T) {
 	}
 	defer engine.Close()
 
-	service := NewEvidenceService(NewService(engine, nil))
+	service := NewEvidenceService(NewService(engine, nil, nil))
 
 	interactions := []models.Interaction{
 		{
@@ -435,7 +435,7 @@ func TestCalculateEvidenceStrength_HTTPWeighted(t *testing.T) {
 	}
 	defer engine.Close()
 
-	service := NewEvidenceService(NewService(engine, nil))
+	service := NewEvidenceService(NewService(engine, nil, nil))
 
 	// Test with HTTP interactions (should have higher confidence than DNS only)
 	httpInteractions := []models.Interaction{
