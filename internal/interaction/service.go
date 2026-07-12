@@ -11,6 +11,7 @@ import (
 
 	"github.com/chennqqi/godnslog/internal/interaction/classifier"
 	"github.com/chennqqi/godnslog/internal/interaction/decoder"
+	"github.com/chennqqi/godnslog/internal/interaction/fingerprint"
 	"github.com/chennqqi/godnslog/internal/models"
 	"github.com/chennqqi/godnslog/internal/websocket"
 )
@@ -21,13 +22,14 @@ var (
 
 // Service provides interaction management services
 type Service struct {
-	engine *xorm.Engine
-	wsHub  *websocket.Hub // WebSocket hub for real-time push, nil to disable
+	engine        *xorm.Engine
+	wsHub         *websocket.Hub // WebSocket hub for real-time push, nil to disable
+	fingerprinter *fingerprint.Fingerprinter // source fingerprint, nil to disable
 }
 
 // NewService creates a new interaction service
-func NewService(engine *xorm.Engine, wsHub *websocket.Hub) *Service {
-	return &Service{engine: engine, wsHub: wsHub}
+func NewService(engine *xorm.Engine, wsHub *websocket.Hub, fp *fingerprint.Fingerprinter) *Service {
+	return &Service{engine: engine, wsHub: wsHub, fingerprinter: fp}
 }
 
 // CreateInteraction creates a new interaction record
@@ -66,8 +68,8 @@ func (s *Service) CreateInteraction(interaction *models.Interaction) error {
 		}
 	}
 
-	// Data enhancement pipeline: decode + classify
-	enhanceInteraction(interaction)
+	// Data enhancement pipeline: decode + classify + fingerprint
+	enhanceInteraction(interaction, s.fingerprinter)
 
 	_, err := s.engine.InsertOne(interaction)
 	if err != nil {
@@ -318,9 +320,9 @@ func (s *Service) exportToMarkdown(interactions []models.Interaction, includeRaw
 	return md, nil
 }
 
-// enhanceInteraction runs the data enhancement pipeline (decode + classify) on an interaction.
+// enhanceInteraction runs the data enhancement pipeline (decode + classify + fingerprint) on an interaction.
 // This is a no-error enrichment — failures should not block interaction creation.
-func enhanceInteraction(interaction *models.Interaction) {
+func enhanceInteraction(interaction *models.Interaction, fp *fingerprint.Fingerprinter) {
 	if interaction == nil {
 		return
 	}
@@ -359,6 +361,19 @@ func enhanceInteraction(interaction *models.Interaction) {
 	if cls != nil {
 		interaction.ExploitType = &cls.ExploitType
 		interaction.Confidence = &cls.Confidence
+	}
+
+	// Step 3: Source fingerprint
+	if fp != nil && interaction.SourceIP != "" {
+		var ua string
+		if interaction.UserAgent != nil {
+			ua = *interaction.UserAgent
+		}
+		result := fp.Lookup(interaction.SourceIP, ua)
+		if result != nil && result.SourceType != fingerprint.SourceUnknown {
+			interaction.SourceType = &result.SourceType
+			interaction.SourceName = &result.SourceName
+		}
 	}
 }
 

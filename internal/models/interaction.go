@@ -65,6 +65,10 @@ type Interaction struct {
 	Encoding    *string `json:"encoding,omitempty" xorm:"'encoding' varchar(32)"`
 	ExploitType *string `json:"exploit_type,omitempty" xorm:"'exploit_type' varchar(64) index"`
 	Confidence  *string `json:"confidence,omitempty" xorm:"'confidence' varchar(16)"`
+
+		// Source identification fields (set by source fingerprint pipeline)
+		SourceType *string `json:"source_type,omitempty" xorm:"'source_type' varchar(32)"`
+		SourceName *string `json:"source_name,omitempty" xorm:"'source_name' varchar(128)"`
 }
 
 // MarshalJSON implements json.Marshaler interface for Interaction
