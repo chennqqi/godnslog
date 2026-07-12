@@ -305,7 +305,18 @@ func (self *WebServer) record(c *gin.Context) {
 		}
 	}
 
-	self.resp(c, 200, &CR{
-		Message: "OK",
-	})
+	// Echo back the full request in the response body
+	var echoBody strings.Builder
+	echoBody.WriteString("=== Request Echo ===\n")
+	echoBody.WriteString(c.Request.Method + " " + c.Request.URL.String() + "\n")
+	for k, v := range c.Request.Header {
+		echoBody.WriteString(k + ": " + strings.Join(v, ", ") + "\n")
+	}
+	echoBody.WriteString("\n")
+	if bodyStr := data.String(); bodyStr != "" {
+		echoBody.WriteString(bodyStr + "\n")
+	}
+	echoBody.WriteString("===================\n")
+
+	c.String(200, echoBody.String())
 }
