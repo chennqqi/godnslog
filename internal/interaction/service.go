@@ -9,6 +9,8 @@ import (
 
 	"xorm.io/xorm"
 
+	"github.com/chennqqi/godnslog/internal/interaction/classifier"
+	"github.com/chennqqi/godnslog/internal/interaction/decoder"
 	"github.com/chennqqi/godnslog/internal/models"
 )
 
@@ -61,6 +63,9 @@ func (s *Service) CreateInteraction(interaction *models.Interaction) error {
 			interaction.CaseID = &caseID
 		}
 	}
+
+	// Data enhancement pipeline: decode + classify
+	enhanceInteraction(interaction)
 
 	_, err := s.engine.InsertOne(interaction)
 	return err
@@ -298,6 +303,50 @@ func (s *Service) exportToMarkdown(interactions []models.Interaction, includeRaw
 	}
 
 	return md, nil
+}
+
+// enhanceInteraction runs the data enhancement pipeline (decode + classify) on an interaction.
+// This is a no-error enrichment — failures should not block interaction creation.
+func enhanceInteraction(interaction *models.Interaction) {
+	if interaction == nil {
+		return
+	}
+
+	// Step 1: Try to decode exfiltrated data
+	var decodeInput string
+	switch interaction.Type {
+	case "dns":
+		if interaction.Domain != nil && *interaction.Domain != "" {
+			decodeInput = *interaction.Domain
+		}
+	case "http":
+		if interaction.Body != nil && *interaction.Body != "" {
+			decodeInput = *interaction.Body
+		} else if interaction.Path != nil && *interaction.Path != "" {
+			decodeInput = *interaction.Path
+		}
+	default:
+		if interaction.Body != nil && *interaction.Body != "" {
+			decodeInput = *interaction.Body
+		} else if interaction.RawData != "" {
+			decodeInput = interaction.RawData
+		}
+	}
+
+	if decodeInput != "" {
+		result := decoder.Decode(decodeInput)
+		if result.Confident {
+			interaction.DecodedData = &result.Decoded
+			interaction.Encoding = &result.Encoding
+		}
+	}
+
+	// Step 2: Classify the interaction
+	cls := classifier.Classify(interaction)
+	if cls != nil {
+		interaction.ExploitType = &cls.ExploitType
+		interaction.Confidence = &cls.Confidence
+	}
 }
 
 // BatchImport imports interactions idempotently.
