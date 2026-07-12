@@ -68,5 +68,6 @@ const (
 	ActionTypeDNS     = "dns"
 	ActionTypeSMTP    = "smtp"
 	ActionTypeWebhook = "webhook"
-	ActionTypeNotify  = "notify"
+	ActionTypeNotify   = "notify"
+	ActionTypeResponse = "response"
 )

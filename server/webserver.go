@@ -589,7 +589,18 @@ func (self *WebServer) triggerWorkflows(interaction *v2models.Interaction) {
 	}
 
 	for _, wf := range workflows.Items {
-		if err := self.workflowQueue.EnqueueWorkflow(wf.ID, wf.Actions, interaction); err != nil {
+		// Exclude response-type actions from async queue; they are
+		// handled synchronously by the web handler (checkWorkflowResponse).
+		var otherActions v2models.Actions
+		for _, a := range wf.Actions {
+			if a.Type != v2models.ActionTypeResponse {
+				otherActions = append(otherActions, a)
+			}
+		}
+		if len(otherActions) == 0 {
+			continue
+		}
+		if err := self.workflowQueue.EnqueueWorkflow(wf.ID, otherActions, interaction); err != nil {
 			logrus.Errorf("[webserver.go::triggerWorkflows] EnqueueWorkflow %s: %v", wf.ID, err)
 		}
 	}

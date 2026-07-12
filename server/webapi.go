@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"sort"
@@ -275,6 +276,25 @@ func (self *WebServer) record(c *gin.Context) {
 	// Trigger matching workflows asynchronously
 	self.triggerWorkflows(interaction)
 
+	// Check for Workflow-driven HTTP response overrides (SCA-02)
+	// This runs before Payload-level CustomResponse so workflow rules
+	// take highest priority.
+	if wfResp := self.checkWorkflowResponse(); wfResp != nil {
+		if wfResp.Redirect != "" {
+			c.Redirect(wfResp.Status, wfResp.Redirect)
+			return
+		}
+		status := wfResp.Status
+		if status == 0 {
+			status = 200
+		}
+		for k, v := range wfResp.Headers {
+			c.Header(k, v)
+		}
+		c.String(status, wfResp.Body)
+		return
+	}
+
 	// Check for custom HTTP response configured on the payload (SCA-02)
 	token := c.Param("any")
 	if token != "" {
@@ -319,4 +339,54 @@ func (self *WebServer) record(c *gin.Context) {
 	echoBody.WriteString("===================\n")
 
 	c.String(200, echoBody.String())
+}
+
+// workflowRespConfig holds HTTP response override values from a workflow action.
+type workflowRespConfig struct {
+	Status   int
+	Headers  map[string]string
+	Body     string
+	Redirect string
+}
+
+// checkWorkflowResponse synchronously checks all enabled workflows for
+// HTTP response overrides (ActionTypeResponse). Returns the first matching
+// response config, or nil if no workflow defines a response action.
+func (self *WebServer) checkWorkflowResponse() *workflowRespConfig {
+	if self.workflowSvc == nil {
+		return nil
+	}
+	workflows, err := self.workflowSvc.ListWorkflows("", boolPtr(true), 1, 100)
+	if err != nil {
+		logrus.Errorf("[webapi.go::checkWorkflowResponse] ListWorkflows: %v", err)
+		return nil
+	}
+	for _, wf := range workflows.Items {
+		for _, action := range wf.Actions {
+			if action.Type == v2models.ActionTypeResponse && action.Enabled {
+				cfg := &workflowRespConfig{}
+				if v, ok := action.Config["status"]; ok {
+					if s, ok := v.(float64); ok {
+						cfg.Status = int(s)
+					}
+				}
+				if v, ok := action.Config["redirect"]; ok {
+					cfg.Redirect, _ = v.(string)
+				}
+				if v, ok := action.Config["body"]; ok {
+					cfg.Body, _ = v.(string)
+				}
+				if v, ok := action.Config["headers"]; ok {
+					if h, ok := v.(map[string]interface{}); ok {
+						cfg.Headers = make(map[string]string, len(h))
+						for k, val := range h {
+							cfg.Headers[k] = fmt.Sprintf("%v", val)
+						}
+					}
+				}
+				return cfg
+			}
+		}
+	}
+	return nil
 }
