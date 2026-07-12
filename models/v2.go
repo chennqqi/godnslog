@@ -217,7 +217,7 @@ type NotificationChannel struct {
 
 type NotificationChannelCreateRequest struct {
 	Name   string `json:"name"`
-	Type   string `json:"type" binding:"required,oneof=webhook wechat feishu dingtalk"`
+	Type   string `json:"type" binding:"required,oneof=webhook wechat feishu dingtalk bark serverchan telegram slack"`
 	Config string `json:"config"`
 }
 

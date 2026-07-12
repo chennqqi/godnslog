@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"xorm.io/xorm"
@@ -121,6 +122,14 @@ func (s *Service) SendNotification(channelId int64, notificationType, message, p
 		sendErr = s.sendFeishu(channel.Config, message, payload)
 	case "dingtalk":
 		sendErr = s.sendDingtalk(channel.Config, message, payload)
+	case "bark":
+		sendErr = s.sendBark(channel.Config, message, payload)
+	case "serverchan":
+		sendErr = s.sendServerchan(channel.Config, message, payload)
+	case "telegram":
+		sendErr = s.sendTelegram(channel.Config, message, payload)
+	case "slack":
+		sendErr = s.sendSlack(channel.Config, message, payload)
 	default:
 		sendErr = fmt.Errorf("unsupported channel type: %s", channel.Type)
 	}
@@ -261,6 +270,141 @@ func (s *Service) sendDingtalk(config, message, payload string) error {
 		return fmt.Errorf("dingtalk returned status %d", resp.StatusCode)
 	}
 
+	return nil
+}
+
+// sendBark sends a notification via Bark (iOS push)
+func (s *Service) sendBark(config, message, payload string) error {
+	var cfg struct {
+		URL string `json:"url"`
+	}
+	if err := json.Unmarshal([]byte(config), &cfg); err != nil {
+		return err
+	}
+	if cfg.URL == "" {
+		return errors.New("bark url is required")
+	}
+
+	body := map[string]interface{}{
+		"title":     "GODNSLOG - " + message,
+		"body":      payload,
+		"group":     "godnslog",
+		"isArchive": "1",
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	resp, err := http.Post(cfg.URL, "application/json", bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("bark returned status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// sendServerchan sends a notification via Server酱 (WeChat push)
+func (s *Service) sendServerchan(config, message, payload string) error {
+	var cfg struct {
+		SendKey string `json:"sendkey"`
+	}
+	if err := json.Unmarshal([]byte(config), &cfg); err != nil {
+		return err
+	}
+	if cfg.SendKey == "" {
+		return errors.New("serverchan sendkey is required")
+	}
+
+	u := fmt.Sprintf("https://sctapi.ftqq.com/%s.send", cfg.SendKey)
+	formData := url.Values{
+		"title": {"GODNSLOG - " + message},
+		"desp":  {payload},
+	}
+
+	resp, err := http.PostForm(u, formData)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("serverchan returned status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// sendTelegram sends a notification via Telegram Bot
+func (s *Service) sendTelegram(config, message, payload string) error {
+	var cfg struct {
+		BotToken string `json:"bot_token"`
+		ChatID   string `json:"chat_id"`
+	}
+	if err := json.Unmarshal([]byte(config), &cfg); err != nil {
+		return err
+	}
+	if cfg.BotToken == "" || cfg.ChatID == "" {
+		return errors.New("telegram bot_token and chat_id are required")
+	}
+
+	text := fmt.Sprintf("*GODNSLOG* %s\n\n%s", message, payload)
+	u := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", cfg.BotToken)
+	body := map[string]interface{}{
+		"chat_id":    cfg.ChatID,
+		"text":       text,
+		"parse_mode": "Markdown",
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	resp, err := http.Post(u, "application/json", bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("telegram returned status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// sendSlack sends a notification via Slack Webhook
+func (s *Service) sendSlack(config, message, payload string) error {
+	var cfg struct {
+		WebhookURL string `json:"webhook_url"`
+	}
+	if err := json.Unmarshal([]byte(config), &cfg); err != nil {
+		return err
+	}
+	if cfg.WebhookURL == "" {
+		return errors.New("slack webhook_url is required")
+	}
+
+	body := map[string]interface{}{
+		"text": fmt.Sprintf("*GODNSLOG* %s\n\n%s", message, payload),
+		"blocks": []map[string]interface{}{
+			{
+				"type": "header",
+				"text": map[string]string{"type": "plain_text", "text": "GODNSLOG Alert"},
+			},
+			{
+				"type": "section",
+				"text": map[string]string{"type": "mrkdwn", "text": fmt.Sprintf("*%s*", message)},
+			},
+			{
+				"type": "section",
+				"text": map[string]string{"type": "mrkdwn", "text": payload},
+			},
+		},
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	resp, err := http.Post(cfg.WebhookURL, "application/json", bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("slack returned status %d", resp.StatusCode)
+	}
 	return nil
 }
 

@@ -159,7 +159,7 @@ func (rs Resolves) GetValueConflict(r *Resolve) *Resolve {
 type TblNotificationChannel struct {
 	Id        int64     `xorm:"pk autoincr" json:"id"`
 	Name      string    `xorm:"varchar(255) not null" json:"name"`
-	Type      string    `xorm:"varchar(50) not null" json:"type"` // webhook, wechat, feishu, dingtalk
+	Type      string    `xorm:"varchar(50) not null" json:"type"` // webhook, wechat, feishu, dingtalk, bark, serverchan, telegram, slack
 	Config    string    `xorm:"text" json:"config"`               // JSON string
 	Enabled   bool      `xorm:"bool default true" json:"enabled"`
 	CreatedBy int64     `xorm:"bigint" json:"created_by"`
