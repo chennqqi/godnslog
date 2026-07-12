@@ -280,6 +280,8 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			haCluster.GET("/status", self.v2ClusterStatus)
 			haCluster.GET("/leader", self.v2GetLeader)
 		}
+			// Poll API (Burp Collaborator style cursor-based polling)
+			v2.GET("/poll", self.authHandler, self.v2Poll)
 	}
 
 	// Health endpoints (no auth required)
@@ -2295,6 +2297,55 @@ func (self *WebServer) v2InteractionStream(c *gin.Context) {
 			}
 		}
 	}
+}
+
+// v2Poll implements Burp Collaborator-style cursor-based polling.
+// Returns interactions created after the cursor timestamp.
+// GET /api/v2/poll?cursor={ISO8601}&limit={n}
+func (self *WebServer) v2Poll(c *gin.Context) {
+	cursorStr := c.Query("cursor")
+	limitStr := c.DefaultQuery("limit", "20")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	var cursorTime time.Time
+	if cursorStr != "" {
+		cursorTime, err = time.Parse(time.RFC3339, cursorStr)
+		if err != nil {
+			cursorTime = time.Now().Add(-24 * time.Hour)
+		}
+	} else {
+		cursorTime = time.Now().Add(-24 * time.Hour)
+	}
+
+	iaSvc := interaction.NewService(self.orm, nil, nil)
+	// Fetch one more than limit to detect has_more
+	interactions, err := iaSvc.ListInteractions("", "", "", &cursorTime, nil, 1, limit+1)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	hasMore := len(interactions.Items) > limit
+	if hasMore {
+		interactions.Items = interactions.Items[:limit]
+	}
+
+	nextCursor := time.Now().Format(time.RFC3339)
+	if len(interactions.Items) > 0 {
+		nextCursor = interactions.Items[len(interactions.Items)-1].Timestamp.Format(time.RFC3339)
+	}
+
+	c.JSON(200, gin.H{
+		"code": 0,
+		"data": gin.H{
+			"interactions": interactions.Items,
+			"next_cursor":  nextCursor,
+			"has_more":     hasMore,
+		},
+	})
 }
 
 // v2ListPlugins lists marketplace plugins
