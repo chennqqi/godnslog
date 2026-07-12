@@ -21,7 +21,12 @@ class WSClient {
     if (this.ws?.readyState === WebSocket.OPEN) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${protocol}//${this.baseURL}/api/ws`;
+    const token =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('token')
+        : '';
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
+    const url = `${protocol}//${this.baseURL}/api/ws${tokenParam}`;
 
     try {
       this.ws = new WebSocket(url);
