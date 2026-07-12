@@ -207,3 +207,72 @@ func TestFTPCommandModel(t *testing.T) {
 		t.Fatal("SourceIP should not be empty")
 	}
 }
+
+func TestRMIInteractionModel(t *testing.T) {
+	now := time.Now()
+	interaction := &RMIInteraction{
+		ID:         "rmi-test-1",
+		ListenerID: "listener-1",
+		SourceIP:   "192.168.1.1",
+		SourcePort: 1099,
+		URN:        "JRMP StreamProtocol",
+		RawData:    "4a524d4900024b",
+		Timestamp:  now,
+	}
+
+	if interaction.ID == "" {
+		t.Fatal("ID should not be empty")
+	}
+
+	if interaction.SourceIP == "" {
+		t.Fatal("SourceIP should not be empty")
+	}
+
+	if interaction.URN == "" {
+		t.Fatal("URN should not be empty")
+	}
+}
+
+// TestRMIInteractionTableName tests table name
+func TestRMIInteractionTableName(t *testing.T) {
+	i := RMIInteraction{}
+	tableName := i.TableName()
+	if tableName != "rmi_interactions" {
+		t.Fatalf("Expected table name 'rmi_interactions', got '%s'", tableName)
+	}
+}
+
+// TestRMIProtocolParsing tests RMI handshake parsing
+func TestRMIProtocolParsing(t *testing.T) {
+	// Valid JRMP StreamProtocol
+	data := []byte{0x4a, 0x52, 0x4d, 0x49, 0x00, 0x02, 0x4b, 0x00, 0x50}
+	urn, ok := parseRMIHandshake(data)
+	if !ok {
+		t.Error("expected RMI handshake to be recognized")
+	}
+	if urn == "" {
+		t.Error("expected non-empty URN")
+	}
+
+	// Not RMI
+	_, ok2 := parseRMIHandshake([]byte{0x00, 0x00, 0x00, 0x00})
+	if ok2 {
+		t.Error("expected non-RMI data to not be recognized")
+	}
+
+	// Short data
+	_, ok3 := parseRMIHandshake([]byte{0x4a})
+	if ok3 {
+		t.Error("expected short data to not be recognized")
+	}
+
+	// SingleOpProtocol
+	data2 := []byte{0x4a, 0x52, 0x4d, 0x49, 0x00, 0x02, 0x4c}
+	urn2, ok4 := parseRMIHandshake(data2)
+	if !ok4 {
+		t.Error("expected SingleOpProtocol to be recognized")
+	}
+	if urn2 != "JRMP SingleOpProtocol" {
+		t.Errorf("expected 'JRMP SingleOpProtocol', got '%s'", urn2)
+	}
+}

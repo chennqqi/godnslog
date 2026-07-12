@@ -188,6 +188,8 @@ func (m *Manager) startListener(ctx context.Context, l *Listener) error {
 		protoListener = NewSMBListener(cfg, wrappedStore, l)
 	case ProtocolFTP:
 		protoListener = NewFTPListener(cfg, wrappedStore, l)
+	case ProtocolRMI:
+		protoListener = NewRMIListener(l, cfg, wrappedStore, m.logger)
 	default:
 		return fmt.Errorf("unsupported protocol: %s", l.Protocol)
 	}
@@ -234,6 +236,8 @@ func (m *Manager) getConfigForProtocol(protocol Protocol) *ListenerConfig {
 		return DefaultSMBConfig()
 	case ProtocolFTP:
 		return DefaultFTPConfig()
+	case ProtocolRMI:
+		return DefaultRMIConfig()
 	default:
 		return &ListenerConfig{
 			MaxConnections: 100,

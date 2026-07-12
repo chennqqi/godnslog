@@ -303,7 +303,7 @@ type Response struct {
 // isValidProtocol checks if protocol is valid
 func isValidProtocol(protocol Protocol) bool {
 	switch protocol {
-	case ProtocolSMTP, ProtocolLDAP, ProtocolSMB, ProtocolFTP:
+	case ProtocolSMTP, ProtocolLDAP, ProtocolSMB, ProtocolFTP, ProtocolRMI:
 		return true
 	default:
 		return false

@@ -14,6 +14,7 @@ const (
 	ProtocolLDAP Protocol = "ldap"
 	ProtocolSMB  Protocol = "smb"
 	ProtocolFTP  Protocol = "ftp"
+	ProtocolRMI  Protocol = "rmi"
 )
 
 // Listener represents a protocol listener
@@ -169,6 +170,21 @@ func (SMBRequest) TableName() string {
 // TableName returns the table name for FTPCommand
 func (FTPCommand) TableName() string {
 	return "ftp_commands"
+}
+
+// RMIInteraction represents a captured RMI connection for JNDI injection detection.
+type RMIInteraction struct {
+	ID         string    `json:"id" xorm:"'id' pk varchar(36) notnull"`
+	ListenerID string    `json:"listener_id" xorm:"'listener_id' varchar(36) notnull index"`
+	SourceIP   string    `json:"source_ip" xorm:"varchar(64) notnull"`
+	SourcePort int       `json:"source_port" xorm:"int notnull"`
+	URN        string    `json:"urn" xorm:"text"`
+	RawData    string    `json:"raw_data" xorm:"mediumtext"`
+	Timestamp  time.Time `json:"timestamp" xorm:"datetime notnull created"`
+}
+
+func (RMIInteraction) TableName() string {
+	return "rmi_interactions"
 }
 
 // ListenerListResponse represents the response for listing listeners

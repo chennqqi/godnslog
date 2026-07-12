@@ -49,6 +49,9 @@ type Store interface {
 	GetFTPCommands(ctx context.Context, listenerID string) ([]FTPCommand, error)
 	GetFTPCommand(ctx context.Context, id string) (*FTPCommand, error)
 	DeleteFTPCommand(ctx context.Context, id string) error
+
+	// RMI interaction operations
+	SaveRMIInteraction(interaction *RMIInteraction) error
 }
 
 // XormStore implements Store using XORM
@@ -267,6 +270,12 @@ func (s *XormStore) GetFTPCommand(ctx context.Context, id string) (*FTPCommand, 
 // DeleteFTPCommand deletes an FTP command
 func (s *XormStore) DeleteFTPCommand(ctx context.Context, id string) error {
 	_, err := s.engine.ID(id).Delete(&FTPCommand{})
+	return err
+}
+
+// SaveRMIInteraction saves an RMI interaction
+func (s *XormStore) SaveRMIInteraction(interaction *RMIInteraction) error {
+	_, err := s.engine.Insert(interaction)
 	return err
 }
 
