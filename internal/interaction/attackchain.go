@@ -120,10 +120,7 @@ func (s *Service) GetAttackChainDetail(token string) (*AttackChainDetail, error)
 	}
 
 	if len(interactions) == 0 {
-		return &AttackChainDetail{
-			Token:        token,
-			Interactions: []models.Interaction{},
-		}, nil
+		return nil, nil
 	}
 
 	firstSeen := interactions[0].Timestamp
