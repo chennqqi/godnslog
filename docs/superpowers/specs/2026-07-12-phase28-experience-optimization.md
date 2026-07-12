@@ -83,14 +83,17 @@ var telegramMarkdownEscaper = strings.NewReplacer(
 
 2. `SetFlags` 新增：
    - `-geoip-mmdb` — mmdb 路径
+   - `-geoip-license-key` — MaxMind License Key，可选，用于自动下载
    - 环境变量 `MMDB_PATH` / `MMDB_LICENSE_KEY`
+   - flag 描述中提示免费 Key 申请链接：`https://www.maxmind.com/en/geolite2/signup`
 
 3. `Execute` 启动序列中新增：
    - 检查 mmdbPath 文件是否存在
    - 如不存在且 licenseKey 不为空 -> 自动下载
    - 下载 URL: `https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-ASN&license_key={key}&suffix=tar.gz`
    - 下载后解压 tar.gz，提取 mmdb 文件到目标路径
-   - 下载失败/无 key -> 仅 log 警告，不阻止启动
+   - 如不存在且 licenseKey 为空 -> log 警告：未配置 license key，GeoIP 自动更新已禁用，可在 https://www.maxmind.com/en/geolite2/signup 免费申请
+   - 下载失败 -> 仅 log 警告，不阻止启动
 
 4. `fingerprint.NewFingerprint(mmdbPath)` 传入有效路径创建 fingerprinter，而非传空
 
