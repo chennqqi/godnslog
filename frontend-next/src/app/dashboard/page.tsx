@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useI18n } from '@/lib/i18n-context'
+import { PayloadCheatSheet } from '@/features/dashboard/payload-cheatsheet'
 
 /** Protocol color mapping per design spec */
 const PROTOCOL_COLORS: Record<string, string> = {
@@ -297,6 +298,9 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Payload Cheat Sheet */}
+      <PayloadCheatSheet />
     </div>
   )
 }
