@@ -23,6 +23,7 @@ import (
 	"github.com/chennqqi/godnslog/internal/payload"
 	"github.com/chennqqi/godnslog/internal/retention"
 	"github.com/chennqqi/godnslog/internal/scannerhub"
+	"github.com/chennqqi/godnslog/internal/scannerhub/search"
 	"github.com/dgrijalva/jwt-go"
 
 	v2models "github.com/chennqqi/godnslog/internal/models"
@@ -32,6 +33,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
+
+// getSetting retrieves a setting value by key from the Settings table.
+func (self *WebServer) getSetting(key string) string {
+	var setting v2models.Settings
+	_, err := self.orm.Where("key = ?", key).Get(&setting)
+	if err != nil || setting.ID == "" {
+		return ""
+	}
+	return setting.Value
+}
 
 // registerV2API registers v2 API routes
 func (self *WebServer) registerV2API(r *gin.Engine) {
@@ -235,6 +246,14 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		scannerHub := v2.Group("/scanner-hub", self.authHandler)
 		{
 			scannerHub.GET("/adapters", self.v2ListScannerAdapters)
+		}
+
+		// Search engines (ZoomEye, Shodan, Fofa)
+		searchGroup := v2.Group("/search", self.authHandler)
+		{
+			searchGroup.GET("/zoomeye", self.v2SearchZoomEye)
+			searchGroup.GET("/shodan", self.v2SearchShodan)
+			searchGroup.GET("/fofa", self.v2SearchFofa)
 		}
 
 		scannerRuns := v2.Group("/scanner-runs", self.authHandler)
@@ -5193,4 +5212,86 @@ func (self *WebServer) v2GetAttackChainDetail(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, detail)
+}
+
+// v2SearchZoomEye queries ZoomEye API
+func (self *WebServer) v2SearchZoomEye(c *gin.Context) {
+	query := c.Query("q")
+	if query == "" {
+		c.JSON(400, gin.H{"error": "query is required"})
+		return
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+
+	key := self.getSetting("zoomeye_api_key")
+	if key == "" {
+		c.JSON(400, gin.H{"error": "ZoomEye API key not configured"})
+		return
+	}
+
+	s := search.NewZoomEye(key)
+	result, err := s.Search(query, page)
+	if err != nil {
+		c.JSON(502, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"code": 0, "data": result})
+}
+
+// v2SearchShodan queries Shodan API
+func (self *WebServer) v2SearchShodan(c *gin.Context) {
+	query := c.Query("q")
+	if query == "" {
+		c.JSON(400, gin.H{"error": "query is required"})
+		return
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+
+	key := self.getSetting("shodan_api_key")
+	if key == "" {
+		c.JSON(400, gin.H{"error": "Shodan API key not configured"})
+		return
+	}
+
+	s := search.NewShodan(key)
+	result, err := s.Search(query, page)
+	if err != nil {
+		c.JSON(502, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"code": 0, "data": result})
+}
+
+// v2SearchFofa queries Fofa API
+func (self *WebServer) v2SearchFofa(c *gin.Context) {
+	query := c.Query("q")
+	if query == "" {
+		c.JSON(400, gin.H{"error": "query is required"})
+		return
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+
+	email := self.getSetting("fofa_email")
+	key := self.getSetting("fofa_api_key")
+	if email == "" || key == "" {
+		c.JSON(400, gin.H{"error": "Fofa email/api key not configured"})
+		return
+	}
+
+	s := search.NewFofa(email, key)
+	result, err := s.Search(query, page)
+	if err != nil {
+		c.JSON(502, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"code": 0, "data": result})
 }
