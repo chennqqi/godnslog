@@ -82,6 +82,10 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			interactions.GET("/:id", self.v2GetInteraction)
 		}
 
+		// Attack chains
+		v2.GET("/attack-chains", self.authHandler, self.v2ListAttackChains)
+		v2.GET("/attack-chains/:token", self.authHandler, self.v2GetAttackChainDetail)
+
 		// APIKeys
 		apikeys := v2.Group("/apikeys", self.authHandler)
 		{
@@ -5095,4 +5099,47 @@ func (self *WebServer) v2ListRetentionArchives(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": gin.H{"items": archives, "total": len(archives)}})
+}
+
+// v2ListAttackChains lists attack chains grouped by token
+func (self *WebServer) v2ListAttackChains(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+
+	iaSvc := interaction.NewService(self.orm, nil)
+	chains, err := iaSvc.GetAttackChains(page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, chains)
+}
+
+// v2GetAttackChainDetail gets attack chain detail by token
+func (self *WebServer) v2GetAttackChainDetail(c *gin.Context) {
+	token := c.Param("token")
+	if token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "token is required"})
+		return
+	}
+
+	iaSvc := interaction.NewService(self.orm, nil)
+	detail, err := iaSvc.GetAttackChainDetail(token)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if detail == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "attack chain not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, detail)
 }
