@@ -320,6 +320,9 @@ func (self *WebServer) Run() error {
 	self.workflowQueue.Start()
 	logrus.Info("[webserver.go::Run] workflow async queue started with 3 workers")
 
+	// Initialize WebSocket hub for real-time push
+	initWS()
+
 	// Start listener manager
 	listenerStore := listener.NewXormStore(self.orm)
 	self.listenerMgr = listener.NewManager(listenerStore, logrus.StandardLogger())
@@ -338,6 +341,9 @@ func (self *WebServer) Run() error {
 		data.DELETE("/dns", self.delDnsRecord)
 		data.DELETE("/http", self.delHttpRecord)
 	}
+
+	// WebSocket endpoint (auth required)
+	api.GET("/ws", self.authHandler, wsHandler)
 
 	setting := api.Group("/setting", self.authHandler)
 	{

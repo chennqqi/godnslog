@@ -2667,7 +2667,7 @@ func (self *WebServer) v2GenerateEvidence(c *gin.Context) {
 		return
 	}
 
-	interactionService := interaction.NewService(self.orm)
+	interactionService := interaction.NewService(self.orm, nil)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 
 	resp, err := evidenceService.GenerateEvidence(req.CaseID, req.PayloadID, req.Format)
@@ -4093,7 +4093,7 @@ func (self *WebServer) v2GetAgentRunReview(c *gin.Context) {
 
 	authService := auth.NewService(self.orm)
 	agentRunService := agentrun.NewService(self.orm, authService)
-	interactionService := interaction.NewService(self.orm)
+	interactionService := interaction.NewService(self.orm, nil)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := agentrun.NewReviewService(self.orm, agentRunService, authService, evidenceService, interactionService)
 
@@ -4273,7 +4273,7 @@ func (self *WebServer) v2ExportReviewPackage(c *gin.Context) {
 
 	authService := auth.NewService(self.orm)
 	agentRunService := agentrun.NewService(self.orm, authService)
-	interactionService := interaction.NewService(self.orm)
+	interactionService := interaction.NewService(self.orm, nil)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := agentrun.NewReviewService(self.orm, agentRunService, authService, evidenceService, interactionService)
 
@@ -4310,7 +4310,7 @@ func (self *WebServer) v2DeliverReviewPackage(c *gin.Context) {
 
 	authService := auth.NewService(self.orm)
 	agentRunService := agentrun.NewService(self.orm, authService)
-	interactionService := interaction.NewService(self.orm)
+	interactionService := interaction.NewService(self.orm, nil)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := agentrun.NewReviewService(self.orm, agentRunService, authService, evidenceService, interactionService)
 
@@ -4349,7 +4349,7 @@ func (self *WebServer) v2ListReviewDeliveries(c *gin.Context) {
 
 	authService := auth.NewService(self.orm)
 	agentRunService := agentrun.NewService(self.orm, authService)
-	interactionService := interaction.NewService(self.orm)
+	interactionService := interaction.NewService(self.orm, nil)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := agentrun.NewReviewService(self.orm, agentRunService, authService, evidenceService, interactionService)
 
@@ -4385,7 +4385,7 @@ func (self *WebServer) v2TraceReviewPackage(c *gin.Context) {
 
 	authService := auth.NewService(self.orm)
 	agentRunService := agentrun.NewService(self.orm, authService)
-	interactionService := interaction.NewService(self.orm)
+	interactionService := interaction.NewService(self.orm, nil)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := agentrun.NewReviewService(self.orm, agentRunService, authService, evidenceService, interactionService)
 
@@ -4456,7 +4456,7 @@ func (self *WebServer) v2CompleteAgentRun(c *gin.Context) {
 
 	authService := auth.NewService(self.orm)
 	agentRunService := agentrun.NewService(self.orm, authService)
-	interactionService := interaction.NewService(self.orm)
+	interactionService := interaction.NewService(self.orm, nil)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := agentrun.NewReviewService(self.orm, agentRunService, authService, evidenceService, interactionService)
 

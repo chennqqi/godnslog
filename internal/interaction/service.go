@@ -12,6 +12,7 @@ import (
 	"github.com/chennqqi/godnslog/internal/interaction/classifier"
 	"github.com/chennqqi/godnslog/internal/interaction/decoder"
 	"github.com/chennqqi/godnslog/internal/models"
+	"github.com/chennqqi/godnslog/internal/websocket"
 )
 
 var (
@@ -21,11 +22,12 @@ var (
 // Service provides interaction management services
 type Service struct {
 	engine *xorm.Engine
+	wsHub  *websocket.Hub // WebSocket hub for real-time push, nil to disable
 }
 
 // NewService creates a new interaction service
-func NewService(engine *xorm.Engine) *Service {
-	return &Service{engine: engine}
+func NewService(engine *xorm.Engine, wsHub *websocket.Hub) *Service {
+	return &Service{engine: engine, wsHub: wsHub}
 }
 
 // CreateInteraction creates a new interaction record
@@ -68,7 +70,18 @@ func (s *Service) CreateInteraction(interaction *models.Interaction) error {
 	enhanceInteraction(interaction)
 
 	_, err := s.engine.InsertOne(interaction)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Broadcast via WebSocket
+	if s.wsHub != nil {
+		if data, err := json.Marshal(interaction); err == nil {
+			s.wsHub.Broadcast(data)
+		}
+	}
+
+	return nil
 }
 
 // GetInteractionByID retrieves an interaction by its ID

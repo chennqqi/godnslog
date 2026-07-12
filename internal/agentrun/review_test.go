@@ -108,7 +108,7 @@ func TestListReviewDeliveries(t *testing.T) {
 	// Create services
 	authService := auth.NewService(engine)
 	agentRunService := NewService(engine, authService)
-	interactionService := interaction.NewService(engine)
+	interactionService := interaction.NewService(engine, nil)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := NewReviewService(engine, agentRunService, authService, evidenceService, interactionService)
 
@@ -396,7 +396,7 @@ func TestBuildReviewPacket(t *testing.T) {
 	// Create services
 	authService := auth.NewService(engine)
 	agentRunService := NewService(engine, authService)
-	interactionService := interaction.NewService(engine)
+	interactionService := interaction.NewService(engine, nil)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := NewReviewService(engine, agentRunService, authService, evidenceService, interactionService)
 
@@ -658,7 +658,7 @@ func TestDeliverReviewPackage(t *testing.T) {
 	// Create services
 	authService := auth.NewService(engine)
 	agentRunService := NewService(engine, authService)
-	interactionService := interaction.NewService(engine)
+	interactionService := interaction.NewService(engine, nil)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := NewReviewService(engine, agentRunService, authService, evidenceService, interactionService)
 
@@ -1054,7 +1054,7 @@ func TestExportPackageHash(t *testing.T) {
 	// Create services
 	authService := auth.NewService(engine)
 	agentRunService := NewService(engine, authService)
-	interactionService := interaction.NewService(engine)
+	interactionService := interaction.NewService(engine, nil)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := NewReviewService(engine, agentRunService, authService, evidenceService, interactionService)
 
@@ -1218,7 +1218,7 @@ func TestDeliveryPackageHash(t *testing.T) {
 	// Create services
 	authService := auth.NewService(engine)
 	agentRunService := NewService(engine, authService)
-	interactionService := interaction.NewService(engine)
+	interactionService := interaction.NewService(engine, nil)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := NewReviewService(engine, agentRunService, authService, evidenceService, interactionService)
 
@@ -1434,7 +1434,7 @@ func TestDeliveryHistoryPackageHash(t *testing.T) {
 	// Create services
 	authService := auth.NewService(engine)
 	agentRunService := NewService(engine, authService)
-	interactionService := interaction.NewService(engine)
+	interactionService := interaction.NewService(engine, nil)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := NewReviewService(engine, agentRunService, authService, evidenceService, interactionService)
 

@@ -33,7 +33,7 @@ func TestNewService(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, engine)
 
-	service := NewService(engine)
+	service := NewService(engine, nil)
 	assert.NotNil(t, service)
 }
 
@@ -41,7 +41,7 @@ func TestService_CreateInteraction(t *testing.T) {
 	engine, err := MockEngine()
 	assert.NoError(t, err)
 
-	service := NewService(engine)
+	service := NewService(engine, nil)
 
 	token := "test-token"
 	interaction := &models.Interaction{
@@ -67,7 +67,7 @@ func TestService_GetInteractionByID(t *testing.T) {
 	engine, err := MockEngine()
 	assert.NoError(t, err)
 
-	service := NewService(engine)
+	service := NewService(engine, nil)
 
 	token := "test-token"
 	interaction := &models.Interaction{
@@ -92,7 +92,7 @@ func TestService_ListInteractions(t *testing.T) {
 	engine, err := MockEngine()
 	assert.NoError(t, err)
 
-	service := NewService(engine)
+	service := NewService(engine, nil)
 
 	// Create multiple interactions
 	for i := 0; i < 3; i++ {
@@ -119,7 +119,7 @@ func TestService_DeleteInteractions(t *testing.T) {
 	engine, err := MockEngine()
 	assert.NoError(t, err)
 
-	service := NewService(engine)
+	service := NewService(engine, nil)
 
 	token := "test-token"
 	interaction := &models.Interaction{
@@ -173,7 +173,7 @@ func TestExtractPattern(t *testing.T) {
 	}
 	defer engine.Close()
 
-	service := NewService(engine)
+	service := NewService(engine, nil)
 
 	tests := []struct {
 		input    string
@@ -196,7 +196,7 @@ func TestBatchImportInteractions(t *testing.T) {
 	engine, err := MockEngine()
 	assert.NoError(t, err)
 
-	service := NewService(engine)
+	service := NewService(engine, nil)
 	ts := time.Now()
 
 	token1 := "token1"
