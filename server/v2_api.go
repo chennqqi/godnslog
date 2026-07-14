@@ -58,8 +58,8 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		{
 			cases.GET("", self.v2ListCases)
 			cases.POST("", self.v2CreateCase)
-				cases.GET("/stats", self.v2CaseStats)
-				cases.GET("/:id", self.v2GetCase)
+			cases.GET("/stats", self.v2CaseStats)
+			cases.GET("/:id", self.v2GetCase)
 			cases.PUT("/:id", self.v2UpdateCase)
 			cases.DELETE("/:id", self.v2DeleteCase)
 			cases.GET("/:id/stats", self.v2GetCaseStats)
@@ -300,8 +300,8 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			haCluster.GET("/status", self.v2ClusterStatus)
 			haCluster.GET("/leader", self.v2GetLeader)
 		}
-			// Poll API (Burp Collaborator style cursor-based polling)
-			v2.GET("/poll", self.authHandler, self.v2Poll)
+		// Poll API (Burp Collaborator style cursor-based polling)
+		v2.GET("/poll", self.authHandler, self.v2Poll)
 	}
 
 	// Health endpoints (no auth required)
@@ -2356,7 +2356,7 @@ func (self *WebServer) v2Poll(c *gin.Context) {
 		cursorTime = time.Now().Add(-24 * time.Hour)
 	}
 
-	iaSvc := interaction.NewService(self.orm, nil, nil, false)
+	iaSvc := interaction.NewService(self.orm, nil, self.fingerprinter, false)
 	// Fetch one more than limit to detect has_more
 	interactions, err := iaSvc.ListInteractions("", "", "", &cursorTime, nil, 1, limit+1)
 	if err != nil {
@@ -2758,7 +2758,7 @@ func (self *WebServer) v2GenerateEvidence(c *gin.Context) {
 		return
 	}
 
-	interactionService := interaction.NewService(self.orm, nil, nil, false)
+	interactionService := interaction.NewService(self.orm, nil, self.fingerprinter, false)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 
 	resp, err := evidenceService.GenerateEvidence(req.CaseID, req.PayloadID, req.Format)
@@ -4184,7 +4184,7 @@ func (self *WebServer) v2GetAgentRunReview(c *gin.Context) {
 
 	authService := auth.NewService(self.orm)
 	agentRunService := agentrun.NewService(self.orm, authService)
-	interactionService := interaction.NewService(self.orm, nil, nil, false)
+	interactionService := interaction.NewService(self.orm, nil, self.fingerprinter, false)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := agentrun.NewReviewService(self.orm, agentRunService, authService, evidenceService, interactionService)
 
@@ -4364,7 +4364,7 @@ func (self *WebServer) v2ExportReviewPackage(c *gin.Context) {
 
 	authService := auth.NewService(self.orm)
 	agentRunService := agentrun.NewService(self.orm, authService)
-	interactionService := interaction.NewService(self.orm, nil, nil, false)
+	interactionService := interaction.NewService(self.orm, nil, self.fingerprinter, false)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := agentrun.NewReviewService(self.orm, agentRunService, authService, evidenceService, interactionService)
 
@@ -4401,7 +4401,7 @@ func (self *WebServer) v2DeliverReviewPackage(c *gin.Context) {
 
 	authService := auth.NewService(self.orm)
 	agentRunService := agentrun.NewService(self.orm, authService)
-	interactionService := interaction.NewService(self.orm, nil, nil, false)
+	interactionService := interaction.NewService(self.orm, nil, self.fingerprinter, false)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := agentrun.NewReviewService(self.orm, agentRunService, authService, evidenceService, interactionService)
 
@@ -4440,7 +4440,7 @@ func (self *WebServer) v2ListReviewDeliveries(c *gin.Context) {
 
 	authService := auth.NewService(self.orm)
 	agentRunService := agentrun.NewService(self.orm, authService)
-	interactionService := interaction.NewService(self.orm, nil, nil, false)
+	interactionService := interaction.NewService(self.orm, nil, self.fingerprinter, false)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := agentrun.NewReviewService(self.orm, agentRunService, authService, evidenceService, interactionService)
 
@@ -4476,7 +4476,7 @@ func (self *WebServer) v2TraceReviewPackage(c *gin.Context) {
 
 	authService := auth.NewService(self.orm)
 	agentRunService := agentrun.NewService(self.orm, authService)
-	interactionService := interaction.NewService(self.orm, nil, nil, false)
+	interactionService := interaction.NewService(self.orm, nil, self.fingerprinter, false)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := agentrun.NewReviewService(self.orm, agentRunService, authService, evidenceService, interactionService)
 
@@ -4547,7 +4547,7 @@ func (self *WebServer) v2CompleteAgentRun(c *gin.Context) {
 
 	authService := auth.NewService(self.orm)
 	agentRunService := agentrun.NewService(self.orm, authService)
-	interactionService := interaction.NewService(self.orm, nil, nil, false)
+	interactionService := interaction.NewService(self.orm, nil, self.fingerprinter, false)
 	evidenceService := interaction.NewEvidenceService(interactionService)
 	reviewService := agentrun.NewReviewService(self.orm, agentRunService, authService, evidenceService, interactionService)
 
@@ -5199,7 +5199,7 @@ func (self *WebServer) v2ListAttackChains(c *gin.Context) {
 		pageSize = 20
 	}
 
-	iaSvc := interaction.NewService(self.orm, nil, nil, false)
+	iaSvc := interaction.NewService(self.orm, nil, self.fingerprinter, false)
 	chains, err := iaSvc.GetAttackChains(page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -5217,7 +5217,7 @@ func (self *WebServer) v2GetAttackChainDetail(c *gin.Context) {
 		return
 	}
 
-	iaSvc := interaction.NewService(self.orm, nil, nil, false)
+	iaSvc := interaction.NewService(self.orm, nil, self.fingerprinter, false)
 	detail, err := iaSvc.GetAttackChainDetail(token)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

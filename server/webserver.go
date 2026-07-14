@@ -16,6 +16,7 @@ import (
 	"github.com/chennqqi/godnslog/cache"
 	"github.com/chennqqi/godnslog/internal/auth"
 	"github.com/chennqqi/godnslog/internal/ha"
+	"github.com/chennqqi/godnslog/internal/interaction/fingerprint"
 	"github.com/chennqqi/godnslog/internal/listener"
 	v2models "github.com/chennqqi/godnslog/internal/models"
 	"github.com/chennqqi/godnslog/internal/workflow"
@@ -53,6 +54,11 @@ type WebServerConfig struct {
 	DefaultMaxCallbackErrorCount int64
 	DefaultLanguage              string
 	AnonymousMode                bool `json:"anonymous_mode"` // when true, don't record real source IPs
+
+	// GeoIP configuration. MMDBPath is the location of GeoLite2-ASN.mmdb.
+	// LicenseKey enables auto-download when the file is missing.
+	GeoIPMMDBPath    string
+	GeoIPLicenseKey string
 }
 
 type WebServer struct {
@@ -78,6 +84,7 @@ type WebServer struct {
 	haNodeID    string
 	haCancel    context.CancelFunc
 	redisClient *redis.Client
+	fingerprinter *fingerprint.Fingerprinter
 }
 
 func NewWebServer(cfg *WebServerConfig, store *cache.Cache) (*WebServer, error) {
@@ -106,6 +113,18 @@ func NewWebServer(cfg *WebServerConfig, store *cache.Cache) (*WebServer, error) 
 
 	app.verifyKey = genRandomString(16)
 	app.storeQuit = make(chan struct{})
+
+	// Initialize GeoIP fingerprinter
+	if cfg.GeoIPMMDBPath != "" {
+		if err := fingerprint.EnsureMMDB(cfg.GeoIPMMDBPath, cfg.GeoIPLicenseKey); err != nil {
+			logrus.Warnf("[webserver] GeoIP disabled: %v", err)
+		}
+		app.fingerprinter = fingerprint.NewFingerprinter(cfg.GeoIPMMDBPath)
+		logrus.Infof("[webserver] GeoIP fingerprinter initialized (mmdb=%s)", cfg.GeoIPMMDBPath)
+	} else {
+		logrus.Info("[webserver] GeoIP disabled (no mmdb path configured)")
+	}
+
 	return app, nil
 }
 
