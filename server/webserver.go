@@ -52,7 +52,7 @@ type WebServerConfig struct {
 	DefaultQueryApiMaxItem       int
 	DefaultMaxCallbackErrorCount int64
 	DefaultLanguage              string
-	AnonymousMode                bool   `json:"anonymous_mode"` // when true, don't record real source IPs
+	AnonymousMode                bool `json:"anonymous_mode"` // when true, don't record real source IPs
 }
 
 type WebServer struct {
@@ -207,6 +207,10 @@ FOR_LOOP:
 				}
 				// Dual-write to unified interactions table with attribution
 				interaction := v2models.FromTblDnsWithAttribution(dnsRecord, self.orm)
+				// Override DNSType with actual query type from DNS server
+				if d.Qtype != "" {
+					interaction.DNSType = &d.Qtype
+				}
 				if _, err2 := session.InsertOne(interaction); err2 != nil {
 					logrus.Errorf("[web.go::storeRoutine] dual-write interactions: %v", err2)
 				}
@@ -406,6 +410,8 @@ func (self *WebServer) Shutdown(ctx context.Context) error {
 	if self.s != nil {
 		err = self.s.Shutdown(ctx)
 	}
+	// Stop accepting new WebSocket connections and drain active clients.
+	stopWS(ctx)
 	//important: stop input then call shutdown
 
 	<-self.storeQuit

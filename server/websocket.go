@@ -1,11 +1,12 @@
 package server
 
 import (
+	"context"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	gorillawebsocket "github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
-	"github.com/gin-gonic/gin"
 
 	ws "github.com/chennqqi/godnslog/internal/websocket"
 )
@@ -16,6 +17,13 @@ var wsHub = ws.NewHub()
 func initWS() {
 	go wsHub.Run()
 	logrus.Info("[websocket] WebSocket hub started")
+}
+
+// stopWS gracefully shuts down the package-level WebSocket hub.
+func stopWS(ctx context.Context) {
+	if err := wsHub.Shutdown(ctx); err != nil {
+		logrus.Warnf("[websocket] hub shutdown error: %v", err)
+	}
 }
 
 // wsHandler upgrades HTTP to WebSocket and registers the client.
