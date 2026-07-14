@@ -7,12 +7,42 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"xorm.io/xorm"
 
 	"github.com/chennqqi/godnslog/models"
 )
+
+// telegramMarkdownReplacer escapes characters with special meaning in
+// Telegram's Markdown parse_mode so user-supplied text renders literally.
+var telegramMarkdownReplacer = strings.NewReplacer(
+	"_", `\_`,
+	"*", `\*`,
+	"[", `\[`,
+	"]", `\]`,
+	"(", `\(`,
+	")", `\)`,
+	"~", `\~`,
+	"`", "\\`",
+	">", `\>`,
+	"#", `\#`,
+	"+", `\+`,
+	"-", `\-`,
+	"=", `\=`,
+	"|", `\|`,
+	"{", `\{`,
+	"}", `\}`,
+	".", `\.`,
+	"!", `\!`,
+)
+
+// escapeTelegramMarkdown escapes Markdown special characters per Telegram's
+// parse_mode=Markdown rules.
+func escapeTelegramMarkdown(s string) string {
+	return telegramMarkdownReplacer.Replace(s)
+}
 
 // Option configures a notification Service.
 type Option func(*Service)
@@ -367,7 +397,9 @@ func (s *Service) sendTelegram(config, message, payload string) error {
 		return errors.New("telegram bot_token and chat_id are required")
 	}
 
-	text := fmt.Sprintf("*GODNSLOG* %s\n\n%s", message, payload)
+	text := fmt.Sprintf("*GODNSLOG* %s\n\n%s",
+		escapeTelegramMarkdown(message),
+		escapeTelegramMarkdown(payload))
 	u := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", cfg.BotToken)
 	body := map[string]interface{}{
 		"chat_id":    cfg.ChatID,

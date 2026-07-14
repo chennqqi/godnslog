@@ -297,3 +297,30 @@ func TestService_DefaultHTTPTimeout(t *testing.T) {
 		t.Errorf("expected default timeout 30s, got %v", svc.httpClient.Timeout)
 	}
 }
+
+func TestEscapeTelegramMarkdown(t *testing.T) {
+	tests := []struct {
+		name, input, want string
+	}{
+		{"plain", "hello world", "hello world"},
+		{"underscore", "a_b", `a\_b`},
+		{"asterisk", "a*b", `a\*b`},
+		{"brackets", "a[b]c(d)", `a\[b\]c\(d\)`},
+		{"tilde", "a~b", `a\~b`},
+		{"backtick", "a`b", "a\\`b"},
+		{"hash", "#tag", `\#tag`},
+		{"plus_minus_eq", "a+b-c=d", `a\+b\-c\=d`},
+		{"pipe_braces", "a|b{c}d", `a\|b\{c\}d`},
+		{"dot_bang", "a.b!c", `a\.b\!c`},
+		{"gt", ">quote", `\>quote`},
+		{"all_chars", "_*[]()~`>#+-=|{}.!", "\\_\\*\\[\\]\\(\\)\\~\\`\\>\\#\\+\\-\\=\\|\\{\\}\\.\\!"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := escapeTelegramMarkdown(tt.input)
+			if got != tt.want {
+				t.Errorf("escapeTelegramMarkdown(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
