@@ -12,6 +12,7 @@ import type {
   Interaction,
   InteractionListResponse,
   InteractionStats,
+  DailyStat,
   APIKey,
   APIKeyCreateRequest,
   APIKeyUpdateRequest,
@@ -125,6 +126,8 @@ export const interactionApi = {
   }) => api.get<InteractionListResponse>('/interactions', params),
   stats: (params?: { case_id?: string; payload_id?: string; period?: string }) =>
     api.get<InteractionStats>('/interactions/stats', params),
+  dailyStats: (params?: { case_id?: string; payload_id?: string; days?: number }) =>
+    api.get<DailyStat[]>('/interactions/stats/daily', params),
   get: (id: string) => api.get<{ data: Interaction }>(`/interactions/${id}`),
   delete: (ids: string[]) => api.post('/interactions/delete', { ids }),
   export: (data: Record<string, unknown>) => api.post('/interactions/export', data),

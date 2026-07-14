@@ -5,12 +5,15 @@ import Link from 'next/link'
 import { useCases } from '@/features/cases/hooks/use-cases'
 import { usePayloads } from '@/features/payloads/hooks/use-payloads'
 import { useInteractions, useInteractionStats } from '@/features/interactions/hooks/use-interactions'
+import { useQuery } from '@tanstack/react-query'
+import { interactionApi } from '@/lib/api-client'
 import type { Interaction } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useI18n } from '@/lib/i18n-context'
 import { PayloadCheatSheet } from '@/features/dashboard/payload-cheatsheet'
+import { DonutChart, LineChart } from '@/components/charts'
 
 /** Protocol color mapping per design spec */
 const PROTOCOL_COLORS: Record<string, string> = {
@@ -61,39 +64,12 @@ function StatCardSkeleton() {
 }
 
 /** Protocol distribution mini-bar */
-function ProtocolBar({ dns, http, smtp, other }: { dns: number; http: number; smtp: number; other: number }) {
-  const total = dns + http + smtp + other || 1
-  const dnsPct = Math.round((dns / total) * 100)
-  const httpPct = Math.round((http / total) * 100)
-  const smtpPct = Math.round((smtp / total) * 100)
-  const otherPct = 100 - dnsPct - httpPct - smtpPct
-
+function LegendItem({ color, label, value }: { color: string; label: string; value: number }) {
   return (
-    <div className="space-y-2">
-      <div className="flex rounded-full overflow-hidden h-3">
-        <div className="bg-purple-500" style={{ width: `${dnsPct}%` }} title={`DNS ${dnsPct}%`} />
-        <div className="bg-blue-500" style={{ width: `${httpPct}%` }} title={`HTTP ${httpPct}%`} />
-        <div className="bg-emerald-500" style={{ width: `${smtpPct}%` }} title={`SMTP ${smtpPct}%`} />
-        <div className="bg-gray-300 dark:bg-gray-600" style={{ width: `${otherPct}%` }} title={`Other ${otherPct}%`} />
-      </div>
-      <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-purple-500 inline-block" />
-          DNS {dnsPct}%
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
-          HTTP {httpPct}%
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-          SMTP {smtpPct}%
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 inline-block" />
-          Other {otherPct}%
-        </span>
-      </div>
+    <div className="flex items-center gap-2">
+      <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: color }} />
+      <span className="text-gray-600 dark:text-gray-400">{label}</span>
+      <span className="ml-auto font-medium text-gray-900 dark:text-gray-100">{value}</span>
     </div>
   )
 }
@@ -107,8 +83,12 @@ export default function DashboardPage() {
   const { data: interactionsResp, isLoading: interactionsLoading } = useInteractions({ page: 1, page_size: 10 })
   const { data: statsResp, isLoading: statsLoading } = useInteractionStats()
   const { data: payloadsResp, isLoading: payloadsLoading } = usePayloads({ status: 'deployed', page: 1, page_size: 1 })
+  const { data: dailyResp, isLoading: dailyLoading } = useQuery({
+    queryKey: ['interactions', 'daily'],
+    queryFn: () => interactionApi.dailyStats({ days: 7 }),
+  })
 
-  const loading = casesLoading || interactionsLoading || statsLoading || payloadsLoading
+  const loading = casesLoading || interactionsLoading || statsLoading || payloadsLoading || dailyLoading
 
   const cases = casesResp?.data?.items || []
   const recentInteractions: Interaction[] = interactionsResp?.data?.items || []
@@ -123,6 +103,7 @@ export default function DashboardPage() {
   const systemOk = true
 
   const otherCount = totalInteractions - dnsCount - httpCount - smtpCount
+  const dailyStats = dailyResp?.data ?? []
 
   const loadData = () => {
     window.location.reload()
@@ -178,7 +159,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Protocol distribution */}
         <Card className="dark:bg-gray-800 dark:border-gray-700">
           <CardHeader className="pb-3">
@@ -190,12 +171,39 @@ export default function DashboardPage() {
             {loading ? (
               <Skeleton className="h-8 w-full" />
             ) : (
-              <ProtocolBar
-                dns={dnsCount}
-                http={httpCount}
-                smtp={smtpCount}
-                other={otherCount > 0 ? otherCount : 0}
-              />
+              <div className="flex items-center gap-6">
+                <DonutChart
+                  size={180}
+                  data={[
+                    { name: 'DNS', value: dnsCount, color: '#8b5cf6' },
+                    { name: 'HTTP', value: httpCount, color: '#3b82f6' },
+                    { name: 'SMTP', value: smtpCount, color: '#10b981' },
+                    { name: 'Other', value: Math.max(0, otherCount), color: '#6b7280' },
+                  ]}
+                />
+                <div className="space-y-2 text-sm">
+                  <LegendItem color="#8b5cf6" label="DNS" value={dnsCount} />
+                  <LegendItem color="#3b82f6" label="HTTP" value={httpCount} />
+                  <LegendItem color="#10b981" label="SMTP" value={smtpCount} />
+                  <LegendItem color="#6b7280" label="Other" value={Math.max(0, otherCount)} />
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 7-day trend */}
+        <Card className="dark:bg-gray-800 dark:border-gray-700">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              {t('dashboard.trend_7d')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-[260px] w-full" />
+            ) : (
+              <LineChart data={dailyStats} height={260} />
             )}
           </CardContent>
         </Card>

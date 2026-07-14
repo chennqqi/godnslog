@@ -40,6 +40,7 @@
     "react-day-picker": "^9.14.0",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.75.0",
+    "recharts": "^3.9.2",
     "tailwind-merge": "^2.0.0",
     "zod": "^3.22.0",
     "zustand": "^5.0.13"

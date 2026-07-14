@@ -156,6 +156,12 @@ export interface InteractionStats {
   ldap_count?: number
 }
 
+/** Single day interaction count from GET /interactions/stats/daily */
+export interface DailyStat {
+  date: string
+  count: number
+}
+
 // APIKey types
 export interface APIKey {
   id: string
