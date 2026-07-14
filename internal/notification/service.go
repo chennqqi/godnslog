@@ -14,14 +14,35 @@ import (
 	"github.com/chennqqi/godnslog/models"
 )
 
-// Service handles notification operations
-type Service struct {
-	engine *xorm.Engine
+// Option configures a notification Service.
+type Option func(*Service)
+
+// WithHTTPTimeout sets the HTTP client timeout for outbound notification calls.
+func WithHTTPTimeout(d time.Duration) Option {
+	return func(s *Service) {
+		s.httpClient.Timeout = d
+	}
 }
 
-// NewService creates a new notification service
-func NewService(engine *xorm.Engine) *Service {
-	return &Service{engine: engine}
+// Service handles notification operations
+type Service struct {
+	engine     *xorm.Engine
+	httpClient *http.Client
+}
+
+// NewService creates a new notification service.
+// Default HTTP timeout is 30 seconds; override with WithHTTPTimeout.
+func NewService(engine *xorm.Engine, opts ...Option) *Service {
+	s := &Service{
+		engine: engine,
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // CreateChannel creates a new notification channel

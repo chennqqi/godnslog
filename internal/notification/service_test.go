@@ -2,6 +2,7 @@ package notification
 
 import (
 	"testing"
+	"time"
 
 	"github.com/chennqqi/godnslog/models"
 	_ "modernc.org/sqlite"
@@ -239,4 +240,26 @@ func TestService_ListLogs_ByChannelId(t *testing.T) {
 		t.Fatalf("expected at most 2 logs, got %d", filteredTotal)
 	}
 	_ = filteredLogs
+}
+
+func TestService_HTTPTimeoutOption(t *testing.T) {
+	engine := setupNotificationEngine(t)
+	svc := NewService(engine, WithHTTPTimeout(5*time.Second))
+	if svc.httpClient == nil {
+		t.Fatal("httpClient should be set after WithHTTPTimeout option")
+	}
+	if svc.httpClient.Timeout != 5*time.Second {
+		t.Errorf("expected timeout 5s, got %v", svc.httpClient.Timeout)
+	}
+}
+
+func TestService_DefaultHTTPTimeout(t *testing.T) {
+	engine := setupNotificationEngine(t)
+	svc := NewService(engine)
+	if svc.httpClient == nil {
+		t.Fatal("httpClient should be set by default")
+	}
+	if svc.httpClient.Timeout != 30*time.Second {
+		t.Errorf("expected default timeout 30s, got %v", svc.httpClient.Timeout)
+	}
 }
