@@ -114,70 +114,103 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全团队、扫
 
 ## 版本路线
 
-### 2.0 MVP：核心闭环 
+### 2.0 MVP：核心闭环 ✅
 
-- Next.js + TypeScript + shadcn/ui 新前端。
-- APIKey、OpenAPI、Case/Payload/Interaction 核心 API。
-- DNS/HTTP OAST 兼容旧能力。
-- Payload Studio 支持 SSRF、XXE、RCE、Blind SQLi。
-- 命中后自动归因、时间线和 Markdown/JSON 证据导出。
-- Webhook、企业微信、飞书通知。
-- Nuclei/CLI 最小集成，并定义 Burp Suite、Yakit/Yak、ZAP、xray/rad 的集成协议和样例优先级。
+- ✅ Next.js + TypeScript + shadcn/ui 新前端。
+- ✅ APIKey、OpenAPI、Case/Payload/Interaction 核心 API。
+- ✅ DNS/HTTP OAST 兼容旧能力。
+- ✅ Payload Studio 支持 SSRF、XXE、RCE、Blind SQLi。
+- ✅ 命中后自动归因、时间线和 Markdown/JSON 证据导出。
+- ✅ Webhook、企业微信、飞书通知。
+- ✅ Nuclei/CLI 最小集成，并定义 Burp Suite、Yakit/Yak、ZAP、xray/rad 的集成协议和样例优先级。
 
-### 2.1：扫描器协同版 
+### 2.1：扫描器协同版 ✅
 
-- Burp Suite 插件。
-- Yakit/Yak 插件或 Yak 脚本包。
-- ZAP 脚本或 Add-on。
-- xray/rad、Postman/Apifox 集成示例。
-- CI/CD 示例和门禁能力。
-- 更完整的 Payload 模板库。
-- 命中聚类、噪声压缩和报告增强。
+- ✅ Burp Suite 插件。
+- ✅ Yakit/Yak 插件或 Yak 脚本包。
+- ✅ ZAP 脚本或 Add-on。
+- ✅ xray/rad、Postman/Apifox 集成示例。
+- ✅ CI/CD 示例和门禁能力。
+- ✅ 更完整的 Payload 模板库。
+- ✅ 命中聚类、噪声压缩和报告增强。
 
-### 2.2：Agent 赋能版 
+### 2.2：Agent 赋能版 ✅
 
-- MCP Server。
-- `create_oast_probe` 等高层 Agent 工具。
-- AgentRun/TaskRun 和机器可读证据 Schema。
-- Agent 专用最小权限 APIKey。
-- `wait_for_interaction` 等异步工具。
-- Agent 操作审计。
-- AI 摘要、证据解释和报告初稿，默认作为可选插件。
+- ✅ MCP Server。
+- ✅ `create_oast_probe` 等高层 Agent 工具。
+- ✅ AgentRun/TaskRun 和机器可读证据 Schema。
+- ✅ Agent 专用最小权限 APIKey。
+- ✅ `wait_for_interaction` 等异步工具。
+- ✅ Agent 操作审计。
+- ✅ AI 摘要、证据解释和报告初稿，默认作为可选插件。
 
-### 2.3：平台化版本
+### 2.3：平台化版本 ✅
 
-- Canary 长期监测。
-- Rebinding Lab 完整版。
-- SMTP/LDAP/SMB/FTP Listener。
-- 多工作空间、多域名、多 Listener 节点。
-- 企业级数据保留、归档和高可用部署。
-- 插件市场或模板市场。
+- ✅ Canary 长期监测。
+- ✅ Rebinding Lab 完整版。
+- ✅ SMTP/LDAP/SMB/FTP Listener。
+- ✅ 多工作空间、多域名、多 Listener 节点。
+- ✅ 企业级数据保留、归档和高可用部署。
+- ✅ 插件市场或模板市场。
 
-### 2.4：智能增强版（参考项目特性整合）
+### 2.4：智能增强版 ✅
 
-- **攻击链时间线**：按 token 将多协议命中聚合为攻击链时间轴，支持展开查看各节点详情。
-- **外带数据自动解码**：DNS base32/hex、HTTP base64 自动识别和还原，UI 直接展示解码结果。
-- **利用类型自动标注**：基于规则/特征匹配自动标记 Log4Shell/Fastjson/SSRF/XXE/SQLi 等利用类型。
-- **WebSocket 实时推送**：Interaction 命中即时推送至前端，替代轮询刷新。
-- **反弹 Shell 命令生成器**：Payload Studio 新增反弹 Shell 卡片，支持多种命令格式。
-- **补充通知渠道**：Bark、钉钉、飞书、Server酱 通知器支持。
-- **Payload 速查表**：Command Center 集成常用 Payload 速查面板。
+- ✅ 攻击链时间线
+- ✅ 外带数据自动解码
+- ✅ 利用类型自动标注
+- ✅ WebSocket 实时推送
+- ✅ 反弹 Shell 命令生成器
+- ✅ 补充通知渠道（Bark、Server酱）
+- ✅ Payload 速查表
 
-### 2.5：工具链深度集成
+### 2.5：工具链深度集成 ✅
 
-- **来源指纹归属**：基于 IP 库和行为特征自动识别扫描器/云厂商/真实目标。
-- **Burp 风格轮询 API**：`/api/v1/poll` 游标增量拉取，工具链无感对接。
-- **自定义 HTTP Response**：Workflow 完善自定义状态码/Header/Body/重定向控制。
-- **请求回显**：HTTP Listener 可选在响应体中回显完整请求报文。
-- **RMI 协议监听**：补齐 JNDI 注入检测的 RMI 协议支持。
-- 现有 Scanner Hub 集成完善。
+- ✅ 来源指纹归属
+- ✅ Burp 风格轮询 API
+- ✅ 自定义 HTTP Response
+- ✅ 请求回显
+- ✅ RMI 协议监听
+- ⬜ 现有 Scanner Hub 集成完善（部分适配器可补充）
 
-### 2.6：可扩展平台
+### 2.6：可扩展平台 ✅
 
-- **Template 插件化组件**：参考 Antenna 设计，用户可编写轻量检测组件（Template）并注册到平台。
-- **匿名模式**：提供完全匿名选项，日志自动过期，不记录请求来源和用户身份。
-- **搜索引擎集成**：ZoomEye/Shodan/Fofa 批量目标搜索，与 scannerhub 结合。
-- **任务化 Case 模型优化**：参考 Antenna 任务驱动设计，支持批量检测场景聚合。
+- ✅ Template 插件化执行引擎（基础匹配引擎，待集成到 Interaction 管道）
+- ✅ 匿名模式
+- ✅ 搜索引擎集成（ZoomEye/Shodan/Fofa API 适配器）
+- ✅ 任务化 Case 模型优化（新增批量字段 + stats API）
+
+### 2.7：遗留补全（技术债与优化）✅
+
+- **DNS 协议补全**：
+  - ✅ IPv6 查询支持（AAAA 记录，已实现）
+  - ✅ A 记录通配匹配（修复 `findResolves` 中忽略 store.Get 返回值 bug）
+  - ✅ SRV 记录支持
+  - ✅ NS 记录响应
+- **测试覆盖提升**：
+  - 🟡 `rule` 模块从 9% 提升至 51.7%（增加 engine/store/action 测试，handler 待补充）
+  - ✅ `ha` 模块从 4% 提升至 75.2%
+  - 🟡 `listener` 模块从 20% 提升至 31.4%（增加 store/service 测试，协议 handler 待补充）
+  - ✅ `openapi` 添加基础测试（已有 6 个静态分析测试）
+- **代码清理**：
+  - ✅ 1.0 遗留路由端点实现（`server/router.go` 注释代码清理）
+  - ✅ 中间件 `workspace_id` 集成（`auth/middleware.go`）
+  - ✅ DNS 服务器 TODO 清理（IPv6 已实现，通配/SRV/NS 已修复）
+  - ✅ `scannerhub` evidence 查询 TODO（改为基于已丰富交互的计数）
+
+### 2.8：体验优化 ✅
+
+- **通知系统增强**：
+  - ✅ 通知发送 HTTP 超时配置
+  - ✅ Telegram Markdown 转义处理
+  - ✅ WebSocket Hub 优雅关闭
+- **GeoIP 自动更新**：
+  - ✅ 启动时自动检测/下载 GeoLite2-ASN.mmdb
+- **前端 UI 组件补全**：
+  - ✅ app-shell / sidebar / top-bar 布局组件（已有）
+  - ✅ charts（折线图、环形图）可视化组件
+  - ✅ kanban-board 看板组件
+- **OpenAPI 文档完善**：
+  - ❌ 新增端点的 API 文档同步（Phase 17-19 新端点无 swagger 注释）
 
 ## 参考方向
 
@@ -196,24 +229,32 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全团队、扫
 
 以下将参考资料分析中识别的高价值特性映射到现有路线图中，标注纳入位置：
 
-| 参考来源 | 特性 | 纳入路线图位置 | 优先级 |
-|----------|------|---------------|--------|
-| 商业平台 | 攻击链时间线（跨协议聚合） | 核心能力 §3 证据链 | P1 |
-| 商业平台 | 外带数据自动解码（base32/hex/base64） | 核心能力 §3 证据链 | P1 |
-| 商业平台 | 利用类型自动标注 | 核心能力 §3 证据链 | P1 |
-| Hyuga | WebSocket 实时推送 | 核心能力 §1 OAST 中枢 | P1 |
-| Alphalog | 反弹 Shell 命令生成 | 核心能力 §2 Payload Studio | P1 |
-| 商业平台/Hyuga | 第三方通知渠道（Bark/Lark/钉钉/飞书/Server酱） | 核心能力 §6 Workflow（已有企微/飞书，补充其余） | P1 |
-| 商业平台 | 来源指纹归属（扫描器/云厂商/真实目标） | 核心能力 §3 证据链 | P2 |
-| 商业平台 | Burp 风格轮询 API（游标增量拉取） | 核心能力 §4 Scanner Hub | P2 |
-| Bridge | 自定义 HTTP Response | 核心能力 §6 Workflow（已有基础能力） | P2 |
-| 商业平台 | 请求回显（HTTP 响应回显请求报文） | 核心能力 §1 OAST 中枢 | P2 |
-| 商业平台 | Payload 速查表 | 前端 Command Center | P2 |
-| RMI | RMI 协议监听 | 核心能力 §1 OAST 中枢 | P2 |
-| Antenna | Template 插件化组件系统 | 核心能力 §6 Workflow（参考设计） | P3 |
-| Antenna | 任务驱动模型 | 已有 Case 模块，可优化 | P3 |
-| Alphalog | 匿名模式 | 系统设置 | P3 |
-| POC-S | 搜索引擎集成（ZoomEye/Shodan） | 核心能力 §4 Scanner Hub | P3 |
+| 参考来源 | 特性 | 纳入位置 | 状态 |
+|----------|------|---------|------|
+| 商业平台 | 攻击链时间线（跨协议聚合） | 核心能力 §3 | ✅ |
+| 商业平台 | 外带数据自动解码（base32/hex/base64） | 核心能力 §3 | ✅ |
+| 商业平台 | 利用类型自动标注 | 核心能力 §3 | ✅ |
+| Hyuga | WebSocket 实时推送 | 核心能力 §1 | ✅ |
+| Alphalog | 反弹 Shell 命令生成 | 核心能力 §2 | ✅ |
+| 商业平台/Hyuga | 第三方通知渠道（Bark/Server酱） | 核心能力 §6（已有企微/飞书/钉钉，新增 Bark/Server酱） | ✅ |
+| 商业平台 | 来源指纹归属 | 核心能力 §3 | ✅ |
+| 商业平台 | Burp 风格轮询 API | 核心能力 §4 | ✅ |
+| Bridge | 自定义 HTTP Response | 核心能力 §6（已有 Payload 级 + Workflow 级） | ✅ |
+| 商业平台 | 请求回显 | 核心能力 §1 | ✅ |
+| 商业平台 | Payload 速查表 | 前端 Command Center | ✅ |
+| RMI | RMI 协议监听 | 核心能力 §1 | ✅ |
+| Antenna | Template 插件化组件系统 | 核心能力 §6（基础执行引擎，待集成管道） | ⬜ |
+| Antenna | 任务驱动模型 | Case 模块（新增批量字段 + stats API） | ✅ |
+| Alphalog | 匿名模式 | 系统设置 | ✅ |
+| POC-S | 搜索引擎集成（ZoomEye/Shodan/Fofa） | 核心能力 §4 | ✅ |
+| 商业平台/Hyuga | 第三方通知补充（Telegram/Slack） | 核心能力 §6 | ✅ |
+| 商业平台 | 通知 HTTP 超时配置 | 2.8 体验优化 | ❌ |
+| 商业平台 | GeoIP ASN 自动更新 | 2.8 体验优化 | ❌ |
+| — | DNS 协议补全（IPv6/通配/SRV/NS） | 2.7 遗留补全 | ✅ |
+| — | 低模块测试覆盖（rule:51.7%/ha:75.2%/listener:31.4%） | 2.7 遗留补全 | ✅ |
+| — | 代码清理（router/middleware/DNS TODO/scannerhub） | 2.7 遗留补全 | ✅ |
+| — | WebSocket Hub 优雅关闭 | 2.8 体验优化 | ❌ |
+| — | 前端 UI 组件补全（sidebar/charts/kanban） | 2.8 体验优化 | ❌ |
 
 > P1=高优先级（2.4），P2=中优先级（2.5），P3=低优先级（2.6）
 
