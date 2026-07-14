@@ -87,6 +87,7 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 			interactions.GET("", self.v2ListInteractions)
 			// Register /stats, /timeline, /stream before /:id so paths are not captured as ids.
 			interactions.GET("/stats", self.v2InteractionStats)
+			interactions.GET("/stats/daily", self.v2InteractionDailyStats)
 			interactions.GET("/timeline", self.v2InteractionTimeline)
 			interactions.GET("/stream", self.v2InteractionStream)
 			interactions.POST("/delete", self.v2DeleteInteractions)
@@ -2167,6 +2168,59 @@ func (self *WebServer) v2InteractionStats(c *gin.Context) {
 			"smtp_count": typeCountMap["smtp"],
 			"ldap_count": typeCountMap["ldap"],
 		},
+	})
+}
+
+// v2InteractionDailyStats returns daily interaction counts for the last N days.
+func (self *WebServer) v2InteractionDailyStats(c *gin.Context) {
+	caseId := c.Query("case_id")
+	payloadId := c.Query("payload_id")
+	days := 7
+	if d, err := strconv.Atoi(c.Query("days")); err == nil && d > 0 && d <= 90 {
+		days = d
+	}
+
+	now := time.Now().UTC()
+	start := time.Date(now.Year(), now.Month(), now.Day()-days+1, 0, 0, 0, 0, time.UTC)
+
+	session := self.orm.NewSession()
+	defer session.Close()
+	query := session.Table(new(v2models.Interaction)).Where("timestamp >= ?", start)
+	if caseId != "" {
+		query = query.Where("case_id = ?", caseId)
+	}
+	if payloadId != "" {
+		query = query.Where("payload_id = ?", payloadId)
+	}
+
+	type dailyStat struct {
+		Date  string `xorm:"date" json:"date"`
+		Count int64  `xorm:"count" json:"count"`
+	}
+	var rows []dailyStat
+	if err := query.Select("DATE(timestamp) as date, count(*) as count").
+		GroupBy("DATE(timestamp)").OrderBy("date ASC").Find(&rows); err != nil {
+		logrus.Errorf("[v2_api.go::v2InteractionDailyStats] query error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "server internal error"})
+		return
+	}
+
+	// Fill missing days with zero counts for a continuous chart.
+	countMap := make(map[string]int64, len(rows))
+	for _, r := range rows {
+		countMap[r.Date] = r.Count
+	}
+	result := make([]gin.H, 0, days)
+	for i := 0; i < days; i++ {
+		day := time.Date(now.Year(), now.Month(), now.Day()-days+1+i, 0, 0, 0, 0, time.UTC)
+		dateStr := day.Format("2006-01-02")
+		result = append(result, gin.H{"date": dateStr, "count": countMap[dateStr]})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code": 0,
+		"message": "success",
+		"data": result,
 	})
 }
 
