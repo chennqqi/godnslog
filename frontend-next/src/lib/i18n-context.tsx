@@ -125,6 +125,12 @@ const translations = {
     'cases.description': 'Description',
     'cases.create': 'Create',
     'cases.cancel': 'Cancel',
+    'cases.view_table': 'Table',
+    'cases.view_board': 'Board',
+    'cases.board_active': 'Active',
+    'cases.board_completed': 'Completed',
+    'cases.board_archived': 'Archived',
+    'cases.board_empty': 'No cases',
     'cases.loading': 'Loading cases...',
 
     // Payloads
@@ -563,6 +569,12 @@ const translations = {
     'cases.description': '描述',
     'cases.create': '创建',
     'cases.cancel': '取消',
+    'cases.view_table': '列表',
+    'cases.view_board': '看板',
+    'cases.board_active': '进行中',
+    'cases.board_completed': '已完成',
+    'cases.board_archived': '已归档',
+    'cases.board_empty': '暂无用例',
     'cases.loading': '加载案例中...',
 
     // Payloads

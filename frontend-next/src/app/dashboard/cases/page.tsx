@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCases, useCreateCase } from '@/features/cases/hooks/use-cases'
 import type { CaseCreateRequest } from '@/types'
+import { KanbanBoard } from '@/components/kanban'
+import { LayoutGrid, List } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -37,6 +39,7 @@ export default function CasesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState(STATUS_FILTER_ALL)
+  const [viewMode, setViewMode] = useState<'table' | 'board'>('table')
 
   const { data, isLoading: loading } = useCases({
     page: 1,
@@ -104,9 +107,47 @@ export default function CasesPage() {
               <SelectItem value="archived">{t('cases.archived')}</SelectItem>
             </SelectContent>
           </Select>
+          <div className="flex items-center gap-1 border border-gray-200 dark:border-gray-600 rounded-md p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`flex items-center gap-1 px-2 py-1 text-xs rounded ${
+                viewMode === 'table'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              <List className="w-3.5 h-3.5" />
+              {t('cases.view_table')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('board')}
+              className={`flex items-center gap-1 px-2 py-1 text-xs rounded ${
+                viewMode === 'board'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              {t('cases.view_board')}
+            </button>
+          </div>
         </div>
       </div>
 
+      {viewMode === 'board' ? (
+        <KanbanBoard
+          cases={cases}
+          onCardClick={(id) => router.push(`/dashboard/cases/${id}`)}
+          labels={{
+            active: t('cases.board_active'),
+            completed: t('cases.board_completed'),
+            archived: t('cases.board_archived'),
+            empty: t('cases.board_empty'),
+          }}
+        />
+      ) : (
       <div className="bg-white dark:bg-gray-800 shadow rounded-lg border border-gray-200 dark:border-gray-700">
         <div className="px-4 py-5 sm:p-6">
           {cases.length === 0 ? (
@@ -153,6 +194,7 @@ export default function CasesPage() {
           )}
         </div>
       </div>
+      )}
 
       {/* Create Modal */}
       <Dialog open={showCreateModal} onOpenChange={(open) => {
