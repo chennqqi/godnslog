@@ -53,6 +53,8 @@ func (c *Client) ReadPump() {
 // WritePump writes messages to the WebSocket connection.
 // Runs in its own goroutine. Handles ping frames.
 func (c *Client) WritePump() {
+	c.hub.wg.Add(1)
+	defer c.hub.wg.Done()
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
