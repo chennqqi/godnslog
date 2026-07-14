@@ -23,9 +23,9 @@ var (
 // Service provides interaction management services
 type Service struct {
 	engine        *xorm.Engine
-	wsHub         *websocket.Hub // WebSocket hub for real-time push, nil to disable
+	wsHub         *websocket.Hub             // WebSocket hub for real-time push, nil to disable
 	fingerprinter *fingerprint.Fingerprinter // source fingerprint, nil to disable
-	anonymousMode bool // when true, mask source IP for privacy
+	anonymousMode bool                       // when true, mask source IP for privacy
 }
 
 // NewService creates a new interaction service
@@ -376,9 +376,21 @@ func enhanceInteraction(interaction *models.Interaction, fp *fingerprint.Fingerp
 			ua = *interaction.UserAgent
 		}
 		result := fp.Lookup(interaction.SourceIP, ua)
-		if result != nil && result.SourceType != fingerprint.SourceUnknown {
-			interaction.SourceType = &result.SourceType
-			interaction.SourceName = &result.SourceName
+		if result != nil {
+			if result.SourceType != fingerprint.SourceUnknown {
+				interaction.SourceType = &result.SourceType
+				interaction.SourceName = &result.SourceName
+			}
+			// Persist GeoIP enrichment regardless of source classification.
+			if result.ASN > 0 {
+				interaction.ASN = &result.ASN
+			}
+			if result.Org != "" {
+				interaction.Org = &result.Org
+			}
+			if result.Country != "" {
+				interaction.Country = &result.Country
+			}
 		}
 	}
 }
