@@ -29,6 +29,9 @@ type servePwCmd struct {
 	httpListen string
 	upstream   string
 	redisAddr  string
+
+	geoipMMDBPath    string
+	geoipLicenseKey string
 }
 
 func (*servePwCmd) Name() string     { return "serve" }
@@ -42,7 +45,7 @@ func (*servePwCmd) Usage() string {
 func (p *servePwCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&p.domain, "domain", "example.com", "set domain, required")
 	f.StringVar(&p.ipv4, "4", "", "set public IPv4, required")
-	//flag.StringVar(&ipv6, "6", "", "set ipv6 publicIP, option")	// not support IPv6 now
+	f.StringVar(&p.ipv6, "6", "", "set ipv6 publicIP, option")
 
 	//https://github.com/mattn/go-sqlite3/issues/39
 	f.StringVar(&p.dsn, "dsn", "file:godnslog.db?cache=shared&mode=rwc", "set database source name, option")
@@ -56,6 +59,8 @@ func (p *servePwCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&p.defaultLanguage, "lang", DefaultLanguage, "set default language, [en-US/zh-CN], option")
 	f.StringVar(&p.httpListen, "http", ":8080", "set http listen, option")
 	f.StringVar(&p.redisAddr, "redis", "", "set Redis address for HA session sharing, option")
+	f.StringVar(&p.geoipMMDBPath, "geoip-mmdb", os.Getenv("MMDB_PATH"), "path to GeoLite2-ASN.mmdb for source ASN enrichment (optional); auto-downloads if -geoip-license-key is set")
+	f.StringVar(&p.geoipLicenseKey, "geoip-license-key", os.Getenv("MMDB_LICENSE_KEY"), "MaxMind license key for auto-downloading GeoLite2-ASN.mmdb; sign up free at https://www.maxmind.com/en/geolite2/signup")
 }
 
 func (p *servePwCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
@@ -91,6 +96,8 @@ func (p *servePwCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 		DefaultMaxCallbackErrorCount: DefaultMaxCallbackErrorCount,
 		DefaultLanguage:              DefaultLanguage,
 		RedisAddr:                    p.redisAddr,
+			GeoIPMMDBPath:                p.geoipMMDBPath,
+			GeoIPLicenseKey:              p.geoipLicenseKey,
 	}, store)
 	if err != nil {
 		logrus.Fatalf("[main.go::main] NewWebServer: %v", err)
