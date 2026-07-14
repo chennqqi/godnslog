@@ -1,6 +1,8 @@
 package notification
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -24,6 +26,38 @@ func setupNotificationEngine(t *testing.T) *xorm.Engine {
 		t.Fatalf("Failed to sync tables: %v", err)
 	}
 	return engine
+}
+
+func TestService_SendWebhook_RespectsTimeout(t *testing.T) {
+	engine := setupNotificationEngine(t)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(2 * time.Second)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	svc := NewService(engine, WithHTTPTimeout(200*time.Millisecond))
+
+	channel := &models.TblNotificationChannel{
+		Name: "slow-webhook", Type: "webhook",
+		Config: `{"url":"` + srv.URL + `"}`,
+		Enabled: true, CreatedBy: 1, CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	if _, err := engine.Insert(channel); err != nil {
+		t.Fatalf("insert channel: %v", err)
+	}
+
+	start := time.Now()
+	err := svc.SendNotification(channel.Id, "alert", "test", "payload")
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected timeout error, got nil")
+	}
+	if elapsed > 1*time.Second {
+		t.Errorf("expected to fail within ~200ms, took %v", elapsed)
+	}
 }
 
 func TestService_CreateChannel(t *testing.T) {

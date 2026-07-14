@@ -190,7 +190,7 @@ func (s *Service) sendWebhook(config, message, payload string) error {
 	}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, err := http.Post(webhookConfig.URL, "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := s.httpClient.Post(webhookConfig.URL, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return err
 	}
@@ -220,7 +220,7 @@ func (s *Service) sendWechat(config, message, payload string) error {
 	}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, err := http.Post(wechatConfig.WebhookURL, "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := s.httpClient.Post(wechatConfig.WebhookURL, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return err
 	}
@@ -250,7 +250,7 @@ func (s *Service) sendFeishu(config, message, payload string) error {
 	}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, err := http.Post(feishuConfig.WebhookURL, "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := s.httpClient.Post(feishuConfig.WebhookURL, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return err
 	}
@@ -281,7 +281,7 @@ func (s *Service) sendDingtalk(config, message, payload string) error {
 	}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, err := http.Post(dingtalkConfig.WebhookURL, "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := s.httpClient.Post(dingtalkConfig.WebhookURL, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return err
 	}
@@ -314,7 +314,7 @@ func (s *Service) sendBark(config, message, payload string) error {
 	}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, err := http.Post(cfg.URL, "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := s.httpClient.Post(cfg.URL, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return err
 	}
@@ -343,7 +343,7 @@ func (s *Service) sendServerchan(config, message, payload string) error {
 		"desp":  {payload},
 	}
 
-	resp, err := http.PostForm(u, formData)
+	resp, err := s.httpClient.PostForm(u, formData)
 	if err != nil {
 		return err
 	}
@@ -376,7 +376,7 @@ func (s *Service) sendTelegram(config, message, payload string) error {
 	}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, err := http.Post(u, "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := s.httpClient.Post(u, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return err
 	}
@@ -418,7 +418,7 @@ func (s *Service) sendSlack(config, message, payload string) error {
 	}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, err := http.Post(cfg.WebhookURL, "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := s.httpClient.Post(cfg.WebhookURL, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return err
 	}
