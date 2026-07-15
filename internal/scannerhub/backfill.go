@@ -30,6 +30,10 @@ func (s *Service) BackfillResults(req *BackfillResultsRequest) (*BackfillResult,
 		findings, err = parseNucleiJSONL(req.RawResults)
 	case "sarif":
 		findings, err = parseSARIF(req.RawResults)
+	case "burp-json":
+		findings, err = parseBurpJSON(req.RawResults)
+	case "xray-json":
+		findings, err = parseXrayJSON(req.RawResults)
 	default:
 		return nil, fmt.Errorf("unsupported results format: %s", req.Format)
 	}
@@ -342,4 +346,85 @@ func severityToSARIFLevel(severity string) string {
 	default:
 		return "none"
 	}
+}
+
+// parseBurpJSON parses Burp Suite issue JSON export into findings.
+func parseBurpJSON(raw string) ([]ScanFinding, error) {
+	var doc struct {
+		Issues []struct {
+			Name       string `json:"name"`
+			Severity   string `json:"severity"`
+			Confidence string `json:"confidence"`
+			Host       string `json:"host"`
+			Path       string `json:"path"`
+		} `json:"issues"`
+	}
+	if err := json.Unmarshal([]byte(raw), &doc); err != nil {
+		return nil, fmt.Errorf("failed to parse Burp JSON: %w", err)
+	}
+	var findings []ScanFinding
+	for _, issue := range doc.Issues {
+		if issue.Name == "" {
+			continue
+		}
+		url := issue.Host + issue.Path
+		findings = append(findings, ScanFinding{
+			ID:       fmt.Sprintf("burp-%d", len(findings)+1),
+			RuleID:   issue.Name,
+			Name:     issue.Name,
+			Severity: burpSeverityToStandard(issue.Severity),
+			URL:      url,
+		})
+	}
+	return findings, nil
+}
+
+// burpSeverityToStandard converts Burp severity to standard severity string.
+func burpSeverityToStandard(severity string) string {
+	switch strings.ToLower(severity) {
+	case "high", "medium", "low", "info":
+		return severity
+	case "certain", "firm":
+		return "medium"
+	default:
+		return "info"
+	}
+}
+
+// parseXrayJSON parses xray JSON output into findings.
+func parseXrayJSON(raw string) ([]ScanFinding, error) {
+	var results []struct {
+		VulnID   string `json:"vuln_id"`
+		Plugin   string `json:"plugin"`
+		Severity string `json:"severity"`
+		URL      string `json:"url"`
+		Payload  string `json:"payload"`
+		Detail   string `json:"detail"`
+	}
+	if err := json.Unmarshal([]byte(raw), &results); err != nil {
+		return nil, fmt.Errorf("failed to parse xray JSON: %w", err)
+	}
+	var findings []ScanFinding
+	for _, r := range results {
+		if r.VulnID == "" && r.Plugin == "" {
+			continue
+		}
+		ruleID := r.VulnID
+		if ruleID == "" {
+			ruleID = r.Plugin
+		}
+		desc := r.Detail
+		if desc == "" && r.Payload != "" {
+			desc = "Payload: " + r.Payload
+		}
+		findings = append(findings, ScanFinding{
+			ID:          fmt.Sprintf("xray-%d", len(findings)+1),
+			RuleID:      ruleID,
+			Name:        r.Plugin,
+			Severity:    r.Severity,
+			URL:         r.URL,
+			Description: desc,
+		})
+	}
+	return findings, nil
 }
