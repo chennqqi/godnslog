@@ -26,8 +26,9 @@ func (f *fofa) Search(query string, page int) (*SearchResult, error) {
 	}
 	defer resp.Body.Close()
 	var apiResp struct {
-		Error   bool          `json:"error"`
-		Results []interface{} `json:"results"`
+		Error   bool            `json:"error"`
+		Total   int             `json:"size"` // Fofa returns total count in "size" field
+		Results []interface{}   `json:"results"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
 		return nil, err
@@ -35,7 +36,7 @@ func (f *fofa) Search(query string, page int) (*SearchResult, error) {
 	if apiResp.Error {
 		return nil, fmt.Errorf("fofa API error")
 	}
-	result := &SearchResult{}
+	result := &SearchResult{Total: apiResp.Total}
 	// Fofa returns: [ip, port, protocol, hostname, country, title, ...]
 	for _, row := range apiResp.Results {
 		if cols, ok := row.([]interface{}); ok && len(cols) >= 2 {
@@ -46,9 +47,28 @@ func (f *fofa) Search(query string, page int) (*SearchResult, error) {
 			if port, ok := cols[1].(float64); ok {
 				item.Port = int(port)
 			}
+			if len(cols) > 2 {
+				if protocol, ok := cols[2].(string); ok {
+					item.Protocol = protocol
+				}
+			}
+			if len(cols) > 3 {
+				if hostname, ok := cols[3].(string); ok {
+					item.Hostname = hostname
+				}
+			}
+			if len(cols) > 4 {
+				if country, ok := cols[4].(string); ok {
+					item.Country = country
+				}
+			}
+			if len(cols) > 5 {
+				if title, ok := cols[5].(string); ok {
+					item.Title = title
+				}
+			}
 			result.Results = append(result.Results, item)
 		}
 	}
-	result.Total = len(result.Results)
 	return result, nil
 }
