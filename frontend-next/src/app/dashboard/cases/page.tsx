@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useCases, useCreateCase } from '@/features/cases/hooks/use-cases'
 import type { CaseCreateRequest } from '@/types'
 import { KanbanBoard } from '@/components/kanban'
@@ -33,13 +33,15 @@ import { useI18n } from '@/lib/i18n-context'
 /** Sentinel for Radix Select: empty string is reserved for clearing selection */
 const STATUS_FILTER_ALL = 'all'
 
-export default function CasesPage() {
+function CasesPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { t } = useI18n()
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState(STATUS_FILTER_ALL)
-  const [viewMode, setViewMode] = useState<'table' | 'board'>('table')
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') ?? '')
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') ?? STATUS_FILTER_ALL)
+  const [viewMode, setViewMode] = useState<'table' | 'board'>((searchParams.get('view') as 'table' | 'board') ?? 'table')
+  const [error, setError] = useState('')
 
   const { data, isLoading: loading } = useCases({
     page: 1,
@@ -49,6 +51,16 @@ export default function CasesPage() {
   })
   const createCase = useCreateCase()
   const cases = data?.data?.items ?? []
+
+  // Sync filters to URL
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (searchTerm) params.set('search', searchTerm)
+    if (statusFilter !== STATUS_FILTER_ALL) params.set('status', statusFilter)
+    if (viewMode !== 'table') params.set('view', viewMode)
+    const qs = params.toString()
+    router.replace(`/dashboard/cases${qs ? `?${qs}` : ''}`, { scroll: false })
+  }, [searchTerm, statusFilter, viewMode, router])
 
   const form = useForm<CaseFormValues>({
     resolver: zodResolver(caseSchema),
@@ -63,11 +75,13 @@ export default function CasesPage() {
 
   const handleCreateCase = async (values: CaseFormValues) => {
     try {
+      setError('')
       await createCase.mutateAsync(values as CaseCreateRequest)
       setShowCreateModal(false)
       form.reset()
     } catch (error) {
       console.error('Failed to create case:', error)
+      setError(t('cases.create_failed'))
     }
   }
 
@@ -86,6 +100,15 @@ export default function CasesPage() {
           {t('cases.new')}
         </Button>
       </div>
+
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4 flex items-start gap-3">
+          <svg className="w-5 h-5 text-red-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+        </div>
+      )}
 
       {/* Search and Filter */}
       <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 border border-gray-200 dark:border-gray-700">
@@ -244,5 +267,13 @@ export default function CasesPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function CasesPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12 text-gray-500">Loading...</div>}>
+      <CasesPageContent />
+    </Suspense>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { agentRunApi } from '@/lib/api-client'
 import { LoadingState } from '@/components/loading-state'
 import type { AgentRunDetail, AgentRunReviewQueueItem, ReviewState, EvidenceStrength, AgentRunStatus } from '@/types'
@@ -23,15 +23,16 @@ type ViewMode = 'all' | 'review-queue'
 
 export default function AgentRunsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { t } = useI18n()
-  const [viewMode, setViewMode] = useState<ViewMode>('all')
+  const [viewMode, setViewMode] = useState<ViewMode>((searchParams.get('view') as ViewMode) ?? 'all')
   const [agentRuns, setAgentRuns] = useState<AgentRunDetail[]>([])
   const [reviewQueue, setReviewQueue] = useState<AgentRunReviewQueueItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [filterAgentId, setFilterAgentId] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
-  const [filterReviewState, setFilterReviewState] = useState<ReviewState | ''>('')
-  const [filterEvidenceStrength, setFilterEvidenceStrength] = useState<EvidenceStrength | ''>('')
+  const [filterAgentId, setFilterAgentId] = useState(searchParams.get('agent_id') ?? '')
+  const [filterStatus, setFilterStatus] = useState(searchParams.get('status') ?? '')
+  const [filterReviewState, setFilterReviewState] = useState<ReviewState | ''>((searchParams.get('review_state') as ReviewState) ?? '')
+  const [filterEvidenceStrength, setFilterEvidenceStrength] = useState<EvidenceStrength | ''>((searchParams.get('evidence_strength') as EvidenceStrength) ?? '')
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [reviewSummary, setReviewSummary] = useState({
@@ -42,6 +43,19 @@ export default function AgentRunsPage() {
     needs_attention: 0,
   })
   const [pageSize] = useState(20)
+  const [error, setError] = useState('')
+
+  // Sync filters to URL
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (viewMode !== 'all') params.set('view', viewMode)
+    if (filterAgentId) params.set('agent_id', filterAgentId)
+    if (filterStatus) params.set('status', filterStatus)
+    if (filterReviewState) params.set('review_state', filterReviewState)
+    if (filterEvidenceStrength) params.set('evidence_strength', filterEvidenceStrength)
+    const qs = params.toString()
+    router.replace(`/dashboard/agent-runs${qs ? `?${qs}` : ''}`, { scroll: false })
+  }, [viewMode, filterAgentId, filterStatus, filterReviewState, filterEvidenceStrength, router])
 
   const loadAgentRuns = useCallback(async () => {
     setLoading(true)
@@ -58,6 +72,7 @@ export default function AgentRunsPage() {
       }
     } catch (error) {
       console.error('Failed to load agent runs:', error)
+      setError('Failed to load agent runs')
     } finally {
       setLoading(false)
     }
@@ -225,6 +240,15 @@ export default function AgentRunsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4 flex items-start gap-3 mb-6">
+          <svg className="w-5 h-5 text-red-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+        </div>
+      )}
 
       {viewMode === 'review-queue' && (
         <Card className="mb-6">

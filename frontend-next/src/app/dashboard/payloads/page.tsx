@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { usePayloads, useCreatePayload } from '@/features/payloads/hooks/use-payloads'
 import { payloadApi } from '@/lib/api-client'
 import { LoadingState } from '@/components/loading-state'
@@ -35,16 +35,26 @@ const templates = [
 
 export default function PayloadsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { data, isLoading: loading } = usePayloads({ page: 1, page_size: 100 })
   const createPayload = useCreatePayload()
   const payloads = data?.data?.items ?? []
-  const [filter, setFilter] = useState('')
+  const [filter, setFilter] = useState(searchParams.get('filter') ?? '')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showBatchModal, setShowBatchModal] = useState(false)
   const [previewPayload, setPreviewPayload] = useState('')
   const [selectedTemplate, setSelectedTemplate] = useState(templates[0])
   const [variables, setVariables] = useState<Record<string, string>>({})
   const [batchCount, setBatchCount] = useState(1)
+  const [error, setError] = useState('')
+
+  // Sync filter to URL
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (filter) params.set('filter', filter)
+    const qs = params.toString()
+    router.replace(`/dashboard/payloads${qs ? `?${qs}` : ''}`, { scroll: false })
+  }, [filter, router])
 
   const updatePreview = useCallback(() => {
     let preview = selectedTemplate.template
@@ -67,11 +77,13 @@ export default function PayloadsPage() {
       variables,
     }
     try {
+      setError('')
       await createPayload.mutateAsync(req)
       setShowCreateModal(false)
       setVariables({})
     } catch (error) {
       console.error('Failed to create payload:', error)
+      setError('Failed to create payload')
     }
   }
 
@@ -100,10 +112,6 @@ export default function PayloadsPage() {
     p.template.toLowerCase().includes(filter.toLowerCase())
   )
 
-  if (loading) {
-    return <LoadingState />
-  }
-
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -125,6 +133,19 @@ export default function PayloadsPage() {
           onChange={(e) => setFilter(e.target.value)}
         />
       </div>
+
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4 flex items-start gap-3 mb-4">
+          <svg className="w-5 h-5 text-red-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+        </div>
+      )}
+
+      {loading ? (
+        <LoadingState />
+      ) : (
 
       <div className="bg-white dark:bg-gray-800 shadow rounded-lg border border-gray-200 dark:border-gray-700">
         <div className="px-4 py-5 sm:p-6">
@@ -196,6 +217,7 @@ export default function PayloadsPage() {
           )}
         </div>
       </div>
+      )}
 
       {/* Create Modal */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
