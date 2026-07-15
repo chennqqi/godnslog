@@ -588,15 +588,11 @@ func (self *WebServer) userList(c *gin.Context) {
 }
 
 // @Summary userNav
-// @Description get Dns Record by user query
+// @Description get navigation links for current user
 // @Accept  json
 // @Produce  json
-// @Param   some_id     path    int     true        "Some ID"
 // @Success 200 {string} string	"ok"
-// @Failure 400 {object} CR "We need ID!!"
-// @Failure 404 {object} CR "Can not find ID"
-// @Failure 401 {object} CR "Can not find ID"
-// @Router /user/nav [get]
+// @Router /auth/nav [get]
 func (self *WebServer) userNav(c *gin.Context) {
 }
 
@@ -604,16 +600,14 @@ func (self *WebServer) userNav(c *gin.Context) {
 //							user manage
 //==============================================================================
 
-// @Summary userNav
-// @Description get Dns Record by user query
+// @Summary delUser
+// @Description delete user by id
 // @Accept  json
 // @Produce  json
-// @Param   some_id     path    int     true        "Some ID"
-// @Success 200 {string} string	"ok"
-// @Failure 400 {object} CR "We need ID!!"
-// @Failure 404 {object} CR "Can not find ID"
-// @Failure 401 {object} CR "Can not find ID"
-// @Router /user/nav [get]
+// @Param   ids     body    []int     true        "User IDs to delete"
+// @Success 200 {object} CR	"OK"
+// @Failure 400 {object} CR "Bad request"
+// @Router /admin/user [delete]
 func (self *WebServer) delUser(c *gin.Context) {
 	T := getTranslateFunc(c)
 
@@ -672,12 +666,12 @@ func (self *WebServer) delUser(c *gin.Context) {
 // @Description add a new User
 // @Accept  json
 // @Produce  json
-// @Param   some_id     path    int     true        "Some ID"
+// @Param   body     body    UserRequest     true        "User data"
 // @Success 200 {string} CR	"OK"
 // @Failure 502 {object} CR "BadService"
 // @Failure 403 {object} CR "Forbidden"
 // @Failure 401 {object} CR "Unauthorized"
-// @Router /user/logout [post]
+// @Router /admin/user [put]
 func (self *WebServer) addUser(c *gin.Context) {
 	T := getTranslateFunc(c)
 
@@ -1064,12 +1058,16 @@ func (self *WebServer) setSecuritySetting(c *gin.Context) {
 // @Description get Dns Record by user query
 // @Accept  json
 // @Produce  json
-// @Param   some_id     path    int     true        "Some ID"
+// @Param   ip     query    string     false        "IP address filter"
+// @Param   domain  query    string     false        "Domain filter"
+// @Param   date    query    string     false        "Date filter (RFC3339)"
+// @Param   pageNo  query    int        false        "Page number (default 1)"
+// @Param   pageSize query   int        false        "Page size (default 10)"
 // @Success 200 {string} string	"ok"
 // @Failure 400 {object} CR "We need ID!!"
 // @Failure 404 {object} CR "Can not find ID"
 // @Failure 401 {object} CR "Can not find ID"
-// @Router /testapi/get-string-by-int/{some_id} [get]
+// @Router /record/dns [get]
 func (self *WebServer) getDnsRecord(c *gin.Context) {
 	T := getTranslateFunc(c)
 	ip, ipExist := c.GetQuery("ip")
@@ -1149,11 +1147,10 @@ func (self *WebServer) getDnsRecord(c *gin.Context) {
 // @Description del Dns Record by query ids
 // @Accept  json
 // @Produce  json
-// @Param   some_id     path    int     true        "Some ID"
+// @Param   ids     body    []int     true        "Record IDs to delete"
 // @Success 200 {string} string	"ok"
 // @Failure 400 {object} CR "We need ID!!"
-// @Failure 404 {object} CR "Can not find ID"
-// @Router /testapi/get-string-by-int/{some_id} [get]
+// @Router /record/dns [delete]
 func (self *WebServer) delDnsRecord(c *gin.Context) {
 	T := getTranslateFunc(c)
 	var req DeleteRecordRequest

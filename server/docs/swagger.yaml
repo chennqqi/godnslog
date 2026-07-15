@@ -1,21 +1,1120 @@
-basePath: /
 definitions:
+  canary.Canary:
+    properties:
+      context:
+        description: Encoded context (project, asset, location, owner)
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      is_enabled:
+        type: boolean
+      token:
+        type: string
+      type:
+        description: dns, http, document, config, ci, storage, email
+        type: string
+      updated_at:
+        type: string
+    type: object
+  canary.CanaryHit:
+    properties:
+      body:
+        type: string
+      canary_id:
+        type: string
+      headers:
+        description: JSON string
+        type: string
+      id:
+        type: string
+      is_compressed:
+        type: boolean
+      source_ip:
+        type: string
+      timestamp:
+        type: string
+      user_agent:
+        type: string
+    type: object
+  canary.CanaryStats:
+    properties:
+      canary_id:
+        type: string
+      first_hit:
+        type: string
+      last_hit:
+        type: string
+      risk_level:
+        type: string
+      total_hits:
+        type: integer
+      unique_ips:
+        type: integer
+    type: object
+  canary.CreateCanaryRequest:
+    properties:
+      context:
+        type: string
+      description:
+        type: string
+      expires_in:
+        description: e.g., "90d"
+        type: string
+      token:
+        type: string
+      type:
+        type: string
+    required:
+    - token
+    - type
+    type: object
+  canary.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+    type: object
+  canary.UpdateCanaryRequest:
+    properties:
+      description:
+        type: string
+      is_enabled:
+        type: boolean
+    type: object
+  clustering.Cluster:
+    properties:
+      count:
+        type: integer
+      first_seen:
+        type: string
+      id:
+        type: string
+      interactions:
+        items:
+          $ref: '#/definitions/interaction.Interaction'
+        type: array
+      is_noise:
+        type: boolean
+      last_seen:
+        type: string
+      noise_reason:
+        type: string
+      pattern:
+        description: Common pattern (e.g., domain, path)
+        type: string
+      source_ip:
+        type: string
+      token:
+        type: string
+      type:
+        description: dns, http, etc.
+        type: string
+    type: object
+  clustering.ClusterRequest:
+    properties:
+      interactions:
+        items:
+          $ref: '#/definitions/interaction.Interaction'
+        type: array
+    type: object
+  clustering.ClusterResponse:
+    properties:
+      clusters:
+        items:
+          $ref: '#/definitions/clustering.Cluster'
+        type: array
+      noise_count:
+        type: integer
+      total_count:
+        type: integer
+    type: object
+  clustering.ClusteringConfig:
+    properties:
+      max_cluster_size:
+        description: Max interactions per cluster
+        type: integer
+      noise_patterns:
+        description: Known noise patterns
+        items:
+          $ref: '#/definitions/clustering.NoisePattern'
+        type: array
+      noise_threshold:
+        description: Count threshold for noise detection
+        type: integer
+      time_window:
+        description: Time window for clustering (e.g., "5m", "1h")
+        type: string
+    type: object
+  clustering.CompressRequest:
+    properties:
+      interactions:
+        items:
+          $ref: '#/definitions/interaction.Interaction'
+        type: array
+    type: object
+  clustering.CompressionConfig:
+    properties:
+      compress_headers:
+        description: Compress header data
+        type: boolean
+      keep_first_n:
+        description: Keep first N interactions per cluster
+        type: integer
+      max_raw_data_length:
+        description: Max length for raw data
+        type: integer
+      remove_duplicates:
+        description: Remove duplicate interactions
+        type: boolean
+    type: object
+  clustering.ConfigResponse:
+    properties:
+      clustering:
+        $ref: '#/definitions/clustering.ClusteringConfig'
+      compression:
+        $ref: '#/definitions/clustering.CompressionConfig'
+    type: object
+  clustering.NoisePattern:
+    properties:
+      description:
+        type: string
+      pattern:
+        description: Regex pattern
+        type: string
+      type:
+        description: dns, http
+        type: string
+    type: object
+  clustering.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+    type: object
+  gin.H:
+    additionalProperties: {}
+    type: object
+  interaction.Headers:
+    additionalProperties:
+      type: string
+    type: object
+  interaction.Interaction:
+    properties:
+      body:
+        type: string
+      case_id:
+        type: string
+      content_type:
+        type: string
+      created_at:
+        type: string
+      dns_type:
+        type: string
+      domain:
+        description: DNS specific fields
+        type: string
+      headers:
+        $ref: '#/definitions/interaction.Headers'
+      id:
+        type: string
+      method:
+        description: HTTP specific fields
+        type: string
+      path:
+        type: string
+      payload_id:
+        type: string
+      raw_data:
+        description: Common fields
+        type: string
+      source_ip:
+        type: string
+      timestamp:
+        type: string
+      token:
+        type: string
+      type:
+        description: dns, http, smtp, ldap, smb, ftp
+        type: string
+      user_agent:
+        type: string
+    type: object
+  listener.CreateListenerRequest:
+    properties:
+      host:
+        type: string
+      is_enabled:
+        type: boolean
+      port:
+        type: integer
+      protocol:
+        $ref: '#/definitions/listener.Protocol'
+      token:
+        type: string
+    required:
+    - host
+    - port
+    - protocol
+    - token
+    type: object
+  listener.FTPCommand:
+    properties:
+      argument:
+        type: string
+      command:
+        description: FTP command
+        type: string
+      data:
+        description: For STOR/APPE commands
+        type: string
+      id:
+        type: string
+      listener_id:
+        type: string
+      source_ip:
+        type: string
+      source_port:
+        type: integer
+      timestamp:
+        type: string
+      username:
+        type: string
+    type: object
+  listener.LDAPQuery:
+    properties:
+      attributes:
+        description: JSON string
+        type: string
+      base_dn:
+        type: string
+      bind_dn:
+        type: string
+      filter:
+        type: string
+      id:
+        type: string
+      listener_id:
+        type: string
+      source_ip:
+        type: string
+      timestamp:
+        type: string
+    type: object
+  listener.Listener:
+    properties:
+      created_at:
+        type: string
+      host:
+        type: string
+      id:
+        type: string
+      is_enabled:
+        type: boolean
+      port:
+        type: integer
+      protocol:
+        $ref: '#/definitions/models.Protocol'
+      token:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  listener.ListenerConfig:
+    properties:
+      allow_private_ips:
+        description: |-
+          AllowPrivateIPs allows connections from RFC 1918 private IP ranges.
+          Default false — private IP connections are rejected.
+        type: boolean
+      buffer_size:
+        type: integer
+      enable_tls:
+        type: boolean
+      max_concurrent_connections:
+        description: |-
+          MaxConcurrentConnections is the max simultaneous connections across all IPs.
+          0 means use MaxConnections as fallback.
+        type: integer
+      max_connections:
+        type: integer
+      rate_limit_max:
+        description: |-
+          RateLimitMax is the max connections per IP within the rate limit window.
+          0 means use MaxConnections as fallback. Default is high to avoid false negatives.
+        type: integer
+      timeout:
+        $ref: '#/definitions/time.Duration'
+      tls_cert_file:
+        type: string
+      tls_key_file:
+        type: string
+      whitelist_cidrs:
+        description: |-
+          WhitelistCIDRs is a list of CIDR ranges that bypass rate and connection limits.
+          e.g. ["10.0.0.0/8", "192.168.0.0/16"]
+        items:
+          type: string
+        type: array
+    type: object
+  listener.ListenerInteraction:
+    properties:
+      data:
+        type: string
+      id:
+        type: string
+      listener_id:
+        type: string
+      metadata:
+        $ref: '#/definitions/models.Metadata'
+      protocol:
+        $ref: '#/definitions/models.Protocol'
+      source_ip:
+        type: string
+      source_port:
+        type: integer
+      timestamp:
+        type: string
+    type: object
+  listener.Protocol:
+    enum:
+    - smtp
+    - ldap
+    - smb
+    - ftp
+    - rmi
+    - smtp
+    - ldap
+    - smb
+    - ftp
+    - rmi
+    type: string
+    x-enum-varnames:
+    - ProtocolSMTP
+    - ProtocolLDAP
+    - ProtocolSMB
+    - ProtocolFTP
+    - ProtocolRMI
+  listener.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+    type: object
+  listener.SMBRequest:
+    properties:
+      command:
+        description: SMB command
+        type: string
+      data:
+        description: JSON string
+        type: string
+      file_path:
+        type: string
+      id:
+        type: string
+      listener_id:
+        type: string
+      share_name:
+        type: string
+      source_ip:
+        type: string
+      source_port:
+        type: integer
+      timestamp:
+        type: string
+      username:
+        type: string
+    type: object
+  listener.SMTPMessage:
+    properties:
+      body:
+        type: string
+      from:
+        type: string
+      headers:
+        description: JSON string
+        type: string
+      id:
+        type: string
+      listener_id:
+        type: string
+      source_ip:
+        type: string
+      subject:
+        type: string
+      timestamp:
+        type: string
+      to:
+        description: JSON array
+        type: string
+    type: object
+  listener.UpdateListenerRequest:
+    properties:
+      is_enabled:
+        type: boolean
+    type: object
+  models.Metadata:
+    additionalProperties:
+      type: string
+    type: object
+  models.Protocol:
+    enum:
+    - smtp
+    - ldap
+    - smb
+    - ftp
+    - rmi
+    - smtp
+    - ldap
+    - smb
+    - ftp
+    - rmi
+    type: string
+    x-enum-varnames:
+    - ProtocolSMTP
+    - ProtocolLDAP
+    - ProtocolSMB
+    - ProtocolFTP
+    - ProtocolRMI
+  models.Stage:
+    properties:
+      condition:
+        description: Condition to trigger this stage
+        type: string
+      description:
+        type: string
+      hit_count:
+        description: Number of hits for this stage
+        type: integer
+      max_hits:
+        description: Maximum hits before moving to next stage
+        type: integer
+      order:
+        type: integer
+      target_ip:
+        type: string
+      ttl:
+        description: Time to live in seconds
+        type: integer
+    type: object
+  rebinding.CreateRuleRequest:
+    properties:
+      domain:
+        type: string
+      is_enabled:
+        type: boolean
+      stages:
+        items:
+          $ref: '#/definitions/rebinding.Stage'
+        type: array
+    required:
+    - domain
+    - stages
+    type: object
+  rebinding.CreateScenarioRequest:
+    properties:
+      domain:
+        type: string
+      scenario:
+        $ref: '#/definitions/rebinding.RebindingScenario'
+    required:
+    - domain
+    - scenario
+    type: object
+  rebinding.RebindingConfig:
+    properties:
+      audit_c2:
+        description: Audit all C2 operations
+        type: boolean
+      default_ttl:
+        description: Default TTL in seconds
+        type: integer
+      enable_c2:
+        description: Enable DNS C2 (disabled by default)
+        type: boolean
+      max_stages:
+        description: Maximum number of stages
+        type: integer
+      require_auth:
+        description: Require authentication for C2
+        type: boolean
+    type: object
+  rebinding.RebindingRule:
+    properties:
+      created_at:
+        type: string
+      domain:
+        type: string
+      id:
+        type: string
+      is_enabled:
+        type: boolean
+      stages:
+        items:
+          $ref: '#/definitions/models.Stage'
+        type: array
+      updated_at:
+        type: string
+    type: object
+  rebinding.RebindingScenario:
+    enum:
+    - browser-rebinding
+    - cloud-metadata
+    - internal-management
+    - iot-device
+    - router-exploit
+    - browser-rebinding
+    - cloud-metadata
+    - internal-management
+    - iot-device
+    - router-exploit
+    type: string
+    x-enum-varnames:
+    - ScenarioBrowserRebinding
+    - ScenarioCloudMetadata
+    - ScenarioInternalManagement
+    - ScenarioIoTDevice
+    - ScenarioRouterExploit
+  rebinding.RebindingSession:
+    properties:
+      current_stage:
+        type: integer
+      hit_count:
+        type: integer
+      id:
+        type: string
+      last_hit:
+        type: string
+      rule_id:
+        type: string
+      source_ip:
+        type: string
+      started_at:
+        type: string
+    type: object
+  rebinding.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+    type: object
+  rebinding.Stage:
+    properties:
+      condition:
+        description: Condition to trigger this stage
+        type: string
+      description:
+        type: string
+      hit_count:
+        description: Number of hits for this stage
+        type: integer
+      max_hits:
+        description: Maximum hits before moving to next stage
+        type: integer
+      order:
+        type: integer
+      target_ip:
+        type: string
+      ttl:
+        description: Time to live in seconds
+        type: integer
+    type: object
+  rebinding.UpdateRuleRequest:
+    properties:
+      is_enabled:
+        type: boolean
+      stages:
+        items:
+          $ref: '#/definitions/rebinding.Stage'
+        type: array
+    type: object
+  rule.Actions:
+    properties:
+      discard_noise:
+        description: Noise filtering
+        type: boolean
+      notifications:
+        description: Notification actions
+        items:
+          $ref: '#/definitions/rule.Notification'
+        type: array
+      reports:
+        description: Report generation
+        items:
+          $ref: '#/definitions/rule.Report'
+        type: array
+      tags:
+        description: Tag actions
+        items:
+          $ref: '#/definitions/rule.TagAction'
+        type: array
+      webhooks:
+        description: Webhook forwarding
+        items:
+          $ref: '#/definitions/rule.Webhook'
+        type: array
+    type: object
+  rule.Conditions:
+    properties:
+      body:
+        description: 'Body filter: regex match for body content'
+        items:
+          type: string
+        type: array
+      case_ids:
+        description: 'Case filter: match specific case IDs'
+        items:
+          type: string
+        type: array
+      headers:
+        additionalProperties:
+          items:
+            type: string
+          type: array
+        description: 'Header filter: key-value pairs'
+        type: object
+      keywords:
+        description: 'Keywords filter: match in any field'
+        items:
+          type: string
+        type: array
+      path:
+        description: 'Path filter: regex match for HTTP path'
+        items:
+          type: string
+        type: array
+      protocol:
+        description: 'Protocol filter: dns, http, smtp, ldap'
+        items:
+          type: string
+        type: array
+      risk_levels:
+        description: 'Risk level filter: low, medium, high, critical'
+        items:
+          type: string
+        type: array
+      source_ip:
+        description: 'SourceIP filter: CIDR or exact match'
+        items:
+          type: string
+        type: array
+      time_range:
+        allOf:
+        - $ref: '#/definitions/rule.TimeRange'
+        description: Time range filter
+      tokens:
+        description: 'Token filter: match specific tokens'
+        items:
+          type: string
+        type: array
+    type: object
+  rule.CreateRuleRequest:
+    properties:
+      actions:
+        $ref: '#/definitions/rule.Actions'
+      conditions:
+        $ref: '#/definitions/rule.Conditions'
+      description:
+        type: string
+      enabled:
+        type: boolean
+      name:
+        type: string
+      priority:
+        type: integer
+    required:
+    - name
+    type: object
+  rule.Notification:
+    properties:
+      channel:
+        type: string
+      config:
+        additionalProperties: true
+        type: object
+      template:
+        type: string
+      type:
+        description: feishu, wecom, dingtalk, slack, discord, telegram, email, webhook
+        type: string
+    type: object
+  rule.Report:
+    properties:
+      format:
+        description: json, markdown, csv
+        type: string
+      title:
+        type: string
+    type: object
+  rule.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+    type: object
+  rule.Rule:
+    properties:
+      actions:
+        $ref: '#/definitions/rule.Actions'
+      conditions:
+        $ref: '#/definitions/rule.Conditions'
+      createdAt:
+        type: string
+      description:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: string
+      name:
+        type: string
+      priority:
+        type: integer
+      updatedAt:
+        type: string
+    type: object
+  rule.RuleExecution:
+    properties:
+      error:
+        type: string
+      executedAt:
+        type: string
+      id:
+        type: string
+      interaction:
+        type: string
+      matched:
+        type: boolean
+      ruleID:
+        type: string
+    type: object
+  rule.TagAction:
+    properties:
+      add:
+        items:
+          type: string
+        type: array
+      remove:
+        items:
+          type: string
+        type: array
+    type: object
+  rule.TimeRange:
+    properties:
+      end:
+        description: HH:MM format
+        type: string
+      start:
+        description: HH:MM format
+        type: string
+    type: object
+  rule.UpdateRuleRequest:
+    properties:
+      actions:
+        $ref: '#/definitions/rule.Actions'
+      conditions:
+        $ref: '#/definitions/rule.Conditions'
+      description:
+        type: string
+      enabled:
+        type: boolean
+      name:
+        type: string
+      priority:
+        type: integer
+    type: object
+  rule.Webhook:
+    properties:
+      body:
+        type: string
+      headers:
+        additionalProperties:
+          type: string
+        type: object
+      method:
+        description: POST, PUT
+        type: string
+      url:
+        type: string
+    type: object
   server.CR:
-    $ref: '#/definitions/models.CR'
-host: www.godnslog.com
+    properties:
+      code:
+        type: integer
+      data: {}
+      error: {}
+      message:
+        type: string
+      result:
+        description: Keep Result for backward compatibility
+      timestemp:
+        type: integer
+    type: object
+  server.UserRequest:
+    properties:
+      email:
+        type: string
+      id:
+        type: integer
+      lang:
+        type: string
+      password:
+        type: string
+      role:
+        type: integer
+      username:
+        type: string
+    type: object
+  time.Duration:
+    enum:
+    - -9223372036854775808
+    - 9223372036854775807
+    - 1
+    - 1000
+    - 1000000
+    - 1000000000
+    - 60000000000
+    - 3600000000000
+    - -9223372036854775808
+    - 9223372036854775807
+    - 1
+    - 1000
+    - 1000000
+    - 1000000000
+    - 60000000000
+    - 3600000000000
+    - -9223372036854775808
+    - 9223372036854775807
+    - 1
+    - 1000
+    - 1000000
+    - 1000000000
+    - 60000000000
+    - 3600000000000
+    - 1
+    - 1000
+    - 1000000
+    - 1000000000
+    - 60000000000
+    - 3600000000000
+    format: int64
+    type: integer
+    x-enum-varnames:
+    - minDuration
+    - maxDuration
+    - Nanosecond
+    - Microsecond
+    - Millisecond
+    - Second
+    - Minute
+    - Hour
+    - minDuration
+    - maxDuration
+    - Nanosecond
+    - Microsecond
+    - Millisecond
+    - Second
+    - Minute
+    - Hour
+    - minDuration
+    - maxDuration
+    - Nanosecond
+    - Microsecond
+    - Millisecond
+    - Second
+    - Minute
+    - Hour
+    - Nanosecond
+    - Microsecond
+    - Millisecond
+    - Second
+    - Minute
+    - Hour
+  workspace.AddDomainRequest:
+    properties:
+      domain:
+        type: string
+      is_primary:
+        type: boolean
+    required:
+    - domain
+    type: object
+  workspace.AddMemberRequest:
+    properties:
+      role:
+        type: string
+      user_id:
+        type: string
+    required:
+    - role
+    - user_id
+    type: object
+  workspace.CreateWorkspaceRequest:
+    properties:
+      description:
+        type: string
+      is_enabled:
+        type: boolean
+      name:
+        type: string
+      owner_id:
+        type: string
+    required:
+    - name
+    - owner_id
+    type: object
+  workspace.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+    type: object
+  workspace.UpdateWorkspaceRequest:
+    properties:
+      description:
+        type: string
+      is_enabled:
+        type: boolean
+      name:
+        type: string
+    type: object
+  workspace.Workspace:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_enabled:
+        type: boolean
+      name:
+        type: string
+      owner_id:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  workspace.WorkspaceDomain:
+    properties:
+      created_at:
+        type: string
+      domain:
+        type: string
+      id:
+        type: string
+      is_primary:
+        type: boolean
+      workspace_id:
+        type: string
+    type: object
+  workspace.WorkspaceMember:
+    properties:
+      id:
+        type: string
+      joined_at:
+        type: string
+      role:
+        description: owner, admin, member, viewer
+        type: string
+      user_id:
+        type: string
+      workspace_id:
+        type: string
+    type: object
+  workspace.WorkspaceStats:
+    properties:
+      case_count:
+        type: integer
+      domain_count:
+        type: integer
+      interaction_count:
+        type: integer
+      member_count:
+        type: integer
+      payload_count:
+        type: integer
+      workspace_id:
+        type: string
+    type: object
 info:
-  contact:
-    email: chennqqi@qq.com
-    name: API Support
-    url: https://github.com/chennqqi/godnslog/issue
-  description: This is godnslog server.
-  license:
-    name: Apache 2.0
-    url: http://www.apache.org/licenses/LICENSE-2.0.html
-  termsOfService: http://swagger.io/terms/
-  title: GoDnsLog API
-  version: "0.1"
+  contact: {}
 paths:
+  /admin/user:
+    delete:
+      consumes:
+      - application/json
+      description: delete user by id
+      parameters:
+      - description: User IDs to delete
+        in: body
+        name: ids
+        required: true
+        schema:
+          items:
+            type: integer
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.CR'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/server.CR'
+      summary: delUser
+    put:
+      consumes:
+      - application/json
+      description: add a new User
+      parameters:
+      - description: User data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/server.UserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/server.CR'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/server.CR'
+        "502":
+          description: BadService
+          schema:
+            $ref: '#/definitions/server.CR'
+      summary: addUser
   /admin/user/list:
     get:
       consumes:
@@ -47,16 +1146,1043 @@ paths:
           schema:
             $ref: '#/definitions/server.CR'
       summary: userInfo
-  /testapi/get-string-by-int/{some_id}:
+  /api/v2/attack-chains:
     get:
+      consumes:
+      - application/json
+      description: List all attack chains grouped by token with pagination
+      parameters:
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (1-100, default 20)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: list of attack chains
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: List attack chains
+      tags:
+      - v2
+      - attack-chains
+  /api/v2/attack-chains/{token}:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a specific attack chain by token
+      parameters:
+      - description: Attack chain token
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: attack chain detail
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get attack chain detail
+      tags:
+      - v2
+      - attack-chains
+  /api/v2/cases/stats:
+    get:
+      consumes:
+      - application/json
+      description: Get aggregated statistics for all cases (total, active, archived,
+        batch counts)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: case statistics
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get case stats
+      tags:
+      - v2
+      - cases
+  /api/v2/poll:
+    get:
+      consumes:
+      - application/json
+      description: Burp Collaborator-style cursor-based polling for new interactions
+        since a given timestamp
+      parameters:
+      - description: ISO8601 timestamp cursor, defaults to 24h ago
+        in: query
+        name: cursor
+        type: string
+      - description: Maximum results (1-100, default 20)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: poll results with next_cursor and has_more
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Poll for new interactions (cursor-based)
+      tags:
+      - v2
+      - interactions
+  /api/v2/search/fofa:
+    get:
+      consumes:
+      - application/json
+      description: Query the Fofa search engine for internet-connected devices
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: search results
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "502":
+          description: Bad gateway
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Search Fofa
+      tags:
+      - v2
+      - search
+  /api/v2/search/shodan:
+    get:
+      consumes:
+      - application/json
+      description: Query the Shodan search engine for internet-connected devices
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: search results
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "502":
+          description: Bad gateway
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Search Shodan
+      tags:
+      - v2
+      - search
+  /api/v2/search/zoomeye:
+    get:
+      consumes:
+      - application/json
+      description: Query the ZoomEye search engine for internet-connected devices
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: search results
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "502":
+          description: Bad gateway
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Search ZoomEye
+      tags:
+      - v2
+      - search
+  /auth/nav:
+    get:
+      consumes:
+      - application/json
+      description: get navigation links for current user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            type: string
+      summary: userNav
+  /canaries:
+    get:
+      description: List all canary tokens
+      parameters:
+      - description: Filter by enabled status
+        in: query
+        name: enabled
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/canary.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/canary.Canary'
+                  type: array
+              type: object
+      summary: List canaries
+      tags:
+      - canary
+    post:
+      consumes:
+      - application/json
+      description: Create a new canary token for long-term monitoring
+      parameters:
+      - description: Canary details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/canary.CreateCanaryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/canary.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/canary.Canary'
+              type: object
+      summary: Create canary token
+      tags:
+      - canary
+  /canaries/{id}:
+    delete:
+      description: Delete a canary token
+      parameters:
+      - description: Canary ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/canary.Response'
+      summary: Delete canary
+      tags:
+      - canary
+    get:
+      description: Get a canary token by ID
+      parameters:
+      - description: Canary ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/canary.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/canary.Canary'
+              type: object
+      summary: Get canary
+      tags:
+      - canary
+    put:
+      consumes:
+      - application/json
+      description: Update a canary token
+      parameters:
+      - description: Canary ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/canary.UpdateCanaryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/canary.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/canary.Canary'
+              type: object
+      summary: Update canary
+      tags:
+      - canary
+  /canaries/{id}/hits:
+    get:
+      description: List all hits for a canary token
+      parameters:
+      - description: Canary ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/canary.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/canary.CanaryHit'
+                  type: array
+              type: object
+      summary: List canary hits
+      tags:
+      - canary
+  /canaries/{id}/stats:
+    get:
+      description: Get statistics for a canary token
+      parameters:
+      - description: Canary ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/canary.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/canary.CanaryStats'
+              type: object
+      summary: Get canary stats
+      tags:
+      - canary
+  /clustering/cluster:
+    post:
+      consumes:
+      - application/json
+      description: Group similar interactions together and detect noise
+      parameters:
+      - description: Interactions to cluster
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/clustering.ClusterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/clustering.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/clustering.ClusterResponse'
+              type: object
+      summary: Cluster interactions
+      tags:
+      - clustering
+  /clustering/compress:
+    post:
+      consumes:
+      - application/json
+      description: Reduce interaction data size by compressing similar interactions
+      parameters:
+      - description: Interactions to compress
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/clustering.CompressRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/clustering.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/interaction.Interaction'
+                  type: array
+              type: object
+      summary: Compress interactions
+      tags:
+      - clustering
+  /clustering/config:
+    get:
+      description: Get the current clustering and compression configuration
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/clustering.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/clustering.ConfigResponse'
+              type: object
+      summary: Get clustering config
+      tags:
+      - clustering
+  /listeners:
+    get:
+      description: List all protocol listeners
+      parameters:
+      - description: Filter by protocol
+        in: query
+        name: protocol
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/listener.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/listener.Listener'
+                  type: array
+              type: object
+      summary: List listeners
+      tags:
+      - listener
+    post:
+      consumes:
+      - application/json
+      description: Create a new protocol listener
+      parameters:
+      - description: Listener details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/listener.CreateListenerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/listener.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/listener.Listener'
+              type: object
+      summary: Create listener
+      tags:
+      - listener
+  /listeners/{id}:
+    delete:
+      description: Delete a listener
+      parameters:
+      - description: Listener ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/listener.Response'
+      summary: Delete listener
+      tags:
+      - listener
+    get:
+      description: Get a listener by ID
+      parameters:
+      - description: Listener ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/listener.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/listener.Listener'
+              type: object
+      summary: Get listener
+      tags:
+      - listener
+    put:
+      consumes:
+      - application/json
+      description: Update a listener
+      parameters:
+      - description: Listener ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/listener.UpdateListenerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/listener.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/listener.Listener'
+              type: object
+      summary: Update listener
+      tags:
+      - listener
+  /listeners/{id}/ftp:
+    get:
+      description: Get all FTP commands for a specific listener
+      parameters:
+      - description: Listener ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/listener.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/listener.FTPCommand'
+                  type: array
+              type: object
+      summary: List FTP commands
+      tags:
+      - listener
+  /listeners/{id}/interactions:
+    get:
+      description: List all interactions for a listener
+      parameters:
+      - description: Listener ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/listener.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/listener.ListenerInteraction'
+                  type: array
+              type: object
+      summary: List listener interactions
+      tags:
+      - listener
+  /listeners/{id}/ldap:
+    get:
+      description: List all LDAP queries for a listener
+      parameters:
+      - description: Listener ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/listener.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/listener.LDAPQuery'
+                  type: array
+              type: object
+      summary: List LDAP queries
+      tags:
+      - listener
+  /listeners/{id}/smb:
+    get:
+      description: Get all SMB requests for a specific listener
+      parameters:
+      - description: Listener ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/listener.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/listener.SMBRequest'
+                  type: array
+              type: object
+      summary: List SMB requests
+      tags:
+      - listener
+  /listeners/{id}/smtp:
+    get:
+      description: List all SMTP messages for a listener
+      parameters:
+      - description: Listener ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/listener.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/listener.SMTPMessage'
+                  type: array
+              type: object
+      summary: List SMTP messages
+      tags:
+      - listener
+  /listeners/config:
+    get:
+      description: Get the current listener configuration
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/listener.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/listener.ListenerConfig'
+              type: object
+      summary: Get listener config
+      tags:
+      - listener
+  /rebinding/config:
+    get:
+      description: Get the current rebinding configuration
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/rebinding.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/rebinding.RebindingConfig'
+              type: object
+      summary: Get rebinding config
+      tags:
+      - rebinding
+    put:
+      consumes:
+      - application/json
+      description: Update the rebinding configuration
+      parameters:
+      - description: Configuration
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/rebinding.RebindingConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/rebinding.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/rebinding.RebindingConfig'
+              type: object
+      summary: Update rebinding config
+      tags:
+      - rebinding
+  /rebinding/rules:
+    get:
+      description: List all DNS rebinding rules
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/rebinding.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/rebinding.RebindingRule'
+                  type: array
+              type: object
+      summary: List rebinding rules
+      tags:
+      - rebinding
+    post:
+      consumes:
+      - application/json
+      description: Create a new DNS rebinding rule
+      parameters:
+      - description: Rule details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rebinding.CreateRuleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/rebinding.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/rebinding.RebindingRule'
+              type: object
+      summary: Create rebinding rule
+      tags:
+      - rebinding
+  /rebinding/rules/{id}:
+    delete:
+      description: Delete a rebinding rule
+      parameters:
+      - description: Rule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/rebinding.Response'
+      summary: Delete rebinding rule
+      tags:
+      - rebinding
+    get:
+      description: Get a rebinding rule by ID
+      parameters:
+      - description: Rule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/rebinding.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/rebinding.RebindingRule'
+              type: object
+      summary: Get rebinding rule
+      tags:
+      - rebinding
+    put:
+      consumes:
+      - application/json
+      description: Update a rebinding rule
+      parameters:
+      - description: Rule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rebinding.UpdateRuleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/rebinding.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/rebinding.RebindingRule'
+              type: object
+      summary: Update rebinding rule
+      tags:
+      - rebinding
+  /rebinding/rules/{id}/sessions:
+    get:
+      description: List all sessions for a rebinding rule
+      parameters:
+      - description: Rule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/rebinding.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/rebinding.RebindingSession'
+                  type: array
+              type: object
+      summary: List rebinding sessions
+      tags:
+      - rebinding
+  /rebinding/rules/scenario:
+    post:
+      consumes:
+      - application/json
+      description: Create a rebinding rule from a predefined scenario
+      parameters:
+      - description: Scenario details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rebinding.CreateScenarioRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/rebinding.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/rebinding.RebindingRule'
+              type: object
+      summary: Create scenario rule
+      tags:
+      - rebinding
+  /record/dns:
+    delete:
       consumes:
       - application/json
       description: del Dns Record by query ids
       parameters:
-      - description: Some ID
-        in: path
-        name: some_id
+      - description: Record IDs to delete
+        in: body
+        name: ids
         required: true
+        schema:
+          items:
+            type: integer
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ok
+          schema:
+            type: string
+        "400":
+          description: We need ID!!
+          schema:
+            $ref: '#/definitions/server.CR'
+      summary: delDnsRecord
+    get:
+      consumes:
+      - application/json
+      description: get Dns Record by user query
+      parameters:
+      - description: IP address filter
+        in: query
+        name: ip
+        type: string
+      - description: Domain filter
+        in: query
+        name: domain
+        type: string
+      - description: Date filter (RFC3339)
+        in: query
+        name: date
+        type: string
+      - description: Page number (default 1)
+        in: query
+        name: pageNo
+        type: integer
+      - description: Page size (default 10)
+        in: query
+        name: pageSize
         type: integer
       produces:
       - application/json
@@ -69,11 +2195,181 @@ paths:
           description: We need ID!!
           schema:
             $ref: '#/definitions/server.CR'
+        "401":
+          description: Can not find ID
+          schema:
+            $ref: '#/definitions/server.CR'
         "404":
           description: Can not find ID
           schema:
             $ref: '#/definitions/server.CR'
-      summary: delDnsRecord
+      summary: getDnsRecord
+  /rules:
+    get:
+      description: List all rules with pagination
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/rule.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/rule.Rule'
+                  type: array
+              type: object
+      summary: List rules
+      tags:
+      - rules
+    post:
+      consumes:
+      - application/json
+      description: Create a new automation rule
+      parameters:
+      - description: Rule data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rule.CreateRuleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/rule.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/rule.Rule'
+              type: object
+      summary: Create a rule
+      tags:
+      - rules
+  /rules/{id}:
+    delete:
+      description: Delete a rule by ID
+      parameters:
+      - description: Rule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/rule.Response'
+      summary: Delete a rule
+      tags:
+      - rules
+    get:
+      description: Get a rule by ID
+      parameters:
+      - description: Rule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/rule.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/rule.Rule'
+              type: object
+      summary: Get a rule
+      tags:
+      - rules
+    put:
+      consumes:
+      - application/json
+      description: Update an existing rule
+      parameters:
+      - description: Rule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Rule data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rule.UpdateRuleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/rule.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/rule.Rule'
+              type: object
+      summary: Update a rule
+      tags:
+      - rules
+  /rules/{id}/executions:
+    get:
+      description: Get execution records for a specific rule
+      parameters:
+      - description: Rule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/rule.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/rule.RuleExecution'
+                  type: array
+              type: object
+      summary: Get rule executions
+      tags:
+      - rules
   /user/info:
     get:
       consumes:
@@ -140,7 +2436,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: add a new User
+      description: get Dns Record by user query
       parameters:
       - description: Some ID
         in: path
@@ -166,36 +2462,287 @@ paths:
           description: BadService
           schema:
             $ref: '#/definitions/server.CR'
-      summary: addUser
-  /user/nav:
+      summary: userLogout
+  /workspaces:
     get:
-      consumes:
-      - application/json
-      description: get Dns Record by user query
+      description: List all workspaces
       parameters:
-      - description: Some ID
-        in: path
-        name: some_id
-        required: true
-        type: integer
+      - description: Filter by owner ID
+        in: query
+        name: owner_id
+        type: string
       produces:
       - application/json
       responses:
         "200":
-          description: ok
+          description: OK
           schema:
-            type: string
-        "400":
-          description: We need ID!!
+            allOf:
+            - $ref: '#/definitions/workspace.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/workspace.Workspace'
+                  type: array
+              type: object
+      summary: List workspaces
+      tags:
+      - workspace
+    post:
+      consumes:
+      - application/json
+      description: Create a new multi-tenant workspace
+      parameters:
+      - description: Workspace details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/workspace.CreateWorkspaceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
           schema:
-            $ref: '#/definitions/server.CR'
-        "401":
-          description: Can not find ID
+            allOf:
+            - $ref: '#/definitions/workspace.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/workspace.Workspace'
+              type: object
+      summary: Create workspace
+      tags:
+      - workspace
+  /workspaces/{id}:
+    delete:
+      description: Delete a workspace
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
           schema:
-            $ref: '#/definitions/server.CR'
-        "404":
-          description: Can not find ID
+            $ref: '#/definitions/workspace.Response'
+      summary: Delete workspace
+      tags:
+      - workspace
+    get:
+      description: Get a workspace by ID
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
           schema:
-            $ref: '#/definitions/server.CR'
-      summary: userNav
+            allOf:
+            - $ref: '#/definitions/workspace.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/workspace.Workspace'
+              type: object
+      summary: Get workspace
+      tags:
+      - workspace
+    put:
+      consumes:
+      - application/json
+      description: Update a workspace
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/workspace.UpdateWorkspaceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/workspace.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/workspace.Workspace'
+              type: object
+      summary: Update workspace
+      tags:
+      - workspace
+  /workspaces/{id}/domains:
+    get:
+      description: List all domains of a workspace
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/workspace.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/workspace.WorkspaceDomain'
+                  type: array
+              type: object
+      summary: List workspace domains
+      tags:
+      - workspace
+    post:
+      consumes:
+      - application/json
+      description: Add a domain to a workspace
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Domain details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/workspace.AddDomainRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/workspace.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/workspace.WorkspaceDomain'
+              type: object
+      summary: Add workspace domain
+      tags:
+      - workspace
+  /workspaces/{id}/members:
+    get:
+      description: List all members of a workspace
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/workspace.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/workspace.WorkspaceMember'
+                  type: array
+              type: object
+      summary: List workspace members
+      tags:
+      - workspace
+    post:
+      consumes:
+      - application/json
+      description: Add a member to a workspace
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Member details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/workspace.AddMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/workspace.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/workspace.WorkspaceMember'
+              type: object
+      summary: Add workspace member
+      tags:
+      - workspace
+  /workspaces/{id}/members/{user_id}:
+    delete:
+      description: Remove a member from a workspace
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/workspace.Response'
+      summary: Remove workspace member
+      tags:
+      - workspace
+  /workspaces/{id}/stats:
+    get:
+      description: Get statistics for a workspace
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/workspace.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/workspace.WorkspaceStats'
+              type: object
+      summary: Get workspace stats
+      tags:
+      - workspace
 swagger: "2.0"

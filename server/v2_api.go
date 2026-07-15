@@ -894,6 +894,15 @@ func (self *WebServer) v2GetCaseStats(c *gin.Context) {
 }
 
 // v2CaseStats returns aggregate case statistics across all cases
+// @Summary Get case stats
+// @Description Get aggregated statistics for all cases (total, active, archived, batch counts)
+// @Tags v2, cases
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "case statistics"
+// @Failure 401 {object} gin.H "Unauthorized"
+// @Failure 500 {object} gin.H "Internal server error"
+// @Router /api/v2/cases/stats [get]
 func (self *WebServer) v2CaseStats(c *gin.Context) {
 	type CaseStats struct {
 		Total    int64 `json:"total"`
@@ -2392,6 +2401,17 @@ func (self *WebServer) v2InteractionStream(c *gin.Context) {
 // v2Poll implements Burp Collaborator-style cursor-based polling.
 // Returns interactions created after the cursor timestamp.
 // GET /api/v2/poll?cursor={ISO8601}&limit={n}
+// @Summary Poll for new interactions (cursor-based)
+// @Description Burp Collaborator-style cursor-based polling for new interactions since a given timestamp
+// @Tags v2, interactions
+// @Accept json
+// @Produce json
+// @Param cursor query string false "ISO8601 timestamp cursor, defaults to 24h ago"
+// @Param limit query int false "Maximum results (1-100, default 20)"
+// @Success 200 {object} gin.H "poll results with next_cursor and has_more"
+// @Failure 401 {object} gin.H "Unauthorized"
+// @Failure 500 {object} gin.H "Internal server error"
+// @Router /api/v2/poll [get]
 func (self *WebServer) v2Poll(c *gin.Context) {
 	cursorStr := c.Query("cursor")
 	limitStr := c.DefaultQuery("limit", "20")
@@ -5243,6 +5263,17 @@ func (self *WebServer) v2ListRetentionArchives(c *gin.Context) {
 }
 
 // v2ListAttackChains lists attack chains grouped by token
+// @Summary List attack chains
+// @Description List all attack chains grouped by token with pagination
+// @Tags v2, attack-chains
+// @Accept json
+// @Produce json
+// @Param page query int false "Page number (default 1)"
+// @Param page_size query int false "Items per page (1-100, default 20)"
+// @Success 200 {object} gin.H "list of attack chains"
+// @Failure 401 {object} gin.H "Unauthorized"
+// @Failure 500 {object} gin.H "Internal server error"
+// @Router /api/v2/attack-chains [get]
 func (self *WebServer) v2ListAttackChains(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -5263,7 +5294,18 @@ func (self *WebServer) v2ListAttackChains(c *gin.Context) {
 	c.JSON(http.StatusOK, chains)
 }
 
-// v2GetAttackChainDetail gets attack chain detail by token
+// @Summary Get attack chain detail
+// @Description Get detailed information about a specific attack chain by token
+// @Tags v2, attack-chains
+// @Accept json
+// @Produce json
+// @Param token path string true "Attack chain token"
+// @Success 200 {object} gin.H "attack chain detail"
+// @Failure 400 {object} gin.H "Bad request"
+// @Failure 401 {object} gin.H "Unauthorized"
+// @Failure 404 {object} gin.H "Not found"
+// @Failure 500 {object} gin.H "Internal server error"
+// @Router /api/v2/attack-chains/{token} [get]
 func (self *WebServer) v2GetAttackChainDetail(c *gin.Context) {
 	token := c.Param("token")
 	if token == "" {
@@ -5285,7 +5327,18 @@ func (self *WebServer) v2GetAttackChainDetail(c *gin.Context) {
 	c.JSON(http.StatusOK, detail)
 }
 
-// v2SearchZoomEye queries ZoomEye API
+// @Summary Search ZoomEye
+// @Description Query the ZoomEye search engine for internet-connected devices
+// @Tags v2, search
+// @Accept json
+// @Produce json
+// @Param q query string true "Search query"
+// @Param page query int false "Page number (default 1)"
+// @Success 200 {object} gin.H "search results"
+// @Failure 400 {object} gin.H "Bad request"
+// @Failure 401 {object} gin.H "Unauthorized"
+// @Failure 502 {object} gin.H "Bad gateway"
+// @Router /api/v2/search/zoomeye [get]
 func (self *WebServer) v2SearchZoomEye(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
@@ -5312,7 +5365,18 @@ func (self *WebServer) v2SearchZoomEye(c *gin.Context) {
 	c.JSON(200, gin.H{"code": 0, "data": result})
 }
 
-// v2SearchShodan queries Shodan API
+// @Summary Search Shodan
+// @Description Query the Shodan search engine for internet-connected devices
+// @Tags v2, search
+// @Accept json
+// @Produce json
+// @Param q query string true "Search query"
+// @Param page query int false "Page number (default 1)"
+// @Success 200 {object} gin.H "search results"
+// @Failure 400 {object} gin.H "Bad request"
+// @Failure 401 {object} gin.H "Unauthorized"
+// @Failure 502 {object} gin.H "Bad gateway"
+// @Router /api/v2/search/shodan [get]
 func (self *WebServer) v2SearchShodan(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
@@ -5339,7 +5403,18 @@ func (self *WebServer) v2SearchShodan(c *gin.Context) {
 	c.JSON(200, gin.H{"code": 0, "data": result})
 }
 
-// v2SearchFofa queries Fofa API
+// @Summary Search Fofa
+// @Description Query the Fofa search engine for internet-connected devices
+// @Tags v2, search
+// @Accept json
+// @Produce json
+// @Param q query string true "Search query"
+// @Param page query int false "Page number (default 1)"
+// @Success 200 {object} gin.H "search results"
+// @Failure 400 {object} gin.H "Bad request"
+// @Failure 401 {object} gin.H "Unauthorized"
+// @Failure 502 {object} gin.H "Bad gateway"
+// @Router /api/v2/search/fofa [get]
 func (self *WebServer) v2SearchFofa(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {

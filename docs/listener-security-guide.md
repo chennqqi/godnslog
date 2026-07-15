@@ -19,6 +19,7 @@ default-disable policy, and provides operational guidance for secure deployment.
 | LDAP     | Medium     | Simplified ASN.1/BER parser, minimal feature surface |
 | SMB      | High       | Complex protocol, raw binary parsing, privileged port |
 | FTP      | Medium     | Plain-text command protocol, clear-text credentials |
+| RMI      | Medium     | Java RMI protocol; used for JNDI injection detection |
 
 ---
 
@@ -190,6 +191,28 @@ iptables to restrict source IPs when possible.
 - Uses `log.Printf` instead of the structured `*logrus.Logger` (inconsistency
   with SMTP/LDAP listeners).
 
+### RMI Listener (`internal/listener/rmi.go`)
+
+**Risk Level: Medium**
+
+**Attack Surface:**
+- Binds TCP (default port 1099 or user-configured)
+- Accepts Java RMI protocol messages
+- Used for JNDI injection detection in Java applications
+
+**Security Mechanisms:**
+- SecurityContext rate/conn limiting on accept
+- Timeout on connection read/write
+- Minimal RMI protocol parsing; only captures callbacks without
+  performing Java deserialization
+- Returns fixed response; no actual RMI registry operations
+
+**Concerns:**
+- RMI protocol has historically been associated with deserialization
+  vulnerabilities. This implementation does not perform deserialization
+  beyond basic protocol identification.
+- Default RMI port (1099) is a common scan target.
+
 ---
 
 ## Production Deployment Recommendations
@@ -244,6 +267,7 @@ used by GODNSLOG:
 | 389   | TCP      | LDAP          | If used  |
 | 445   | TCP      | SMB           | If used  |
 | 21    | TCP      | FTP           | If used  |
+| 1099  | TCP      | RMI           | If used  |
 
 ### TLS Configuration
 
