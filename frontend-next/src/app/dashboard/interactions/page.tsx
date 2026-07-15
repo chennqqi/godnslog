@@ -39,6 +39,10 @@ function InteractionsPageContent() {
   const caseId = searchParams.get('case_id') ?? undefined
   const payloadId = searchParams.get('payload_id') ?? undefined
   const typeParam = searchParams.get('type')
+  const filterParam = searchParams.get('filter') ?? ''
+  const startTimeParam = searchParams.get('start_time') ?? ''
+  const endTimeParam = searchParams.get('end_time') ?? ''
+  const viewParam = searchParams.get('view')
 
   const { data: interactionsData, isLoading: loading } = useInteractions({
     page: 1, page_size: 100,
@@ -52,16 +56,37 @@ function InteractionsPageContent() {
   const interactions = interactionsData?.data?.items ?? []
   const stats = statsData?.data ?? { total: 0, dns_count: 0, http_count: 0, smtp_count: 0, ldap_count: 0 }
 
-  const [filter, setFilter] = useState('')
-  const [typeFilter, setTypeFilter] = useState(TYPE_FILTER_ALL)
-  const [viewMode, setViewMode] = useState<'table' | 'timeline'>('table')
+  const [filter, setFilter] = useState(filterParam)
+  const [typeFilter, setTypeFilter] = useState(typeParam ?? TYPE_FILTER_ALL)
+  const [viewMode, setViewMode] = useState<'table' | 'timeline'>(viewParam === 'timeline' ? 'timeline' : 'table')
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [liveCount, setLiveCount] = useState(0)
   const [exporting, setExporting] = useState(false)
-  const [startTimeFilter, setStartTimeFilter] = useState('')
-  const [endTimeFilter, setEndTimeFilter] = useState('')
+  const [startTimeFilter, setStartTimeFilter] = useState(startTimeParam)
+  const [endTimeFilter, setEndTimeFilter] = useState(endTimeParam)
   const { t } = useI18n()
+
+  // Sync filters to URL
+  const syncFiltersToURL = useCallback((overrides: Record<string, string | undefined>) => {
+    const params = new URLSearchParams()
+    const cId = overrides.case_id ?? caseId
+    const pId = overrides.payload_id ?? payloadId
+    if (cId) params.set('case_id', cId)
+    if (pId) params.set('payload_id', pId)
+    const f = overrides.filter ?? filter
+    if (f) params.set('filter', f)
+    const t = overrides.type ?? typeFilter
+    if (t && t !== TYPE_FILTER_ALL) params.set('type', t)
+    const st = overrides.start_time ?? startTimeFilter
+    if (st) params.set('start_time', st)
+    const et = overrides.end_time ?? endTimeFilter
+    if (et) params.set('end_time', et)
+    const v = overrides.view ?? viewMode
+    if (v !== 'table') params.set('view', v)
+    const qs = params.toString()
+    router.replace(`/dashboard/interactions${qs ? `?${qs}` : ''}`, { scroll: false })
+  }, [caseId, payloadId, filter, typeFilter, startTimeFilter, endTimeFilter, viewMode, router])
 
   // Set type filter from URL param if present
   useEffect(() => {
@@ -69,6 +94,11 @@ function InteractionsPageContent() {
       setTypeFilter(typeParam)
     }
   }, [typeParam])
+
+  // Sync filter states to URL
+  useEffect(() => {
+    syncFiltersToURL({})
+  }, [filter, typeFilter, startTimeFilter, endTimeFilter, viewMode])
 
   // SSE real-time stream
   const handleNewInteraction = useCallback(() => {
