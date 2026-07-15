@@ -434,6 +434,12 @@ const translations = {
     'scanner_hub.selected': ' selected',
     'scanner_hub.create_selected_runs': 'Create Scanner Runs for Selected',
     'scanner_hub.create_from_search_failed': 'Failed to create Scanner Runs from search results',
+    'scanner_hub.no_results': 'No results found',
+    'scanner_hub.confirm_create_title': 'Confirm Create Scanner Runs',
+    'scanner_hub.confirm_create_desc': 'Scanner runs will be created for the following targets:',
+    'scanner_hub.confirm_create_total': 'Total ',
+    'scanner_hub.confirm_create_confirm': 'Confirm',
+    'scanner_hub.and_more': 'and ',
 
     // Workflow
     'workflow.title': 'Workflow Builder',
@@ -891,6 +897,12 @@ const translations = {
     'scanner_hub.selected': '条已选择',
     'scanner_hub.create_selected_runs': '创建选中项的 Scanner Run',
     'scanner_hub.create_from_search_failed': '从搜索结果创建 Scanner Run 失败',
+    'scanner_hub.no_results': '未找到匹配的结果',
+    'scanner_hub.confirm_create_title': '确认创建 Scanner Run',
+    'scanner_hub.confirm_create_desc': '将为以下目标创建 Scanner Run：',
+    'scanner_hub.confirm_create_total': '共 ',
+    'scanner_hub.confirm_create_confirm': '确认创建',
+    'scanner_hub.and_more': '以及其他 ',
 
     // Workflow
     'workflow.title': '工作流构建器',

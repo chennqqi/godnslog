@@ -1,7 +1,7 @@
 'use client'
 
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { caseApi, payloadApi, scannerRunApi, searchApi } from '@/lib/api-client'
 import { createScannerRun, generateWebUrls, type ScannerRunInput } from '@/lib/scanner-hub'
@@ -18,6 +18,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { useI18n } from '@/lib/i18n-context'
 
 export default function ScannerHubPage() {
@@ -46,6 +53,8 @@ export default function ScannerHubPage() {
   const [searching, setSearching] = useState(false)
   const [selectedSearchItems, setSelectedSearchItems] = useState<Set<number>>(new Set())
   const [creatingFromSearch, setCreatingFromSearch] = useState(false)
+  const [showConfirmCreate, setShowConfirmCreate] = useState(false)
+  const searchCardRef = useRef<HTMLDivElement>(null)
 
   const loadCases = useCallback(async () => {
     try {
@@ -199,6 +208,10 @@ export default function ScannerHubPage() {
       const response = await searchFn({ q: searchQuery })
       if (response.data) {
         setSearchResults(response.data as SearchResult)
+        // Auto-scroll to results after search completes
+        setTimeout(() => {
+          searchCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 100)
       }
     } catch (err: unknown) {
       console.error('Search failed:', err)
@@ -226,6 +239,7 @@ export default function ScannerHubPage() {
 
     setCreatingFromSearch(true)
     setError('')
+    setShowConfirmCreate(false)
     try {
       const items = Array.from(selectedSearchItems).map(i => searchResults.results[i])
       const response = await scannerRunApi.createFromSearch({
@@ -327,7 +341,7 @@ export default function ScannerHubPage() {
         </Card>
 
         {/* Search Engines */}
-        <Card>
+        <Card ref={searchCardRef}>
           <CardHeader>
             <CardTitle>{t('scanner_hub.search_engines')}</CardTitle>
           </CardHeader>
@@ -359,7 +373,7 @@ export default function ScannerHubPage() {
                 <div className="text-sm text-muted-foreground">
                   {t('scanner_hub.found_results')}{searchResults.total}
                 </div>
-                {searchResults.results.length > 0 && (
+                {searchResults.results.length > 0 ? (
                   <>
                     <div className="border rounded">
                       <table className="w-full text-sm">
@@ -406,7 +420,7 @@ export default function ScannerHubPage() {
                                   disabled={!selectedCase || !selectedPayload || creatingFromSearch}
                                   onClick={async () => {
                                     setSelectedSearchItems(new Set([index]))
-                                    await handleCreateFromSearch()
+                                    setShowConfirmCreate(true)
                                   }}
                                 >
                                   {t('scanner_hub.create_run')}
@@ -422,16 +436,61 @@ export default function ScannerHubPage() {
                         {selectedSearchItems.size} {t('scanner_hub.selected')}
                       </span>
                       <Button
-                        onClick={handleCreateFromSearch}
+                        onClick={() => setShowConfirmCreate(true)}
                         disabled={selectedSearchItems.size === 0 || !selectedCase || !selectedPayload || creatingFromSearch}
                       >
                         {creatingFromSearch ? t('common.loading') : t('scanner_hub.create_selected_runs')}
                       </Button>
                     </div>
                   </>
+                ) : (
+                  <div className="text-sm text-muted-foreground py-8 text-center border rounded">
+                    {t('scanner_hub.no_results')}
+                  </div>
                 )}
               </div>
             )}
+
+            {/* Confirmation dialog for creating scanner runs from search results */}
+            <Dialog open={showConfirmCreate} onOpenChange={setShowConfirmCreate}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{t('scanner_hub.confirm_create_title')}</DialogTitle>
+                </DialogHeader>
+                <div className="py-4 text-sm">
+                  <p className="text-muted-foreground">
+                    {t('scanner_hub.confirm_create_desc')}
+                  </p>
+                  <ul className="mt-2 space-y-1">
+                    {Array.from(selectedSearchItems).slice(0, 10).map(i => {
+                      const item = searchResults?.results[i]
+                      if (!item) return null
+                      return (
+                        <li key={i} className="font-mono text-xs">
+                          {item.ip}:{item.port}{item.hostname ? ` (${item.hostname})` : ''}
+                        </li>
+                      )
+                    })}
+                    {selectedSearchItems.size > 10 && (
+                      <li className="text-xs text-muted-foreground">
+                        ...{t('scanner_hub.and_more')}{(selectedSearchItems.size - 10).toString()}
+                      </li>
+                    )}
+                  </ul>
+                  <p className="mt-3 font-medium">
+                    {t('scanner_hub.confirm_create_total')}{selectedSearchItems.size}
+                  </p>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowConfirmCreate(false)}>
+                    {t('common.cancel')}
+                  </Button>
+                  <Button onClick={handleCreateFromSearch} disabled={creatingFromSearch}>
+                    {creatingFromSearch ? t('common.loading') : t('scanner_hub.confirm_create_confirm')}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
 
