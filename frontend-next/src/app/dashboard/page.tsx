@@ -125,6 +125,33 @@ export default function DashboardPage() {
         </Button>
       </div>
 
+      {/* Welcome onboarding for new users */}
+      {!loading && cases.length === 0 && (
+        <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-6">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0 text-white font-bold text-lg">
+              G
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold text-indigo-900 dark:text-indigo-200 text-lg">
+                {t('dashboard.welcome_title')}
+              </h3>
+              <p className="text-sm text-indigo-700 dark:text-indigo-300">
+                {t('dashboard.welcome_desc')}
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button size="sm" onClick={() => router.push('/dashboard/cases')}>
+                  {t('dashboard.welcome_create_case')}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => router.push('/dashboard/docs/quick-start')}>
+                  {t('dashboard.welcome_view_docs')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {loading ? (

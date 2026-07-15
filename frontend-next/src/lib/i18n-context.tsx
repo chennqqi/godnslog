@@ -360,6 +360,10 @@ const translations = {
     'dashboard.view_all': 'View all',
     'dashboard.no_interactions': 'No interactions yet',
     'dashboard.waiting_payloads': 'Waiting for payloads to be triggered',
+    'dashboard.welcome_title': 'Welcome to GODNSLOG!',
+    'dashboard.welcome_desc': 'Start by creating a Case to track your security testing — or read the Quick Start guide to learn the OAST workflow.',
+    'dashboard.welcome_create_case': 'Create First Case',
+    'dashboard.welcome_view_docs': 'Quick Start Guide',
 
     // Agent Runs list
     'agent_runs.title': 'Agent Runs',
@@ -823,6 +827,10 @@ const translations = {
     'dashboard.view_all': '查看全部',
     'dashboard.no_interactions': '暂无交互记录',
     'dashboard.waiting_payloads': '等待 Payload 被触发',
+    'dashboard.welcome_title': '欢迎使用 GODNSLOG！',
+    'dashboard.welcome_desc': '创建一个 Case 来开始安全测试，或阅读快速入门指南了解 OAST 工作流程。',
+    'dashboard.welcome_create_case': '创建第一个 Case',
+    'dashboard.welcome_view_docs': '快速入门指南',
 
     // Agent Runs list
     'agent_runs.title': 'Agent 运行',
