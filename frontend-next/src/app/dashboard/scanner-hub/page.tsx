@@ -3,9 +3,9 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { caseApi, payloadApi, scannerRunApi } from '@/lib/api-client'
+import { caseApi, payloadApi, scannerRunApi, searchApi } from '@/lib/api-client'
 import { createScannerRun, generateWebUrls, type ScannerRunInput } from '@/lib/scanner-hub'
-import type { Case, Payload, ScannerAdapter, ScannerDeliveryMethod, ScannerKind, ScannerRun } from '@/types'
+import type { Case, Payload, ScannerAdapter, ScannerDeliveryMethod, ScannerKind, ScannerRun, SearchResultItem, SearchResult } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -38,6 +38,14 @@ export default function ScannerHubPage() {
   const [error, setError] = useState<string>('')
   const [recentScannerRuns, setRecentScannerRuns] = useState<ScannerRun[]>([])
   const [loadingRuns, setLoadingRuns] = useState(false)
+
+  // Search from search engines
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchEngine, setSearchEngine] = useState<'zoomeye' | 'shodan' | 'fofa'>('shodan')
+  const [searchResults, setSearchResults] = useState<SearchResult | null>(null)
+  const [searching, setSearching] = useState(false)
+  const [selectedSearchItems, setSelectedSearchItems] = useState<Set<number>>(new Set())
+  const [creatingFromSearch, setCreatingFromSearch] = useState(false)
 
   const loadCases = useCallback(async () => {
     try {
@@ -180,6 +188,72 @@ export default function ScannerHubPage() {
     navigator.clipboard.writeText(text)
   }
 
+  const handleSearch = async () => {
+    if (!searchQuery) return
+    setSearching(true)
+    setError('')
+    setSearchResults(null)
+    setSelectedSearchItems(new Set())
+    try {
+      const searchFn = searchApi[searchEngine]
+      const response = await searchFn({ q: searchQuery })
+      if (response.data) {
+        setSearchResults(response.data as SearchResult)
+      }
+    } catch (err: unknown) {
+      console.error('Search failed:', err)
+      setError(t('scanner_hub.search_failed'))
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const toggleSearchItem = (index: number) => {
+    setSelectedSearchItems(prev => {
+      const next = new Set(prev)
+      if (next.has(index)) {
+        next.delete(index)
+      } else {
+        next.add(index)
+      }
+      return next
+    })
+  }
+
+  const handleCreateFromSearch = async () => {
+    if (!selectedCase || !selectedPayload || selectedSearchItems.size === 0) return
+    if (!searchResults) return
+
+    setCreatingFromSearch(true)
+    setError('')
+    try {
+      const items = Array.from(selectedSearchItems).map(i => searchResults.results[i])
+      const response = await scannerRunApi.createFromSearch({
+        case_id: selectedCase,
+        payload_id: selectedPayload,
+        source: searchEngine,
+        results: items.map(item => ({
+          ip: item.ip,
+          port: item.port,
+          protocol: item.protocol,
+          hostname: item.hostname,
+        })),
+        scanner: selectedScanner,
+        template,
+        delivery_method: selectedDeliveryMethod,
+      })
+      if (response.data) {
+        loadRecentScannerRuns()
+        setSelectedSearchItems(new Set())
+      }
+    } catch (err: unknown) {
+      console.error('Failed to create scanner runs from search:', err)
+      setError(t('scanner_hub.create_from_search_failed'))
+    } finally {
+      setCreatingFromSearch(false)
+    }
+  }
+
   const handleScannerChange = (scanner: ScannerKind) => {
     const adapter = adapters.find(item => item.id === scanner)
     setSelectedScanner(scanner)
@@ -247,6 +321,115 @@ export default function ScannerHubPage() {
                     </Button>
                   </div>
                 ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Search Engines */}
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('scanner_hub.search_engines')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Select value={searchEngine} onValueChange={(v: 'zoomeye' | 'shodan' | 'fofa') => setSearchEngine(v)}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="shodan">Shodan</SelectItem>
+                  <SelectItem value="zoomeye">ZoomEye</SelectItem>
+                  <SelectItem value="fofa">Fofa</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder={t('scanner_hub.search_placeholder')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
+              />
+              <Button onClick={handleSearch} disabled={searching || !searchQuery}>
+                {searching ? t('common.loading') : t('scanner_hub.search')}
+              </Button>
+            </div>
+
+            {searchResults && (
+              <div className="space-y-3">
+                <div className="text-sm text-muted-foreground">
+                  {t('scanner_hub.found_results')}{searchResults.total}
+                </div>
+                {searchResults.results.length > 0 && (
+                  <>
+                    <div className="border rounded">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b bg-muted/50">
+                            <th className="p-2 w-10">
+                              <input
+                                type="checkbox"
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedSearchItems(new Set(searchResults.results.map((_, i) => i)))
+                                  } else {
+                                    setSelectedSearchItems(new Set())
+                                  }
+                                }}
+                                checked={selectedSearchItems.size === searchResults.results.length}
+                              />
+                            </th>
+                            <th className="p-2 text-left">IP</th>
+                            <th className="p-2 text-left">{t('scanner_hub.port')}</th>
+                            <th className="p-2 text-left">{t('scanner_hub.protocol')}</th>
+                            <th className="p-2 text-left">{t('scanner_hub.hostname')}</th>
+                            <th className="p-2 text-left">{t('scanner_hub.action')}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {searchResults.results.map((item, index) => (
+                            <tr key={index} className="border-b hover:bg-muted/50">
+                              <td className="p-2">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedSearchItems.has(index)}
+                                  onChange={() => toggleSearchItem(index)}
+                                />
+                              </td>
+                              <td className="p-2 font-mono">{item.ip}</td>
+                              <td className="p-2">{item.port}</td>
+                              <td className="p-2">{item.protocol || '-'}</td>
+                              <td className="p-2">{item.hostname || '-'}</td>
+                              <td className="p-2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={!selectedCase || !selectedPayload || creatingFromSearch}
+                                  onClick={async () => {
+                                    setSelectedSearchItems(new Set([index]))
+                                    await handleCreateFromSearch()
+                                  }}
+                                >
+                                  {t('scanner_hub.create_run')}
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        {selectedSearchItems.size} {t('scanner_hub.selected')}
+                      </span>
+                      <Button
+                        onClick={handleCreateFromSearch}
+                        disabled={selectedSearchItems.size === 0 || !selectedCase || !selectedPayload || creatingFromSearch}
+                      >
+                        {creatingFromSearch ? t('common.loading') : t('scanner_hub.create_selected_runs')}
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </CardContent>

@@ -502,6 +502,37 @@ export interface ScannerRunListResponse {
   total_pages: number
 }
 
+export interface ScanTargetItem {
+  ip: string
+  port: number
+  protocol?: string
+  hostname?: string
+}
+
+export interface ScannerRunCreateFromSearchRequest {
+  case_id: string
+  payload_id: string
+  source: string
+  results: ScanTargetItem[]
+  scanner?: ScannerKind
+  template?: string
+  delivery_method?: ScannerDeliveryMethod
+}
+
+export interface SearchResultItem {
+  ip: string
+  port: number
+  protocol?: string
+  hostname?: string
+  country?: string
+  title?: string
+}
+
+export interface SearchResult {
+  total: number
+  results: SearchResultItem[]
+}
+
 // Agent Run types
 export type AgentRunStatus = 'created' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled' | 'timed_out'
 

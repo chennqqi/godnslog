@@ -21,6 +21,7 @@ var (
 	ErrPayloadNotInCase   = errors.New("payload does not belong to case")
 	ErrInvalidScanner     = errors.New("invalid scanner")
 	ErrInvalidDelivery    = errors.New("invalid delivery method")
+	ErrNoResults          = errors.New("no search results provided")
 )
 
 // Service provides scanner run management services
@@ -123,6 +124,98 @@ func (s *Service) CreateScannerRun(req *models.ScannerRunCreateRequest, userID, 
 	}
 
 	return scannerRun, nil
+}
+
+// CreateScannerRunsFromSearch creates scanner runs from search engine results.
+// Each result item becomes a separate scanner run targeting that host.
+func (s *Service) CreateScannerRunsFromSearch(req *models.ScannerRunCreateFromSearchRequest, userID, baseURL string) ([]*models.ScannerRun, error) {
+	if len(req.Results) == 0 {
+		return nil, ErrNoResults
+	}
+
+	// Default to nuclei if not specified
+	scanner := req.Scanner
+	if scanner == "" {
+		scanner = models.ScannerNuclei
+	}
+	deliveryMethod := req.DeliveryMethod
+	if deliveryMethod == "" {
+		deliveryMethod = models.DeliveryMethodNucleiJsonl
+	}
+	template := req.Template
+	if template == "" {
+		template = "ssrf-basic"
+	}
+
+	if err := validateScannerDelivery(scanner, deliveryMethod); err != nil {
+		return nil, err
+	}
+
+	// Validate case exists
+	var caseModel models.Case
+	has, err := s.engine.ID(req.CaseID).Get(&caseModel)
+	if err != nil {
+		return nil, err
+	}
+	if !has {
+		return nil, ErrInvalidCase
+	}
+
+	// Validate payload exists
+	var payload models.Payload
+	has, err = s.engine.ID(req.PayloadID).Get(&payload)
+	if err != nil {
+		return nil, err
+	}
+	if !has {
+		return nil, ErrInvalidPayload
+	}
+	if payload.CaseID != req.CaseID {
+		return nil, ErrPayloadNotInCase
+	}
+
+	var created []*models.ScannerRun
+
+	for _, result := range req.Results {
+		target := buildTargetFromResult(result)
+		if target == "" {
+			continue
+		}
+
+		createReq := &models.ScannerRunCreateRequest{
+			CaseID:         req.CaseID,
+			PayloadID:      req.PayloadID,
+			Scanner:        scanner,
+			Target:         target,
+			Template:       template,
+			DeliveryMethod: deliveryMethod,
+		}
+
+		scannerRun, err := s.CreateScannerRun(createReq, userID, baseURL)
+		if err != nil {
+			return created, fmt.Errorf("failed to create scanner run for target %s: %w", target, err)
+		}
+		created = append(created, scannerRun)
+	}
+
+	return created, nil
+}
+
+// buildTargetFromResult constructs a target string from a search result item.
+func buildTargetFromResult(item models.ScanTargetItem) string {
+	if item.Hostname != "" {
+		if item.Port > 0 {
+			return fmt.Sprintf("%s:%d", item.Hostname, item.Port)
+		}
+		return item.Hostname
+	}
+	if item.IP != "" {
+		if item.Port > 0 {
+			return fmt.Sprintf("%s:%d", item.IP, item.Port)
+		}
+		return item.IP
+	}
+	return ""
 }
 
 // GetScannerRunByID retrieves a scanner run by its ID

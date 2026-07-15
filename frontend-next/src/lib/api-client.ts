@@ -29,6 +29,9 @@ import type {
   ScannerRunUpdateStatusRequest,
   ScannerRunListResponse,
   ScannerAdapterListResponse,
+  ScannerRunCreateFromSearchRequest,
+  SearchResult,
+  SearchResultItem,
   AgentRun,
   AgentRunDetail,
   AgentRunCreateRequest,
@@ -227,8 +230,20 @@ export const scannerRunApi = {
   }) => api.get<ScannerRunListResponse>('/scanner-runs', params),
   get: (id: string) => api.get<{ data: ScannerRunDetail }>(`/scanner-runs/${id}`),
   create: (data: ScannerRunCreateRequest) => api.post<ScannerRun>('/scanner-runs', data),
+  createFromSearch: (data: ScannerRunCreateFromSearchRequest) =>
+    api.post<{ items: ScannerRun[]; total: number }>('/scanner-runs/from-search', data),
   updateStatus: (id: string, data: ScannerRunUpdateStatusRequest) =>
     api.put<{ data: ScannerRun }>(`/scanner-runs/${id}/status`, data),
+}
+
+// Search Engine API
+export const searchApi = {
+  zoomeye: (params: { q: string; page?: number }) =>
+    api.get<SearchResult>('/search/zoomeye', params),
+  shodan: (params: { q: string; page?: number }) =>
+    api.get<SearchResult>('/search/shodan', params),
+  fofa: (params: { q: string; page?: number }) =>
+    api.get<SearchResult>('/search/fofa', params),
 }
 
 // Agent Run API

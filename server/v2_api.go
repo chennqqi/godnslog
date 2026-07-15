@@ -262,6 +262,7 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		{
 			scannerRuns.GET("", self.v2ListScannerRuns)
 			scannerRuns.POST("", self.v2CreateScannerRun)
+			scannerRuns.POST("/from-search", self.v2CreateScannerRunFromSearch)
 			scannerRuns.GET("/:id", self.v2GetScannerRun)
 			scannerRuns.PUT("/:id/status", self.v2UpdateScannerRunStatus)
 			scannerRuns.POST("/:id/backfill", self.v2BackfillScannerResults)
@@ -4072,6 +4073,62 @@ func (self *WebServer) v2UpdateScannerRunStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
+	})
+}
+
+// v2CreateScannerRunFromSearch creates scanner runs from search engine results.
+func (self *WebServer) v2CreateScannerRunFromSearch(c *gin.Context) {
+	var req v2models.ScannerRunCreateFromSearchRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": fmt.Sprintf("invalid request: %v", err),
+		})
+		return
+	}
+
+	user := c.MustGet("user").(*models.TblUser)
+	userID := strconv.FormatInt(user.Id, 10)
+
+	baseURL := fmt.Sprintf("%s://%s", c.Request.URL.Scheme, c.Request.Host)
+	if baseURL == "://" {
+		baseURL = "http://" + c.Request.Host
+	}
+
+	scannerHubService := scannerhub.NewService(self.orm)
+	runs, err := scannerHubService.CreateScannerRunsFromSearch(&req, userID, baseURL)
+	if err != nil {
+		logrus.Errorf("[v2_api.go::v2CreateScannerRunFromSearch] error: %v", err)
+		if err == scannerhub.ErrInvalidCase {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "case not found"})
+			return
+		}
+		if err == scannerhub.ErrInvalidPayload || err == scannerhub.ErrPayloadNotInCase {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid payload"})
+			return
+		}
+		if err == scannerhub.ErrInvalidScanner || err == scannerhub.ErrInvalidDelivery {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid scanner or delivery method"})
+			return
+		}
+		if err == scannerhub.ErrNoResults {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "no results provided"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to create scanner runs",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"items": runs,
+			"total": len(runs),
+		},
 	})
 }
 
