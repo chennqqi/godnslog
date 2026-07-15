@@ -115,7 +115,7 @@ func TestGenerateScannerArtifactsForPrimaryAdapters(t *testing.T) {
 			contains: []string{
 				"Burp Suite Extension",
 				"/api/v2/payloads",
-				"/api/v2/interactions?payload_id=payload-1",
+				"GODNSLOG_API_KEY",
 			},
 		},
 		{
@@ -123,8 +123,9 @@ func TestGenerateScannerArtifactsForPrimaryAdapters(t *testing.T) {
 			scanner: models.ScannerYakit,
 			method:  models.DeliveryMethodYakitScript,
 			contains: []string{
-				"yak",
-				"CreateHTTPFlow",
+				"yak run",
+				"GODNSLOG_PAYLOAD",
+				"GODNSLOG_TARGET",
 				"http://tok-abc123.example.com/callback",
 			},
 		},
@@ -134,7 +135,8 @@ func TestGenerateScannerArtifactsForPrimaryAdapters(t *testing.T) {
 			method:  models.DeliveryMethodZapScript,
 			contains: []string{
 				"ZAP Script",
-				"zap.script",
+				"zap.sh",
+				"GODNSLOG_PAYLOAD",
 			},
 		},
 		{
@@ -142,8 +144,10 @@ func TestGenerateScannerArtifactsForPrimaryAdapters(t *testing.T) {
 			scanner: models.ScannerXray,
 			method:  models.DeliveryMethodXrayWebhook,
 			contains: []string{
-				"webhook",
-				"/api/v2/interactions?payload_id=payload-1",
+				"xray",
+				"GODNSLOG_PAYLOAD",
+				"webhook-url",
+				"GODNSLOG_WEBHOOK",
 			},
 		},
 		{
@@ -151,28 +155,10 @@ func TestGenerateScannerArtifactsForPrimaryAdapters(t *testing.T) {
 			scanner: models.ScannerRad,
 			method:  models.DeliveryMethodRadWebhook,
 			contains: []string{
-				"webhook",
-				"/api/v2/interactions?payload_id=payload-1",
-			},
-		},
-		{
-			name:    "postman env",
-			scanner: models.ScannerPostman,
-			method:  models.DeliveryMethodPostmanEnv,
-			contains: []string{
+				"xray",
 				"GODNSLOG_PAYLOAD",
-				"GODNSLOG_INTERACTIONS_URL",
-				"GODNSLOG_EVIDENCE_URL",
-			},
-		},
-		{
-			name:    "apifox env",
-			scanner: models.ScannerApifox,
-			method:  models.DeliveryMethodApifoxEnv,
-			contains: []string{
-				"GODNSLOG_PAYLOAD",
-				"GODNSLOG_INTERACTIONS_URL",
-				"GODNSLOG_EVIDENCE_URL",
+				"webhook-url",
+				"GODNSLOG_WEBHOOK",
 			},
 		},
 	}

@@ -163,17 +163,12 @@ func (s *Service) GetScannerRunDetail(id, baseURL string) (*models.ScannerRunDet
 	interactionsURL := fmt.Sprintf("%s/api/v2/interactions?payload_id=%s", baseURL, scannerRun.PayloadID)
 	evidenceURL := fmt.Sprintf("%s/dashboard/evidence?payload_id=%s", baseURL, scannerRun.PayloadID)
 
-	// Evidence count calculation
-	// NOTE: Sprint I limitation - evidence table not yet implemented
-	// Future Sprint I+ will implement proper evidence table and count query
-	// Current implementation: evidence_count = 0 (placeholder for future evidence table)
+	// Evidence count: count enriched interactions (those with exploit type or decoded data)
+	evidenceCount64, err := s.engine.Where("payload_id = ? AND (exploit_type IS NOT NULL AND exploit_type != '' OR decoded_data IS NOT NULL AND decoded_data != '')", scannerRun.PayloadID).Count(&models.Interaction{})
 	evidenceCount := 0
-	// TODO: Implement proper evidence table and count query for Sprint I+
-	// This will require:
-	// 1. Create models.Evidence table
-	// 2. Add evidence generation logic in interaction service
-	// 3. Query evidence count by payload_id here
-	// For now, evidence_count is 0 to avoid false assumptions
+	if err == nil {
+		evidenceCount = int(evidenceCount64)
+	}
 
 	detail := &models.ScannerRunDetail{
 		ScannerRun:        *scannerRun,
@@ -518,36 +513,53 @@ func generateScannerCommand(req *models.ScannerRunCreateRequest, payload *models
 			target, req.Template, payloadVar)
 	case models.ScannerBurp:
 		return strings.Join([]string{
-			"Burp Suite Extension Package",
-			fmt.Sprintf("Target: %s", req.Target),
-			fmt.Sprintf("Create probe API: /api/v2/payloads"),
-			fmt.Sprintf("Rendered payload: %s", payload.TemplateRendered),
-			fmt.Sprintf("Poll interactions: %s", interactionsURL),
-			fmt.Sprintf("Open evidence: %s", evidenceURL),
+			fmt.Sprintf("# Burp Suite Extension — OAST probe for %s", req.Target),
+			fmt.Sprintf("# 1. Build: cd $GODNSLOG_HOME/examples/burp-suite && mvn package"),
+			fmt.Sprintf("# 2. Load godnslog-burp-extension-*.jar into Burp Extender"),
+			fmt.Sprintf("# 3. Configure extension with:"),
+			fmt.Sprintf("#    GODNSLOG_URL=%s", interactionsURL[:strings.LastIndex(interactionsURL, "/interactions")]),
+			fmt.Sprintf("#    GODNSLOG_API_KEY=<your-api-key>"),
+			fmt.Sprintf("# 4. Right-click HTTP request → Extensions → GODNSLOG → Create OAST Probe"),
+			"",
+			fmt.Sprintf("# Alternatively, create payload via API:"),
+			fmt.Sprintf("curl -s -X POST \"${GODNSLOG_URL}/api/v2/payloads\" \\"),
+			fmt.Sprintf("  -H \"Content-Type: application/json\" \\"),
+			fmt.Sprintf("  -H \"Authorization: Bearer ${GODNSLOG_API_KEY}\" \\"),
+			fmt.Sprintf("  -d '{\"case_id\":\"%s\",\"template\":\"%s\",\"scenario\":\"Burp OAST probe for %s\"}'", req.CaseID, req.Template, req.Target),
+			fmt.Sprintf("# Poll: curl -s \"${GODNSLOG_URL}/api/v2/interactions?payload_id=<id>\" | jq ."),
 		}, "\n")
 	case models.ScannerYakit:
 		return strings.Join([]string{
-			"yak godnslog-oast.yak",
-			fmt.Sprintf("target = %q", req.Target),
-			fmt.Sprintf("payload = %q", payload.TemplateRendered),
-			"CreateHTTPFlow(target, payload)",
-			fmt.Sprintf("interactions = %q", interactionsURL),
+			fmt.Sprintf("export GODNSLOG_PAYLOAD=%s", payload.TemplateRendered),
+			fmt.Sprintf("export GODNSLOG_TARGET=%s", req.Target),
+			fmt.Sprintf("export GODNSLOG_INTERACTIONS=%s", interactionsURL),
+			fmt.Sprintf("export GODNSLOG_EVIDENCE=%s", evidenceURL),
+			"yak run godnslog-oast.yak",
 		}, "\n")
 	case models.ScannerZap:
 		return strings.Join([]string{
-			"ZAP Script Package",
-			"zap.script.load godnslog-oast.js",
-			fmt.Sprintf("target=%s", req.Target),
-			fmt.Sprintf("payload=%s", payload.TemplateRendered),
-			fmt.Sprintf("interactions=%s", interactionsURL),
+			fmt.Sprintf("# ZAP Script — OAST probe for %s", req.Target),
+			fmt.Sprintf("export GODNSLOG_PAYLOAD=\"%s\"", payload.TemplateRendered),
+			fmt.Sprintf("export GODNSLOG_TARGET=\"%s\"", req.Target),
+			fmt.Sprintf("export GODNSLOG_INTERACTIONS=\"%s\"", interactionsURL),
+			"",
+			fmt.Sprintf("zap.sh -cmd -script godnslog-oast.js \\"),
+			fmt.Sprintf("  -scriptVars 'godnslog_payload=$GODNSLOG_PAYLOAD,godnslog_target=$GODNSLOG_TARGET,godnslog_url=$GODNSLOG_INTERACTIONS' \\"),
+			fmt.Sprintf("  -port 8080 -host 127.0.0.1"),
 		}, "\n")
 	case models.ScannerXray, models.ScannerRad:
+		webhookURL := interactionsURL[:strings.LastIndex(interactionsURL, "/interactions")] + "/webhook/xray"
 		return strings.Join([]string{
-			fmt.Sprintf("%s webhook bridge package", req.Scanner),
-			fmt.Sprintf("webhook.target=%s", req.Target),
-			fmt.Sprintf("webhook.payload=%s", payload.TemplateRendered),
-			fmt.Sprintf("webhook.interactions=%s", interactionsURL),
-			fmt.Sprintf("webhook.evidence=%s", evidenceURL),
+			fmt.Sprintf("# xray/rad Webhook Bridge — OAST probe for %s", req.Target),
+			fmt.Sprintf("export GODNSLOG_PAYLOAD=\"%s\"", payload.TemplateRendered),
+			fmt.Sprintf("export GODNSLOG_TARGET=\"%s\"", req.Target),
+			fmt.Sprintf("export GODNSLOG_WEBHOOK=\"%s\"", webhookURL),
+			fmt.Sprintf("export GODNSLOG_INTERACTIONS=\"%s\"", interactionsURL),
+			fmt.Sprintf("export GODNSLOG_EVIDENCE=\"%s\"", evidenceURL),
+			"",
+			fmt.Sprintf("./xray webhook --target %s \\", target),
+			fmt.Sprintf("  --webhook-url ${GODNSLOG_WEBHOOK} \\"),
+			fmt.Sprintf("  --json-output xray-output.json"),
 		}, "\n")
 	case models.ScannerPostman, models.ScannerApifox:
 		return strings.Join([]string{
