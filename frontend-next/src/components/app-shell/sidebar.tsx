@@ -146,6 +146,7 @@ const NAV_GROUPS: NavGroup[] = [
       { labelKey: 'nav.agent-runs', href: '/dashboard/agent-runs', icon: <RocketIcon /> },
       { labelKey: 'nav.interactions', href: '/dashboard/interactions', icon: <TimelineIcon /> },
       { labelKey: 'nav.evidence-summary', href: '/dashboard/evidence-summary', icon: <ClipboardCheckIcon /> },
+      { labelKey: 'nav.attack-chains', href: '/dashboard/attack-chains', icon: <TimelineIcon /> },
     ],
   },
   {
