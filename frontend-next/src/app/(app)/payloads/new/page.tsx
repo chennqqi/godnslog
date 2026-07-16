@@ -436,7 +436,7 @@ function NewPayloadContent() {
         router.push(`/dashboard/payloads/${payloadData.id}`)
         return
       }
-      router.push('/dashboard/payloads')
+      router.push('/payloads')
     } catch (err) {
       console.error('Failed to create payload:', err)
       setSubmitError('Failed to create payload. Please try again.')

@@ -10,13 +10,15 @@ import { MarkdownRenderer } from '@/components/markdown-renderer'
 interface DocPageLayoutProps {
   titleKey: TranslationKey
   children?: ReactNode
-  /** Markdown content to render instead of children */
-  md?: string
+  /** English markdown content */
+  mdEn?: string
+  /** Chinese markdown content */
+  mdZh?: string
 }
 
-export function DocPageLayout({ titleKey, children, md }: DocPageLayoutProps) {
+export function DocPageLayout({ titleKey, children, mdEn, mdZh }: DocPageLayoutProps) {
   const router = useRouter()
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -25,10 +27,12 @@ export function DocPageLayout({ titleKey, children, md }: DocPageLayoutProps) {
     }
   }, [router])
 
+  const md = lang === 'zh-CN' && mdZh ? mdZh : mdEn
+
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="mb-6">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard/docs')}>
+        <Button variant="ghost" size="sm" onClick={() => router.push('/docs')}>
           ← {t('docs.title')}
         </Button>
       </div>

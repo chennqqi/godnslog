@@ -113,7 +113,7 @@ function InteractionsPageContent() {
   })
 
   const clearScope = () => {
-    router.push('/dashboard/interactions')
+    router.push('/interactions')
   }
 
   const filteredInteractions = interactions.filter(i => {

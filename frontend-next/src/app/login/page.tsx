@@ -83,7 +83,7 @@ export default function LoginPage() {
           email: response.data.user.email,
           role: String(response.data.user.role),
         })
-        router.push('/dashboard')
+        router.push('/')
       } else {
         setError(response.message || t('login.error'))
       }

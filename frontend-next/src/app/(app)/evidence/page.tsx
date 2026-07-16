@@ -192,7 +192,7 @@ function EvidenceReportContent() {
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Case scoped: {caseId}
               <button
-                onClick={() => router.push('/dashboard/evidence')}
+                onClick={() => router.push('/evidence')}
                 className="ml-2 text-indigo-600 dark:text-indigo-400 hover:underline"
               >
                 Clear scope
@@ -203,7 +203,7 @@ function EvidenceReportContent() {
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Payload scoped: {payloadId}
               <button
-                onClick={() => router.push('/dashboard/evidence')}
+                onClick={() => router.push('/evidence')}
                 className="ml-2 text-indigo-600 dark:text-indigo-400 hover:underline"
               >
                 Clear scope

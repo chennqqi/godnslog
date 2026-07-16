@@ -160,10 +160,10 @@ export function TopBar({ onToggleSidebar, pageTitle }: TopBarProps) {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={() => router.push('/dashboard/settings')}>
+            <DropdownMenuItem onClick={() => router.push('/settings')}>
               {t('topbar.profile')}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push('/dashboard/apikeys')}>
+            <DropdownMenuItem onClick={() => router.push('/apikeys')}>
               {t('topbar.apikeys')}
             </DropdownMenuItem>
             <DropdownMenuSeparator />

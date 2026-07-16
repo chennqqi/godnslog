@@ -140,40 +140,40 @@ const NAV_GROUPS: NavGroup[] = [
   {
     titleKey: 'nav.group.oast',
     items: [
-      { labelKey: 'nav.dashboard', href: '/dashboard', icon: <LayoutIcon /> },
-      { labelKey: 'nav.cases', href: '/dashboard/cases', icon: <FolderIcon /> },
-      { labelKey: 'nav.payloads', href: '/dashboard/payloads', icon: <BeakerIcon /> },
-      { labelKey: 'nav.agent-runs', href: '/dashboard/agent-runs', icon: <RocketIcon /> },
-      { labelKey: 'nav.interactions', href: '/dashboard/interactions', icon: <TimelineIcon /> },
-      { labelKey: 'nav.evidence-summary', href: '/dashboard/evidence-summary', icon: <ClipboardCheckIcon /> },
-      { labelKey: 'nav.attack-chains', href: '/dashboard/attack-chains', icon: <TimelineIcon /> },
+      { labelKey: 'nav.dashboard', href: '/', icon: <LayoutIcon /> },
+      { labelKey: 'nav.cases', href: '/cases', icon: <FolderIcon /> },
+      { labelKey: 'nav.payloads', href: '/payloads', icon: <BeakerIcon /> },
+      { labelKey: 'nav.agent-runs', href: '/agent-runs', icon: <RocketIcon /> },
+      { labelKey: 'nav.interactions', href: '/interactions', icon: <TimelineIcon /> },
+      { labelKey: 'nav.evidence-summary', href: '/evidence-summary', icon: <ClipboardCheckIcon /> },
+      { labelKey: 'nav.attack-chains', href: '/attack-chains', icon: <TimelineIcon /> },
     ],
   },
   {
     titleKey: 'nav.group.monitor',
     items: [
-      { labelKey: 'nav.canary', href: '/dashboard/canary', icon: <ShieldIcon /> },
-      { labelKey: 'nav.rebinding', href: '/dashboard/rebinding', icon: <GlobeIcon /> },
-      { labelKey: 'nav.listeners', href: '/dashboard/listeners', icon: <RadioIcon /> },
-      { labelKey: 'nav.workflow', href: '/dashboard/workflow', icon: <WorkflowIcon /> },
+      { labelKey: 'nav.canary', href: '/canary', icon: <ShieldIcon /> },
+      { labelKey: 'nav.rebinding', href: '/rebinding', icon: <GlobeIcon /> },
+      { labelKey: 'nav.listeners', href: '/listeners', icon: <RadioIcon /> },
+      { labelKey: 'nav.workflow', href: '/workflow', icon: <WorkflowIcon /> },
     ],
   },
   {
     titleKey: 'nav.group.integrations',
     items: [
-      { labelKey: 'nav.scanner-hub', href: '/dashboard/scanner-hub', icon: <TerminalIcon /> },
-      { labelKey: 'nav.marketplace', href: '/dashboard/marketplace', icon: <StoreIcon /> },
-      { labelKey: 'nav.retention', href: '/dashboard/retention', icon: <ArchiveIcon /> },
+      { labelKey: 'nav.scanner-hub', href: '/scanner-hub', icon: <TerminalIcon /> },
+      { labelKey: 'nav.marketplace', href: '/marketplace', icon: <StoreIcon /> },
+      { labelKey: 'nav.retention', href: '/retention', icon: <ArchiveIcon /> },
     ],
   },
   {
     titleKey: 'nav.group.system',
     items: [
-      { labelKey: 'nav.settings', href: '/dashboard/settings', icon: <CogIcon /> },
-      { labelKey: 'nav.users', href: '/dashboard/users', icon: <UsersIcon /> },
-      { labelKey: 'nav.apikeys', href: '/dashboard/apikeys', icon: <KeyIcon /> },
-      { labelKey: 'nav.audit', href: '/dashboard/audit', icon: <AuditIcon /> },
-      { labelKey: 'nav.docs', href: '/dashboard/docs', icon: <BookIcon /> },
+      { labelKey: 'nav.settings', href: '/settings', icon: <CogIcon /> },
+      { labelKey: 'nav.users', href: '/users', icon: <UsersIcon /> },
+      { labelKey: 'nav.apikeys', href: '/apikeys', icon: <KeyIcon /> },
+      { labelKey: 'nav.audit', href: '/audit', icon: <AuditIcon /> },
+      { labelKey: 'nav.docs', href: '/docs', icon: <BookIcon /> },
     ],
   },
 ]
@@ -184,7 +184,7 @@ export function Sidebar({ collapsed = false, onClose }: SidebarProps) {
   const { t } = useI18n()
 
   const isActive = (href: string) => {
-    if (href === '/dashboard') return pathname === '/dashboard'
+    if (href === '/') return pathname === '/'
     return pathname.startsWith(href)
   }
 

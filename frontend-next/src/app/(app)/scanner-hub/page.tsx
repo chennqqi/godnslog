@@ -567,7 +567,7 @@ export default function ScannerHubPage() {
             {cases.length === 0 && (
               <div className="mt-3 text-sm text-muted-foreground">
                 {t('scanner_hub.no_case_hint')}
-                <Button variant="link" className="px-0" onClick={() => router.push('/dashboard/cases')}>
+                <Button variant="link" className="px-0" onClick={() => router.push('/cases')}>
                   {t('scanner_hub.go_to_cases')}
                 </Button>
               </div>

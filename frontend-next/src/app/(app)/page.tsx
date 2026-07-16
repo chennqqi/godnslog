@@ -140,10 +140,10 @@ export default function DashboardPage() {
                 {t('dashboard.welcome_desc')}
               </p>
               <div className="flex flex-wrap gap-2 pt-1">
-                <Button size="sm" onClick={() => router.push('/dashboard/cases')}>
+                <Button size="sm" onClick={() => router.push('/cases')}>
                   {t('dashboard.welcome_create_case')}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => router.push('/dashboard/docs/quick-start')}>
+                <Button size="sm" variant="outline" onClick={() => router.push('/docs/quick-start')}>
                   {t('dashboard.welcome_view_docs')}
                 </Button>
               </div>
@@ -245,10 +245,10 @@ export default function DashboardPage() {
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: t('dashboard.new_case'), href: '/dashboard/cases', color: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400' },
-                { label: t('dashboard.new_payload'), href: '/dashboard/payloads/new', color: 'bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400' },
-                { label: t('dashboard.view_timeline'), href: '/dashboard/interactions', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400' },
-                { label: t('dashboard.canary_tokens'), href: '/dashboard/canary', color: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400' },
+                { label: t('dashboard.new_case'), href: '/cases', color: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400' },
+                { label: t('dashboard.new_payload'), href: '/payloads/new', color: 'bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400' },
+                { label: t('dashboard.view_timeline'), href: '/interactions', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400' },
+                { label: t('dashboard.canary_tokens'), href: '/canary', color: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400' },
               ].map((action) => (
                 <Link
                   key={action.href}
@@ -271,7 +271,7 @@ export default function DashboardPage() {
             {t('dashboard.live_hit_stream')}
           </CardTitle>
           <Link
-            href="/dashboard/interactions"
+            href="/interactions"
             className="text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 font-medium"
           >
             {t('dashboard.view_all')} →
@@ -301,7 +301,7 @@ export default function DashboardPage() {
                 <div
                   key={interaction.id}
                   className="flex items-center gap-3 py-3 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 -mx-2 px-2 rounded"
-                  onClick={() => router.push('/dashboard/interactions')}
+                  onClick={() => router.push('/interactions')}
                 >
                   <span
                     className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${
@@ -322,7 +322,7 @@ export default function DashboardPage() {
                   <div className="flex gap-1 shrink-0">
                     <button
                       className="text-xs text-gray-400 hover:text-indigo-600"
-                      onClick={(e) => { e.stopPropagation(); router.push('/dashboard/interactions') }}
+                      onClick={(e) => { e.stopPropagation(); router.push('/interactions') }}
                     >
                       →
                     </button>

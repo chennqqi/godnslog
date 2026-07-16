@@ -22,32 +22,32 @@ export default function DocsPage() {
     {
       titleKey: 'docs.quick_start' as TranslationKey,
       descKey: 'docs.quick_start_desc' as TranslationKey,
-      link: '/dashboard/docs/quick-start',
+      link: '/docs/quick-start',
     },
     {
       titleKey: 'docs.api' as TranslationKey,
       descKey: 'docs.api_desc' as TranslationKey,
-      link: '/dashboard/docs/api',
+      link: '/docs/api',
     },
     {
       titleKey: 'docs.user_guide' as TranslationKey,
       descKey: 'docs.user_guide_desc' as TranslationKey,
-      link: '/dashboard/docs/user-guide',
+      link: '/docs/user-guide',
     },
     {
       titleKey: 'docs.config' as TranslationKey,
       descKey: 'docs.config_desc' as TranslationKey,
-      link: '/dashboard/docs/config',
+      link: '/docs/config',
     },
     {
       titleKey: 'docs.faq' as TranslationKey,
       descKey: 'docs.faq_desc' as TranslationKey,
-      link: '/dashboard/docs/faq',
+      link: '/docs/faq',
     },
     {
       titleKey: 'docs.security' as TranslationKey,
       descKey: 'docs.security_desc' as TranslationKey,
-      link: '/dashboard/docs/security',
+      link: '/docs/security',
     },
   ]
 
