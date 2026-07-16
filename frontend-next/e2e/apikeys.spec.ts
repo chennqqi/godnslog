@@ -109,7 +109,7 @@ test.describe('API Keys Page', () => {
       });
     });
 
-    await page.goto('/dashboard/apikeys');
+    await page.goto('/apikeys');
     await expect(page.locator('h2')).toContainText('API Keys 管理');
     await expect(page.locator('text=Test Key 1')).toBeVisible();
   });
@@ -166,7 +166,7 @@ test.describe('API Keys Page', () => {
       }
     });
 
-    await page.goto('/dashboard/apikeys');
+    await page.goto('/apikeys');
     await page.click('button:has-text("创建 API Key")');
 
     await page.fill('input[type="text"]', 'Agent Test Key');
@@ -271,7 +271,7 @@ test.describe('API Keys Page', () => {
       })
     })
 
-    await page.goto('/dashboard/apikeys')
+    await page.goto('/apikeys')
     await page.getByRole('button', { name: '创建 API Key' }).click()
     await page.getByLabel('名称').fill('Agent Risk Key')
     await page.getByLabel('Agent Key (AI Agent 专用)').check()
@@ -344,7 +344,7 @@ test.describe('API Keys Page', () => {
     });
 
     // Handle custom confirm dialog (not native)
-    await page.goto('/dashboard/apikeys');
+    await page.goto('/apikeys');
     await page.click('button:has-text("删除")');
     // Wait for the custom confirm dialog and click Delete
     await page.waitForTimeout(500);
@@ -383,7 +383,7 @@ test.describe('API Keys Page', () => {
       });
     });
 
-    await page.goto('/dashboard/apikeys');
+    await page.goto('/apikeys');
     const keyText = await page.locator('text=Key:').textContent();
     expect(keyText).toContain('********');
     expect(keyText).not.toContain('gdl_abc123' + 'x'.repeat(24));

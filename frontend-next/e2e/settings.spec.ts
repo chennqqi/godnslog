@@ -11,7 +11,7 @@ test.describe('Settings Page', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/settings');
+    await page.goto('/settings');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });

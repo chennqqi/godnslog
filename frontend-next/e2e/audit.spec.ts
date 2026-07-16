@@ -109,7 +109,7 @@ const fulfillTrace = async (route: Route, options: TraceOptions = {}) => {
 }
 
 const gotoAudit = async (page: Page) => {
-  await page.goto('/dashboard/audit')
+  await page.goto('/audit')
   await expect(page.getByRole('heading', { name: 'Audit Log', exact: true })).toBeVisible()
   await expect(page.getByRole('table')).toBeVisible()
 }

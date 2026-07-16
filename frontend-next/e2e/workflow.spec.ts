@@ -12,7 +12,7 @@ test.describe('Workflow Page', () => {
       localStorage.setItem('token', 'mock-token');
       localStorage.setItem('user', JSON.stringify({ id: 1, username: 'admin', email: 'admin@godnslog.com', role: 0, lang: 'en-US' }));
     });
-    await page.goto('/dashboard/workflow')
+    await page.goto('/workflow')
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(5000);
   });

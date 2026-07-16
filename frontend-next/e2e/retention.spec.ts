@@ -54,13 +54,13 @@ test.describe('Retention Page', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/retention');
+    await page.goto('/retention');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
 
   test('should display retention page', async ({ page }) => {
-    await expect(page).toHaveURL('/dashboard/retention');
+    await expect(page).toHaveURL('/retention');
   });
 
   test('should display data retention title', async ({ page }) => {
@@ -235,7 +235,7 @@ test.describe('Retention Page - Empty State', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/retention');
+    await page.goto('/retention');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
@@ -269,7 +269,7 @@ test.describe('Retention Page - API Error', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/retention');
+    await page.goto('/retention');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });

@@ -49,13 +49,13 @@ test.describe('Canary Page', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/canary');
+    await page.goto('/canary');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
 
   test('should display canary page', async ({ page }) => {
-    await expect(page).toHaveURL('/dashboard/canary');
+    await expect(page).toHaveURL('/canary');
   });
 
   test('should display canary tokens title', async ({ page }) => {
@@ -94,7 +94,7 @@ test.describe('Canary Page', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/canary');
+    await page.goto('/canary');
     await page.waitForURL('**/login', { timeout: 10000 });
     await expect(page).toHaveURL(/\/login/);
 
@@ -115,7 +115,7 @@ test.describe('Canary Page - Empty State', () => {
       });
     });
 
-    await page.goto('/dashboard/canary');
+    await page.goto('/canary');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
@@ -140,7 +140,7 @@ test.describe('Canary Page - API Error State', () => {
       return route.fulfill({ status: 500, json: { code: 500, message: 'Internal Server Error' } });
     });
 
-    await page.goto('/dashboard/canary');
+    await page.goto('/canary');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });

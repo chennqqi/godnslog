@@ -11,7 +11,7 @@ test.describe('Marketplace Page', () => {
       return route.fulfill({ json: { code: 0, data: { items: [], total: 0, page: 1, page_size: 20, total_pages: 0 } } });
     });
 
-    await page.goto('/dashboard/marketplace');
+    await page.goto('/marketplace');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });

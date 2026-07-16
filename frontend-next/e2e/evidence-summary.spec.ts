@@ -62,13 +62,13 @@ test.describe('Evidence Summary Page', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/evidence-summary');
+    await page.goto('/evidence-summary');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
 
   test('should display evidence summary page', async ({ page }) => {
-    await expect(page).toHaveURL('/dashboard/evidence-summary');
+    await expect(page).toHaveURL('/evidence-summary');
   });
 
   test('should display evidence summary title', async ({ page }) => {

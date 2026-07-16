@@ -41,7 +41,7 @@ test.describe('Interactions Page', () => {
   });
 
   test('should display interactions page', async ({ page }) => {
-    await page.goto('/dashboard/interactions');
+    await page.goto('/interactions');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
     await expect(page.locator('h2').first()).toContainText('Interaction Timeline');
@@ -59,7 +59,7 @@ test.describe('Interactions Page', () => {
         url.searchParams.get('case_id') === 'case-1';
     });
 
-    await page.goto('/dashboard/interactions?case_id=case-1');
+    await page.goto('/interactions?case_id=case-1');
     await Promise.all([listRequestPromise, statsRequestPromise]);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
@@ -79,7 +79,7 @@ test.describe('Interactions Page', () => {
         url.searchParams.get('payload_id') === 'payload-1';
     });
 
-    await page.goto('/dashboard/interactions?payload_id=payload-1');
+    await page.goto('/interactions?payload_id=payload-1');
     await Promise.all([listRequestPromise, statsRequestPromise]);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
@@ -99,14 +99,14 @@ test.describe('Interactions Page', () => {
       });
     });
 
-    await page.goto('/dashboard/interactions?payload_id=payload-1');
+    await page.goto('/interactions?payload_id=payload-1');
     await page.waitForLoadState('networkidle');
     await expect(page.locator('text=Payload scoped: payload-1')).toBeVisible();
     await expect(page.locator('text=Total').locator('..').getByText('2')).toBeVisible();
   });
 
   test('should clear scope and return to all interactions', async ({ page }) => {
-    await page.goto('/dashboard/interactions?case_id=case-1');
+    await page.goto('/interactions?case_id=case-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
     await page.click('button:has-text("Clear scope")');
@@ -121,14 +121,14 @@ test.describe('Interactions Page', () => {
         json: { code: 0, data: { items: [], total: 0, page: 1, page_size: 20, total_pages: 0 } }
       });
     });
-    await page.goto('/dashboard/interactions?case_id=case-1');
+    await page.goto('/interactions?case_id=case-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
     await expect(page.getByText('No interactions for this Case/Payload')).toBeVisible();
   });
 
   test('should open triage panel and display interaction details', async ({ page }) => {
-    await page.goto('/dashboard/interactions');
+    await page.goto('/interactions');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
     await page.click('button:has-text("Details")');
@@ -138,7 +138,7 @@ test.describe('Interactions Page', () => {
   });
 
   test('should display case and payload attribution in triage panel', async ({ page }) => {
-    await page.goto('/dashboard/interactions');
+    await page.goto('/interactions');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
     await page.click('button:has-text("Details")');
@@ -148,7 +148,7 @@ test.describe('Interactions Page', () => {
   });
 
   test('should have copy token button in triage panel', async ({ page }) => {
-    await page.goto('/dashboard/interactions');
+    await page.goto('/interactions');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
     await page.click('button:has-text("Details")');
@@ -157,7 +157,7 @@ test.describe('Interactions Page', () => {
   });
 
   test('should have navigation buttons in triage panel', async ({ page }) => {
-    await page.goto('/dashboard/interactions');
+    await page.goto('/interactions');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
     await page.click('button:has-text("Details")');
@@ -167,7 +167,7 @@ test.describe('Interactions Page', () => {
   });
 
   test('should have evidence generation buttons in triage panel', async ({ page }) => {
-    await page.goto('/dashboard/interactions');
+    await page.goto('/interactions');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
     await page.click('button:has-text("Details")');

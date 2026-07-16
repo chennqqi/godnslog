@@ -11,13 +11,13 @@ test.describe('Export Page', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/export');
+    await page.goto('/export');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
 
   test('should display export page', async ({ page }) => {
-    await expect(page).toHaveURL('/dashboard/export');
+    await expect(page).toHaveURL('/export');
   });
 
   test('should display export title', async ({ page }) => {

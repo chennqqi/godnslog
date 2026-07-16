@@ -14,7 +14,7 @@ test.describe('Payload Cheat Sheet', () => {
   });
 
   test('should display cheat sheet on dashboard', async ({ page }) => {
-    await page.goto('/dashboard');
+    await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
 
@@ -23,7 +23,7 @@ test.describe('Payload Cheat Sheet', () => {
   });
 
   test('should expand cheat sheet on click', async ({ page }) => {
-    await page.goto('/dashboard');
+    await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
 
@@ -37,7 +37,7 @@ test.describe('Payload Cheat Sheet', () => {
   });
 
   test('should show SSRF payloads when category expanded', async ({ page }) => {
-    await page.goto('/dashboard');
+    await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
 
@@ -50,7 +50,7 @@ test.describe('Payload Cheat Sheet', () => {
   });
 
   test('should have copy buttons on payload items', async ({ page }) => {
-    await page.goto('/dashboard');
+    await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
 

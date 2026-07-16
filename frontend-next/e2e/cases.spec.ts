@@ -30,7 +30,7 @@ test.describe('Cases Board', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/cases');
+    await page.goto('/cases');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
@@ -81,8 +81,8 @@ test.describe('Cases Board', () => {
     await caseRow.click();
 
     // Should navigate to case detail
-    await page.waitForURL('**/dashboard/cases/case-1');
-    expect(page.url()).toContain('/dashboard/cases/case-1');
+    await page.waitForURL('**/cases/case-1');
+    expect(page.url()).toContain('/cases/case-1');
   });
 });
 
@@ -143,7 +143,7 @@ test.describe('Case Detail', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/cases/case-1');
+    await page.goto('/cases/case-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
@@ -179,7 +179,7 @@ test.describe('Case Detail', () => {
     await createButton.click();
 
     // Should navigate to new payload page with case_id
-    await page.waitForURL('**/dashboard/payloads/new?case_id=case-1');
+    await page.waitForURL('**/payloads/new?case_id=case-1');
     expect(page.url()).toContain('case_id=case-1');
   });
 
@@ -188,7 +188,7 @@ test.describe('Case Detail', () => {
     await interactionsButton.click();
 
     // Should navigate to interactions page with case_id
-    await page.waitForURL('**/dashboard/interactions?case_id=case-1');
+    await page.waitForURL('**/interactions?case_id=case-1');
     expect(page.url()).toContain('case_id=case-1');
   });
 
@@ -197,7 +197,7 @@ test.describe('Case Detail', () => {
     await evidenceButton.click();
 
     // Should navigate to evidence page with case_id
-    await page.waitForURL('**/dashboard/evidence?case_id=case-1');
+    await page.waitForURL('**/evidence?case_id=case-1');
     expect(page.url()).toContain('case_id=case-1');
   });
 });
@@ -238,14 +238,14 @@ test.describe('New Payload', () => {
   });
 
   test('should display new payload page', async ({ page }) => {
-    await page.goto('/dashboard/payloads/new');
+    await page.goto('/payloads/new');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(5000);
     await expect(page.locator('text=New Payload').first()).toBeVisible();
   });
 
   test('should display associated case when case_id is provided', async ({ page }) => {
-    await page.goto('/dashboard/payloads/new?case_id=case-1');
+    await page.goto('/payloads/new?case_id=case-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
     await expect(page.locator('text=Creating for Case').first()).toBeVisible();
@@ -253,14 +253,14 @@ test.describe('New Payload', () => {
   });
 
   test('should display step indicator', async ({ page }) => {
-    await page.goto('/dashboard/payloads/new');
+    await page.goto('/payloads/new');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
     await expect(page.locator('text=Choose a template').first()).toBeVisible();
   });
 
   test('should display template selection', async ({ page }) => {
-    await page.goto('/dashboard/payloads/new');
+    await page.goto('/payloads/new');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
     await expect(page.locator('text=SSRF HTTP').first()).toBeVisible();
@@ -329,7 +329,7 @@ test.describe('Payload Detail', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/payloads/payload-1');
+    await page.goto('/payloads/payload-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
@@ -371,14 +371,14 @@ test.describe('Payload Detail', () => {
   test('should navigate to interactions on quick action click', async ({ page }) => {
     const interactionsButton = page.locator('button').filter({ hasText: 'View Interactions' }).first();
     await interactionsButton.click();
-    await page.waitForURL('**/dashboard/interactions?payload_id=payload-1');
+    await page.waitForURL('**/interactions?payload_id=payload-1');
     expect(page.url()).toContain('payload_id=payload-1');
   });
 
   test('should navigate to evidence on quick action click', async ({ page }) => {
     const evidenceButton = page.locator('button').filter({ hasText: 'View Evidence' }).first();
     await evidenceButton.click();
-    await page.waitForURL('**/dashboard/evidence?payload_id=payload-1');
+    await page.waitForURL('**/evidence?payload_id=payload-1');
     expect(page.url()).toContain('payload_id=payload-1');
   });
 });

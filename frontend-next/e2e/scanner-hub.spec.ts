@@ -34,7 +34,7 @@ const mockScannerRun = {
   template: 'ssrf-basic',
   delivery_method: 'nuclei-jsonl',
   command: "nuclei -u 'https://target.example' -t godnslog-ssrf-basic.yaml -var 'godnslog_payload=http://tok-abc123.example.com/callback'",
-  jsonl: '{"scanner":"nuclei","case_id":"case-1","payload_id":"payload-1","token":"tok-abc123","target":"https://target.example","template":"ssrf-basic","rendered_payload":"http://tok-abc123.example.com/callback","interactions_url":"http://localhost:3000/api/v2/interactions?payload_id=payload-1","evidence_url":"http://localhost:3000/dashboard/evidence?payload_id=payload-1","created_at":"2026-05-24T00:00:00.000Z"}',
+  jsonl: '{"scanner":"nuclei","case_id":"case-1","payload_id":"payload-1","token":"tok-abc123","target":"https://target.example","template":"ssrf-basic","rendered_payload":"http://tok-abc123.example.com/callback","interactions_url":"http://localhost:3000/api/v2/interactions?payload_id=payload-1","evidence_url":"http://localhost:3000/evidence?payload_id=payload-1","created_at":"2026-05-24T00:00:00.000Z"}',
   package_hash: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
   package_manifest: {
     schema_version: 'scanner-package.v1',
@@ -43,7 +43,7 @@ const mockScannerRun = {
     package_hash: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
     hash_algorithm: 'sha256',
     interactions_url: 'http://localhost:3000/api/v2/interactions?payload_id=payload-1',
-    evidence_url: 'http://localhost:3000/dashboard/evidence?payload_id=payload-1',
+    evidence_url: 'http://localhost:3000/evidence?payload_id=payload-1',
     files: [
       {
         name: 'README.md',
@@ -183,7 +183,7 @@ function scannerRunFor(body: { scanner?: string; delivery_method?: string }) {
       template: 'ssrf-basic',
       rendered_payload: 'http://tok-abc123.example.com/callback',
       interactions_url: 'http://localhost:3000/api/v2/interactions?payload_id=payload-1',
-      evidence_url: 'http://localhost:3000/dashboard/evidence?payload_id=payload-1',
+      evidence_url: 'http://localhost:3000/evidence?payload_id=payload-1',
       created_at: '2026-05-24T00:00:00.000Z',
     }),
   }
@@ -293,7 +293,7 @@ async function installScannerHubMocks(page: Page) {
 
 async function openScannerHub(page: Page) {
   await installScannerHubMocks(page)
-  await page.goto('/dashboard/scanner-hub')
+  await page.goto('/scanner-hub')
   await page.waitForLoadState('networkidle')
 }
 
@@ -378,7 +378,7 @@ test.describe('Scanner Hub', () => {
       template: 'ssrf-basic',
       rendered_payload: 'http://tok-abc123.example.com/callback',
       interactions_url: 'http://localhost:3000/api/v2/interactions?payload_id=payload-1',
-      evidence_url: 'http://localhost:3000/dashboard/evidence?payload_id=payload-1',
+      evidence_url: 'http://localhost:3000/evidence?payload_id=payload-1',
     })
   })
 
@@ -463,13 +463,13 @@ test.describe('Scanner Hub', () => {
     // Wait for scanner run to be created and navigate to detail
     await page.waitForTimeout(1000)
     await page.getByRole('button', { name: 'View Detail' }).click()
-    await page.waitForURL('**/dashboard/scanner-hub/**')
-    expect(page.url()).toContain('/dashboard/scanner-hub/')
+    await page.waitForURL('**/scanner-hub/**')
+    expect(page.url()).toContain('/scanner-hub/')
   })
 
   test('should update scanner run status on detail page', async ({ page }) => {
     // Directly navigate to detail page with proper mock
-    await page.goto('http://localhost:3000/dashboard/scanner-hub/run-1')
+    await page.goto('http://localhost:3000/scanner-hub/run-1')
 
     // Mock detail page API and status update API
     await page.route('**/api/v2/scanner-runs/*', route => {
@@ -486,7 +486,7 @@ test.describe('Scanner Hub', () => {
                 interaction_count: 0,
                 evidence_count: 0,
                 interactions_url: 'http://localhost:3000/api/v2/interactions?payload_id=payload-1',
-                evidence_url: 'http://localhost:3000/dashboard/evidence?payload_id=payload-1',
+                evidence_url: 'http://localhost:3000/evidence?payload_id=payload-1',
               },
             },
           },
@@ -531,14 +531,14 @@ test.describe('Scanner Hub', () => {
               interaction_count: 0,
               evidence_count: 0,
               interactions_url: 'http://localhost:3000/api/v2/interactions?payload_id=payload-1',
-              evidence_url: 'http://localhost:3000/dashboard/evidence?payload_id=payload-1',
+              evidence_url: 'http://localhost:3000/evidence?payload_id=payload-1',
             },
           },
         },
       })
     })
 
-    await page.goto('http://localhost:3000/dashboard/scanner-hub/run-1')
+    await page.goto('http://localhost:3000/scanner-hub/run-1')
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByRole('heading', { name: 'Package Hash' })).toBeVisible()
@@ -569,7 +569,7 @@ test.describe('Scanner Hub', () => {
     await generateScannerRun(page)
 
     await page.getByRole('button', { name: 'View Interactions' }).click()
-    await page.waitForURL('**/dashboard/interactions?payload_id=payload-1')
+    await page.waitForURL('**/interactions?payload_id=payload-1')
     expect(page.url()).toContain('payload_id=payload-1')
   })
 
@@ -577,7 +577,7 @@ test.describe('Scanner Hub', () => {
     await openScannerHub(page)
     await generateScannerRun(page)
     await page.getByRole('button', { name: 'View Evidence' }).click()
-    await page.waitForURL('**/dashboard/evidence?payload_id=payload-1')
+    await page.waitForURL('**/evidence?payload_id=payload-1')
     expect(page.url()).toContain('payload_id=payload-1')
   })
 

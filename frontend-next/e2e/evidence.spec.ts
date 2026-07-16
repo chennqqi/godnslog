@@ -53,14 +53,14 @@ test.describe('Evidence Page', () => {
   });
 
   test('should display evidence page', async ({ page }) => {
-    await page.goto('/dashboard/evidence');
+    await page.goto('/evidence');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
     await expect(page.locator('h2').first()).toContainText('Evidence Report');
   });
 
   test('should display case scoped evidence', async ({ page }) => {
-    await page.goto('/dashboard/evidence?case_id=case-1');
+    await page.goto('/evidence?case_id=case-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
     await expect(page.locator('text=Case scoped: case-1')).toBeVisible();
@@ -68,7 +68,7 @@ test.describe('Evidence Page', () => {
   });
 
   test('should display payload scoped evidence', async ({ page }) => {
-    await page.goto('/dashboard/evidence?payload_id=payload-1');
+    await page.goto('/evidence?payload_id=payload-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
     await expect(page.locator('text=Payload scoped: payload-1')).toBeVisible();
@@ -82,7 +82,7 @@ test.describe('Evidence Page', () => {
       return body.case_id === 'case-1' && !body.payload_id && body.format === 'markdown';
     });
 
-    await page.goto('/dashboard/evidence?case_id=case-1');
+    await page.goto('/evidence?case_id=case-1');
     await evidenceRequestPromise;
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
@@ -97,7 +97,7 @@ test.describe('Evidence Page', () => {
       return body.payload_id === 'payload-1' && !body.case_id && body.format === 'markdown';
     });
 
-    await page.goto('/dashboard/evidence?payload_id=payload-1');
+    await page.goto('/evidence?payload_id=payload-1');
     await evidenceRequestPromise;
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
@@ -112,14 +112,14 @@ test.describe('Evidence Page', () => {
       return body.case_id === 'case-1' && body.format === 'json';
     });
 
-    await page.goto('/dashboard/evidence?case_id=case-1&format=json');
+    await page.goto('/evidence?case_id=case-1&format=json');
     await evidenceRequestPromise;
     await page.waitForLoadState('networkidle');
     await expect(page.locator('text=Case scoped: case-1')).toBeVisible();
   });
 
   test('should display evidence summary after generation', async ({ page }) => {
-    await page.goto('/dashboard/evidence?case_id=case-1');
+    await page.goto('/evidence?case_id=case-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
     await expect(page.locator('h3:has-text("Evidence Summary")')).toBeVisible();
@@ -128,21 +128,21 @@ test.describe('Evidence Page', () => {
   });
 
   test('should display explainability section', async ({ page }) => {
-    await page.goto('/dashboard/evidence?case_id=case-1');
+    await page.goto('/evidence?case_id=case-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
     await expect(page.locator('text=Explainability').first()).toBeVisible();
   });
 
   test('should display timeline section', async ({ page }) => {
-    await page.goto('/dashboard/evidence?case_id=case-1');
+    await page.goto('/evidence?case_id=case-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
     await expect(page.locator('text=Timeline').first()).toBeVisible();
   });
 
   test('should display report preview', async ({ page }) => {
-    await page.goto('/dashboard/evidence?case_id=case-1');
+    await page.goto('/evidence?case_id=case-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
     await expect(page.locator('text=Report Preview').first()).toBeVisible();
@@ -154,7 +154,7 @@ test.describe('Evidence Page', () => {
         json: { code: 404, message: 'Evidence data not found' }
       });
     });
-    await page.goto('/dashboard/evidence?case_id=case-1');
+    await page.goto('/evidence?case_id=case-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
     await expect(page.locator('text=No evidence data available')).toBeVisible();
@@ -166,7 +166,7 @@ test.describe('Evidence Page', () => {
         json: { code: 500, message: 'Failed to generate evidence' }
       });
     });
-    await page.goto('/dashboard/evidence?case_id=case-1');
+    await page.goto('/evidence?case_id=case-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
     await expect(page.locator('.bg-red-50').first()).toBeVisible();

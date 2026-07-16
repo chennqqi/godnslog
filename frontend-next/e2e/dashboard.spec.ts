@@ -52,13 +52,13 @@ test.describe('Dashboard', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard');
+    await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
 
   test('should display dashboard page', async ({ page }) => {
-    await expect(page).toHaveURL('/dashboard');
+    await expect(page).toHaveURL('/');
   });
 
   test('should display stats from API', async ({ page }) => {
@@ -82,7 +82,7 @@ test.describe('Dashboard', () => {
     })
 
     // Navigate to dashboard - should redirect to login
-    await page.goto('/dashboard')
+    await page.goto('/')
     await page.waitForURL('**/login', { timeout: 10000 })
     await expect(page).toHaveURL(/\/login/)
 

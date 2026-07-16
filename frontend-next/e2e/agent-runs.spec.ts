@@ -43,10 +43,10 @@ const mockAgentRun = {
       created_at: '2026-05-24T00:01:00Z',
     },
   ],
-  case_url: '/dashboard/cases/case-1',
-  payload_url: '/dashboard/payloads/payload-1',
+  case_url: '/cases/case-1',
+  payload_url: '/payloads/payload-1',
   interactions_url: '/api/v2/interactions?payload_id=payload-1',
-  evidence_url: '/dashboard/evidence?payload_id=payload-1',
+  evidence_url: '/evidence?payload_id=payload-1',
 }
 
 test.describe('Agent Runs', () => {
@@ -218,10 +218,10 @@ test.describe('Agent Runs', () => {
                     interaction_count: 5,
                     last_interaction_at: '2026-05-31T10:00:00Z',
                     operations: [],
-                    case_url: '/dashboard/cases/case-1',
-                    payload_url: '/dashboard/payloads/payload-1',
-                    interactions_url: '/dashboard/interactions?case_id=case-1',
-                    evidence_url: '/dashboard/evidence?case_id=case-1',
+                    case_url: '/cases/case-1',
+                    payload_url: '/payloads/payload-1',
+                    interactions_url: '/interactions?case_id=case-1',
+                    evidence_url: '/evidence?case_id=case-1',
                   },
                   interaction_summary: {
                     total: 5,
@@ -270,10 +270,10 @@ test.describe('Agent Runs', () => {
                     interaction_count: 5,
                     last_interaction_at: '2026-05-31T10:00:00Z',
                     operations: [],
-                    case_url: '/dashboard/cases/case-1',
-                    payload_url: '/dashboard/payloads/payload-1',
-                    interactions_url: '/dashboard/interactions?case_id=case-1',
-                    evidence_url: '/dashboard/evidence?case_id=case-1',
+                    case_url: '/cases/case-1',
+                    payload_url: '/payloads/payload-1',
+                    interactions_url: '/interactions?case_id=case-1',
+                    evidence_url: '/evidence?case_id=case-1',
                   },
                   interaction_summary: {
                     total: 5,
@@ -317,7 +317,7 @@ test.describe('Agent Runs', () => {
       }
     })
 
-    await page.goto('/dashboard/agent-runs')
+    await page.goto('/agent-runs')
     await page.waitForLoadState('networkidle')
 
     // Check page title
@@ -344,7 +344,7 @@ test.describe('Agent Runs', () => {
   })
 
   test('should display agent run detail with operations timeline and backlinks', async ({ page }) => {
-    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.goto('/agent-runs/agent-run-1')
     await page.waitForLoadState('networkidle')
 
     // Check basic info
@@ -372,23 +372,23 @@ test.describe('Agent Runs', () => {
     const evidenceLink = page.getByRole('link', { name: '查看证据' })
     await expect(evidenceLink).toBeVisible()
     const evidenceHref = await evidenceLink.getAttribute('href')
-    expect(evidenceHref).toContain('/dashboard/evidence')
+    expect(evidenceHref).toContain('/evidence')
     expect(evidenceHref).toContain('payload_id=payload-1')
 
     // Check case/payload links
     const caseLink = page.getByRole('link', { name: 'case-1' })
     await expect(caseLink).toBeVisible()
     const caseHref = await caseLink.getAttribute('href')
-    expect(caseHref).toContain('/dashboard/cases/case-1')
+    expect(caseHref).toContain('/cases/case-1')
 
     const payloadLink = page.getByRole('link', { name: 'payload-1' })
     await expect(payloadLink).toBeVisible()
     const payloadHref = await payloadLink.getAttribute('href')
-    expect(payloadHref).toContain('/dashboard/payloads/payload-1')
+    expect(payloadHref).toContain('/payloads/payload-1')
   })
 
   test('should update agent run status with API call', async ({ page }) => {
-    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.goto('/agent-runs/agent-run-1')
     await page.waitForLoadState('networkidle')
 
     let putRequestCount = 0
@@ -407,7 +407,7 @@ test.describe('Agent Runs', () => {
   })
 
   test('should generate and display review packet with API calls', async ({ page }) => {
-    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.goto('/agent-runs/agent-run-1')
     await page.waitForLoadState('networkidle')
 
     // Check if Review Packet section exists
@@ -585,7 +585,7 @@ test.describe('Agent Runs', () => {
     })
 
     // Navigate to agent run detail page
-    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.goto('/agent-runs/agent-run-1')
     await page.waitForLoadState('networkidle')
 
     // Generate review first to enable followup button
@@ -683,9 +683,9 @@ test.describe('Agent Runs', () => {
         needs_attention: false,
         created_at: '2026-05-24T00:00:00Z',
         updated_at: '2026-05-24T00:00:00Z',
-        case_url: '/dashboard/cases/case-1',
-        payload_url: '/dashboard/payloads/payload-1',
-        evidence_url: '/dashboard/evidence?payload_id=payload-1',
+        case_url: '/cases/case-1',
+        payload_url: '/payloads/payload-1',
+        evidence_url: '/evidence?payload_id=payload-1',
       }
 
       let items = [mockReviewQueueItem]
@@ -745,7 +745,7 @@ test.describe('Agent Runs', () => {
       })
     })
 
-    await page.goto('/dashboard/agent-runs')
+    await page.goto('/agent-runs')
     await page.waitForLoadState('networkidle')
 
     // Switch to Review Queue tab
@@ -844,7 +844,7 @@ test.describe('Agent Runs', () => {
       })
     })
 
-    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.goto('/agent-runs/agent-run-1')
     await page.waitForLoadState('networkidle')
 
     // Check follow-up history section is displayed
@@ -860,7 +860,7 @@ test.describe('Agent Runs', () => {
     const auditLink = page.getByRole('link', { name: 'audit-123' })
     await expect(auditLink).toBeVisible()
     const auditHref = await auditLink.getAttribute('href')
-    expect(auditHref).toContain('/dashboard/audit')
+    expect(auditHref).toContain('/audit')
     expect(auditHref).toContain('resource_type=agent_run')
     expect(auditHref).toContain('resource_id=agent-run-1')
 
@@ -875,7 +875,7 @@ test.describe('Agent Runs', () => {
     await page.waitForLoadState('networkidle')
 
     // Verify we are on the audit page
-    await expect(page).toHaveURL(/\/dashboard\/audit/)
+    await expect(page).toHaveURL(/\/\/audit/)
     
     // Verify that no network error occurred
     expect(consoleErrors.some(error => error.includes('Network Error'))).toBe(false)
@@ -1029,9 +1029,9 @@ test.describe('Agent Runs', () => {
                 needs_attention: false,
                 created_at: '2026-05-24T00:00:00Z',
                 updated_at: '2026-05-24T00:00:00Z',
-                case_url: '/dashboard/cases/case-1',
-                payload_url: '/dashboard/payloads/payload-1',
-                evidence_url: '/dashboard/evidence?payload_id=payload-1',
+                case_url: '/cases/case-1',
+                payload_url: '/payloads/payload-1',
+                evidence_url: '/evidence?payload_id=payload-1',
               },
             ],
             total: 1,
@@ -1051,7 +1051,7 @@ test.describe('Agent Runs', () => {
     })
 
     // Navigate to agent run detail page
-    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.goto('/agent-runs/agent-run-1')
     await page.waitForLoadState('networkidle')
 
     // Verify review decision button is visible
@@ -1091,14 +1091,14 @@ test.describe('Agent Runs', () => {
     await expect(page.getByRole('link', { name: 'View Audit Log (audit-decision-1)' })).toBeVisible()
 
     // Navigate to audit page
-    await page.goto('/dashboard/audit?resource_type=agent_run&resource_id=agent-run-1')
+    await page.goto('/audit?resource_type=agent_run&resource_id=agent-run-1')
     await page.waitForLoadState('networkidle')
 
     // Verify: audit log shows review_decision_recorded
     await expect(page.getByText('agent_run.review_decision_recorded')).toBeVisible()
 
     // Navigate to review queue
-    await page.goto('/dashboard/agent-runs')
+    await page.goto('/agent-runs')
     await page.waitForLoadState('networkidle')
 
     // Switch to Review Queue tab
@@ -1180,10 +1180,10 @@ test.describe('Agent Runs', () => {
                   audit_ref_id: 'audit-decision-1',
                 },
                 links: {
-                  case_url: '/dashboard/cases/case-1',
-                  payload_url: '/dashboard/payloads/payload-1',
-                  evidence_url: '/dashboard/evidence?payload_id=payload-1',
-                  audit_url: '/dashboard/audit?resource_type=agent_run&resource_id=agent-run-1',
+                  case_url: '/cases/case-1',
+                  payload_url: '/payloads/payload-1',
+                  evidence_url: '/evidence?payload_id=payload-1',
+                  audit_url: '/audit?resource_type=agent_run&resource_id=agent-run-1',
                 },
               },
               generated_at: '2026-06-07T00:00:00Z',
@@ -1291,7 +1291,7 @@ test.describe('Agent Runs', () => {
     })
 
     // Navigate to agent run detail page
-    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.goto('/agent-runs/agent-run-1')
     await page.waitForLoadState('networkidle')
 
     // Click Export JSON button
@@ -1325,7 +1325,7 @@ test.describe('Agent Runs', () => {
     await expect(page.getByText('review_export.json')).toBeVisible()
 
     // Navigate to audit page
-    await page.goto('/dashboard/audit?resource_type=agent_run&resource_id=agent-run-1')
+    await page.goto('/audit?resource_type=agent_run&resource_id=agent-run-1')
     await page.waitForLoadState('networkidle')
 
     // Verify audit log shows review_exported
@@ -1336,7 +1336,7 @@ test.describe('Agent Runs', () => {
     await expect(page.getByText(stableHash.substring(0, 12) + '...')).toBeVisible()
 
     // Navigate back to agent run detail
-    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.goto('/agent-runs/agent-run-1')
     await page.waitForLoadState('networkidle')
 
     // Test Markdown export
@@ -1428,10 +1428,10 @@ test.describe('Agent Runs', () => {
                     audit_ref_id: 'audit-decision-1',
                   },
                   links: {
-                    case_url: '/dashboard/cases/case-1',
-                    payload_url: '/dashboard/payloads/payload-1',
-                    evidence_url: '/dashboard/evidence?payload_id=payload-1',
-                    audit_url: '/dashboard/audit?resource_type=agent_run&resource_id=agent-run-1',
+                    case_url: '/cases/case-1',
+                    payload_url: '/payloads/payload-1',
+                    evidence_url: '/evidence?payload_id=payload-1',
+                    audit_url: '/audit?resource_type=agent_run&resource_id=agent-run-1',
                   },
                 },
                 generated_at: '2026-06-07T00:00:00Z',
@@ -1567,7 +1567,7 @@ test.describe('Agent Runs', () => {
       })
     })
 
-    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.goto('/agent-runs/agent-run-1')
     await page.waitForLoadState('networkidle')
 
     // Click Deliver to Webhook button
@@ -1667,7 +1667,7 @@ test.describe('Agent Runs', () => {
     await expect(page.getByText('review_delivery.webhook')).toBeVisible()
 
     // Navigate to audit page
-    await page.goto('/dashboard/audit?resource_type=agent_run&resource_id=agent-run-1')
+    await page.goto('/audit?resource_type=agent_run&resource_id=agent-run-1')
     await page.waitForLoadState('networkidle')
 
     // Verify audit log shows agent_run.review_delivered
@@ -1763,7 +1763,7 @@ test.describe('Agent Runs', () => {
       })
     })
 
-    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.goto('/agent-runs/agent-run-1')
     await page.waitForLoadState('networkidle')
 
     // Click Deliver to Webhook button
@@ -1949,7 +1949,7 @@ test.describe('Agent Runs', () => {
     })
 
     // Navigate to agent run detail page
-    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.goto('/agent-runs/agent-run-1')
 
     // Wait for page to load
     await page.waitForLoadState('domcontentloaded')
@@ -2104,7 +2104,7 @@ test.describe('Agent Runs', () => {
     })
 
     // Navigate to agent run detail page
-    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.goto('/agent-runs/agent-run-1')
 
     // Wait for page to load
     await page.waitForLoadState('domcontentloaded')
@@ -2209,7 +2209,7 @@ test.describe('Agent Runs', () => {
       }
     })
 
-    await page.goto('/dashboard/agent-runs/agent-run-1')
+    await page.goto('/agent-runs/agent-run-1')
     await page.waitForLoadState('networkidle')
 
     // Click Deliver to Webhook button

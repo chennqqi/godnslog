@@ -29,13 +29,13 @@ test.describe('Users Page', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/users');
+    await page.goto('/users');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
 
   test('should display users page', async ({ page }) => {
-    await expect(page).toHaveURL('/dashboard/users');
+    await expect(page).toHaveURL('/users');
   });
 
   test('should display user management title', async ({ page }) => {

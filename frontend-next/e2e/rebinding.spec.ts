@@ -46,13 +46,13 @@ test.describe('Rebinding Page', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/rebinding');
+    await page.goto('/rebinding');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
 
   test('should display rebinding page', async ({ page }) => {
-    await expect(page).toHaveURL('/dashboard/rebinding');
+    await expect(page).toHaveURL('/rebinding');
   });
 
   test('should display rebinding lab title', async ({ page }) => {
@@ -88,7 +88,7 @@ test.describe('Rebinding Page', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/rebinding');
+    await page.goto('/rebinding');
     await page.waitForURL('**/login', { timeout: 10000 });
     await expect(page).toHaveURL(/\/login/);
 
@@ -113,7 +113,7 @@ test.describe('Rebinding Page - Empty State', () => {
       });
     });
 
-    await page.goto('/dashboard/rebinding');
+    await page.goto('/rebinding');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
@@ -142,7 +142,7 @@ test.describe('Rebinding Page - API Error State', () => {
       return route.fulfill({ status: 500, json: { code: 500, message: 'Internal Server Error' } });
     });
 
-    await page.goto('/dashboard/rebinding');
+    await page.goto('/rebinding');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });

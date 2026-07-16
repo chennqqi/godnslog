@@ -12,7 +12,7 @@ test.describe('Payloads Page', () => {
       localStorage.setItem('token', 'mock-token');
       localStorage.setItem('user', JSON.stringify({ id: 1, username: 'admin', email: 'admin@godnslog.com', role: 0, lang: 'en-US' }));
     });
-    await page.goto('/dashboard/payloads')
+    await page.goto('/payloads')
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(5000);
   });
@@ -64,7 +64,7 @@ test.describe('Payloads Page', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/payloads/payload-1');
+    await page.goto('/payloads/payload-1');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
 

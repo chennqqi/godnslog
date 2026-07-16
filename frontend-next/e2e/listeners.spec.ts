@@ -34,13 +34,13 @@ test.describe('Listeners Page', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/listeners');
+    await page.goto('/listeners');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
 
   test('should display listeners page', async ({ page }) => {
-    await expect(page).toHaveURL('/dashboard/listeners');
+    await expect(page).toHaveURL('/listeners');
   });
 
   test('should display protocol listeners title', async ({ page }) => {
@@ -156,7 +156,7 @@ test.describe('Listeners Page - Empty State', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/listeners');
+    await page.goto('/listeners');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
@@ -182,7 +182,7 @@ test.describe('Listeners Page - API Error', () => {
       return route.fulfill({ json: { code: 0, data: {} } });
     });
 
-    await page.goto('/dashboard/listeners');
+    await page.goto('/listeners');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
   });
