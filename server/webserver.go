@@ -294,12 +294,8 @@ func (self *WebServer) Run() error {
 		c.Next()
 	})
 
-	if self.Swagger {
-		// Use docs/openapi.yaml for Swagger documentation
-		url := ginSwagger.URL("/docs/openapi.yaml")
-		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, url))
-		r.StaticFile("/docs/openapi.yaml", "docs/openapi.yaml")
-	}
+	// Swagger UI (interactive API documentation)
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	//static handler
 	r.Use(static.Serve("/", static.LocalFile("dist", false)))
