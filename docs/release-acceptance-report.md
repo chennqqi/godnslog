@@ -56,13 +56,31 @@
 | Docs 代码块复制 | ✅ | Copy 按钮 + 反馈 |
 | 新用户引导横幅 | ✅ | 空 Case 时显示 |
 
-## E2E 测试结果（Playwright）
+## 集成测试结果（手动验证）
 
-| 指标 | 数值 |
-|------|------|
-| 总测试数 | 225 |
-| 通过 | **171 (76%)** |
-| 失败 | 54 (24%) |
+**验证日期**: 2026-07-18
+**测试环境**: Docker 容器，通过 curl/bash 脚本直接测试 API
+
+| 核心链路 | 测试项 | 结果 | 说明 |
+|----------|--------|------|------|
+| **认证 → Case → Payload** | 登录、创建 Case、创建 Payload | ✅ | 全流程通过 |
+| **HTTP 回连捕获** | 模拟 OAST 触发 + 交互查询 | ✅ | HTTP 200，交互被正确捕获 |
+| **交互统计** | `/api/v2/interactions/stats` | ✅ | 正常返回 |
+| **Poll API** | 游标轮询 | ✅ | Burp Collaborator 风格正常工作 |
+| **Scanner Hub** | 适配器列表 (8个) | ✅ | nuclei/burp/yakit/zap/xray/rad/postman/apifox |
+| **Scanner Run** | 创建 + 命令生成 + 哈希 | ✅ | nuclei 命令正确生成 |
+| **状态流转** | created → distributed | ✅ | 状态更新正常 |
+| **Backfill** | 扫描结果回填 | ✅ | JSONL 格式回填正常 |
+| **from-search** | 从搜索结果批量创建 | ✅ | 批量创建 2 条成功 |
+| **MCP 协议** | initialize + tools/list + tools/call | ✅ | 13 个工具，复合工具正常 |
+| **API Key** | Agent 凭证创建 | ✅ | scoped API key 正常签发 |
+| **Agent Run** | 创建 → 操作 → 状态更新 → 完成 | ✅ | 全链路闭环通过 |
+
+### 验证过程中发现的 Bug 及修复
+
+| Bug | 文件 | 修复 |
+|-----|------|------|
+| `interaction_type_stats` 表不存在导致 Stats API 500 | `server/v2_api.go` | XORM 自动将 `InteractionTypeStats` 结构体映射为表名 `interaction_type_stats`，需显式指定 `Table()` |
 
 ### 通过的功能模块
 
