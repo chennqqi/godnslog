@@ -141,7 +141,7 @@ func (m *AuthMiddleware) authenticateAPIKey(c *gin.Context) (*AuthIdentity, erro
 		UserID:      key.CreatedBy,
 		IsAgent:     key.IsAgent,
 		APIKeyID:    key.ID,
-		WorkspaceID: nil, // TODO: add workspace_id to APIKey model
+		WorkspaceID: key.WorkspaceID,
 	}, nil
 }
 
@@ -156,8 +156,6 @@ func (m *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 		}
 
 		// Set legacy context keys for backward compatibility
-		// TODO: Handle int64 ID conversion from string UserID
-		// c.Set(ContextKeyUser, &models.TblUser{Id: identity.UserID})
 		if identity.Role > 0 {
 			c.Set(ContextKeyRole, identity.Role)
 		}

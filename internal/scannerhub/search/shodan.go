@@ -26,9 +26,9 @@ func (s *shodan) Search(query string, page int) (*SearchResult, error) {
 	var apiResp struct {
 		Total   int `json:"total"`
 		Matches []struct {
-			IPStr    string   `json:"ip_str"`
-			Port     int      `json:"port"`
-			Protocol string   `json:"protocol"`
+			IPStr     string   `json:"ip_str"`
+			Port      int      `json:"port"`
+			Protocol  string   `json:"protocol"`
 			Hostnames []string `json:"hostnames"`
 		} `json:"matches"`
 	}

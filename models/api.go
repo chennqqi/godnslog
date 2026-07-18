@@ -122,6 +122,7 @@ type DnsRecord struct {
 	Var      string    `json:"-"`
 	Domain   string    `json:"domain"`
 	Ip       string    `json:"addr"`
+	Qtype    string    `json:"qtype,omitempty"`
 	Ctime    time.Time `json:"ctime"`
 }
 

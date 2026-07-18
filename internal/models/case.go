@@ -34,18 +34,18 @@ func (t Tags) Value() (driver.Value, error) {
 // Case represents a security engagement or testing session that groups related OAST activities.
 // This struct serves as both the database entity and the API response model.
 type Case struct {
-	ID          string    `json:"id" xorm:"pk varchar(36) notnull"`
-	Title       string    `json:"title" xorm:"varchar(255) notnull"`
-	Description string    `json:"description" xorm:"text"`
-	Status      string    `json:"status" xorm:"varchar(32) notnull default('active') index"` // active, completed, archived
-	Tags        Tags      `json:"tags" xorm:"json"`                                          // Stored as JSON array
-	Type        string    `xorm:"varchar(32) default('single')" json:"type"`
-	Progress    int       `xorm:"int default(0)" json:"progress"`
-	TotalTargets int      `xorm:"int default(0)" json:"total_targets"`
-	HitTargets  int       `xorm:"int default(0)" json:"hit_targets"`
-	CreatedBy   string    `json:"created_by" xorm:"varchar(36) notnull index"`               // User ID
-	CreatedAt   time.Time `json:"created_at" xorm:"datetime created"`
-	UpdatedAt   time.Time `json:"updated_at" xorm:"datetime updated"`
+	ID           string    `json:"id" xorm:"pk varchar(36) notnull"`
+	Title        string    `json:"title" xorm:"varchar(255) notnull"`
+	Description  string    `json:"description" xorm:"text"`
+	Status       string    `json:"status" xorm:"varchar(32) notnull default('active') index"` // active, completed, archived
+	Tags         Tags      `json:"tags" xorm:"json"`                                          // Stored as JSON array
+	Type         string    `xorm:"varchar(32) default('single')" json:"type"`
+	Progress     int       `xorm:"int default(0)" json:"progress"`
+	TotalTargets int       `xorm:"int default(0)" json:"total_targets"`
+	HitTargets   int       `xorm:"int default(0)" json:"hit_targets"`
+	CreatedBy    string    `json:"created_by" xorm:"varchar(36) notnull index"` // User ID
+	CreatedAt    time.Time `json:"created_at" xorm:"datetime created"`
+	UpdatedAt    time.Time `json:"updated_at" xorm:"datetime updated"`
 }
 
 // MarshalJSON implements json.Marshaler interface for Case

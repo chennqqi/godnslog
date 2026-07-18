@@ -21,14 +21,14 @@ type AttackChain struct {
 // AttackChainDetail represents a detailed view of an attack chain for a token,
 // including all associated interactions.
 type AttackChainDetail struct {
-	Token            string                `json:"token"`
-	InteractionCount int                   `json:"interaction_count"`
-	Protocols        []string              `json:"protocols"`
-	ExploitTypes     []string              `json:"exploit_types"`
-	FirstSeen        string                `json:"first_seen"`
-	LastSeen         string                `json:"last_seen"`
-	Confidence       string                `json:"confidence"`
-	Interactions     []models.Interaction  `json:"interactions"`
+	Token            string               `json:"token"`
+	InteractionCount int                  `json:"interaction_count"`
+	Protocols        []string             `json:"protocols"`
+	ExploitTypes     []string             `json:"exploit_types"`
+	FirstSeen        string               `json:"first_seen"`
+	LastSeen         string               `json:"last_seen"`
+	Confidence       string               `json:"confidence"`
+	Interactions     []models.Interaction `json:"interactions"`
 }
 
 // AttackChainListResponse represents a paginated list of attack chains.

@@ -37,7 +37,7 @@ export default function MarketplacePage() {
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) {
-      router.push('/login')
+      window.location.href = '/login'
     }
   }, [router])
 
@@ -97,7 +97,7 @@ export default function MarketplacePage() {
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) {
-      router.push('/login')
+      window.location.href = '/login'
     }
   }, [router])
 

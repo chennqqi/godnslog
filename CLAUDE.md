@@ -117,3 +117,13 @@ docker run -p 80:8080 -p 53:53/udp "user/godnslog" serve -domain yourdomain.com 
 - `DefaultCleanInterval`: 7200秒清理间隔  
 - `DefaultQueryApiMaxItem`: API 查询最大 20 条记录
 - `DefaultMaxCallbackErrorCount`: 最大回调错误次数 5 次
+
+## 开发流程约束
+
+### Spec → Plan → Implement
+
+1. **先写 design spec**，保存到 `docs/superpowers/specs/`
+2. **再写 implementation plan**，保存到 `docs/superpowers/plans/`
+3. **最后执行实现**（subagent-driven 或 inline）
+
+不得由 spec 直接跳入执行阶段。每个 spec 必须有对应的 plan 文件才能开始编码。

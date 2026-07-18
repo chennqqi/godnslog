@@ -122,11 +122,11 @@ func TestDecodeBase32(t *testing.T) {
 
 func TestDecode(t *testing.T) {
 	tests := []struct {
-		name           string
-		input          string
-		wantEncoding   string
-		wantConfident  bool
-		wantDecoded    string
+		name          string
+		input         string
+		wantEncoding  string
+		wantConfident bool
+		wantDecoded   string
 	}{
 		{
 			name:          "base64 input",

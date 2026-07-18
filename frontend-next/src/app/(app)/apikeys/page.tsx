@@ -54,7 +54,7 @@ export default function APIKeysPage() {
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) {
-      router.push('/login')
+      window.location.href = '/login'
       return
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect

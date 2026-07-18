@@ -64,10 +64,10 @@ type WorkflowListResponse struct {
 
 // Action types
 const (
-	ActionTypeHTTP    = "http"
-	ActionTypeDNS     = "dns"
-	ActionTypeSMTP    = "smtp"
-	ActionTypeWebhook = "webhook"
+	ActionTypeHTTP     = "http"
+	ActionTypeDNS      = "dns"
+	ActionTypeSMTP     = "smtp"
+	ActionTypeWebhook  = "webhook"
 	ActionTypeNotify   = "notify"
 	ActionTypeResponse = "response"
 )

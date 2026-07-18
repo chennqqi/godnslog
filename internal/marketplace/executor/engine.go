@@ -17,12 +17,12 @@ type Action struct {
 
 // TemplateDef is a parsed template definition from marketplace Template.Content
 type TemplateDef struct {
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	Protocols   []string   `json:"protocols"`
-	Match       MatchRule  `json:"match"`
-	Action      Action     `json:"action"`
-	Severity    string     `json:"severity"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Protocols   []string  `json:"protocols"`
+	Match       MatchRule `json:"match"`
+	Action      Action    `json:"action"`
+	Severity    string    `json:"severity"`
 }
 
 // MatchResult represents a template match result

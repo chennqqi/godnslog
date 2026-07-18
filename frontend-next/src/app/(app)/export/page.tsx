@@ -28,7 +28,7 @@ export default function ExportPage() {
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) {
-      router.push('/login')
+      window.location.href = '/login'
     }
   }, [router])
 

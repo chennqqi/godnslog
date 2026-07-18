@@ -23,7 +23,7 @@ export function DocPageLayout({ titleKey, children, mdEn, mdZh }: DocPageLayoutP
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) {
-      router.push('/login')
+      window.location.href = '/login'
     }
   }, [router])
 

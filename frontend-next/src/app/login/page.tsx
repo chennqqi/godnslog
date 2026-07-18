@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { authApi } from '@/lib/api-client'
@@ -42,6 +43,7 @@ function FeatureIcon({ name }: { name: string }) {
 }
 
 export default function LoginPage() {
+  const router = useRouter()
   const { setToken, setUser } = useAuthStore()
   const { t, lang, setLang } = useI18n()
   const [loading, setLoading] = useState(false)
@@ -81,7 +83,7 @@ export default function LoginPage() {
           email: response.data.user.email,
           role: String(response.data.user.role),
         })
-        window.location.href = '/'
+        router.push('/')
       } else {
         setError(response.message || t('login.error'))
       }

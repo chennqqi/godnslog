@@ -30,5 +30,4 @@ services:
       - ./godnslog:/app/godnslog:ro
       # 宿主机构建的前端（npm run build 产物 + node_modules）
       - ./frontend-next:/app/frontend:ro
-      # 入口脚本
-      - ./deploy/docker/entrypoint.sh:/app/entrypoint.sh:ro
+      # 入口脚本已内置于镜像中

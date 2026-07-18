@@ -110,7 +110,7 @@ export default function AgentRunsPage() {
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) {
-      router.push('/login')
+      window.location.href = '/login'
       return
     }
     // Wrap in setTimeout to avoid react-hooks/set-state-in-effect lint error

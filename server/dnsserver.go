@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -30,12 +31,6 @@ import (
 		127.0.0.1
 	dig r.userXXXX.exmaple.com
 		127.0.0.2
-
-TODO:
-1. 支持IPv6
-2. 支持A记录通配
-3. 支持SRV记录
-4. 支持NS记录
 */
 
 const (
@@ -182,6 +177,16 @@ func (self *DnsServer) responseStandard(w dns.ResponseWriter, req *dns.Msg) {
 				},
 				A: net.ParseIP(r.Value),
 			}
+		case "AAAA":
+			return &dns.AAAA{
+				Hdr: dns.RR_Header{
+					Name:   q,
+					Rrtype: dns.TypeAAAA,
+					Class:  dns.ClassINET,
+					Ttl:    r.Ttl,
+				},
+				AAAA: net.ParseIP(r.Value),
+			}
 		case "CNAME":
 			return &dns.CNAME{
 				Hdr: dns.RR_Header{
@@ -192,7 +197,6 @@ func (self *DnsServer) responseStandard(w dns.ResponseWriter, req *dns.Msg) {
 				},
 				Target: r.Value + ".",
 			}
-
 		case "MX":
 			return &dns.MX{
 				Hdr: dns.RR_Header{
@@ -204,7 +208,6 @@ func (self *DnsServer) responseStandard(w dns.ResponseWriter, req *dns.Msg) {
 				Preference: 0,
 				Mx:         r.Value,
 			}
-
 		case "TXT":
 			return &dns.TXT{
 				Hdr: dns.RR_Header{
@@ -215,7 +218,45 @@ func (self *DnsServer) responseStandard(w dns.ResponseWriter, req *dns.Msg) {
 				},
 				Txt: []string{r.Value},
 			}
-
+		case "SRV":
+			// Value format: "priority weight port target"
+			parts := strings.SplitN(r.Value, " ", 4)
+			if len(parts) != 4 {
+				return nil
+			}
+			priority := mustParseUint16(parts[0])
+			weight := mustParseUint16(parts[1])
+			port := mustParseUint16(parts[2])
+			target := parts[3]
+			if !strings.HasSuffix(target, ".") {
+				target += "."
+			}
+			return &dns.SRV{
+				Hdr: dns.RR_Header{
+					Name:   q,
+					Rrtype: dns.TypeSRV,
+					Class:  dns.ClassINET,
+					Ttl:    r.Ttl,
+				},
+				Priority: priority,
+				Weight:   weight,
+				Port:     port,
+				Target:   target,
+			}
+		case "NS":
+			target := r.Value
+			if !strings.HasSuffix(target, ".") {
+				target += "."
+			}
+			return &dns.NS{
+				Hdr: dns.RR_Header{
+					Name:   q,
+					Rrtype: dns.TypeNS,
+					Class:  dns.ClassINET,
+					Ttl:    r.Ttl,
+				},
+				Ns: target,
+			}
 		default:
 			return nil
 		}
@@ -230,17 +271,22 @@ func (self *DnsServer) responseStandard(w dns.ResponseWriter, req *dns.Msg) {
 		for i := 0; i < len(subs); i++ {
 			subs[i] = "*"
 			altquery := strings.Join(subs[i:], ".")
-			store.Get(altquery)
-			if exist {
-				return v.([]*Resolve)
+			if v2, exist2 := store.Get(altquery + t); exist2 {
+				return v2.([]*Resolve)
 			}
 		}
 		return nil
 	}
 
 	c := self.client
-	cnameToAnswer := func(cname string) []dns.RR {
-		v, exist := store.Get(cname + "#A")
+	cnameToAnswer := func(cname string, qtype uint16) []dns.RR {
+		var typeSuffix string
+		if qtype == dns.TypeAAAA {
+			typeSuffix = "#AAAA"
+		} else {
+			typeSuffix = "#A"
+		}
+		v, exist := store.Get(cname + typeSuffix)
 		if exist {
 			rr := v.([]*Resolve)
 			var r []dns.RR
@@ -258,7 +304,7 @@ func (self *DnsServer) responseStandard(w dns.ResponseWriter, req *dns.Msg) {
 			m.Question = []dns.Question{
 				dns.Question{
 					Name:   cname + ".",
-					Qtype:  dns.TypeA,
+					Qtype:  qtype,
 					Qclass: dns.ClassINET,
 				},
 			}
@@ -284,7 +330,7 @@ func (self *DnsServer) responseStandard(w dns.ResponseWriter, req *dns.Msg) {
 				}
 				//store answer to []*Resolve
 				if len(toStore) > 0 {
-					store.Set(cname+"#A", toStore, time.Duration(rm.Answer[0].Header().Ttl)*time.Second)
+					store.Set(cname+typeSuffix, toStore, time.Duration(rm.Answer[0].Header().Ttl)*time.Second)
 				}
 			}
 			return rm.Answer
@@ -317,7 +363,39 @@ func (self *DnsServer) responseStandard(w dns.ResponseWriter, req *dns.Msg) {
 				Target: rrc[0].Value + ".",
 			}
 			m.Answer = append(m.Answer, a)
-			ca := cnameToAnswer(rrc[0].Value)
+			ca := cnameToAnswer(rrc[0].Value, q.Qtype)
+			if len(ca) > 0 {
+				m.Answer = append(m.Answer, ca...)
+			}
+			w.WriteMsg(m)
+			return
+		}
+
+	case dns.TypeAAAA:
+		// AAAA记录
+		rr := findResolves(origin, "#AAAA")
+		if len(rr) > 0 {
+			for i := 0; i < len(rr); i++ {
+				m.Answer = append(m.Answer, resolveToAnswer(q.Name, rr[i]))
+			}
+			w.WriteMsg(m)
+			return
+		}
+
+		// 查找CNAME
+		rrc := findResolves(origin, "#CNAME")
+		if len(rrc) > 0 {
+			a := &dns.CNAME{
+				Hdr: dns.RR_Header{
+					Name:   q.Name,
+					Rrtype: dns.TypeCNAME,
+					Class:  dns.ClassINET,
+					Ttl:    rrc[0].Ttl,
+				},
+				Target: rrc[0].Value + ".",
+			}
+			m.Answer = append(m.Answer, a)
+			ca := cnameToAnswer(rrc[0].Value, dns.TypeAAAA)
 			if len(ca) > 0 {
 				m.Answer = append(m.Answer, ca...)
 			}
@@ -348,6 +426,28 @@ func (self *DnsServer) responseStandard(w dns.ResponseWriter, req *dns.Msg) {
 
 	case dns.TypeMX:
 		rr := findResolves(origin, "#MX")
+		if rr == nil {
+			break
+		}
+		for i := 0; i < len(rr); i++ {
+			m.Answer = append(m.Answer, resolveToAnswer(q.Name, rr[i]))
+		}
+		w.WriteMsg(m)
+		return
+
+	case dns.TypeSRV:
+		rr := findResolves(origin, "#SRV")
+		if rr == nil {
+			break
+		}
+		for i := 0; i < len(rr); i++ {
+			m.Answer = append(m.Answer, resolveToAnswer(q.Name, rr[i]))
+		}
+		w.WriteMsg(m)
+		return
+
+	case dns.TypeNS:
+		rr := findResolves(origin, "#NS")
 		if rr == nil {
 			break
 		}
@@ -397,8 +497,13 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 			Class:  dns.ClassINET,
 			Ttl:    ttl,
 		}
-		a := &dns.A{Hdr: rr_header, A: ip}
-		m.Answer = append(m.Answer, a)
+		if t == dns.TypeAAAA {
+			a := &dns.AAAA{Hdr: rr_header, AAAA: ip}
+			m.Answer = append(m.Answer, a)
+		} else {
+			a := &dns.A{Hdr: rr_header, A: ip}
+			m.Answer = append(m.Answer, a)
+		}
 		w.WriteMsg(m)
 
 		if (t == dns.TypeA || t == dns.TypeAAAA) && ttl == LOG_TTL {
@@ -408,6 +513,7 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 				Var:    prefix,
 				Ctime:  time.Now(),
 				Ip:     remoteIp.String(),
+				Qtype:  dns.TypeToString[t],
 			})
 		}
 	}
@@ -480,15 +586,23 @@ func (h *DnsServer) Do(w dns.ResponseWriter, req *dns.Msg) {
 		return
 
 	case dns.TypeAAAA:
-		// not ipv6 now
-		dns.HandleFailed(w, req)
+		if h.V6 == nil {
+			dns.HandleFailed(w, req)
+			return
+		}
+		// use V6 for AAAA if not using rebind
+		if !isRebind || len(user.Rebind) == 0 {
+			ip = h.V6
+		}
+		doResp(ip, q.Qtype)
 		return
 
 	case dns.TypeNS:
-		// TODO:
-		// return V4 direct
-		ttl = 600
-		doResp(h.V4, q.Qtype)
+		h.responseStandard(w, req)
+		return
+
+	case dns.TypeSRV:
+		h.responseStandard(w, req)
 		return
 
 	// for standard dns
@@ -535,4 +649,13 @@ func (h *DnsServer) parseXip(qName string) (net.IP, error) {
 		}
 	}
 	return nil, fmt.Errorf("not xip")
+}
+
+// mustParseUint16 parses a uint16 from string, returns 0 on error.
+func mustParseUint16(s string) uint16 {
+	v, err := strconv.ParseUint(s, 10, 16)
+	if err != nil {
+		return 0
+	}
+	return uint16(v)
 }

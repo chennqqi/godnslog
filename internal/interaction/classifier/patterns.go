@@ -19,4 +19,3 @@ const (
 	ConfidenceMedium = "medium"
 	ConfidenceLow    = "low"
 )
-

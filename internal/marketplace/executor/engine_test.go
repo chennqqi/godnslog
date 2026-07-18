@@ -50,7 +50,7 @@ func TestMatchBodyContains(t *testing.T) {
 func TestMatchProtocolFilter(t *testing.T) {
 	e := NewEngine([]TemplateDef{
 		{
-			Name: "http-only",
+			Name:      "http-only",
 			Protocols: []string{"http"},
 			Match: MatchRule{
 				Type: "contains", Field: "path", Pattern: "/test",
