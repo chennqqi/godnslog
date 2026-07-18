@@ -1,42 +1,12 @@
-'use client'
+/**
+ * Dashboard layout (server component).
+ * Exports route segment config for dynamic rendering.
+ * Delegates to AuthLayoutClient for the actual UI and auth guard.
+ */
+export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
-import { AppShell } from '@/components/app-shell'
-import { ErrorBoundary } from '@/components/error-boundary'
-import { Spinner } from '@/components/ui/spinner'
+import { AuthLayoutClient } from './auth-layout-client'
 
-/** Dashboard layout: guards auth and wraps all sub-pages with the enterprise AppShell */
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const [ready, setReady] = useState(false)
-
-  useEffect(() => {
-    const storedToken = localStorage.getItem('token')
-    if (!storedToken) {
-      window.location.href = '/login'
-    } else {
-      setReady(true)
-    }
-  }, [])
-
-  if (!ready) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white text-lg animate-pulse">
-            G
-          </div>
-          <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-600">
-            <Spinner size="sm" />
-            Loading...
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  return <AppShell><ErrorBoundary>{children}</ErrorBoundary></AppShell>
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return <AuthLayoutClient>{children}</AuthLayoutClient>
 }

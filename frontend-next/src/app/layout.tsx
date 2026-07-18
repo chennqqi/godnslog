@@ -3,6 +3,8 @@ import './globals.css'
 import { QueryProvider } from '@/components/query-provider'
 import { I18nProvider } from '@/lib/i18n-context'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'GODNSLOG 2.0 - OAST Interaction Verification Platform',
   description: 'OAST interaction verification and evidence platform',
