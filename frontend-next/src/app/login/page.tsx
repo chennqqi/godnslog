@@ -194,7 +194,7 @@ export default function LoginPage() {
           </div>
 
           {/* Form */}
-          <form className="space-y-5" method="POST" onSubmit={form.handleSubmit(onSubmit)}>
+          <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
             {error && (
               <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
                 <svg className="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
