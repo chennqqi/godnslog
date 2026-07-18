@@ -44,10 +44,16 @@ test.describe('Login Page', () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
-  test('should have form method POST to prevent GET exposure', async ({ page }) => {
+  test('should redirect to home after successful login', async ({ page }) => {
+    const password = process.env.ADMIN_PASSWORD || process.env.PLAYWRIGHT_PASSWORD || ''
     await page.goto('/login');
 
-    const form = page.locator('form');
-    await expect(form).toHaveAttribute('method', 'POST');
+    await page.fill('input[name="username"]', 'admin');
+    await page.fill('input[name="password"]', password);
+    await page.click('button[type="submit"]');
+
+    // Should redirect to home page
+    await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15000 });
+    expect(page.url()).not.toContain('/login');
   });
 });

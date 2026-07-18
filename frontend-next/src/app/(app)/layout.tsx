@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { Spinner } from '@/components/ui/spinner'
@@ -13,20 +12,20 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const router = useRouter()
   const { token } = useAuthStore()
   const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
-    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+    if (typeof window === 'undefined') return;
+    const storedToken = localStorage.getItem('token')
     if (!storedToken && !token) {
-      router.replace('/login')
+      window.location.href = '/login'
       return
     }
     // Defer state update to avoid cascading renders
     const timer = setTimeout(() => setAuthChecked(true), 0)
     return () => clearTimeout(timer)
-  }, [router, token])
+  }, [token])
 
   if (!authChecked) {
     return (
