@@ -1,0 +1,21 @@
+# GODNSLOG Development Dockerfile
+# 用途：快速开发迭代，避免每次代码改动都重新构建镜像
+# 用法：
+#   1. 在宿主机构建后端：  cd /data/dev/github.com/chennqqi/godnslog && go build -o godnslog .
+#   2. 在宿主机构建前端：  cd frontend-next && npm run build
+#   3. 启动容器：          docker compose -f docker-compose.dev.yml up -d --build
+
+FROM alpine:3.20
+
+RUN apk add --no-cache tini wget ca-certificates nodejs
+
+WORKDIR /app
+
+# 后端二进制通过 volume mount 注入（不需要 COPY）
+# 前端构建产物通过 volume mount 注入
+
+COPY deploy/docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["/app/entrypoint.sh"]

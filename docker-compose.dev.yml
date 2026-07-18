@@ -1,0 +1,34 @@
+# GODNSLOG 开发环境
+# 宿主机构建产物通过 volume mount 注入容器，避免频繁 docker build
+#
+# 快速开始：
+#   1. go build -o godnslog .                                     # 编译后端
+#   2. cd frontend-next && npm run build && cd ..                   # 构建前端
+#   3. docker compose -f docker-compose.dev.yml up -d              # 启动
+#   4. 代码改动后重复 1-2，然后 docker compose -f docker-compose.dev.yml restart
+#
+# 前端热更新模式（前端改动即时生效）：
+#   1. go build -o godnslog .                                      # 编译后端
+#   2. docker compose -f docker-compose.dev.yml up -d              # 启动后端
+#   3. cd frontend-next && npm run dev                             # 在宿主机启动前端 dev server
+#   4. 访问 http://localhost:3000（前端 dev server）
+
+services:
+  godnslog:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.dev
+    container_name: godnslog-dev
+    ports:
+      - "8080:8080"    # 后端 API（容器内）
+      - "3000:3000"    # 前端（生产构建，容器内）
+    environment:
+      DOMAIN: godnslog.local
+      DNS_IP: 127.0.0.1
+    volumes:
+      # 宿主机构建的后端二进制（go build 产物）
+      - ./godnslog:/app/godnslog:ro
+      # 宿主机构建的前端（npm run build 产物 + node_modules）
+      - ./frontend-next:/app/frontend:ro
+      # 入口脚本
+      - ./deploy/docker/entrypoint.sh:/app/entrypoint.sh:ro
