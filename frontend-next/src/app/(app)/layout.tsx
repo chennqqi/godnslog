@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { AppShell } from '@/components/app-shell'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { Spinner } from '@/components/ui/spinner'
-import { useAuthStore } from '@/features/auth/store'
 
 /** Dashboard layout: guards auth and wraps all sub-pages with the enterprise AppShell */
 export default function DashboardLayout({
@@ -12,22 +11,18 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { token } = useAuthStore()
-  const [authChecked, setAuthChecked] = useState(false)
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
     const storedToken = localStorage.getItem('token')
-    if (!storedToken && !token) {
+    if (!storedToken) {
       window.location.href = '/login'
-      return
+    } else {
+      setReady(true)
     }
-    // Defer state update to avoid cascading renders
-    const timer = setTimeout(() => setAuthChecked(true), 0)
-    return () => clearTimeout(timer)
-  }, [token])
+  }, [])
 
-  if (!authChecked) {
+  if (!ready) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="flex flex-col items-center gap-3">
