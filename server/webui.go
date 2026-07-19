@@ -318,6 +318,35 @@ func (self *WebServer) verifyAdminPermission(c *gin.Context) {
 // @Failure 403 {object} CR "Forbidden"
 // @Failure 401 {object} CR "Unauthorized"
 // @Router /user/login [post]
+func (self *WebServer) getCaptcha(c *gin.Context) {
+	if self.captchaSvc == nil {
+		self.resp(c, 404, &CR{
+			Code:    models.CodeNoData,
+			Message: "captcha disabled",
+		})
+		return
+	}
+
+	captchaID, imageBase64, thumbBase64, err := self.captchaSvc.Generate()
+	if err != nil {
+		logrus.Errorf("[webui.go::getCaptcha] Generate: %v", err)
+		self.resp(c, 502, &CR{
+			Code:    models.CodeServerInternal,
+			Message: "Failed to generate captcha",
+		})
+		return
+	}
+
+	self.resp(c, 200, &CR{
+		Code: models.CodeOK,
+		Data: map[string]interface{}{
+			"captcha_id":   captchaID,
+			"image_base64": imageBase64,
+			"thumb_base64": thumbBase64,
+		},
+	})
+}
+
 func (self *WebServer) userLogin(c *gin.Context) {
 	T := getTranslateFunc(c)
 
@@ -331,6 +360,25 @@ func (self *WebServer) userLogin(c *gin.Context) {
 		})
 		return
 	}
+
+	// Captcha verification (if enabled)
+	if self.captchaSvc != nil {
+		if req.CaptchaID == "" {
+			self.resp(c, 400, &CR{
+				Code:    CodeBadData,
+				Message: T("bad request"),
+			})
+			return
+		}
+		if !self.captchaSvc.Verify(req.CaptchaID, req.CaptchaValue) {
+			self.resp(c, 400, &CR{
+				Code:    CodeBadData,
+				Message: T("bad request"),
+			})
+			return
+		}
+	}
+
 	session := self.orm.NewSession()
 	defer session.Close()
 	var user = new(models.TblUser)

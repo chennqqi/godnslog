@@ -59,6 +59,9 @@ type WebServerConfig struct {
 	// LicenseKey enables auto-download when the file is missing.
 	GeoIPMMDBPath    string
 	GeoIPLicenseKey string
+
+	CaptchaEnabled bool          `json:"captcha_enabled"` // default true
+	CaptchaExpire  time.Duration // default 2min
 }
 
 type WebServer struct {
@@ -85,6 +88,7 @@ type WebServer struct {
 	haCancel    context.CancelFunc
 	redisClient *redis.Client
 	fingerprinter *fingerprint.Fingerprinter
+	captchaSvc  *captchaService
 }
 
 func NewWebServer(cfg *WebServerConfig, store *cache.Cache) (*WebServer, error) {
@@ -125,8 +129,22 @@ func NewWebServer(cfg *WebServerConfig, store *cache.Cache) (*WebServer, error) 
 		logrus.Info("[webserver] GeoIP disabled (no mmdb path configured)")
 	}
 
+
+	// Initialize captcha service
+	if cfg.CaptchaEnabled {
+		captchaExpire := cfg.CaptchaExpire
+		if captchaExpire <= 0 {
+			captchaExpire = 2 * time.Minute
+		}
+		app.captchaSvc = newCaptchaService(app.store, captchaExpire)
+		logrus.Infof("[webserver.go::NewWebServer] captcha service initialized (expire=%v)", captchaExpire)
+	} else {
+		logrus.Info("[webserver.go::NewWebServer] captcha disabled")
+	}
+
 	return app, nil
 }
+
 
 func (self *WebServer) doClean() {
 	cache := self.store
@@ -317,6 +335,7 @@ func (self *WebServer) Run() error {
 		auth.POST("/logout", self.authHandler, self.userLogout)
 		auth.GET("/info", self.authHandler, self.userInfo)
 		auth.GET("/nav", self.authHandler, self.userNav)
+		auth.GET("/captcha", self.getCaptcha)
 	}
 
 	// Register v2 API

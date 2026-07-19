@@ -27,9 +27,11 @@ const (
 )
 
 type LoginRequest struct {
-	Email    string `json:"email"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Email        string `json:"email"`
+	Username     string `json:"username"`
+	Password     string `json:"password"`
+	CaptchaID   string `json:"captcha_id"`
+	CaptchaValue int    `json:"captcha_value"`
 }
 
 type LoginResponse struct {
