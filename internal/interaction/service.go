@@ -12,6 +12,7 @@ import (
 	"github.com/chennqqi/godnslog/internal/interaction/classifier"
 	"github.com/chennqqi/godnslog/internal/interaction/decoder"
 	"github.com/chennqqi/godnslog/internal/interaction/fingerprint"
+	"github.com/chennqqi/godnslog/internal/marketplace/executor"
 	"github.com/chennqqi/godnslog/internal/models"
 	"github.com/chennqqi/godnslog/internal/websocket"
 )
@@ -22,15 +23,21 @@ var (
 
 // Service provides interaction management services
 type Service struct {
-	engine        *xorm.Engine
-	wsHub         *websocket.Hub             // WebSocket hub for real-time push, nil to disable
-	fingerprinter *fingerprint.Fingerprinter // source fingerprint, nil to disable
-	anonymousMode bool                       // when true, mask source IP for privacy
+	engine         *xorm.Engine
+	wsHub          *websocket.Hub             // WebSocket hub for real-time push, nil to disable
+	fingerprinter  *fingerprint.Fingerprinter // source fingerprint, nil to disable
+	templateEngine *executor.Engine           // template matching engine, nil to disable
+	anonymousMode  bool                       // when true, mask source IP for privacy
 }
 
 // NewService creates a new interaction service
 func NewService(engine *xorm.Engine, wsHub *websocket.Hub, fp *fingerprint.Fingerprinter, anonymousMode bool) *Service {
 	return &Service{engine: engine, wsHub: wsHub, fingerprinter: fp, anonymousMode: anonymousMode}
+}
+
+// SetTemplateEngine sets the template matching engine for interaction enrichment
+func (s *Service) SetTemplateEngine(engine *executor.Engine) {
+	s.templateEngine = engine
 }
 
 // CreateInteraction creates a new interaction record
@@ -76,6 +83,9 @@ func (s *Service) CreateInteraction(interaction *models.Interaction) error {
 
 	// Data enhancement pipeline: decode + classify + fingerprint
 	enhanceInteraction(interaction, s.fingerprinter)
+
+	// Template matching pipeline: match interaction against loaded templates
+	matchTemplateInteraction(interaction, s.templateEngine)
 
 	_, err := s.engine.InsertOne(interaction)
 	if err != nil {
@@ -438,4 +448,34 @@ func (s *Service) BatchImport(interactions []*models.Interaction) (int, error) {
 	}
 
 	return inserted, nil
+}
+
+// matchTemplateInteraction runs the template matching engine on an interaction.
+// This is a no-error enrichment — failures should not block interaction creation.
+// When a template matches, the exploit_type and confidence fields are updated
+// if they were not already set by the classifier.
+func matchTemplateInteraction(interaction *models.Interaction, engine *executor.Engine) {
+	if interaction == nil || engine == nil {
+		return
+	}
+
+	results := engine.Match(interaction)
+	if len(results) == 0 {
+		return
+	}
+
+	// Use the first (best) match to enrich the interaction
+	best := results[0]
+
+	// Only set exploit_type if not already classified
+	if interaction.ExploitType == nil || *interaction.ExploitType == "" {
+		exploitType := best.TemplateName
+		interaction.ExploitType = &exploitType
+	}
+
+	// Only set confidence if not already set
+	if interaction.Confidence == nil || *interaction.Confidence == "" {
+		confidence := best.Severity
+		interaction.Confidence = &confidence
+	}
 }

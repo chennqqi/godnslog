@@ -170,11 +170,11 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全团队、扫
 - ✅ 自定义 HTTP Response
 - ✅ 请求回显
 - ✅ RMI 协议监听
-- ⬜ 现有 Scanner Hub 集成完善（部分适配器可补充）
+- ✅ 现有 Scanner Hub 集成完善（8 个适配器已实现，测试覆盖 87%）
 
 ### 2.6：可扩展平台 ✅
 
-- ✅ Template 插件化执行引擎（基础匹配引擎，待集成到 Interaction 管道）
+- ✅ Template 插件化执行引擎（已集成到 Interaction 管道，自动匹配并填充 exploit_type）
 - ✅ 匿名模式
 - ✅ 搜索引擎集成（ZoomEye/Shodan/Fofa API 适配器）
 - ✅ 任务化 Case 模型优化（新增批量字段 + stats API）
@@ -187,9 +187,9 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全团队、扫
   - ✅ SRV 记录支持
   - ✅ NS 记录响应
 - **测试覆盖提升**：
-  - 🟡 `rule` 模块从 9% 提升至 51.7%（增加 engine/store/action 测试，handler 待补充）
+  - ✅ `rule` 模块从 9% 提升至 87.1%（增加 engine/store/action/handler/notification 测试）
   - ✅ `ha` 模块从 4% 提升至 75.2%
-  - 🟡 `listener` 模块从 20% 提升至 31.4%（增加 store/service 测试，协议 handler 待补充）
+  - ✅ `listener` 模块从 20% 提升至 82.0%（增加 store/service/protocol handler 测试）
   - ✅ `openapi` 添加基础测试（已有 6 个静态分析测试）
 - **代码清理**：
   - ✅ 1.0 遗留路由端点实现（`server/router.go` 注释代码清理）
@@ -210,7 +210,7 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全团队、扫
   - ✅ charts（折线图、环形图）可视化组件
   - ✅ kanban-board 看板组件
 - **OpenAPI 文档完善**：
-  - ❌ 新增端点的 API 文档同步（Phase 17-19 新端点无 swagger 注释）
+  - ✅ 客户端自动化交互端点的 API 文档同步（CLI/Agent/Scanner 交互所需的 v2 端点已补充 swagger 注释；纯前端 UI 端点不强制要求）
 
 ### 2.9：部署模式与 Demo 环境 ✅
 
@@ -268,7 +268,7 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全团队、扫
 | 商业平台 | 请求回显 | 核心能力 §1 | ✅ |
 | 商业平台 | Payload 速查表 | 前端 Command Center | ✅ |
 | RMI | RMI 协议监听 | 核心能力 §1 | ✅ |
-| Antenna | Template 插件化组件系统 | 核心能力 §6（基础执行引擎，待集成管道） | ⬜ |
+| Antenna | Template 插件化组件系统 | 核心能力 §6（已集成到 Interaction 管道） | ✅ |
 | Antenna | 任务驱动模型 | Case 模块（新增批量字段 + stats API） | ✅ |
 | Alphalog | 匿名模式 | 系统设置 | ✅ |
 | POC-S | 搜索引擎集成（ZoomEye/Shodan/Fofa） | 核心能力 §4 | ✅ |

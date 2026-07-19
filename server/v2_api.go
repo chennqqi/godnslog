@@ -1135,6 +1135,13 @@ func (self *WebServer) v2GetCaseInteractions(c *gin.Context) {
 }
 
 // v2ListPayloads lists payloads
+// v2ListPayloads
+// @Summary List payloads
+// @Description Get a paginated list of payloads with optional filters
+// @Tags v2, payloads
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/payloads [get]
 func (self *WebServer) v2ListPayloads(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -1217,6 +1224,14 @@ func (self *WebServer) v2ListPayloads(c *gin.Context) {
 }
 
 // v2CreatePayload creates a payload
+// v2CreatePayload
+// @Summary Create a payload
+// @Description Create a new OAST payload with template and variables
+// @Tags v2, payloads
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/payloads [post]
 func (self *WebServer) v2CreatePayload(c *gin.Context) {
 	var req models.PayloadCreateRequest
 	var err error
@@ -1276,6 +1291,14 @@ func (self *WebServer) v2CreatePayload(c *gin.Context) {
 }
 
 // v2GetPayload gets a payload
+// v2GetPayload
+// @Summary Get a payload
+// @Description Get detailed information about a specific payload
+// @Tags v2, payloads
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/payloads/{id} [get]
 func (self *WebServer) v2GetPayload(c *gin.Context) {
 	id := c.Param("id")
 
@@ -1305,6 +1328,14 @@ func (self *WebServer) v2GetPayload(c *gin.Context) {
 }
 
 // v2RevokePayload revokes a payload
+// v2RevokePayload
+// @Summary Revoke a payload
+// @Description Revoke a payload, making it inactive for future interactions
+// @Tags v2, payloads
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/payloads/{id}/revoke [post]
 func (self *WebServer) v2RevokePayload(c *gin.Context) {
 	id := c.Param("id")
 	payloadId, err := strconv.ParseInt(id, 10, 64)
@@ -1336,6 +1367,15 @@ func (self *WebServer) v2RevokePayload(c *gin.Context) {
 }
 
 // v2UpdatePayload updates a payload
+// v2UpdatePayload
+// @Summary Update a payload
+// @Description Update payload fields such as status, description, expected protocol
+// @Tags v2, payloads
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/payloads/{id} [put]
 func (self *WebServer) v2UpdatePayload(c *gin.Context) {
 	id := c.Param("id")
 	payloadId, err := strconv.ParseInt(id, 10, 64)
@@ -1379,6 +1419,14 @@ func (self *WebServer) v2UpdatePayload(c *gin.Context) {
 }
 
 // v2PreviewPayload previews payload rendering
+// v2PreviewPayload
+// @Summary Preview payload rendering
+// @Description Render a payload template with variables and return the result
+// @Tags v2, payloads
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/payloads/{id}/preview [get]
 func (self *WebServer) v2PreviewPayload(c *gin.Context) {
 	id := c.Param("id")
 
@@ -1410,6 +1458,14 @@ func (self *WebServer) v2PreviewPayload(c *gin.Context) {
 }
 
 // v2BatchCreatePayloads creates multiple payloads
+// v2BatchCreatePayloads
+// @Summary Batch create payloads
+// @Description Create multiple payloads from a template with individual tracking tokens
+// @Tags v2, payloads
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/payloads/batch [post]
 func (self *WebServer) v2BatchCreatePayloads(c *gin.Context) {
 	var req struct {
 		CaseID    string            `json:"case_id" binding:"required"`
@@ -1477,6 +1533,13 @@ func (self *WebServer) v2BatchCreatePayloads(c *gin.Context) {
 }
 
 // v2ListInteractions lists interactions
+// v2ListInteractions
+// @Summary List interactions
+// @Description Get a paginated list of captured OAST interactions with filters
+// @Tags v2, interactions
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/interactions [get]
 func (self *WebServer) v2ListInteractions(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -1605,6 +1668,14 @@ func (self *WebServer) v2ListInteractions(c *gin.Context) {
 }
 
 // v2ListPayloadInteractions lists interactions associated with a specific payload
+// v2ListPayloadInteractions
+// @Summary List interactions for a payload
+// @Description Get interactions captured for a specific payload
+// @Tags v2, payloads, interactions
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/payloads/{id}/interactions [get]
 func (self *WebServer) v2ListPayloadInteractions(c *gin.Context) {
 	payloadId := c.Param("id")
 	if payloadId == "" {
@@ -1723,6 +1794,14 @@ func (self *WebServer) v2ListPayloadInteractions(c *gin.Context) {
 }
 
 // v2GetInteraction gets an interaction
+// v2GetInteraction
+// @Summary Get an interaction
+// @Description Get detailed information about a specific captured interaction
+// @Tags v2, interactions
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/interactions/{id} [get]
 func (self *WebServer) v2GetInteraction(c *gin.Context) {
 	id := c.Param("id")
 
@@ -1818,6 +1897,14 @@ func (self *WebServer) v2GetInteraction(c *gin.Context) {
 }
 
 // v2DeleteInteractions deletes interactions
+// v2DeleteInteractions
+// @Summary Delete interactions
+// @Description Delete one or more interactions by ID
+// @Tags v2, interactions
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/interactions/delete [post]
 func (self *WebServer) v2DeleteInteractions(c *gin.Context) {
 	var req struct {
 		Ids []string `json:"ids"`
@@ -1844,6 +1931,14 @@ func (self *WebServer) v2DeleteInteractions(c *gin.Context) {
 }
 
 // v2ExportInteractions exports interactions
+// v2ExportInteractions
+// @Summary Export interactions
+// @Description Export interactions in JSON or Markdown format
+// @Tags v2, interactions
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/interactions/export [post]
 func (self *WebServer) v2ExportInteractions(c *gin.Context) {
 	var req struct {
 		Ids    []string `json:"ids"`
@@ -1867,6 +1962,13 @@ func (self *WebServer) v2ExportInteractions(c *gin.Context) {
 }
 
 // v2ListAPIKeys lists API keys
+// v2ListAPIKeys
+// @Summary List API keys
+// @Description Get a paginated list of API keys for the current user
+// @Tags v2, apikeys
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/apikeys [get]
 func (self *WebServer) v2ListAPIKeys(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -1898,6 +2000,14 @@ func (self *WebServer) v2ListAPIKeys(c *gin.Context) {
 }
 
 // v2CreateAPIKey creates an API key
+// v2CreateAPIKey
+// @Summary Create an API key
+// @Description Create a new API key with specified scopes and expiration
+// @Tags v2, apikeys
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/apikeys [post]
 func (self *WebServer) v2CreateAPIKey(c *gin.Context) {
 	var req v2models.APIKeyCreateRequest
 	if err := c.BindJSON(&req); err != nil {
@@ -1961,6 +2071,14 @@ func (self *WebServer) v2CreateAPIKey(c *gin.Context) {
 }
 
 // v2DeleteAPIKey deletes an API key
+// v2DeleteAPIKey
+// @Summary Delete an API key
+// @Description Revoke and delete an API key by ID
+// @Tags v2, apikeys
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/apikeys/{id} [delete]
 func (self *WebServer) v2DeleteAPIKey(c *gin.Context) {
 	id := c.Param("id")
 
@@ -2016,6 +2134,14 @@ func (self *WebServer) v2DeleteAPIKey(c *gin.Context) {
 }
 
 // v2GetAPIKey gets an API key by ID
+// v2GetAPIKey
+// @Summary Get an API key
+// @Description Get detailed information about a specific API key
+// @Tags v2, apikeys
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/apikeys/{id} [get]
 func (self *WebServer) v2GetAPIKey(c *gin.Context) {
 	id := c.Param("id")
 
@@ -2041,6 +2167,15 @@ func (self *WebServer) v2GetAPIKey(c *gin.Context) {
 }
 
 // v2UpdateAPIKey updates an API key
+// v2UpdateAPIKey
+// @Summary Update an API key
+// @Description Update API key scopes, name, or expiration
+// @Tags v2, apikeys
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/apikeys/{id} [put]
 func (self *WebServer) v2UpdateAPIKey(c *gin.Context) {
 	id := c.Param("id")
 
@@ -2114,6 +2249,13 @@ func (self *WebServer) v2UpdateAPIKey(c *gin.Context) {
 }
 
 // v2ListAgentPolicyScopes lists the shared Agent scope and risk catalog.
+// v2ListAgentPolicyScopes
+// @Summary List agent policy scopes
+// @Description Get available agent scopes and risk levels
+// @Tags v2, agent
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/agent/policy-scopes [get]
 func (self *WebServer) v2ListAgentPolicyScopes(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
@@ -2136,6 +2278,13 @@ func generateRandomString(length int) string {
 }
 
 // v2ListUsers lists users (admin only)
+// v2ListUsers
+// @Summary List users
+// @Description Get a paginated list of all users (admin only)
+// @Tags v2, users
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/users [get]
 func (self *WebServer) v2ListUsers(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -2205,6 +2354,13 @@ func (self *WebServer) v2ListUsers(c *gin.Context) {
 }
 
 // v2InteractionStats gets interaction statistics
+// v2InteractionStats
+// @Summary Get interaction statistics
+// @Description Get aggregated interaction statistics
+// @Tags v2, interactions, stats
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/interactions/stats [get]
 func (self *WebServer) v2InteractionStats(c *gin.Context) {
 	caseId := c.Query("case_id")
 	payloadId := c.Query("payload_id")
@@ -2275,6 +2431,13 @@ func (self *WebServer) v2InteractionStats(c *gin.Context) {
 }
 
 // v2InteractionDailyStats returns daily interaction counts for the last N days.
+// v2InteractionDailyStats
+// @Summary Get daily interaction stats
+// @Description Get daily interaction counts for the last N days
+// @Tags v2, interactions, stats
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/interactions/daily-stats [get]
 func (self *WebServer) v2InteractionDailyStats(c *gin.Context) {
 	caseId := c.Query("case_id")
 	payloadId := c.Query("payload_id")
@@ -2328,6 +2491,13 @@ func (self *WebServer) v2InteractionDailyStats(c *gin.Context) {
 }
 
 // v2InteractionTimeline gets interaction timeline
+// v2InteractionTimeline
+// @Summary Get interaction timeline
+// @Description Get interaction timeline data grouped by time interval
+// @Tags v2, interactions, stats
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/interactions/timeline [get]
 func (self *WebServer) v2InteractionTimeline(c *gin.Context) {
 	caseId := c.Query("case_id")
 	payloadId := c.Query("payload_id")
@@ -2408,6 +2578,13 @@ func getIntervalKey(t time.Time, interval string) string {
 // The client sends a "since" query param (RFC3339 timestamp) to get interactions newer than that time.
 // The server polls the database every 2 seconds and sends any new interactions as SSE "interaction" events.
 // A "heartbeat" event is sent every 30 seconds to keep the connection alive.
+// v2InteractionStream
+// @Summary Stream interactions (SSE)
+// @Description Stream new interactions in real-time via Server-Sent Events
+// @Tags v2, interactions
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/interactions/stream [get]
 func (self *WebServer) v2InteractionStream(c *gin.Context) {
 	caseId := c.Query("case_id")
 	payloadId := c.Query("payload_id")
@@ -2553,6 +2730,13 @@ func (self *WebServer) v2Poll(c *gin.Context) {
 }
 
 // v2ListPlugins lists marketplace plugins
+// v2ListPlugins
+// @Summary List plugins
+// @Description Get a list of all available marketplace plugins
+// @Tags v2, plugins
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/plugins [get]
 func (self *WebServer) v2ListPlugins(c *gin.Context) {
 	store := marketplace.NewXormStore(self.orm)
 	svc := marketplace.NewService(store)
@@ -2587,6 +2771,14 @@ func (self *WebServer) v2ListPlugins(c *gin.Context) {
 }
 
 // v2CreatePlugin creates a new marketplace plugin
+// v2CreatePlugin
+// @Summary Create a plugin
+// @Description Submit a new plugin to the marketplace
+// @Tags v2, plugins
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/plugins [post]
 func (self *WebServer) v2CreatePlugin(c *gin.Context) {
 	var plugin marketplace.Plugin
 	if err := c.ShouldBindJSON(&plugin); err != nil {
@@ -2610,6 +2802,14 @@ func (self *WebServer) v2CreatePlugin(c *gin.Context) {
 }
 
 // v2GetPlugin gets a specific plugin
+// v2GetPlugin
+// @Summary Get a plugin
+// @Description Get detailed information about a specific plugin
+// @Tags v2, plugins
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/plugins/{id} [get]
 func (self *WebServer) v2GetPlugin(c *gin.Context) {
 	id := c.Param("id")
 	store := marketplace.NewXormStore(self.orm)
@@ -2625,6 +2825,13 @@ func (self *WebServer) v2GetPlugin(c *gin.Context) {
 }
 
 // v2ListTemplates lists marketplace templates
+// v2ListTemplates
+// @Summary List payload templates
+// @Description Get a list of all available payload templates
+// @Tags v2, templates
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/templates [get]
 func (self *WebServer) v2ListTemplates(c *gin.Context) {
 	store := marketplace.NewXormStore(self.orm)
 	svc := marketplace.NewService(store)
@@ -2659,6 +2866,14 @@ func (self *WebServer) v2ListTemplates(c *gin.Context) {
 }
 
 // v2CreateTemplate creates a new marketplace template
+// v2CreateTemplate
+// @Summary Create a payload template
+// @Description Create a new reusable payload template
+// @Tags v2, templates
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/templates [post]
 func (self *WebServer) v2CreateTemplate(c *gin.Context) {
 	var template marketplace.Template
 	if err := c.ShouldBindJSON(&template); err != nil {
@@ -2682,6 +2897,14 @@ func (self *WebServer) v2CreateTemplate(c *gin.Context) {
 }
 
 // v2GetTemplate gets a specific template
+// v2GetTemplate
+// @Summary Get a payload template
+// @Description Get detailed information about a specific payload template
+// @Tags v2, templates
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/templates/{id} [get]
 func (self *WebServer) v2GetTemplate(c *gin.Context) {
 	id := c.Param("id")
 	store := marketplace.NewXormStore(self.orm)
@@ -2697,6 +2920,14 @@ func (self *WebServer) v2GetTemplate(c *gin.Context) {
 }
 
 // v2InstallPlugin installs a marketplace plugin
+// v2InstallPlugin
+// @Summary Install a plugin
+// @Description Install a marketplace plugin
+// @Tags v2, plugins
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/plugins/{id}/install [post]
 func (self *WebServer) v2InstallPlugin(c *gin.Context) {
 	pluginID := c.Param("id")
 
@@ -2732,6 +2963,13 @@ func (self *WebServer) v2InstallPlugin(c *gin.Context) {
 }
 
 // v2ListInstalledPlugins lists all installed plugins
+// v2ListInstalledPlugins
+// @Summary List installed plugins
+// @Description Get a list of all installed plugins
+// @Tags v2, plugins
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/plugins/installed [get]
 func (self *WebServer) v2ListInstalledPlugins(c *gin.Context) {
 	store := marketplace.NewXormStore(self.orm)
 	svc := marketplace.NewService(store)
@@ -2746,6 +2984,14 @@ func (self *WebServer) v2ListInstalledPlugins(c *gin.Context) {
 }
 
 // v2UninstallPlugin uninstalls a plugin
+// v2UninstallPlugin
+// @Summary Uninstall a plugin
+// @Description Remove an installed plugin
+// @Tags v2, plugins
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/plugins/{id}/uninstall [delete]
 func (self *WebServer) v2UninstallPlugin(c *gin.Context) {
 	id := c.Param("id")
 
@@ -2761,6 +3007,13 @@ func (self *WebServer) v2UninstallPlugin(c *gin.Context) {
 }
 
 // v2ListRules lists workflow rules
+// v2ListRules
+// @Summary List workflow rules
+// @Description Get a list of all workflow rules
+// @Tags v2, rules
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/rules [get]
 func (self *WebServer) v2ListRules(c *gin.Context) {
 	page := 1
 	pageSize := 20
@@ -2796,6 +3049,14 @@ func (self *WebServer) v2ListRules(c *gin.Context) {
 }
 
 // v2CreateRule creates a new workflow rule
+// v2CreateRule
+// @Summary Create a workflow rule
+// @Description Create a new workflow rule with conditions and actions
+// @Tags v2, rules
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/rules [post]
 func (self *WebServer) v2CreateRule(c *gin.Context) {
 	var req v2models.Workflow
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -2832,6 +3093,14 @@ func (self *WebServer) v2CreateRule(c *gin.Context) {
 }
 
 // v2GetRule gets a specific rule
+// v2GetRule
+// @Summary Get a workflow rule
+// @Description Get detailed information about a specific workflow rule
+// @Tags v2, rules
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/rules/{id} [get]
 func (self *WebServer) v2GetRule(c *gin.Context) {
 	id := c.Param("id")
 
@@ -2853,6 +3122,15 @@ func (self *WebServer) v2GetRule(c *gin.Context) {
 }
 
 // v2UpdateRule updates a rule
+// v2UpdateRule
+// @Summary Update a workflow rule
+// @Description Update rule conditions, actions, or enabled status
+// @Tags v2, rules
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/rules/{id} [put]
 func (self *WebServer) v2UpdateRule(c *gin.Context) {
 	id := c.Param("id")
 
@@ -2883,6 +3161,14 @@ func (self *WebServer) v2UpdateRule(c *gin.Context) {
 }
 
 // v2DeleteRule deletes a rule
+// v2DeleteRule
+// @Summary Delete a workflow rule
+// @Description Delete a workflow rule by ID
+// @Tags v2, rules
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/rules/{id} [delete]
 func (self *WebServer) v2DeleteRule(c *gin.Context) {
 	id := c.Param("id")
 
@@ -2902,6 +3188,14 @@ func (self *WebServer) v2DeleteRule(c *gin.Context) {
 }
 
 // v2GenerateEvidence generates evidence report
+// v2GenerateEvidence
+// @Summary Generate evidence report
+// @Description Generate an evidence report for a case or interaction
+// @Tags v2, evidence
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/evidence/generate [post]
 func (self *WebServer) v2GenerateEvidence(c *gin.Context) {
 	var req struct {
 		CaseID    string `json:"case_id"`
@@ -2953,6 +3247,14 @@ func (self *WebServer) v2GenerateEvidence(c *gin.Context) {
 }
 
 // v2GetEvidence gets evidence report by ID
+// v2GetEvidence
+// @Summary Get evidence report
+// @Description Get a generated evidence report by ID
+// @Tags v2, evidence
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/evidence/{id} [get]
 func (self *WebServer) v2GetEvidence(c *gin.Context) {
 	// Evidence reports are generated on-demand and not persisted
 	// Use v2GenerateEvidence endpoint to generate evidence reports
@@ -2963,6 +3265,14 @@ func (self *WebServer) v2GetEvidence(c *gin.Context) {
 }
 
 // v2SummarizeEvidence returns an Agent-friendly evidence summary bundle.
+// v2SummarizeEvidence
+// @Summary Summarize evidence with AI
+// @Description Generate an AI-powered summary of evidence
+// @Tags v2, evidence
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/evidence/summarize [post]
 func (self *WebServer) v2SummarizeEvidence(c *gin.Context) {
 	var req evidencehub.SummaryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -3008,6 +3318,13 @@ func (self *WebServer) v2SummarizeEvidence(c *gin.Context) {
 }
 
 // v2ListCanaries lists canary tokens
+// v2ListCanaries
+// @Summary List canaries
+// @Description Get a paginated list of canary tokens
+// @Tags v2, canaries
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/canaries [get]
 func (self *WebServer) v2ListCanaries(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
@@ -3033,6 +3350,14 @@ func (self *WebServer) v2ListCanaries(c *gin.Context) {
 }
 
 // v2CreateCanary creates a new canary token
+// v2CreateCanary
+// @Summary Create a canary
+// @Description Create a new canary token for long-term monitoring
+// @Tags v2, canaries
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/canaries [post]
 func (self *WebServer) v2CreateCanary(c *gin.Context) {
 	var req v2models.Canary
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -3060,6 +3385,14 @@ func (self *WebServer) v2CreateCanary(c *gin.Context) {
 }
 
 // v2GetCanary gets a specific canary token
+// v2GetCanary
+// @Summary Get a canary
+// @Description Get detailed information about a specific canary
+// @Tags v2, canaries
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/canaries/{id} [get]
 func (self *WebServer) v2GetCanary(c *gin.Context) {
 	id := c.Param("id")
 
@@ -3081,6 +3414,15 @@ func (self *WebServer) v2GetCanary(c *gin.Context) {
 }
 
 // v2UpdateCanary updates a canary token
+// v2UpdateCanary
+// @Summary Update a canary
+// @Description Update canary fields such as notes, expiration, status
+// @Tags v2, canaries
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/canaries/{id} [put]
 func (self *WebServer) v2UpdateCanary(c *gin.Context) {
 	id := c.Param("id")
 
@@ -3111,6 +3453,14 @@ func (self *WebServer) v2UpdateCanary(c *gin.Context) {
 }
 
 // v2DeleteCanary deletes a canary token
+// v2DeleteCanary
+// @Summary Delete a canary
+// @Description Delete a canary token by ID
+// @Tags v2, canaries
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/canaries/{id} [delete]
 func (self *WebServer) v2DeleteCanary(c *gin.Context) {
 	id := c.Param("id")
 
@@ -3130,6 +3480,14 @@ func (self *WebServer) v2DeleteCanary(c *gin.Context) {
 }
 
 // v2ListCanaryHits lists hits for a canary token
+// v2ListCanaryHits
+// @Summary List canary hits
+// @Description Get interactions/hits for a specific canary
+// @Tags v2, canaries
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/canaries/{id}/hits [get]
 func (self *WebServer) v2ListCanaryHits(c *gin.Context) {
 	id := c.Param("id")
 
@@ -3155,6 +3513,13 @@ func (self *WebServer) v2ListCanaryHits(c *gin.Context) {
 }
 
 // v2ListRebindingRules lists rebinding rules
+// v2ListRebindingRules
+// @Summary List rebinding rules
+// @Description Get a list of DNS rebinding rules
+// @Tags v2, rebinding
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/rebinding/rules [get]
 func (self *WebServer) v2ListRebindingRules(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
@@ -3180,6 +3545,14 @@ func (self *WebServer) v2ListRebindingRules(c *gin.Context) {
 }
 
 // v2CreateRebindingRule creates a new rebinding rule
+// v2CreateRebindingRule
+// @Summary Create a rebinding rule
+// @Description Create a new DNS rebinding rule
+// @Tags v2, rebinding
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/rebinding/rules [post]
 func (self *WebServer) v2CreateRebindingRule(c *gin.Context) {
 	var req v2models.RebindingRule
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -3207,6 +3580,14 @@ func (self *WebServer) v2CreateRebindingRule(c *gin.Context) {
 }
 
 // v2GetRebindingRule gets a specific rebinding rule
+// v2GetRebindingRule
+// @Summary Get a rebinding rule
+// @Description Get detailed information about a rebinding rule
+// @Tags v2, rebinding
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/rebinding/rules/{id} [get]
 func (self *WebServer) v2GetRebindingRule(c *gin.Context) {
 	id := c.Param("id")
 
@@ -3228,6 +3609,15 @@ func (self *WebServer) v2GetRebindingRule(c *gin.Context) {
 }
 
 // v2UpdateRebindingRule updates a rebinding rule
+// v2UpdateRebindingRule
+// @Summary Update a rebinding rule
+// @Description Update rebinding rule configuration
+// @Tags v2, rebinding
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/rebinding/rules/{id} [put]
 func (self *WebServer) v2UpdateRebindingRule(c *gin.Context) {
 	id := c.Param("id")
 
@@ -3258,6 +3648,14 @@ func (self *WebServer) v2UpdateRebindingRule(c *gin.Context) {
 }
 
 // v2DeleteRebindingRule deletes a rebinding rule
+// v2DeleteRebindingRule
+// @Summary Delete a rebinding rule
+// @Description Delete a rebinding rule by ID
+// @Tags v2, rebinding
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/rebinding/rules/{id} [delete]
 func (self *WebServer) v2DeleteRebindingRule(c *gin.Context) {
 	id := c.Param("id")
 
@@ -3277,6 +3675,13 @@ func (self *WebServer) v2DeleteRebindingRule(c *gin.Context) {
 }
 
 // v2ListRebindingSessions lists sessions for a rebinding rule
+// v2ListRebindingSessions
+// @Summary List rebinding sessions
+// @Description Get a list of active rebinding sessions
+// @Tags v2, rebinding
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/rebinding/sessions [get]
 func (self *WebServer) v2ListRebindingSessions(c *gin.Context) {
 	id := c.Param("id")
 
@@ -3302,6 +3707,13 @@ func (self *WebServer) v2ListRebindingSessions(c *gin.Context) {
 }
 
 // v2ListRebindingScenarios lists predefined rebinding scenarios
+// v2ListRebindingScenarios
+// @Summary List rebinding scenarios
+// @Description Get a list of predefined rebinding scenarios
+// @Tags v2, rebinding
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/rebinding/scenarios [get]
 func (self *WebServer) v2ListRebindingScenarios(c *gin.Context) {
 	scenarios := rebinding.GetPredefinedScenarios()
 	c.JSON(http.StatusOK, gin.H{
@@ -3312,6 +3724,14 @@ func (self *WebServer) v2ListRebindingScenarios(c *gin.Context) {
 }
 
 // v2CreateRebindingFromScenario creates a rebinding rule from a predefined scenario
+// v2CreateRebindingFromScenario
+// @Summary Create rebinding from scenario
+// @Description Create a rebinding rule from a predefined scenario
+// @Tags v2, rebinding
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/rebinding/from-scenario [post]
 func (self *WebServer) v2CreateRebindingFromScenario(c *gin.Context) {
 	scenarioName := c.Param("name")
 
@@ -3344,6 +3764,13 @@ func (self *WebServer) v2CreateRebindingFromScenario(c *gin.Context) {
 }
 
 // v2ListListeners lists protocol listeners
+// v2ListListeners
+// @Summary List listeners
+// @Description Get a list of all protocol listeners
+// @Tags v2, listeners
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/listeners [get]
 func (self *WebServer) v2ListListeners(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
@@ -3369,6 +3796,14 @@ func (self *WebServer) v2ListListeners(c *gin.Context) {
 }
 
 // v2CreateListener creates a new protocol listener
+// v2CreateListener
+// @Summary Create a listener
+// @Description Create a new protocol listener (SMTP/LDAP/SMB/FTP/RMI)
+// @Tags v2, listeners
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/listeners [post]
 func (self *WebServer) v2CreateListener(c *gin.Context) {
 	var req v2models.Listener
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -3403,6 +3838,14 @@ func (self *WebServer) v2CreateListener(c *gin.Context) {
 }
 
 // v2GetListener gets a specific listener
+// v2GetListener
+// @Summary Get a listener
+// @Description Get detailed information about a specific listener
+// @Tags v2, listeners
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/listeners/{id} [get]
 func (self *WebServer) v2GetListener(c *gin.Context) {
 	id := c.Param("id")
 
@@ -3424,6 +3867,15 @@ func (self *WebServer) v2GetListener(c *gin.Context) {
 }
 
 // v2UpdateListener updates a listener
+// v2UpdateListener
+// @Summary Update a listener
+// @Description Update listener configuration
+// @Tags v2, listeners
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/listeners/{id} [put]
 func (self *WebServer) v2UpdateListener(c *gin.Context) {
 	id := c.Param("id")
 
@@ -3465,6 +3917,14 @@ func (self *WebServer) v2UpdateListener(c *gin.Context) {
 }
 
 // v2DeleteListener deletes a listener
+// v2DeleteListener
+// @Summary Delete a listener
+// @Description Delete a protocol listener by ID
+// @Tags v2, listeners
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/listeners/{id} [delete]
 func (self *WebServer) v2DeleteListener(c *gin.Context) {
 	id := c.Param("id")
 
@@ -3489,6 +3949,14 @@ func (self *WebServer) v2DeleteListener(c *gin.Context) {
 }
 
 // v2ListListenerInteractions lists interactions for a listener
+// v2ListListenerInteractions
+// @Summary List listener interactions
+// @Description Get interactions captured by a specific listener
+// @Tags v2, listeners
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/listeners/{id}/interactions [get]
 func (self *WebServer) v2ListListenerInteractions(c *gin.Context) {
 	id := c.Param("id")
 
@@ -3515,6 +3983,13 @@ func (self *WebServer) v2ListListenerInteractions(c *gin.Context) {
 }
 
 // v2ListNotificationChannels lists notification channels
+// v2ListNotificationChannels
+// @Summary List notification channels
+// @Description Get a list of all configured notification channels
+// @Tags v2, notifications
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/notifications/channels [get]
 func (self *WebServer) v2ListNotificationChannels(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -3544,6 +4019,14 @@ func (self *WebServer) v2ListNotificationChannels(c *gin.Context) {
 }
 
 // v2CreateNotificationChannel creates a notification channel
+// v2CreateNotificationChannel
+// @Summary Create a notification channel
+// @Description Create a new notification channel (webhook/email/IM)
+// @Tags v2, notifications
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/notifications/channels [post]
 func (self *WebServer) v2CreateNotificationChannel(c *gin.Context) {
 	var req models.NotificationChannelCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -3574,6 +4057,14 @@ func (self *WebServer) v2CreateNotificationChannel(c *gin.Context) {
 }
 
 // v2GetNotificationChannel gets a notification channel
+// v2GetNotificationChannel
+// @Summary Get a notification channel
+// @Description Get detailed information about a notification channel
+// @Tags v2, notifications
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/notifications/channels/{id} [get]
 func (self *WebServer) v2GetNotificationChannel(c *gin.Context) {
 	id := c.Param("id")
 	channelId, err := strconv.ParseInt(id, 10, 64)
@@ -3604,6 +4095,15 @@ func (self *WebServer) v2GetNotificationChannel(c *gin.Context) {
 }
 
 // v2UpdateNotificationChannel updates a notification channel
+// v2UpdateNotificationChannel
+// @Summary Update a notification channel
+// @Description Update notification channel configuration
+// @Tags v2, notifications
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/notifications/channels/{id} [put]
 func (self *WebServer) v2UpdateNotificationChannel(c *gin.Context) {
 	id := c.Param("id")
 	channelId, err := strconv.ParseInt(id, 10, 64)
@@ -3642,6 +4142,14 @@ func (self *WebServer) v2UpdateNotificationChannel(c *gin.Context) {
 }
 
 // v2DeleteNotificationChannel deletes a notification channel
+// v2DeleteNotificationChannel
+// @Summary Delete a notification channel
+// @Description Delete a notification channel by ID
+// @Tags v2, notifications
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/notifications/channels/{id} [delete]
 func (self *WebServer) v2DeleteNotificationChannel(c *gin.Context) {
 	id := c.Param("id")
 	channelId, err := strconv.ParseInt(id, 10, 64)
@@ -3671,6 +4179,13 @@ func (self *WebServer) v2DeleteNotificationChannel(c *gin.Context) {
 }
 
 // v2ListNotificationLogs lists notification logs
+// v2ListNotificationLogs
+// @Summary List notification logs
+// @Description Get a paginated list of notification delivery logs
+// @Tags v2, notifications
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/notifications/logs [get]
 func (self *WebServer) v2ListNotificationLogs(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -3709,6 +4224,13 @@ func (self *WebServer) v2ListNotificationLogs(c *gin.Context) {
 }
 
 // v2ListSettings lists system settings
+// v2ListSettings
+// @Summary List settings
+// @Description Get a list of all system settings
+// @Tags v2, settings
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/settings [get]
 func (self *WebServer) v2ListSettings(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -3743,6 +4265,14 @@ func (self *WebServer) v2ListSettings(c *gin.Context) {
 }
 
 // v2GetSetting gets a specific setting by key
+// v2GetSetting
+// @Summary Get a setting
+// @Description Get a specific system setting by key
+// @Tags v2, settings
+// @Produce json
+// @Param key path string true "key"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/settings/{key} [get]
 func (self *WebServer) v2GetSetting(c *gin.Context) {
 	key := c.Param("key")
 
@@ -3773,6 +4303,15 @@ func (self *WebServer) v2GetSetting(c *gin.Context) {
 }
 
 // v2UpdateSetting updates a setting
+// v2UpdateSetting
+// @Summary Update a setting
+// @Description Update a system setting value
+// @Tags v2, settings
+// @Accept json
+// @Produce json
+// @Param key path string true "key"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/settings/{key} [put]
 func (self *WebServer) v2UpdateSetting(c *gin.Context) {
 	key := c.Param("key")
 
@@ -3826,6 +4365,14 @@ func (self *WebServer) v2UpdateSetting(c *gin.Context) {
 }
 
 // v2CreateSetting creates a new setting
+// v2CreateSetting
+// @Summary Create a setting
+// @Description Create a new system setting
+// @Tags v2, settings
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/settings [post]
 func (self *WebServer) v2CreateSetting(c *gin.Context) {
 	var req v2models.SettingsCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -3863,6 +4410,14 @@ func (self *WebServer) v2CreateSetting(c *gin.Context) {
 }
 
 // v2DeleteSetting deletes a setting
+// v2DeleteSetting
+// @Summary Delete a setting
+// @Description Delete a system setting by key
+// @Tags v2, settings
+// @Produce json
+// @Param key path string true "key"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/settings/{key} [delete]
 func (self *WebServer) v2DeleteSetting(c *gin.Context) {
 	key := c.Param("key")
 
@@ -3886,6 +4441,13 @@ func (self *WebServer) v2DeleteSetting(c *gin.Context) {
 }
 
 // v2ListAuditLogs lists audit logs with pagination and filtering
+// v2ListAuditLogs
+// @Summary List audit logs
+// @Description Get a paginated list of audit logs with filters
+// @Tags v2, audit
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/audit-logs [get]
 func (self *WebServer) v2ListAuditLogs(c *gin.Context) {
 	// Parse query parameters
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -3959,6 +4521,14 @@ func (self *WebServer) v2ListAuditLogs(c *gin.Context) {
 }
 
 // v2CreateAuditLog creates an audit log entry
+// v2CreateAuditLog
+// @Summary Create an audit log
+// @Description Manually create an audit log entry
+// @Tags v2, audit
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/audit-logs [post]
 func (self *WebServer) v2CreateAuditLog(c *gin.Context) {
 	var req v2models.AuditLog
 	if err := c.BindJSON(&req); err != nil {
@@ -3992,6 +4562,13 @@ func (self *WebServer) v2CreateAuditLog(c *gin.Context) {
 }
 
 // v2ListScannerRuns lists scanner runs with filtering
+// v2ListScannerRuns
+// @Summary List scanner runs
+// @Description Get a paginated list of scanner runs
+// @Tags v2, scanner
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/scanner/runs [get]
 func (self *WebServer) v2ListScannerRuns(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -4019,6 +4596,13 @@ func (self *WebServer) v2ListScannerRuns(c *gin.Context) {
 }
 
 // v2ListScannerAdapters lists supported Scanner Hub adapters.
+// v2ListScannerAdapters
+// @Summary List scanner adapters
+// @Description Get a list of available scanner adapters
+// @Tags v2, scanner
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/scanner/adapters [get]
 func (self *WebServer) v2ListScannerAdapters(c *gin.Context) {
 	scannerHubService := scannerhub.NewService(self.orm)
 	c.JSON(http.StatusOK, gin.H{
@@ -4029,6 +4613,14 @@ func (self *WebServer) v2ListScannerAdapters(c *gin.Context) {
 }
 
 // v2CreateScannerRun creates a new scanner run
+// v2CreateScannerRun
+// @Summary Create a scanner run
+// @Description Start a new scanner run with specified adapter
+// @Tags v2, scanner
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/scanner/runs [post]
 func (self *WebServer) v2CreateScannerRun(c *gin.Context) {
 	var req v2models.ScannerRunCreateRequest
 	if err := c.BindJSON(&req); err != nil {
@@ -4095,6 +4687,14 @@ func (self *WebServer) v2CreateScannerRun(c *gin.Context) {
 }
 
 // v2GetScannerRun gets a scanner run by ID with derived fields
+// v2GetScannerRun
+// @Summary Get a scanner run
+// @Description Get detailed information about a scanner run
+// @Tags v2, scanner
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/scanner/runs/{id} [get]
 func (self *WebServer) v2GetScannerRun(c *gin.Context) {
 	id := c.Param("id")
 
@@ -4130,6 +4730,15 @@ func (self *WebServer) v2GetScannerRun(c *gin.Context) {
 }
 
 // v2UpdateScannerRunStatus updates the status of a scanner run
+// v2UpdateScannerRunStatus
+// @Summary Update scanner run status
+// @Description Update the status of a scanner run
+// @Tags v2, scanner
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/scanner/runs/{id}/status [put]
 func (self *WebServer) v2UpdateScannerRunStatus(c *gin.Context) {
 	id := c.Param("id")
 
@@ -4170,6 +4779,14 @@ func (self *WebServer) v2UpdateScannerRunStatus(c *gin.Context) {
 }
 
 // v2CreateScannerRunFromSearch creates scanner runs from search engine results.
+// v2CreateScannerRunFromSearch
+// @Summary Create scanner run from search
+// @Description Start a scanner run from search engine results
+// @Tags v2, scanner
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/scanner/runs/from-search [post]
 func (self *WebServer) v2CreateScannerRunFromSearch(c *gin.Context) {
 	var req v2models.ScannerRunCreateFromSearchRequest
 	if err := c.BindJSON(&req); err != nil {
@@ -4226,6 +4843,15 @@ func (self *WebServer) v2CreateScannerRunFromSearch(c *gin.Context) {
 }
 
 // v2BackfillScannerResults imports scan results and associates them with a scanner run
+// v2BackfillScannerResults
+// @Summary Backfill scanner results
+// @Description Backfill scanner results for a completed run
+// @Tags v2, scanner
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/scanner/runs/{id}/backfill [post]
 func (self *WebServer) v2BackfillScannerResults(c *gin.Context) {
 	id := c.Param("id")
 
@@ -4275,6 +4901,13 @@ func (self *WebServer) v2BackfillScannerResults(c *gin.Context) {
 }
 
 // v2ListAgentRuns lists agent runs with filtering
+// v2ListAgentRuns
+// @Summary List agent runs
+// @Description Get a paginated list of agent runs
+// @Tags v2, agent
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/agent/runs [get]
 func (self *WebServer) v2ListAgentRuns(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -4313,6 +4946,14 @@ func (self *WebServer) v2ListAgentRuns(c *gin.Context) {
 }
 
 // v2CreateAgentRun creates a new agent run
+// v2CreateAgentRun
+// @Summary Create an agent run
+// @Description Create a new agent run with goal and context
+// @Tags v2, agent
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/agent/runs [post]
 func (self *WebServer) v2CreateAgentRun(c *gin.Context) {
 	var req v2models.AgentRunCreateRequest
 	if err := c.BindJSON(&req); err != nil {
@@ -4347,6 +4988,14 @@ func (self *WebServer) v2CreateAgentRun(c *gin.Context) {
 }
 
 // v2GetAgentRun retrieves an agent run by ID
+// v2GetAgentRun
+// @Summary Get an agent run
+// @Description Get detailed information about an agent run
+// @Tags v2, agent
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/agent/runs/{id} [get]
 func (self *WebServer) v2GetAgentRun(c *gin.Context) {
 	id := c.Param("id")
 
@@ -4386,6 +5035,14 @@ func (self *WebServer) v2GetAgentRun(c *gin.Context) {
 }
 
 // v2GetAgentRunReview generates a review packet for an agent run
+// v2GetAgentRunReview
+// @Summary Get agent run review
+// @Description Get review data for an agent run
+// @Tags v2, agent
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/agent/runs/{id}/review [get]
 func (self *WebServer) v2GetAgentRunReview(c *gin.Context) {
 	id := c.Param("id")
 	format := c.DefaultQuery("format", "json")
@@ -4437,6 +5094,15 @@ func (self *WebServer) v2GetAgentRunReview(c *gin.Context) {
 }
 
 // v2UpdateAgentRunStatus updates the status of an agent run
+// v2UpdateAgentRunStatus
+// @Summary Update agent run status
+// @Description Update the status of an agent run
+// @Tags v2, agent
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/agent/runs/{id}/status [put]
 func (self *WebServer) v2UpdateAgentRunStatus(c *gin.Context) {
 	id := c.Param("id")
 
@@ -4472,6 +5138,15 @@ func (self *WebServer) v2UpdateAgentRunStatus(c *gin.Context) {
 }
 
 // v2AppendAgentOperation appends an operation to an agent run
+// v2AppendAgentOperation
+// @Summary Append agent operation
+// @Description Append an operation log entry to an agent run
+// @Tags v2, agent
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/agent/runs/{id}/operations [post]
 func (self *WebServer) v2AppendAgentOperation(c *gin.Context) {
 	id := c.Param("id")
 
@@ -4507,6 +5182,15 @@ func (self *WebServer) v2AppendAgentOperation(c *gin.Context) {
 }
 
 // v2CreateAgentRunFollowup creates a follow-up action for an agent run
+// v2CreateAgentRunFollowup
+// @Summary Create agent run followup
+// @Description Create a followup agent run linked to a parent run
+// @Tags v2, agent
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/agent/runs/{id}/followup [post]
 func (self *WebServer) v2CreateAgentRunFollowup(c *gin.Context) {
 	id := c.Param("id")
 	var req v2models.AgentRunFollowupRequest
@@ -4541,6 +5225,15 @@ func (self *WebServer) v2CreateAgentRunFollowup(c *gin.Context) {
 }
 
 // v2RecordReviewDecision records a review decision for an agent run
+// v2RecordReviewDecision
+// @Summary Record review decision
+// @Description Record a human review decision for an agent run
+// @Tags v2, agent
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/agent/runs/{id}/review/decision [post]
 func (self *WebServer) v2RecordReviewDecision(c *gin.Context) {
 	id := c.Param("id")
 	var req v2models.AgentRunReviewDecisionRequest
@@ -4575,6 +5268,15 @@ func (self *WebServer) v2RecordReviewDecision(c *gin.Context) {
 }
 
 // v2ExportReviewPackage exports a review evidence package for an agent run
+// v2ExportReviewPackage
+// @Summary Export review package
+// @Description Export a review package for an agent run
+// @Tags v2, agent
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/agent/runs/{id}/review/export [post]
 func (self *WebServer) v2ExportReviewPackage(c *gin.Context) {
 	id := c.Param("id")
 	var req v2models.AgentRunReviewExportRequest
@@ -4612,6 +5314,15 @@ func (self *WebServer) v2ExportReviewPackage(c *gin.Context) {
 }
 
 // v2DeliverReviewPackage delivers a review evidence package to a webhook
+// v2DeliverReviewPackage
+// @Summary Deliver review package
+// @Description Deliver a review package to an external system
+// @Tags v2, agent
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/agent/runs/{id}/review/deliver [post]
 func (self *WebServer) v2DeliverReviewPackage(c *gin.Context) {
 	id := c.Param("id")
 	var req v2models.AgentRunReviewDeliveryRequest
@@ -4659,6 +5370,13 @@ func (self *WebServer) v2DeliverReviewPackage(c *gin.Context) {
 }
 
 // v2ListReviewDeliveries lists the delivery history for an agent run
+// v2ListReviewDeliveries
+// @Summary List review deliveries
+// @Description Get a list of review package deliveries
+// @Tags v2, agent
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/agent/review-deliveries [get]
 func (self *WebServer) v2ListReviewDeliveries(c *gin.Context) {
 	id := c.Param("id")
 
@@ -4683,6 +5401,14 @@ func (self *WebServer) v2ListReviewDeliveries(c *gin.Context) {
 }
 
 // v2TraceReviewPackage traces a review package by its hash
+// v2TraceReviewPackage
+// @Summary Trace review package
+// @Description Trace the delivery status of a review package
+// @Tags v2, agent
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/agent/review-deliveries/{id}/trace [get]
 func (self *WebServer) v2TraceReviewPackage(c *gin.Context) {
 	packageHash := c.Query("package_hash")
 
@@ -4715,6 +5441,13 @@ func (self *WebServer) v2TraceReviewPackage(c *gin.Context) {
 }
 
 // v2ListReviewQueue lists the review queue with filters
+// v2ListReviewQueue
+// @Summary List review queue
+// @Description Get a paginated list of agent runs awaiting review
+// @Tags v2, agent
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/agent/review-queue [get]
 func (self *WebServer) v2ListReviewQueue(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -4757,6 +5490,15 @@ func (self *WebServer) v2ListReviewQueue(c *gin.Context) {
 }
 
 // v2CompleteAgentRun orchestrates the full agent run completion loop
+// v2CompleteAgentRun
+// @Summary Complete an agent run
+// @Description Mark an agent run as completed with final evidence
+// @Tags v2, agent
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/agent/runs/{id}/complete [post]
 func (self *WebServer) v2CompleteAgentRun(c *gin.Context) {
 	id := c.Param("id")
 
@@ -4798,6 +5540,13 @@ func (self *WebServer) v2CompleteAgentRun(c *gin.Context) {
 }
 
 // v2ListDNSRecords lists DNS resolve records with pagination
+// v2ListDNSRecords
+// @Summary List DNS records
+// @Description Get a list of custom DNS resolution records
+// @Tags v2, dns
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/dns/records [get]
 func (self *WebServer) v2ListDNSRecords(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -4858,6 +5607,14 @@ func (self *WebServer) v2ListDNSRecords(c *gin.Context) {
 }
 
 // v2CreateDNSRecord creates a new DNS resolve record
+// v2CreateDNSRecord
+// @Summary Create a DNS record
+// @Description Create a custom DNS resolution record
+// @Tags v2, dns
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/dns/records [post]
 func (self *WebServer) v2CreateDNSRecord(c *gin.Context) {
 	var req struct {
 		Host  string `json:"host" binding:"required"`
@@ -4903,6 +5660,15 @@ func (self *WebServer) v2CreateDNSRecord(c *gin.Context) {
 }
 
 // v2UpdateDNSRecord updates an existing DNS resolve record
+// v2UpdateDNSRecord
+// @Summary Update a DNS record
+// @Description Update an existing DNS resolution record
+// @Tags v2, dns
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/dns/records/{id} [put]
 func (self *WebServer) v2UpdateDNSRecord(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -4970,6 +5736,14 @@ func (self *WebServer) v2UpdateDNSRecord(c *gin.Context) {
 }
 
 // v2DeleteDNSRecord deletes a DNS resolve record
+// v2DeleteDNSRecord
+// @Summary Delete a DNS record
+// @Description Delete a custom DNS resolution record
+// @Tags v2, dns
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/dns/records/{id} [delete]
 func (self *WebServer) v2DeleteDNSRecord(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -5001,6 +5775,13 @@ func (self *WebServer) v2DeleteDNSRecord(c *gin.Context) {
 }
 
 // v2QueryXip returns xip encoding formats for a given IPv4 address
+// v2QueryXip
+// @Summary Query xip.io
+// @Description Query xip.io-style DNS resolution
+// @Tags v2, dns
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/dns/xip [get]
 func (self *WebServer) v2QueryXip(c *gin.Context) {
 	ipStr := c.Param("ip")
 	ip := net.ParseIP(ipStr)
@@ -5035,6 +5816,14 @@ func (self *WebServer) v2QueryXip(c *gin.Context) {
 }
 
 // v2CreateUser creates a new user (admin only)
+// v2CreateUser
+// @Summary Create a user
+// @Description Create a new user account (admin only)
+// @Tags v2, users
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/users [post]
 func (self *WebServer) v2CreateUser(c *gin.Context) {
 	role := c.GetInt("role")
 	if role != roleSuper && role != roleAdmin {
@@ -5106,6 +5895,15 @@ func (self *WebServer) v2CreateUser(c *gin.Context) {
 }
 
 // v2UpdateUser updates an existing user
+// v2UpdateUser
+// @Summary Update a user
+// @Description Update user information (admin only)
+// @Tags v2, users
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/users/{id} [put]
 func (self *WebServer) v2UpdateUser(c *gin.Context) {
 	role := c.GetInt("role")
 	if role != roleSuper && role != roleAdmin {
@@ -5190,6 +5988,14 @@ func (self *WebServer) v2UpdateUser(c *gin.Context) {
 }
 
 // v2DeleteUser deletes a user
+// v2DeleteUser
+// @Summary Delete a user
+// @Description Delete a user account (admin only)
+// @Tags v2, users
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/users/{id} [delete]
 func (self *WebServer) v2DeleteUser(c *gin.Context) {
 	role := c.GetInt("role")
 	if role != roleSuper && role != roleAdmin {
@@ -5233,6 +6039,14 @@ func (self *WebServer) v2DeleteUser(c *gin.Context) {
 }
 
 // v2ListFollowupHistory lists the follow-up history for an agent run
+// v2ListFollowupHistory
+// @Summary List followup history
+// @Description Get followup history for an agent run
+// @Tags v2, agent
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/agent/runs/{id}/followups [get]
 func (self *WebServer) v2ListFollowupHistory(c *gin.Context) {
 	id := c.Param("id")
 
@@ -5259,6 +6073,14 @@ func (self *WebServer) v2ListFollowupHistory(c *gin.Context) {
 // v2MCPHandler handles MCP Streamable HTTP transport requests.
 // It authenticates via Bearer API key, creates an MCP Server instance,
 // and delegates to MCPHandler for JSON-RPC 2.0 protocol processing.
+// v2MCPHandler
+// @Summary MCP handler
+// @Description Handle MCP JSON-RPC 2.0 requests over HTTP
+// @Tags v2, mcp
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/mcp [post]
 func (self *WebServer) v2MCPHandler(c *gin.Context) {
 	// Extract API key from Authorization header
 	authHeader := c.GetHeader("Authorization")
@@ -5298,6 +6120,13 @@ func (self *WebServer) v2MCPHandler(c *gin.Context) {
 }
 
 // v2ListRetentionPolicies lists retention policies
+// v2ListRetentionPolicies
+// @Summary List retention policies
+// @Description Get a list of all data retention policies
+// @Tags v2, retention
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/retention/policies [get]
 func (self *WebServer) v2ListRetentionPolicies(c *gin.Context) {
 	store := retention.NewXormStore(self.orm)
 	svc := retention.NewService(store)
@@ -5310,6 +6139,14 @@ func (self *WebServer) v2ListRetentionPolicies(c *gin.Context) {
 }
 
 // v2CreateRetentionPolicy creates a retention policy
+// v2CreateRetentionPolicy
+// @Summary Create a retention policy
+// @Description Create a new data retention policy
+// @Tags v2, retention
+// @Accept json
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/retention/policies [post]
 func (self *WebServer) v2CreateRetentionPolicy(c *gin.Context) {
 	var policy retention.RetentionPolicy
 	if err := c.ShouldBindJSON(&policy); err != nil {
@@ -5329,6 +6166,14 @@ func (self *WebServer) v2CreateRetentionPolicy(c *gin.Context) {
 }
 
 // v2GetRetentionPolicy gets a specific retention policy
+// v2GetRetentionPolicy
+// @Summary Get a retention policy
+// @Description Get detailed information about a retention policy
+// @Tags v2, retention
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/retention/policies/{id} [get]
 func (self *WebServer) v2GetRetentionPolicy(c *gin.Context) {
 	id := c.Param("id")
 	store := retention.NewXormStore(self.orm)
@@ -5342,6 +6187,15 @@ func (self *WebServer) v2GetRetentionPolicy(c *gin.Context) {
 }
 
 // v2UpdateRetentionPolicy updates a retention policy
+// v2UpdateRetentionPolicy
+// @Summary Update a retention policy
+// @Description Update retention policy configuration
+// @Tags v2, retention
+// @Accept json
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/retention/policies/{id} [put]
 func (self *WebServer) v2UpdateRetentionPolicy(c *gin.Context) {
 	id := c.Param("id")
 	store := retention.NewXormStore(self.orm)
@@ -5364,6 +6218,14 @@ func (self *WebServer) v2UpdateRetentionPolicy(c *gin.Context) {
 }
 
 // v2DeleteRetentionPolicy deletes a retention policy
+// v2DeleteRetentionPolicy
+// @Summary Delete a retention policy
+// @Description Delete a retention policy by ID
+// @Tags v2, retention
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/retention/policies/{id} [delete]
 func (self *WebServer) v2DeleteRetentionPolicy(c *gin.Context) {
 	id := c.Param("id")
 	store := retention.NewXormStore(self.orm)
@@ -5376,6 +6238,14 @@ func (self *WebServer) v2DeleteRetentionPolicy(c *gin.Context) {
 }
 
 // v2RunRetentionPolicy manually triggers a retention policy
+// v2RunRetentionPolicy
+// @Summary Run a retention policy
+// @Description Manually trigger a retention policy execution
+// @Tags v2, retention
+// @Produce json
+// @Param id path string true "id"
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/retention/policies/{id}/run [post]
 func (self *WebServer) v2RunRetentionPolicy(c *gin.Context) {
 	id := c.Param("id")
 	store := retention.NewXormStore(self.orm)
@@ -5389,6 +6259,13 @@ func (self *WebServer) v2RunRetentionPolicy(c *gin.Context) {
 }
 
 // v2ListRetentionJobs lists retention jobs
+// v2ListRetentionJobs
+// @Summary List retention jobs
+// @Description Get a list of retention policy execution jobs
+// @Tags v2, retention
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/retention/jobs [get]
 func (self *WebServer) v2ListRetentionJobs(c *gin.Context) {
 	store := retention.NewXormStore(self.orm)
 	svc := retention.NewService(store)
@@ -5401,6 +6278,13 @@ func (self *WebServer) v2ListRetentionJobs(c *gin.Context) {
 }
 
 // v2ListRetentionArchives lists retention archives
+// v2ListRetentionArchives
+// @Summary List retention archives
+// @Description Get a list of archived data from retention policies
+// @Tags v2, retention
+// @Produce json
+// @Success 200 {object} gin.H "Success"
+// @Router /api/v2/retention/archives [get]
 func (self *WebServer) v2ListRetentionArchives(c *gin.Context) {
 	store := retention.NewXormStore(self.orm)
 	svc := retention.NewService(store)
