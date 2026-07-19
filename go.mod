@@ -3,7 +3,6 @@ module github.com/chennqqi/godnslog
 go 1.25.0
 
 require (
-	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
 	github.com/chennqqi/goutils v0.2.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/getkin/kin-openapi v0.137.0
@@ -27,6 +26,12 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.33.1
 	xorm.io/xorm v1.3.6
+)
+
+require (
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
+	github.com/wenlng/go-captcha/v2 v2.0.5 // indirect
+	golang.org/x/image v0.16.0 // indirect
 )
 
 require (
