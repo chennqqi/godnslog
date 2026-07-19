@@ -10,6 +10,7 @@ import { useI18n } from '@/lib/i18n-context'
 import { Spinner } from '@/components/ui/spinner'
 import { useAuthStore } from '@/features/auth/store'
 import { loginSchema, type LoginFormValues } from '@/features/auth/schemas/login-schema'
+import { SlideCaptcha } from '@/features/auth/components/captcha-slide'
 
 /** Feature key identifiers for the brand panel */
 const FEATURE_KEYS = [
@@ -48,6 +49,9 @@ export default function LoginPage() {
   const { t, lang, setLang } = useI18n()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [captchaID, setCaptchaID] = useState('')
+  const [captchaValue, setCaptchaValue] = useState(0)
+  const [captchaInvalid, setCaptchaInvalid] = useState(false)
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -68,11 +72,20 @@ export default function LoginPage() {
   }))
 
   const onSubmit = async (data: LoginFormValues) => {
+    if (!captchaID) {
+      setError(t('login.captcha.invalid'))
+      return
+    }
+
     setLoading(true)
     setError('')
 
     try {
-      const response = await authApi.login(data as LoginRequest)
+      const response = await authApi.login({
+        ...(data as LoginRequest),
+        captcha_id: captchaID,
+        captcha_value: captchaValue,
+      })
       if (response.code === 0 && response.data) {
         localStorage.setItem('token', response.data.token)
         localStorage.setItem('user', JSON.stringify(response.data.user))
@@ -85,10 +98,12 @@ export default function LoginPage() {
         })
         router.push('/')
       } else {
+        setCaptchaInvalid(true)
         setError(response.message || t('login.error'))
       }
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } }, message?: string }
+      setCaptchaInvalid(true)
       setError(error.response?.data?.message || error.message || t('login.error'))
     } finally {
       setLoading(false)
@@ -239,6 +254,20 @@ export default function LoginPage() {
                 <p className="text-xs text-red-500">{form.formState.errors.password.message}</p>
               )}
             </div>
+
+            {/* Captcha */}
+            <SlideCaptcha
+              onReady={(id, value) => {
+                setCaptchaID(id)
+                setCaptchaValue(value)
+              }}
+              onRefresh={() => {
+                setCaptchaID('')
+                setCaptchaValue(0)
+              }}
+              invalid={captchaInvalid}
+              disabled={loading}
+            />
 
             {/* Submit */}
             <button
