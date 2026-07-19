@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/chennqqi/godnslog/cache"
+	"github.com/chennqqi/godnslog/internal/demo"
 	"github.com/chennqqi/godnslog/internal/ha"
 	"github.com/chennqqi/godnslog/internal/marketplace"
 	v2models "github.com/chennqqi/godnslog/internal/models"
@@ -269,6 +270,20 @@ func (self *WebServer) authHandler(c *gin.Context) {
 		c.Set("email", user.Email)
 		c.Set("role", user.Role)
 
+		// Demo user restriction: block demo users from admin/system config operations
+		if self.demoMgr != nil && demo.IsDemoUser(user.Name) {
+			c.Set("is_demo_user", true)
+			// Check if the request path is a restricted admin/config operation
+			path := c.Request.URL.Path
+			if isDemoRestrictedPath(path) {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+					"code":    403,
+					"message": "demo users cannot perform admin or system configuration operations",
+				})
+				return
+			}
+		}
+
 		c.Next()
 		return
 	}
@@ -285,6 +300,27 @@ func (self *WebServer) authHandler(c *gin.Context) {
 		"code":    401,
 		"message": "unauthorized",
 	})
+}
+
+// isDemoRestrictedPath returns true if the given API path is restricted for demo users.
+func isDemoRestrictedPath(path string) bool {
+	// Admin user management
+	if strings.Contains(path, "/api/admin/") {
+		return true
+	}
+	// System settings
+	if strings.Contains(path, "/api/setting/") {
+		return true
+	}
+	// API key management
+	if strings.Contains(path, "/api/v2/apikeys") {
+		return true
+	}
+	// Security settings
+	if strings.Contains(path, "/api/v2/settings") {
+		return true
+	}
+	return false
 }
 
 func (self *WebServer) verifyAdminPermission(c *gin.Context) {

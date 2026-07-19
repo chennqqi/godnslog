@@ -1,0 +1,61 @@
+# GODNSLOG Docker Compose: Nginx Reverse Proxy Mode
+#
+# In this mode, GODNSLOG listens on high ports (18080 for API, 13000 for frontend)
+# and Nginx handles TLS termination and port 80/443 binding.
+#
+# Usage:
+#   1. Set DOMAIN and DNS_IP environment variables
+#   2. Place TLS certificates in ./certs/ directory
+#   3. docker compose -f docker-compose.nginx.yml up -d
+
+version: '3.8'
+
+services:
+  godnslog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: godnslog
+    # No privileged port mapping - Nginx handles 80/443
+    ports:
+      - "8053:53/udp"
+      - "8053:53/tcp"
+    environment:
+      - GIN_MODE=release
+      - GODNSLOG_DOMAIN=${DOMAIN:-dns.example.com}
+      - GODNSLOG_DB_PATH=/data/godnslog.db
+      # TLS disabled - Nginx terminates TLS
+      - GODNSLOG_TLS_MODE=disabled
+    volumes:
+      - godnslog-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v2/health"]
+      interval: 20s
+      timeout: 3s
+      start_period: 15s
+      retries: 3
+    networks:
+      - godnslog-net
+
+  nginx:
+    image: nginx:alpine
+    container_name: godnslog-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/godnslog-https.conf:/etc/nginx/conf.d/godnslog.conf:ro
+      - ./certs:/etc/letsencrypt:ro
+    depends_on:
+      - godnslog
+    restart: unless-stopped
+    networks:
+      - godnslog-net
+
+volumes:
+  godnslog-data:
+
+networks:
+  godnslog-net:
+    driver: bridge

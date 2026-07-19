@@ -49,7 +49,14 @@ USER app
 
 ENV GODNSLOG_API_URL=http://localhost:8080
 
+# Expose ports for both deployment modes:
+# - 8080: HTTP backend (nginx reverse proxy mode)
+# - 80/443: HTTP/HTTPS (standalone TLS mode)
+# - 3000: Next.js frontend
+# - 53: DNS server (UDP/TCP)
 EXPOSE 8080
+EXPOSE 80
+EXPOSE 443
 EXPOSE 3000
 EXPOSE 53/UDP 53/TCP
 

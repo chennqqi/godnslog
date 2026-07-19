@@ -316,6 +316,16 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 }
 
 // v2Login handles v2 login
+// @Summary User login
+// @Description Authenticate with username/password and receive JWT token
+// @Tags v2, auth
+// @Accept json
+// @Produce json
+// @Param body body LoginRequest true "Login credentials"
+// @Success 200 {object} gin.H "Login successful with token"
+// @Failure 400 {object} gin.H "Bad request"
+// @Failure 401 {object} gin.H "Invalid credentials"
+// @Router /api/v2/login [post]
 func (self *WebServer) v2Login(c *gin.Context) {
 	T := getTranslateFunc(c)
 
@@ -416,6 +426,12 @@ func (self *WebServer) v2Login(c *gin.Context) {
 }
 
 // v2Logout handles v2 logout
+// @Summary User logout
+// @Description Invalidate the current session token
+// @Tags v2, auth
+// @Produce json
+// @Success 200 {object} gin.H "Logout successful"
+// @Router /api/v2/logout [post]
 func (self *WebServer) v2Logout(c *gin.Context) {
 	T := getTranslateFunc(c)
 
@@ -430,6 +446,13 @@ func (self *WebServer) v2Logout(c *gin.Context) {
 }
 
 // v2UserInfo handles v2 user info
+// @Summary Get current user info
+// @Description Get information about the currently authenticated user
+// @Tags v2, auth
+// @Produce json
+// @Success 200 {object} gin.H "User information"
+// @Failure 401 {object} gin.H "Unauthorized"
+// @Router /api/v2/userinfo [get]
 func (self *WebServer) v2UserInfo(c *gin.Context) {
 	T := getTranslateFunc(c)
 
@@ -495,6 +518,16 @@ func (self *WebServer) v2UserInfo(c *gin.Context) {
 }
 
 // v2ListCases lists cases
+// @Summary List cases
+// @Description Get a paginated list of cases with optional status filter
+// @Tags v2, cases
+// @Produce json
+// @Param page query int false "Page number (default 1)"
+// @Param page_size query int false "Page size (default 20)"
+// @Param status query string false "Filter by status"
+// @Success 200 {object} gin.H "List of cases"
+// @Failure 401 {object} gin.H "Unauthorized"
+// @Router /api/v2/cases [get]
 func (self *WebServer) v2ListCases(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -572,6 +605,16 @@ func (self *WebServer) v2ListCases(c *gin.Context) {
 }
 
 // v2CreateCase creates a case
+// @Summary Create a case
+// @Description Create a new case for tracking vulnerability verification
+// @Tags v2, cases
+// @Accept json
+// @Produce json
+// @Param body body models.CaseCreateRequest true "Case creation request"
+// @Success 201 {object} gin.H "Created case"
+// @Failure 400 {object} gin.H "Bad request"
+// @Failure 401 {object} gin.H "Unauthorized"
+// @Router /api/v2/cases [post]
 func (self *WebServer) v2CreateCase(c *gin.Context) {
 	var req models.CaseCreateRequest
 	if err := c.BindJSON(&req); err != nil {
@@ -641,6 +684,14 @@ func (self *WebServer) v2CreateCase(c *gin.Context) {
 }
 
 // v2GetCase gets a case
+// @Summary Get a case
+// @Description Get detailed information about a specific case by ID
+// @Tags v2, cases
+// @Produce json
+// @Param id path int true "Case ID"
+// @Success 200 {object} gin.H "Case details"
+// @Failure 404 {object} gin.H "Case not found"
+// @Router /api/v2/cases/{id} [get]
 func (self *WebServer) v2GetCase(c *gin.Context) {
 	id := c.Param("id")
 	caseId, err := strconv.ParseInt(id, 10, 64)
@@ -696,6 +747,17 @@ func (self *WebServer) v2GetCase(c *gin.Context) {
 }
 
 // v2UpdateCase updates a case
+// @Summary Update a case
+// @Description Update case fields such as title, description, status, tags
+// @Tags v2, cases
+// @Accept json
+// @Produce json
+// @Param id path int true "Case ID"
+// @Param body body models.CaseUpdateRequest true "Case update request"
+// @Success 200 {object} gin.H "Updated case"
+// @Failure 400 {object} gin.H "Bad request"
+// @Failure 404 {object} gin.H "Case not found"
+// @Router /api/v2/cases/{id} [put]
 func (self *WebServer) v2UpdateCase(c *gin.Context) {
 	id := c.Param("id")
 	caseId, err := strconv.ParseInt(id, 10, 64)
@@ -787,6 +849,14 @@ func (self *WebServer) v2UpdateCase(c *gin.Context) {
 }
 
 // v2DeleteCase deletes a case
+// @Summary Delete a case
+// @Description Delete a case and its associated data
+// @Tags v2, cases
+// @Produce json
+// @Param id path int true "Case ID"
+// @Success 200 {object} gin.H "Deletion successful"
+// @Failure 404 {object} gin.H "Case not found"
+// @Router /api/v2/cases/{id} [delete]
 func (self *WebServer) v2DeleteCase(c *gin.Context) {
 	id := c.Param("id")
 	caseId, err := strconv.ParseInt(id, 10, 64)
@@ -818,6 +888,13 @@ func (self *WebServer) v2DeleteCase(c *gin.Context) {
 }
 
 // v2GetCaseStats gets case statistics
+// @Summary Get case statistics
+// @Description Get aggregated statistics for a specific case
+// @Tags v2, cases
+// @Produce json
+// @Param id path int true "Case ID"
+// @Success 200 {object} gin.H "Case statistics"
+// @Router /api/v2/cases/{id}/stats [get]
 func (self *WebServer) v2GetCaseStats(c *gin.Context) {
 	id := c.Param("id")
 	caseId, err := strconv.ParseInt(id, 10, 64)
@@ -920,6 +997,13 @@ func (self *WebServer) v2CaseStats(c *gin.Context) {
 }
 
 // v2GetCasePayloads gets payloads associated with a case
+// @Summary List payloads for a case
+// @Description Get all payloads associated with a specific case
+// @Tags v2, cases, payloads
+// @Produce json
+// @Param id path int true "Case ID"
+// @Success 200 {object} gin.H "List of payloads"
+// @Router /api/v2/cases/{id}/payloads [get]
 func (self *WebServer) v2GetCasePayloads(c *gin.Context) {
 	id := c.Param("id")
 	caseId, err := strconv.ParseInt(id, 10, 64)
@@ -985,6 +1069,15 @@ func (self *WebServer) v2GetCasePayloads(c *gin.Context) {
 }
 
 // v2GetCaseInteractions gets interactions associated with a case
+// @Summary List interactions for a case
+// @Description Get paginated interactions associated with a specific case
+// @Tags v2, cases, interactions
+// @Produce json
+// @Param id path int true "Case ID"
+// @Param page query int false "Page number"
+// @Param page_size query int false "Page size"
+// @Success 200 {object} gin.H "List of interactions"
+// @Router /api/v2/cases/{id}/interactions [get]
 func (self *WebServer) v2GetCaseInteractions(c *gin.Context) {
 	id := c.Param("id")
 
@@ -2228,9 +2321,9 @@ func (self *WebServer) v2InteractionDailyStats(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
+		"code":    0,
 		"message": "success",
-		"data": result,
+		"data":    result,
 	})
 }
 

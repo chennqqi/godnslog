@@ -444,3 +444,22 @@ Phase 2 评估发现大部分功能已在之前 sprint 中实现，剩余缺口�
 
 处理：
 - 在ROADMAP_2.0.md中追加2.9版本计划，涵盖双部署模式和Demo模式
+
+## 2026-07-19 实现2.9：部署模式与Demo环境
+用户要求规划并完成2.9版本全部功能。
+
+分析：
+- 双部署模式需要后端支持TLS终止或委托给Nginx，关键是WebServer.Run()需要支持HTTPS监听
+- Let's Encrypt模式需要引入ACME客户端自动申请证书，失败时用自签名证书兜底
+- Nginx模式只需后端监听高位端口，提供配置模板即可
+- Demo模式需要在启动时自动创建预置账号和样例数据，并限制Demo账号权限
+- 需要新增internal/tlsmanager管理证书，internal/demo管理Demo数据
+
+实现计划：
+1. internal/tlsmanager: ACME自动证书 + 自签名兜底
+2. WebServer.Run() 支持TLS/非TLS两种模式
+3. servecmd.go 新增 --tls-mode, --acme-domain, --acme-email 等参数
+4. internal/demo: Demo数据初始化 + 定期重置 + 权限中间件
+5. deploy/nginx/ 参考配置模板
+6. Dockerfile/entrypoint.sh 支持双模式
+7. 单元测试

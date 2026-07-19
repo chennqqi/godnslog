@@ -31,6 +31,17 @@ type Config struct {
 	DefaultQueryApiMaxItem       int
 	DefaultMaxCallbackErrorCount int64
 	DefaultLanguage              string
+
+	// TLS / Deployment Mode
+	TLSMode     string
+	TLSCertFile string
+	TLSKeyFile  string
+	ACMEEmail   string
+	CertDir     string
+
+	// Demo Mode
+	DemoMode       bool
+	DemoResetHours int
 }
 
 // Load loads configuration from environment variables
@@ -49,6 +60,17 @@ func Load() (*Config, error) {
 		DefaultQueryApiMaxItem:       getIntEnv("DEFAULT_QUERY_API_MAX_ITEM", 1000),
 		DefaultMaxCallbackErrorCount: getInt64Env("DEFAULT_MAX_CALLBACK_ERROR_COUNT", 10),
 		DefaultLanguage:              getEnv("DEFAULT_LANGUAGE", "en-US"),
+
+		// TLS / Deployment Mode
+		TLSMode:     getEnv("GODNSLOG_TLS_MODE", "disabled"),
+		TLSCertFile: getEnv("GODNSLOG_TLS_CERT", ""),
+		TLSKeyFile:  getEnv("GODNSLOG_TLS_KEY", ""),
+		ACMEEmail:   getEnv("GODNSLOG_ACME_EMAIL", ""),
+		CertDir:     getEnv("GODNSLOG_CERT_DIR", ""),
+
+		// Demo Mode
+		DemoMode:       getBoolEnv("GODNSLOG_DEMO", false),
+		DemoResetHours: getIntEnv("GODNSLOG_DEMO_RESET_HOURS", 6),
 	}
 
 	return cfg, nil

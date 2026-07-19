@@ -1,0 +1,58 @@
+# GODNSLOG Docker Compose: Let's Encrypt Standalone Mode
+#
+# In this mode, GODNSLOG directly binds 443/80/53 and manages TLS certificates
+# internally (Let's Encrypt ACME with self-signed fallback).
+#
+# Usage:
+#   1. Set DOMAIN, ACME_EMAIL, and DNS_IP environment variables
+#   2. Ensure ports 80, 443, and 53 are available
+#   3. docker compose -f docker-compose-standalone.yml up -d
+
+version: '3.8'
+
+services:
+  godnslog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: godnslog
+    # Direct privileged port binding
+    ports:
+      - "53:53/udp"
+      - "53:53/tcp"
+      - "80:80"
+      - "443:443"
+    environment:
+      - GIN_MODE=release
+      - GODNSLOG_DOMAIN=${DOMAIN:-dns.example.com}
+      - GODNSLOG_DB_PATH=/data/godnslog.db
+      # Enable ACME TLS mode
+      - GODNSLOG_TLS_MODE=acme
+      - GODNSLOG_ACME_EMAIL=${ACME_EMAIL:-admin@example.com}
+      - GODNSLOG_CERT_DIR=/data/certs
+    volumes:
+      - godnslog-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "https://localhost:443/api/v2/health", "--no-check-certificate"]
+      interval: 20s
+      timeout: 3s
+      start_period: 15s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - godnslog-net
+
+volumes:
+  godnslog-data:
+
+networks:
+  godnslog-net:
+    driver: bridge

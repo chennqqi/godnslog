@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -30,11 +31,20 @@ type servePwCmd struct {
 	upstream   string
 	redisAddr  string
 
-	geoipMMDBPath    string
+	geoipMMDBPath   string
 	geoipLicenseKey string
 
 	captchaEnabled bool
 	captchaExpire  time.Duration
+
+	tlsMode     string
+	tlsCertFile string
+	tlsKeyFile  string
+	acmeEmail   string
+	certDir     string
+
+	demoMode       bool
+	demoResetHours int
 }
 
 func (*servePwCmd) Name() string     { return "serve" }
@@ -66,6 +76,17 @@ func (p *servePwCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&p.geoipLicenseKey, "geoip-license-key", os.Getenv("MMDB_LICENSE_KEY"), "MaxMind license key for auto-downloading GeoLite2-ASN.mmdb; sign up free at https://www.maxmind.com/en/geolite2/signup")
 	f.BoolVar(&p.captchaEnabled, "captcha-enabled", true, "enable captcha verification on login, option")
 	f.DurationVar(&p.captchaExpire, "captcha-expire", DefaultCaptchaExpire, "captcha challenge TTL, option")
+
+	// TLS / deployment mode flags
+	f.StringVar(&p.tlsMode, "tls-mode", os.Getenv("GODNSLOG_TLS_MODE"), "TLS mode: disabled, acme, static, self-signed (env: GODNSLOG_TLS_MODE)")
+	f.StringVar(&p.tlsCertFile, "tls-cert", os.Getenv("GODNSLOG_TLS_CERT"), "path to TLS certificate file (for static mode)")
+	f.StringVar(&p.tlsKeyFile, "tls-key", os.Getenv("GODNSLOG_TLS_KEY"), "path to TLS private key file (for static mode)")
+	f.StringVar(&p.acmeEmail, "acme-email", os.Getenv("GODNSLOG_ACME_EMAIL"), "email for Let's Encrypt registration (env: GODNSLOG_ACME_EMAIL)")
+	f.StringVar(&p.certDir, "cert-dir", os.Getenv("GODNSLOG_CERT_DIR"), "directory for storing certificates (env: GODNSLOG_CERT_DIR)")
+
+	// Demo mode flags
+	f.BoolVar(&p.demoMode, "demo", getEnvBool("GODNSLOG_DEMO"), "enable demo mode with sample data (env: GODNSLOG_DEMO)")
+	f.IntVar(&p.demoResetHours, "demo-reset-hours", 6, "interval in hours for demo data reset")
 }
 
 func (p *servePwCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
@@ -101,10 +122,17 @@ func (p *servePwCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 		DefaultMaxCallbackErrorCount: DefaultMaxCallbackErrorCount,
 		DefaultLanguage:              DefaultLanguage,
 		RedisAddr:                    p.redisAddr,
-			GeoIPMMDBPath:                p.geoipMMDBPath,
-			GeoIPLicenseKey:              p.geoipLicenseKey,
-			CaptchaEnabled:              p.captchaEnabled,
-			CaptchaExpire:               p.captchaExpire,
+		GeoIPMMDBPath:                p.geoipMMDBPath,
+		GeoIPLicenseKey:              p.geoipLicenseKey,
+		CaptchaEnabled:               p.captchaEnabled,
+		CaptchaExpire:                p.captchaExpire,
+		TLSMode:                      p.tlsMode,
+		TLSCertFile:                  p.tlsCertFile,
+		TLSKeyFile:                   p.tlsKeyFile,
+		ACMEEmail:                    p.acmeEmail,
+		CertDir:                      p.certDir,
+		DemoMode:                     p.demoMode,
+		DemoResetHours:               p.demoResetHours,
 	}, store)
 	if err != nil {
 		logrus.Fatalf("[main.go::main] NewWebServer: %v", err)
@@ -161,4 +189,18 @@ func (p *servePwCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 
 	fmt.Println()
 	return subcommands.ExitSuccess
+}
+
+// getEnvBool reads a boolean from an environment variable, returning false on
+// missing or unparseable values.
+func getEnvBool(key string) bool {
+	v := os.Getenv(key)
+	if v == "" {
+		return false
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return false
+	}
+	return b
 }
