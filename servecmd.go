@@ -65,7 +65,7 @@ func (p *servePwCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&p.geoipMMDBPath, "geoip-mmdb", os.Getenv("MMDB_PATH"), "path to GeoLite2-ASN.mmdb for source ASN enrichment (optional); auto-downloads if -geoip-license-key is set")
 	f.StringVar(&p.geoipLicenseKey, "geoip-license-key", os.Getenv("MMDB_LICENSE_KEY"), "MaxMind license key for auto-downloading GeoLite2-ASN.mmdb; sign up free at https://www.maxmind.com/en/geolite2/signup")
 	f.BoolVar(&p.captchaEnabled, "captcha-enabled", true, "enable captcha verification on login, option")
-	f.DurationVar(&p.captchaExpire, "captcha-expire", 2*time.Minute, "captcha challenge TTL, option")
+	f.DurationVar(&p.captchaExpire, "captcha-expire", DefaultCaptchaExpire, "captcha challenge TTL, option")
 }
 
 func (p *servePwCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
