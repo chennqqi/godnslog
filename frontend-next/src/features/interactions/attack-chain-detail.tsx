@@ -48,11 +48,13 @@ export function AttackChainDetail({ token, onBack }: AttackChainDetailProps) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setLoading(true)
+    let cancelled = false
+    const id = requestAnimationFrame(() => setLoading(true))
     apiClient.get<AttackChainDetail>(`/api/v2/attack-chains/${encodeURIComponent(token)}`)
-      .then((data) => setDetail(data))
+      .then((data) => { if (!cancelled) setDetail(data) })
       .catch(console.error)
-      .finally(() => setLoading(false))
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true; cancelAnimationFrame(id) }
   }, [token])
 
   if (loading) return <LoadingState />

@@ -127,7 +127,7 @@ func TestReadLength(t *testing.T) {
 func TestReadInteger(t *testing.T) {
 	t.Run("simple integer", func(t *testing.T) {
 		data := []byte{0x02, 0x01, 0x2A} // tag, length, value(42)
-		offset := 1                     // skip tag
+		offset := 1                      // skip tag
 		value := readInteger(data, &offset)
 		if value != 42 {
 			t.Errorf("expected 42, got %d", value)
@@ -147,7 +147,7 @@ func TestReadInteger(t *testing.T) {
 func TestReadString(t *testing.T) {
 	t.Run("valid string", func(t *testing.T) {
 		data := []byte{0x04, 0x05, 'h', 'e', 'l', 'l', 'o'} // tag, length, "hello"
-		offset := 1                                           // skip tag
+		offset := 1                                         // skip tag
 		str := readString(data, &offset)
 		if str != "hello" {
 			t.Errorf("expected 'hello', got '%s'", str)

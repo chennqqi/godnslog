@@ -19,7 +19,7 @@ const (
 	DefaultLanguage              = "en-US"
 	DefaultQueryApiMaxItem       = 20
 	DefaultMaxCallbackErrorCount = 5
-	DefaultCaptchaExpire          = 2 * time.Minute
+	DefaultCaptchaExpire         = 2 * time.Minute
 )
 
 func main() {

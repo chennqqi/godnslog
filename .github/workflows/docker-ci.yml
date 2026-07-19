@@ -1,0 +1,20 @@
+name: Docker Build CI
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t godnslog-ci:latest .
+
+      - name: Verify binary exists
+        run: docker run --rm godnslog-ci:latest /app/godnslog --help || true

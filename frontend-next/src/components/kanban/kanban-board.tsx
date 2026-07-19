@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -39,8 +39,9 @@ export function KanbanBoard({ cases, onCardClick, labels }: KanbanBoardProps) {
   const [localCases, setLocalCases] = useState<Case[]>(cases)
 
   // Sync external cases prop into local state for optimistic updates.
-  useMemo(() => {
-    setLocalCases(cases)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setLocalCases(cases))
+    return () => cancelAnimationFrame(id)
   }, [cases])
 
   const sensors = useSensors(

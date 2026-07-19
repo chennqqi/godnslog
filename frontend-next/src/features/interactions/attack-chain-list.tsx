@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { LoadingState } from '@/components/loading-state'
 import { EmptyState } from '@/components/empty-state'
-import { PageHeader } from '@/components/page-header'
 
 interface AttackChain {
   token: string
@@ -52,15 +51,20 @@ export function AttackChainList({ onSelectToken }: AttackChainListProps) {
   const pageSize = 20
 
   useEffect(() => {
-    setLoading(true)
-    setError(null)
+    let cancelled = false
+    const id = requestAnimationFrame(() => {
+      setLoading(true)
+      setError(null)
+    })
     apiClient.get<AttackChainListResponse>(`/api/v2/attack-chains?page=${page}&page_size=${pageSize}`)
       .then((data) => {
+        if (cancelled) return
         setChains(data.items || [])
         setTotalPages(data.total_pages || 1)
       })
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setLoading(false))
+      .catch((err: Error) => { if (!cancelled) setError(err.message) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true; cancelAnimationFrame(id) }
   }, [page])
 
   if (loading) return <LoadingState />

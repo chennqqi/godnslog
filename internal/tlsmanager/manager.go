@@ -35,14 +35,14 @@ const (
 
 // Config holds parameters for the TLS manager.
 type Config struct {
-	Mode       Mode
-	Domain     string
-	ACMEEmail  string
-	CertDir    string
-	CertFile   string
-	KeyFile    string
-	HTTPAddr   string // address for ACME HTTP-01 challenge listener (e.g. ":80")
-	HTTPSAddr  string // address for HTTPS listener (e.g. ":443")
+	Mode      Mode
+	Domain    string
+	ACMEEmail string
+	CertDir   string
+	CertFile  string
+	KeyFile   string
+	HTTPAddr  string // address for ACME HTTP-01 challenge listener (e.g. ":80")
+	HTTPSAddr string // address for HTTPS listener (e.g. ":443")
 }
 
 // Manager manages TLS certificates for the web server.

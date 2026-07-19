@@ -18,7 +18,7 @@ import (
 // handlerMockStore implements Store for handler tests
 type handlerMockStore struct {
 	Store
-	listeners   []Listener
+	listeners    []Listener
 	interactions []ListenerInteraction
 	smtpMessages []SMTPMessage
 	ldapQueries  []LDAPQuery

@@ -136,12 +136,12 @@ type ScannerRunUpdateStatusRequest struct {
 
 // ScannerRunCreateFromSearchRequest represents the request to create scanner runs from search results
 type ScannerRunCreateFromSearchRequest struct {
-	CaseID         string `json:"case_id" binding:"required"`
-	PayloadID      string `json:"payload_id" binding:"required"`
-	Source         string `json:"source" binding:"required"`
-	Scanner        string `json:"scanner" binding:"omitempty,oneof=nuclei burp yakit zap xray rad postman apifox"`
-	Template       string `json:"template" binding:"omitempty"`
-	DeliveryMethod string `json:"delivery_method" binding:"omitempty,oneof=nuclei-jsonl nuclei-var burp-extension yakit-script zap-script xray-webhook rad-webhook postman-env apifox-env"`
+	CaseID         string           `json:"case_id" binding:"required"`
+	PayloadID      string           `json:"payload_id" binding:"required"`
+	Source         string           `json:"source" binding:"required"`
+	Scanner        string           `json:"scanner" binding:"omitempty,oneof=nuclei burp yakit zap xray rad postman apifox"`
+	Template       string           `json:"template" binding:"omitempty"`
+	DeliveryMethod string           `json:"delivery_method" binding:"omitempty,oneof=nuclei-jsonl nuclei-var burp-extension yakit-script zap-script xray-webhook rad-webhook postman-env apifox-env"`
 	Results        []ScanTargetItem `json:"results" binding:"required,min=1"`
 }
 

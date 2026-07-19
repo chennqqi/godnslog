@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	_ "modernc.org/sqlite"
 	"github.com/chennqqi/godnslog/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	_ "modernc.org/sqlite"
 	"xorm.io/xorm"
 )
 
@@ -77,7 +77,7 @@ func TestXormStore_GetAllListeners(t *testing.T) {
 
 	for i := 0; i < 3; i++ {
 		require.NoError(t, store.CreateListener(ctx, &Listener{
-			ID: string(rune('a'+i)), Protocol: "dns",
+			ID: string(rune('a' + i)), Protocol: "dns",
 		}))
 	}
 

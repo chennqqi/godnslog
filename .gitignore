@@ -15,7 +15,6 @@ godnslog.exe
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
-.github
 /ui
 .DS_Store
 node_modules

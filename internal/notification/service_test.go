@@ -41,7 +41,7 @@ func TestService_SendWebhook_RespectsTimeout(t *testing.T) {
 
 	channel := &models.TblNotificationChannel{
 		Name: "slow-webhook", Type: "webhook",
-		Config: `{"url":"` + srv.URL + `"}`,
+		Config:  `{"url":"` + srv.URL + `"}`,
 		Enabled: true, CreatedBy: 1, CreatedAt: time.Now(), UpdatedAt: time.Now(),
 	}
 	if _, err := engine.Insert(channel); err != nil {

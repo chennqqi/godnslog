@@ -139,8 +139,8 @@ func TestHandler_CreateRule(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 
 		req := CreateRuleRequest{
-			Name:    "test-rule",
-			Enabled: true,
+			Name:     "test-rule",
+			Enabled:  true,
 			Priority: 10,
 			Conditions: Conditions{
 				Protocol: []string{"http"},

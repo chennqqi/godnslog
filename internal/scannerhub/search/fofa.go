@@ -26,9 +26,9 @@ func (f *fofa) Search(query string, page int) (*SearchResult, error) {
 	}
 	defer resp.Body.Close()
 	var apiResp struct {
-		Error   bool            `json:"error"`
-		Total   int             `json:"size"` // Fofa returns total count in "size" field
-		Results []interface{}   `json:"results"`
+		Error   bool          `json:"error"`
+		Total   int           `json:"size"` // Fofa returns total count in "size" field
+		Results []interface{} `json:"results"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
 		return nil, err

@@ -29,7 +29,10 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
   const startXRef = useRef(0)
   const startPosRef = useRef(0)
   const onReadyRef = useRef(onReady)
-  onReadyRef.current = onReady
+
+  useEffect(() => {
+    onReadyRef.current = onReady
+  }, [onReady])
 
   const loadCaptcha = useCallback(async () => {
     setLoading(true)
@@ -61,12 +64,14 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
   }, [t])
 
   useEffect(() => {
-    loadCaptcha()
+    const id = requestAnimationFrame(() => loadCaptcha())
+    return () => cancelAnimationFrame(id)
   }, [loadCaptcha])
 
   useEffect(() => {
     if (invalid) {
-      loadCaptcha()
+      const id = requestAnimationFrame(() => loadCaptcha())
+      return () => cancelAnimationFrame(id)
     }
   }, [invalid, loadCaptcha])
 

@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chennqqi/godnslog/internal/models"
 	"github.com/chennqqi/godnslog/internal/interaction/fingerprint"
+	"github.com/chennqqi/godnslog/internal/models"
 )
 
 func TestEnhanceInteraction_PersistsASN(t *testing.T) {

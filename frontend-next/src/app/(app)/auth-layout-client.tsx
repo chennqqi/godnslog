@@ -14,7 +14,8 @@ export function AuthLayoutClient({ children }: { children: React.ReactNode }) {
       window.location.href = '/login'
       return
     }
-    setAuthChecked(true)
+    // Defer setState to avoid synchronous call within effect
+    requestAnimationFrame(() => setAuthChecked(true))
   }, [])
 
   if (!authChecked) {
