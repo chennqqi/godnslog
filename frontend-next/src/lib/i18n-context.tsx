@@ -27,6 +27,11 @@ const translations = {
     'login.feature.scanner.desc': 'Nuclei, Burp, ZAP, Yak integration ready',
     'login.footer.version': 'v2.0',
     'login.footer.tagline': 'Self-hosted & Secure',
+    'login.captcha.slide_hint': 'Slide to verify',
+    'login.captcha.refresh': 'Refresh',
+    'login.captcha.error': 'Verification failed, please try again',
+    'login.captcha.loading': 'Loading captcha...',
+    'login.captcha.invalid': 'Please complete the captcha',
 
     // Sidebar groups
     'nav.group.oast': 'OAST CORE',
@@ -496,6 +501,11 @@ const translations = {
     'login.feature.scanner.desc': 'Nuclei、Burp、ZAP、Yak 集成就绪',
     'login.footer.version': 'v2.0',
     'login.footer.tagline': '自托管 & 安全',
+    'login.captcha.slide_hint': '拖动滑块完成验证',
+    'login.captcha.refresh': '刷新',
+    'login.captcha.error': '验证失败，请重试',
+    'login.captcha.loading': '加载验证码中...',
+    'login.captcha.invalid': '请完成验证码',
 
     // Sidebar groups
     'nav.group.oast': 'OAST 核心',

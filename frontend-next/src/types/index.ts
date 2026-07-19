@@ -40,11 +40,19 @@ export interface PermissionActionSet {
 export interface LoginRequest {
   username: string
   password: string
+  captcha_id: string
+  captcha_value: number
 }
 
 export interface LoginResponse {
   token: string
   user: User
+}
+
+export interface CaptchaResponse {
+  captcha_id: string
+  image_base64: string
+  thumb_base64: string
 }
 
 // Case types

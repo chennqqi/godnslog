@@ -2,6 +2,7 @@ import { api } from './api'
 import type {
   LoginRequest,
   LoginResponse,
+  CaptchaResponse,
   Case,
   CaseCreateRequest,
   CaseUpdateRequest,
@@ -83,6 +84,7 @@ export const authApi = {
   login: (data: LoginRequest) => api.post<LoginResponse>('/auth/login', data),
   logout: () => api.post('/auth/logout'),
   info: () => api.get('/auth/info'),
+  captcha: () => api.get<CaptchaResponse>('/auth/captcha'),
 }
 
 /** Summary counts for a case from GET /cases/:id/stats */
