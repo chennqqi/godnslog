@@ -433,7 +433,7 @@ function NewPayloadContent() {
         : (response.data as unknown as import('@/types').Payload)
 
       if (payloadData?.id) {
-        router.push(`/dashboard/payloads/${payloadData.id}`)
+        router.push(`/payloads/${payloadData.id}`)
         return
       }
       router.push('/payloads')

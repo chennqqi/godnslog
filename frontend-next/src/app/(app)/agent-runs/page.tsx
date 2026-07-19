@@ -54,7 +54,7 @@ export default function AgentRunsPage() {
     if (filterReviewState) params.set('review_state', filterReviewState)
     if (filterEvidenceStrength) params.set('evidence_strength', filterEvidenceStrength)
     const qs = params.toString()
-    router.replace(`/dashboard/agent-runs${qs ? `?${qs}` : ''}`, { scroll: false })
+    router.replace(`/agent-runs${qs ? `?${qs}` : ''}`, { scroll: false })
   }, [viewMode, filterAgentId, filterStatus, filterReviewState, filterEvidenceStrength, router])
 
   const loadAgentRuns = useCallback(async () => {
@@ -303,7 +303,7 @@ export default function AgentRunsPage() {
               <Card
                 key={run.id}
                 className="cursor-pointer hover:bg-accent/50 transition-colors"
-                onClick={() => router.push(`/dashboard/agent-runs/${run.id}`)}
+                onClick={() => router.push(`/agent-runs/${run.id}`)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
@@ -338,7 +338,7 @@ export default function AgentRunsPage() {
               <Card
                 key={item.id}
                 className="cursor-pointer hover:bg-accent/50 transition-colors"
-                onClick={() => router.push(`/dashboard/agent-runs/${item.id}`)}
+                onClick={() => router.push(`/agent-runs/${item.id}`)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">

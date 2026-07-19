@@ -212,6 +212,27 @@ GODNSLOG 2.0 不再只是 DNSLOG/HTTPLOG 工具，而是面向安全团队、扫
 - **OpenAPI 文档完善**：
   - ❌ 新增端点的 API 文档同步（Phase 17-19 新端点无 swagger 注释）
 
+### 2.9：部署模式与 Demo 环境 ⬜
+
+- **双部署模式支持**：
+  - ⬜ **Let's Encrypt 自动证书独立托管模式**：
+    - 容器直接对外暴露，监听 443/80/53 端口
+    - 自动申请并续期 Let's Encrypt 证书
+    - 内置自签名证书兜底（证书申请失败时仍可启动）
+    - DNSLog 验证功能在 443 和 80 上均兼容
+    - Web 界面和 API 始终在 443 上提供服务
+  - ⬜ **Nginx 反向代理模式**：
+    - 不监听非特权端口（80/443），仅监听高位端口或 Unix Socket
+    - 不再自动申请证书，TLS 由 Nginx 终结
+    - 所有流量通过 Nginx 转发到后端
+    - 提供标准 Nginx 配置指引（DNS over TLS、HTTP/HTTPS 反代、WebSocket 透传）
+    - 提供 `deploy/nginx/` 参考配置模板
+- **Demo 模式支持**：
+  - ⬜ 自动创建若干 Demo 账号（含预置 Case、Payload、Interaction 样例数据）
+  - ⬜ Demo 账号权限受限：禁止管理员操作、禁止删除/修改系统配置、禁止创建 APIKey
+  - ⬜ Demo 账号数据隔离，定期自动重置
+  - ⬜ 启动参数 `--demo` 或环境变量 `GODNSLOG_DEMO=true` 开启
+
 ## 参考方向
 
 - PortSwigger OAST / Burp Collaborator：强调不可见漏洞检测和请求归因。

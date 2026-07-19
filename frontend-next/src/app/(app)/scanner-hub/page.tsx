@@ -317,7 +317,7 @@ export default function ScannerHubPage() {
                   <div
                     key={run.id}
                     className="flex items-center justify-between p-3 border rounded hover:bg-muted cursor-pointer"
-                    onClick={() => router.push(`/dashboard/scanner-hub/${run.id}`)}
+                    onClick={() => router.push(`/scanner-hub/${run.id}`)}
                   >
                     <div className="flex items-center gap-3">
                       <Badge variant={run.status === 'created' ? 'default' : 'secondary'}>

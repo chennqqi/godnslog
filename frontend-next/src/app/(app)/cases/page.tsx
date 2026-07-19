@@ -59,7 +59,7 @@ function CasesPageContent() {
     if (statusFilter !== STATUS_FILTER_ALL) params.set('status', statusFilter)
     if (viewMode !== 'table') params.set('view', viewMode)
     const qs = params.toString()
-    router.replace(`/dashboard/cases${qs ? `?${qs}` : ''}`, { scroll: false })
+    router.replace(`/cases${qs ? `?${qs}` : ''}`, { scroll: false })
   }, [searchTerm, statusFilter, viewMode, router])
 
   const form = useForm<CaseFormValues>({
@@ -162,7 +162,7 @@ function CasesPageContent() {
       {viewMode === 'board' ? (
         <KanbanBoard
           cases={cases}
-          onCardClick={(id) => router.push(`/dashboard/cases/${id}`)}
+          onCardClick={(id) => router.push(`/cases/${id}`)}
           labels={{
             active: t('cases.board_active'),
             completed: t('cases.board_completed'),
@@ -190,7 +190,7 @@ function CasesPageContent() {
                 <li
                   key={case_.id}
                   className="py-4 flex items-center hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors cursor-pointer"
-                  onClick={() => router.push(`/dashboard/cases/${case_.id}`)}
+                  onClick={() => router.push(`/cases/${case_.id}`)}
                 >
                   <div className="flex-1">
                     <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">{case_.title}</p>

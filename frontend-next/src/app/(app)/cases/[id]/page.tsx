@@ -235,7 +235,7 @@ export default function CaseDetailPage() {
         <div className="px-4 py-5 sm:p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Payloads</h3>
-            <Button size="sm" onClick={() => router.push(`/dashboard/payloads/new?case_id=${case_.id}`)}>
+            <Button size="sm" onClick={() => router.push(`/payloads/new?case_id=${case_.id}`)}>
               Create Payload
             </Button>
           </div>
@@ -247,7 +247,7 @@ export default function CaseDetailPage() {
                 <li
                   key={payload.id}
                   className="py-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
-                  onClick={() => router.push(`/dashboard/payloads/${payload.id}`)}
+                  onClick={() => router.push(`/payloads/${payload.id}`)}
                 >
                   <div>
                     <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">{payload.template}</p>
@@ -269,7 +269,7 @@ export default function CaseDetailPage() {
         <div className="px-4 py-5 sm:p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Interactions</h3>
-            <Button size="sm" variant="outline" onClick={() => router.push(`/dashboard/interactions?case_id=${case_.id}`)}>
+            <Button size="sm" variant="outline" onClick={() => router.push(`/interactions?case_id=${case_.id}`)}>
               View All
             </Button>
           </div>
@@ -281,7 +281,7 @@ export default function CaseDetailPage() {
                 <li
                   key={inter.id}
                   className="py-3 flex justify-between items-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
-                  onClick={() => router.push(`/dashboard/interactions/${inter.id}`)}
+                  onClick={() => router.push(`/interactions/${inter.id}`)}
                 >
                   <div className="flex items-center gap-3">
                     <Badge variant={inter.type === 'dns' ? 'default' : 'secondary'}>
@@ -309,10 +309,10 @@ export default function CaseDetailPage() {
         <div className="px-4 py-5 sm:p-6">
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Quick Actions</h3>
           <div className="flex flex-wrap gap-3">
-            <Button variant="outline" onClick={() => router.push(`/dashboard/evidence?case_id=${case_.id}`)}>
+            <Button variant="outline" onClick={() => router.push(`/evidence?case_id=${case_.id}`)}>
               View Evidence
             </Button>
-            <Button variant="outline" onClick={() => router.push(`/dashboard/interactions?case_id=${case_.id}`)}>
+            <Button variant="outline" onClick={() => router.push(`/interactions?case_id=${case_.id}`)}>
               View Interactions
             </Button>
           </div>

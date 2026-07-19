@@ -515,7 +515,7 @@ export default function AgentRunDetailPage() {
                               return (
                                 <div className="mt-2">
                                   <a
-                                    href={`/dashboard/audit?resource_type=agent_run&resource_id=${agentRun.id}`}
+                                    href={`/audit?resource_type=agent_run&resource_id=${agentRun.id}`}
                                     className="text-sm text-blue-500 hover:underline"
                                   >
                                     View Audit Log ({resultData.audit_ref_id})
@@ -586,7 +586,7 @@ export default function AgentRunDetailPage() {
                       <div>
                         <p className="text-sm font-medium">Audit Ref:</p>
                         <a
-                          href={`/dashboard/audit?resource_type=agent_run&resource_id=${agentRun.id}`}
+                          href={`/audit?resource_type=agent_run&resource_id=${agentRun.id}`}
                           className="text-sm text-blue-500 hover:underline"
                         >
                           {item.audit_ref_id}
@@ -689,7 +689,7 @@ export default function AgentRunDetailPage() {
                           <div>
                             <p className="font-medium">Audit Ref:</p>
                             <a
-                              href={`/dashboard/audit?resource_type=agent_run&resource_id=${agentRun.id}`}
+                              href={`/audit?resource_type=agent_run&resource_id=${agentRun.id}`}
                               className="text-blue-500 hover:underline"
                             >
                               {item.audit_ref_id}
@@ -911,7 +911,7 @@ export default function AgentRunDetailPage() {
                               <Button
                                 variant="link"
                                 className="mt-2"
-                                onClick={() => router.push(`/dashboard/audit?resource_type=agent_run&resource_id=${agentRun.id}`)}
+                                onClick={() => router.push(`/audit?resource_type=agent_run&resource_id=${agentRun.id}`)}
                               >
                                 View Audit Log ({exportResult.audit_ref_id})
                               </Button>
@@ -1041,7 +1041,7 @@ export default function AgentRunDetailPage() {
                                 <Button
                                   variant="link"
                                   className="p-0 h-auto"
-                                  onClick={() => router.push(`/dashboard/audit?resource_type=agent_run&resource_id=${agentRun.id}`)}
+                                  onClick={() => router.push(`/audit?resource_type=agent_run&resource_id=${agentRun.id}`)}
                                 >
                                   View Audit Log ({deliveryResult.audit_ref_id})
                                 </Button>
@@ -1056,7 +1056,7 @@ export default function AgentRunDetailPage() {
               )}
               {agentRun.payload_id && (
                 <Button
-                  onClick={() => router.push(`/dashboard/evidence?payload_id=${agentRun.payload_id}`)}
+                  onClick={() => router.push(`/evidence?payload_id=${agentRun.payload_id}`)}
                   variant="outline"
                   size="sm"
                 >

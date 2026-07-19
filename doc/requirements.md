@@ -665,3 +665,9 @@ Phase 4/5 验收完成，结果保存至 `docs/superpowers/acceptance/phase4-5-a
 - 梳理范围：后端23个模块、26个前端页面、21个E2E测试、121个v2 API端点、13个MCP工具
 - 识别9个已知bug、16项待完成事项（P0/P1/P2分级）
 
+- 修复前端登录后跳转回登录页的BUG：根路由page.tsx无条件redirect到/login，与(app)路由组冲突
+
+## 2026-07-19 部署模式与Demo环境
+- 在Roadmap中追加2.9版本计划
+- 双部署模式：Let's Encrypt自动证书独立托管模式（容器直接暴露443/80/53，自动证书+自签名兜底，Web和API始终在443）或Nginx反向代理模式（不监听特权端口，TLS由Nginx终结，提供配置指引）
+- Demo模式：自动创建若干Demo账号（含预置样例数据），Demo账号权限受限（禁止管理员操作/系统配置/APIKey），数据隔离定期重置，通过--demo或环境变量开启

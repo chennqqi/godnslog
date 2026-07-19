@@ -205,7 +205,7 @@ export default function PayloadDetailPage() {
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Associated Case</h3>
             <div
               className="p-4 bg-gray-50 dark:bg-gray-900 rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              onClick={() => router.push(`/dashboard/cases/${associatedCase.id}`)}
+              onClick={() => router.push(`/cases/${associatedCase.id}`)}
             >
               <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">{associatedCase.title}</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">{associatedCase.description}</p>
@@ -222,7 +222,7 @@ export default function PayloadDetailPage() {
         <div className="px-4 py-5 sm:p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Interactions</h3>
-            <Button size="sm" variant="outline" onClick={() => router.push(`/dashboard/interactions?payload_id=${payload.id}`)}>
+            <Button size="sm" variant="outline" onClick={() => router.push(`/interactions?payload_id=${payload.id}`)}>
               View All
             </Button>
           </div>
@@ -260,10 +260,10 @@ export default function PayloadDetailPage() {
         <div className="px-4 py-5 sm:p-6">
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Quick Actions</h3>
           <div className="flex flex-wrap gap-3">
-            <Button variant="outline" onClick={() => router.push(`/dashboard/interactions?payload_id=${payload.id}`)}>
+            <Button variant="outline" onClick={() => router.push(`/interactions?payload_id=${payload.id}`)}>
               View Interactions
             </Button>
-            <Button variant="outline" onClick={() => router.push(`/dashboard/evidence?payload_id=${payload.id}`)}>
+            <Button variant="outline" onClick={() => router.push(`/evidence?payload_id=${payload.id}`)}>
               View Evidence
             </Button>
           </div>

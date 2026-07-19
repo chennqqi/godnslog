@@ -52,7 +52,7 @@ export function generateJsonlRecord(input: ScannerRunInput): string {
     template,
     rendered_payload,
     interactions_url: `${baseUrl}/api/v2/interactions?payload_id=${payload_id}`,
-    evidence_url: `${baseUrl}/dashboard/evidence?payload_id=${payload_id}`,
+    evidence_url: `${baseUrl}/evidence?payload_id=${payload_id}`,
     created_at: new Date().toISOString()
   }
   return JSON.stringify(record)
@@ -67,8 +67,8 @@ export function generateWebUrls(input: ScannerRunInput): {
 } {
   const { payload_id, baseUrl } = input
   return {
-    interactionsUrl: `${baseUrl}/dashboard/interactions?payload_id=${payload_id}`,
-    evidenceUrl: `${baseUrl}/dashboard/evidence?payload_id=${payload_id}`
+    interactionsUrl: `${baseUrl}/interactions?payload_id=${payload_id}`,
+    evidenceUrl: `${baseUrl}/evidence?payload_id=${payload_id}`
   }
 }
 

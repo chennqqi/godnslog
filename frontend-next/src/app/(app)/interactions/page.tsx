@@ -85,7 +85,7 @@ function InteractionsPageContent() {
     const v = overrides.view ?? viewMode
     if (v !== 'table') params.set('view', v)
     const qs = params.toString()
-    router.replace(`/dashboard/interactions${qs ? `?${qs}` : ''}`, { scroll: false })
+    router.replace(`/interactions${qs ? `?${qs}` : ''}`, { scroll: false })
   }, [caseId, payloadId, filter, typeFilter, startTimeFilter, endTimeFilter, viewMode, router])
 
   // Set type filter from URL param if present
@@ -480,7 +480,7 @@ function InteractionsPageContent() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => router.push(`/dashboard/cases/${selectedInteraction.case_id}`)}
+                          onClick={() => router.push(`/cases/${selectedInteraction.case_id}`)}
                         >
                           View Case
                         </Button>
@@ -492,7 +492,7 @@ function InteractionsPageContent() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => router.push(`/dashboard/payloads/${selectedInteraction.payload_id}`)}
+                          onClick={() => router.push(`/payloads/${selectedInteraction.payload_id}`)}
                         >
                           View Payload
                         </Button>
@@ -569,7 +569,7 @@ function InteractionsPageContent() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => router.push(`/dashboard/evidence?case_id=${selectedInteraction.case_id}`)}
+                      onClick={() => router.push(`/evidence?case_id=${selectedInteraction.case_id}`)}
                     >
                       Generate Evidence (Case)
                     </Button>
@@ -578,7 +578,7 @@ function InteractionsPageContent() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => router.push(`/dashboard/evidence?payload_id=${selectedInteraction.payload_id}`)}
+                      onClick={() => router.push(`/evidence?payload_id=${selectedInteraction.payload_id}`)}
                     >
                       Generate Evidence (Payload)
                     </Button>

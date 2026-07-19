@@ -53,7 +53,7 @@ export default function PayloadsPage() {
     const params = new URLSearchParams()
     if (filter) params.set('filter', filter)
     const qs = params.toString()
-    router.replace(`/dashboard/payloads${qs ? `?${qs}` : ''}`, { scroll: false })
+    router.replace(`/payloads${qs ? `?${qs}` : ''}`, { scroll: false })
   }, [filter, router])
 
   const updatePreview = useCallback(() => {
@@ -154,7 +154,7 @@ export default function PayloadsPage() {
           ) : (
             <ul className="divide-y divide-gray-200 dark:divide-gray-700">
               {filteredPayloads.map((payload) => (
-                <li key={payload.id} className="py-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors" onClick={() => router.push(`/dashboard/payloads/${payload.id}`)}>
+                <li key={payload.id} className="py-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors" onClick={() => router.push(`/payloads/${payload.id}`)}>
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
