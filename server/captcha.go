@@ -24,7 +24,7 @@ const (
 )
 
 type captchaAnswer struct {
-	X int `json:"x"`
+	X int
 }
 
 type captchaService struct {
@@ -106,12 +106,12 @@ func (s *captchaService) Verify(captchaID string, value int) bool {
 	if !exist {
 		return false
 	}
-	s.store.Delete(key)
 
 	ans, ok := v.(*captchaAnswer)
 	if !ok {
 		return false
 	}
+	s.store.Delete(key)
 
 	diff := value - ans.X
 	if diff < 0 {

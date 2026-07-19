@@ -49,7 +49,7 @@ export default function LoginPage() {
   const { t, lang, setLang } = useI18n()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [captchaID, setCaptchaID] = useState('')
+  const [captchaID, setCaptchaID] = useState<string | null>(null)
   const [captchaValue, setCaptchaValue] = useState(0)
   const [captchaInvalid, setCaptchaInvalid] = useState(false)
 
@@ -72,7 +72,7 @@ export default function LoginPage() {
   }))
 
   const onSubmit = async (data: LoginFormValues) => {
-    if (!captchaID) {
+    if (captchaID === null) {
       setError(t('login.captcha.invalid'))
       return
     }

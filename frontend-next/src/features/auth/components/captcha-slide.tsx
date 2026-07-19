@@ -23,10 +23,13 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
   const [dragging, setDragging] = useState(false)
   const [position, setPosition] = useState(0)
   const [completed, setCompleted] = useState(false)
+  const [hidden, setHidden] = useState(false)
 
   const trackRef = useRef<HTMLDivElement>(null)
   const startXRef = useRef(0)
   const startPosRef = useRef(0)
+  const onReadyRef = useRef(onReady)
+  onReadyRef.current = onReady
 
   const loadCaptcha = useCallback(async () => {
     setLoading(true)
@@ -34,10 +37,16 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
     setPosition(0)
     setCompleted(false)
     setCaptchaId('')
+    setHidden(false)
 
     try {
       const response = await authApi.captcha()
       if (response.code === 0 && response.data) {
+        if (!response.data.captcha_id) {
+          setHidden(true)
+          onReadyRef.current('', 0)
+          return
+        }
         setCaptchaId(response.data.captcha_id)
         setImageBase64(response.data.image_base64)
         setThumbBase64(response.data.thumb_base64)
@@ -66,14 +75,6 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
     onRefresh()
   }
 
-  const clampPosition = useCallback((clientX: number) => {
-    if (!trackRef.current) return 0
-    const rect = trackRef.current.getBoundingClientRect()
-    const max = trackRef.current.offsetWidth - THUMB_SIZE
-    const raw = clientX - rect.left - THUMB_SIZE / 2
-    return Math.max(0, Math.min(max, raw))
-  }, [])
-
   // --- Mouse drag ---
   const handleMouseDown = (e: React.MouseEvent) => {
     if (disabled || completed) return
@@ -95,7 +96,7 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
     setDragging(false)
     if (captchaId) {
       setCompleted(true)
-      onReady(captchaId, position)
+      onReadyRef.current(captchaId, position)
     }
   }
 
@@ -138,6 +139,9 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
       </div>
     )
   }
+
+  // --- Hidden state (captcha disabled) ---
+  if (hidden) return null
 
   return (
     <div className="space-y-2">

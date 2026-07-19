@@ -320,9 +320,13 @@ func (self *WebServer) verifyAdminPermission(c *gin.Context) {
 // @Router /user/login [post]
 func (self *WebServer) getCaptcha(c *gin.Context) {
 	if self.captchaSvc == nil {
-		self.resp(c, 404, &CR{
-			Code:    models.CodeNoData,
-			Message: "captcha disabled",
+		self.resp(c, 200, &CR{
+			Code: CodeOK,
+			Data: map[string]interface{}{
+				"captcha_id":   "",
+				"image_base64": "",
+				"thumb_base64": "",
+			},
 		})
 		return
 	}
