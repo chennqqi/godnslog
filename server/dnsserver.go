@@ -267,6 +267,13 @@ func (self *DnsServer) responseStandard(w dns.ResponseWriter, req *dns.Msg) {
 		if exist {
 			return v.([]*Resolve)
 		}
+		// Fallback: root domain queries have empty origin;
+		// interpret them as "@" (same as origin) record.
+		if origin == "" {
+			if v, exist := store.Get("@" + t); exist {
+				return v.([]*Resolve)
+			}
+		}
 		subs := strings.Split(origin, ".")
 		for i := 0; i < len(subs); i++ {
 			subs[i] = "*"

@@ -2,6 +2,7 @@
 const backendUrl = (process.env.GODNSLOG_API_URL || 'http://localhost:8080').replace(/\/$/, '')
 
 const nextConfig = {
+  output: 'standalone',
   reactStrictMode: true,
   distDir: 'dist',
   images: {

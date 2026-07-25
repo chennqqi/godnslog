@@ -5,9 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -92,6 +94,14 @@ func (p *servePwCmd) SetFlags(f *flag.FlagSet) {
 func (p *servePwCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	// verify input
 	{
+		// Auto-detect public IPv4 when not explicitly set.
+		if p.ipv4 == "" {
+			detected := detectPublicIP()
+			if detected != "" {
+				p.ipv4 = detected
+				logrus.Infof("[serve] auto-detected public IPv4: %s", detected)
+			}
+		}
 		if p.ipv4 == "" || p.domain == "" {
 			logrus.Fatal("[main.go::main] You should set ipv4 and domain at least.")
 			return subcommands.ExitUsageError
@@ -203,4 +213,35 @@ func getEnvBool(key string) bool {
 		return false
 	}
 	return b
+}
+
+// detectPublicIP tries to detect the public IPv4 address by querying
+// external services. Returns empty string if detection fails.
+func detectPublicIP() string {
+	services := []string{
+		"http://ipaddr.site",
+		"http://ifconfig.me",
+		"http://icanhazip.com",
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	for _, url := range services {
+		resp, err := client.Get(url)
+		if err != nil {
+			continue
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			continue
+		}
+		body := make([]byte, 64)
+		n, err := resp.Body.Read(body)
+		if err != nil && err.Error() != "EOF" {
+			continue
+		}
+		ip := net.ParseIP(strings.TrimSpace(string(body[:n])))
+		if ip != nil && ip.To4() != nil {
+			return ip.String()
+		}
+	}
+	return ""
 }

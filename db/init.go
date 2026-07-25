@@ -114,22 +114,24 @@ func initSuperUser(orm *xorm.Engine, testMode bool, defaultLanguage string, defa
 
 // initDefaultResolve initializes the default DNS resolve record
 func initDefaultResolve(orm *xorm.Engine, ip string) error {
-	var wwwRcd oldmodels.TblResolve
-	exist, err := orm.Where(`host=?`, `www`).And(`type=?`, `A`).Get(&wwwRcd)
-	if err != nil {
-		logrus.Errorf("[db::initDefaultResolve] orm.Get(resolve): %v", err)
-		return err
-	}
+	for _, host := range []string{"www", "@"} {
+		var rcd oldmodels.TblResolve
+		exist, err := orm.Where(`host=?`, host).And(`type=?`, `A`).Get(&rcd)
+		if err != nil {
+			logrus.Errorf("[db::initDefaultResolve] orm.Get(resolve host=%s): %v", host, err)
+			return err
+		}
 
-	if !exist {
-		wwwRcd.Host = "www"
-		wwwRcd.Value = ip
-		wwwRcd.Type = "A"
-		wwwRcd.Ttl = 600 // default 600s
-		orm.InsertOne(&wwwRcd)
-	} else if wwwRcd.Value != ip {
-		wwwRcd.Value = ip
-		orm.Update(&wwwRcd)
+		if !exist {
+			rcd.Host = host
+			rcd.Value = ip
+			rcd.Type = "A"
+			rcd.Ttl = 600
+			orm.InsertOne(&rcd)
+		} else if rcd.Value != ip {
+			rcd.Value = ip
+			orm.Update(&rcd)
+		}
 	}
 
 	return nil

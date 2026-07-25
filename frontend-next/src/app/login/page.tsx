@@ -51,6 +51,7 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [captchaID, setCaptchaID] = useState<string | null>(null)
   const [captchaValue, setCaptchaValue] = useState(0)
+  const [captchaY, setCaptchaY] = useState(0)
   const [captchaInvalid, setCaptchaInvalid] = useState(false)
 
   const form = useForm<LoginFormValues>({
@@ -85,6 +86,7 @@ export default function LoginPage() {
         ...(data as LoginRequest),
         captcha_id: captchaID,
         captcha_value: captchaValue,
+        captcha_y: captchaY,
       })
       if (response.code === 0 && response.data) {
         localStorage.setItem('token', response.data.token)
@@ -257,9 +259,10 @@ export default function LoginPage() {
 
             {/* Captcha */}
             <SlideCaptcha
-              onReady={(id, value) => {
+              onReady={(id, x, y) => {
                 setCaptchaID(id)
-                setCaptchaValue(value)
+                setCaptchaValue(x)
+                setCaptchaY(y)
               }}
               onRefresh={() => {
                 setCaptchaID('')

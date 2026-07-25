@@ -5,7 +5,7 @@ import { useI18n } from '@/lib/i18n-context'
 import { authApi } from '@/lib/api-client'
 
 export interface SlideCaptchaProps {
-  onReady: (captchaId: string, captchaValue: number) => void
+  onReady: (captchaId: string, captchaValue: number, captchaY: number) => void
   onRefresh: () => void
   invalid: boolean
   disabled?: boolean
@@ -18,6 +18,7 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
   const [captchaId, setCaptchaId] = useState('')
   const [imageBase64, setImageBase64] = useState('')
   const [thumbBase64, setThumbBase64] = useState('')
+  const [blockY, setBlockY] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [dragging, setDragging] = useState(false)
@@ -26,6 +27,7 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
   const [hidden, setHidden] = useState(false)
 
   const trackRef = useRef<HTMLDivElement>(null)
+  const imageRef = useRef<HTMLImageElement>(null)
   const startXRef = useRef(0)
   const startPosRef = useRef(0)
   const onReadyRef = useRef(onReady)
@@ -47,12 +49,13 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
       if (response.code === 0 && response.data) {
         if (!response.data.captcha_id) {
           setHidden(true)
-          onReadyRef.current('', 0)
+          onReadyRef.current('', 0, 0)
           return
         }
         setCaptchaId(response.data.captcha_id)
         setImageBase64(response.data.image_base64)
         setThumbBase64(response.data.thumb_base64)
+        setBlockY(response.data.block_y ?? 0)
       } else {
         setError(response.message || t('login.captcha.error'))
       }
@@ -101,7 +104,10 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
     setDragging(false)
     if (captchaId) {
       setCompleted(true)
-      onReadyRef.current(captchaId, position)
+      // Scale from display pixels to server image coordinates (300px)
+      const displayedW = imageRef.current?.clientWidth ?? 300
+      const scaled = Math.round(position * 300 / displayedW)
+      onReadyRef.current(captchaId, scaled, blockY)
     }
   }
 
@@ -154,6 +160,7 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
       <div className="relative w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 select-none">
         {/* Background image */}
         <img
+          ref={imageRef}
           src={imageBase64}
           alt="captcha background"
           className="block w-full h-auto"
@@ -165,7 +172,7 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
           className="absolute top-0 pointer-events-none"
           style={{
             left: `${position}px`,
-            top: 0,
+            top: `${blockY}px`,
           }}
         >
           <img

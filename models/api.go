@@ -32,6 +32,7 @@ type LoginRequest struct {
 	Password     string `json:"password"`
 	CaptchaID    string `json:"captcha_id"`
 	CaptchaValue int    `json:"captcha_value"`
+	CaptchaY     int    `json:"captcha_y"`
 }
 
 type LoginResponse struct {

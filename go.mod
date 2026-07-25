@@ -6,7 +6,6 @@ require (
 	github.com/chennqqi/goutils v0.2.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/getkin/kin-openapi v0.137.0
-	github.com/gin-contrib/static v1.1.6
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-sql-driver/mysql v1.7.0
 	github.com/google/subcommands v1.2.0

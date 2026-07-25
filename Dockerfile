@@ -4,10 +4,12 @@ WORKDIR /app
 COPY frontend-next/package.json frontend-next/package-lock.json* ./
 RUN npm config set registry https://registry.npmmirror.com && npm install
 COPY frontend-next ./
-RUN npm run build
+RUN npm run build && rm -rf dist/dev/cache
 
 # build backend
 FROM golang:1.25-alpine AS backend-builder
+
+ENV GOPROXY=https://goproxy.cn,direct
 
 RUN apk add --no-cache build-base git musl-dev
 
@@ -23,19 +25,19 @@ COPY *.go go.mod go.sum /src/godnslog/
 WORKDIR /src/godnslog
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o /go/bin/godnslog
 
-# final image: Node runtime for Next.js + Go binary
+# final image: Alpine base with Go binary + frontend static files
+# NOTE: node:24.13.0-alpine is used instead of plain alpine:3.21
+# because the latter may not be available behind certain proxies.
 FROM node:24.13.0-alpine
 
 RUN apk add --no-cache -U tzdata ca-certificates libcap wget tini && \
 	update-ca-certificates
 
-RUN mkdir -p /app/frontend /app
+RUN mkdir -p /app/frontend/dist /app
 
 COPY --from=backend-builder /go/bin/godnslog /app/godnslog
-COPY --from=frontend-builder /app/dist /app/frontend/dist
-COPY --from=frontend-builder /app/package.json /app/frontend/package.json
-COPY --from=frontend-builder /app/next.config.js /app/frontend/next.config.js
-COPY --from=frontend-builder /app/node_modules /app/frontend/node_modules
+COPY --from=frontend-builder /app/dist/standalone /app/frontend
+COPY --from=frontend-builder /app/dist/static /app/frontend/dist/static
 
 ARG UID=1001
 ARG GID=1001
@@ -47,25 +49,15 @@ RUN addgroup -g $GID -S app && adduser -u $UID -S -g app app && \
 WORKDIR /app
 USER app
 
-ENV GODNSLOG_API_URL=http://localhost:8080
-
-# Expose ports for both deployment modes:
-# - 8080: HTTP backend (nginx reverse proxy mode)
-# - 80/443: HTTP/HTTPS (standalone TLS mode)
-# - 3000: Next.js frontend
-# - 53: DNS server (UDP/TCP)
 EXPOSE 8080
 EXPOSE 80
 EXPOSE 443
-EXPOSE 3000
 EXPOSE 53/UDP 53/TCP
 
 HEALTHCHECK --interval=20s --timeout=3s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:8080/api/v2/health || exit 1
 
-# Copy entrypoint script (ensure executable bit is set in source)
 COPY deploy/docker/entrypoint.sh /app/entrypoint.sh
 
-# Start Go backend and Next.js frontend with tini for proper signal handling
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["/app/entrypoint.sh"]

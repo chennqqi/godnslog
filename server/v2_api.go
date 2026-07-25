@@ -52,6 +52,7 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		v2.POST("/auth/login", self.v2Login)
 		v2.POST("/auth/logout", self.authHandler, self.v2Logout)
 		v2.GET("/auth/info", self.authHandler, self.v2UserInfo)
+		v2.GET("/auth/captcha", self.getCaptcha)
 
 		// Cases
 		cases := v2.Group("/cases", self.authHandler)
@@ -341,6 +342,24 @@ func (self *WebServer) v2Login(c *gin.Context) {
 	}
 
 	logrus.Infof("[v2_api.go::v2Login] login request: username=%s", req.Username)
+
+	// Captcha verification (if enabled)
+	if self.captchaSvc != nil {
+		if req.CaptchaID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"code":    400,
+				"message": T("bad request"),
+			})
+			return
+		}
+		if !self.captchaSvc.Verify(req.CaptchaID, req.CaptchaValue, req.CaptchaY) {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"code":    400,
+				"message": T("bad request"),
+			})
+			return
+		}
+	}
 
 	session := self.orm.NewSession()
 	defer session.Close()

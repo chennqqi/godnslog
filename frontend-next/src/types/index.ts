@@ -42,6 +42,7 @@ export interface LoginRequest {
   password: string
   captcha_id: string
   captcha_value: number
+  captcha_y?: number
 }
 
 export interface LoginResponse {
@@ -53,6 +54,7 @@ export interface CaptchaResponse {
   captcha_id: string
   image_base64: string
   thumb_base64: string
+  block_y: number
 }
 
 // Case types

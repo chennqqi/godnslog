@@ -8,6 +8,7 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
+	"math"
 	"math/rand"
 	"time"
 
@@ -20,11 +21,14 @@ import (
 
 const (
 	defaultCaptchaExpire = 2 * time.Minute
-	captchaTolerance     = 3 // pixels
+	captchaTolerance     = 4
+	captchaImageWidth    = 300
+	captchaImageHeight   = 220
 )
 
 type captchaAnswer struct {
 	X int
+	Y int
 }
 
 type captchaService struct {
@@ -42,7 +46,7 @@ func newCaptchaService(store *cache.Cache, expire time.Duration) *captchaService
 	graph, shadow, mask := generateGraphShape()
 
 	builder := slide.NewBuilder(
-		slide.WithImageSize(option.Size{Width: 300, Height: 220}),
+		slide.WithImageSize(option.Size{Width: captchaImageWidth, Height: captchaImageHeight}),
 	)
 	builder.SetResources(
 		slide.WithBackgrounds([]image.Image{bg}),
@@ -64,43 +68,39 @@ func newCaptchaService(store *cache.Cache, expire time.Duration) *captchaService
 }
 
 // Generate creates a new slide captcha challenge.
-// Returns captchaID, base64-encoded main image, base64-encoded thumb image, and error.
-func (s *captchaService) Generate() (captchaID, imageBase64, thumbBase64 string, err error) {
+func (s *captchaService) Generate() (captchaID, imageBase64, thumbBase64 string, blockY int, err error) {
 	data, err := s.capt.Generate()
 	if err != nil {
-		return "", "", "", fmt.Errorf("captcha generate: %w", err)
+		return "", "", "", 0, fmt.Errorf("captcha generate: %w", err)
 	}
 
 	block := data.GetData()
 	if block == nil {
-		return "", "", "", fmt.Errorf("captcha data is nil")
+		return "", "", "", 0, fmt.Errorf("captcha data is nil")
 	}
 
-	// Encode master image (background with cutout) to base64 PNG
 	masterBuf := new(bytes.Buffer)
 	if err := png.Encode(masterBuf, data.GetMasterImage().Get()); err != nil {
-		return "", "", "", fmt.Errorf("encode master image: %w", err)
+		return "", "", "", 0, fmt.Errorf("encode master image: %w", err)
 	}
 	masterBase64 := "data:image/png;base64," + base64.StdEncoding.EncodeToString(masterBuf.Bytes())
 
-	// Encode thumb image (puzzle piece) to base64 PNG
 	thumbBuf := new(bytes.Buffer)
 	if err := png.Encode(thumbBuf, data.GetTileImage().Get()); err != nil {
-		return "", "", "", fmt.Errorf("encode thumb image: %w", err)
+		return "", "", "", 0, fmt.Errorf("encode thumb image: %w", err)
 	}
 	thumbBase64 = "data:image/png;base64," + base64.StdEncoding.EncodeToString(thumbBuf.Bytes())
 
-	// Store answer
 	captchaID = uuid.New().String()
-	answer := &captchaAnswer{X: block.X}
+	answer := &captchaAnswer{X: block.X, Y: block.Y}
 	s.store.Set("captcha:"+captchaID, answer, s.expire)
 
-	return captchaID, masterBase64, thumbBase64, nil
+	return captchaID, masterBase64, thumbBase64, block.Y, nil
 }
 
-// Verify checks the user-provided captcha value against the stored answer.
+// Verify checks the user-provided captcha position using go-captcha's Validate.
 // Always deletes the challenge from cache after verification (one-time use).
-func (s *captchaService) Verify(captchaID string, value int) bool {
+func (s *captchaService) Verify(captchaID string, x, y int) bool {
 	key := "captcha:" + captchaID
 	v, exist := s.store.Get(key)
 	if !exist {
@@ -113,111 +113,171 @@ func (s *captchaService) Verify(captchaID string, value int) bool {
 	}
 	s.store.Delete(key)
 
-	diff := value - ans.X
-	if diff < 0 {
-		diff = -diff
-	}
-	return diff <= captchaTolerance
+	return slide.Validate(ans.X, ans.Y, x, y, captchaTolerance)
 }
 
-// generateBackground creates a simple gradient background image at runtime.
+
+// --- image generation helpers ---
+
 func generateBackground() image.Image {
-	width, height := 300, 220
+	width, height := captchaImageWidth, captchaImageHeight
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
-
-	// Seed with current time for variety
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	baseR := uint8(rng.Intn(60) + 40)
-	baseG := uint8(rng.Intn(60) + 40)
-	baseB := uint8(rng.Intn(60) + 100)
 
+	// Soft pastel palette with subtle color shifts
+	baseH := 30.0 + rng.Float64()*60  // warm hue range
+	baseL := 0.75 + rng.Float64()*0.15
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
-			// Vertical gradient + slight noise
-			noise := uint8(rng.Intn(30))
-			r := uint8(float64(baseR)*(1-float64(y)/float64(height))) + noise
-			g := uint8(float64(baseG)*(1-float64(y)/float64(height))) + noise
-			b := uint8(float64(baseB)*(1-float64(y)/float64(height))) + noise
+			h := baseH + float64(x)*0.08 + float64(y)*0.02 + rng.Float64()*3
+			s := 0.12 + rng.Float64()*0.08
+			l := baseL + float64(y)*0.0003 + rng.Float64()*0.03
+			r, g, b := hslToRGB(h, s, l)
 			img.Set(x, y, color.NRGBA{R: r, G: g, B: b, A: 255})
 		}
 	}
 
-	// Draw some random circles for visual complexity
-	drawRandomCircles(img, rng)
+	// Organic curved shapes (like watercolor strokes)
+	for i := 0; i < 3; i++ {
+		cx := rng.Intn(width)
+		cy := rng.Intn(height)
+		cr := rng.Intn(60) + 30
+		rc := color.NRGBA{
+			R: uint8(rng.Intn(60) + 180),
+			G: uint8(rng.Intn(60) + 180),
+			B: uint8(rng.Intn(60) + 180),
+			A: uint8(rng.Intn(30) + 15),
+		}
+		for y := cy - cr; y <= cy+cr; y++ {
+			for x := cx - cr; x <= cx+cr; x++ {
+				if x < 0 || x >= width || y < 0 || y >= height {
+					continue
+				}
+				dx, dy := float64(x-cx), float64(y-cy)
+				d := dx*dx/(float64(cr)*float64(cr)) + dy*dy/(float64(cr*cr/2))
+				if d < 1.0 {
+					alpha := uint8(float64(rc.A) * (1.0 - d))
+					existing := img.NRGBAAt(x, y)
+					r := uint8((int(existing.R)*int(255-alpha) + int(rc.R)*int(alpha)) / 255)
+					g := uint8((int(existing.G)*int(255-alpha) + int(rc.G)*int(alpha)) / 255)
+					b := uint8((int(existing.B)*int(255-alpha) + int(rc.B)*int(alpha)) / 255)
+					img.Set(x, y, color.NRGBA{R: r, G: g, B: b, A: 255})
+				}
+			}
+		}
+	}
+
+	// Subtle wavy lines
+	for i := 0; i < 2; i++ {
+		startY := rng.Intn(height)
+		lc := color.NRGBA{
+			R: uint8(rng.Intn(40) + 200),
+			G: uint8(rng.Intn(40) + 200),
+			B: uint8(rng.Intn(40) + 200),
+			A: uint8(rng.Intn(30) + 15),
+		}
+		amplitude := float64(rng.Intn(15) + 5)
+		freq := rng.Float64()*0.03 + 0.02
+		phase := rng.Float64() * 10
+		for x := 0; x < width; x++ {
+			y := startY + int(amplitude*math.Sin(float64(x)*freq+phase))
+			if y >= 0 && y < height {
+				for dy := -2; dy <= 2; dy++ {
+					if y+dy >= 0 && y+dy < height {
+						existing := img.NRGBAAt(x, y+dy)
+						r := uint8((int(existing.R)*int(255-lc.A) + int(lc.R)*int(lc.A)) / 255)
+						g := uint8((int(existing.G)*int(255-lc.A) + int(lc.G)*int(lc.A)) / 255)
+						b := uint8((int(existing.B)*int(255-lc.A) + int(lc.B)*int(lc.A)) / 255)
+						img.Set(x, y+dy, color.NRGBA{R: r, G: g, B: b, A: 255})
+					}
+				}
+			}
+		}
+	}
+
 	return img
 }
 
-// drawRandomCircles adds decorative circles to the background.
-func drawRandomCircles(img *image.NRGBA, rng *rand.Rand) {
-	bounds := img.Bounds()
-	for i := 0; i < 8; i++ {
-		cx := rng.Intn(bounds.Dx())
-		cy := rng.Intn(bounds.Dy())
-		radius := rng.Intn(30) + 10
-		c := color.NRGBA{
-			R: uint8(rng.Intn(80) + 40),
-			G: uint8(rng.Intn(80) + 40),
-			B: uint8(rng.Intn(80) + 40),
-			A: 80,
-		}
-		drawCircle(img, cx, cy, radius, c)
-	}
-}
-
-// drawCircle draws a filled circle on the image.
-func drawCircle(img *image.NRGBA, cx, cy, radius int, c color.Color) {
-	bounds := img.Bounds()
-	for y := cy - radius; y <= cy+radius; y++ {
-		for x := cx - radius; x <= cx+radius; x++ {
-			if x < bounds.Min.X || x >= bounds.Max.X || y < bounds.Min.Y || y >= bounds.Max.Y {
-				continue
-			}
-			dx, dy := x-cx, y-cy
-			if dx*dx+dy*dy <= radius*radius {
-				img.Set(x, y, c)
-			}
-		}
-	}
-}
-
-// generateGraphShape creates a simple shape image for the puzzle piece and its shadow.
 func generateGraphShape() (overlay, shadow, mask image.Image) {
 	size := 60
 	overlayImg := image.NewNRGBA(image.Rect(0, 0, size, size))
 	shadowImg := image.NewNRGBA(image.Rect(0, 0, size, size))
 	maskImg := image.NewNRGBA(image.Rect(0, 0, size, size))
+	transparent := color.NRGBA{A: 0}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano() + 100))
-	fg := color.NRGBA{
-		R: uint8(rng.Intn(100) + 100),
-		G: uint8(rng.Intn(100) + 100),
-		B: uint8(rng.Intn(100) + 100),
-		A: 255,
-	}
-	bg := color.NRGBA{A: 0} // transparent
+	r := uint8(rng.Intn(40) + 200)
+	g := uint8(rng.Intn(40) + 200)
+	b := uint8(rng.Intn(40) + 200)
+	fg := color.NRGBA{R: r, G: g, B: b, A: 230}
 
-	// Draw overlay (solid rounded rectangle)
-	draw.Draw(overlayImg, overlayImg.Bounds(), &image.Uniform{bg}, image.Point{}, draw.Src)
-	drawRoundedRect(overlayImg, 5, 5, size-10, size-10, 10, fg)
+	pad := 3
+	tabH := 8
+	total := size - pad*2
 
-	// Draw shadow (darker, semi-transparent, offset by 2px down-right)
-	shadowColor := color.NRGBA{R: 0, G: 0, B: 0, A: 100}
-	draw.Draw(shadowImg, shadowImg.Bounds(), &image.Uniform{bg}, image.Point{}, draw.Src)
-	drawRoundedRect(shadowImg, 5+2, 5+2, size-10+2, size-10+2, 10, shadowColor)
+	draw.Draw(overlayImg, overlayImg.Bounds(), &image.Uniform{transparent}, image.Point{}, draw.Src)
+	drawPuzzleShape(overlayImg, pad, pad+tabH, total, total-tabH, 5, fg, tabH, true)
 
-	// Draw mask (white shape on transparent background — defines the cutout region)
+	sh := color.NRGBA{R: 0, G: 0, B: 0, A: 70}
+	draw.Draw(shadowImg, shadowImg.Bounds(), &image.Uniform{transparent}, image.Point{}, draw.Src)
+	drawPuzzleShape(shadowImg, pad+2, pad+tabH+2, total, total-tabH, 5, sh, tabH, true)
+
 	white := color.NRGBA{R: 255, G: 255, B: 255, A: 255}
-	draw.Draw(maskImg, maskImg.Bounds(), &image.Uniform{bg}, image.Point{}, draw.Src)
-	drawRoundedRect(maskImg, 5, 5, size-10, size-10, 10, white)
+	draw.Draw(maskImg, maskImg.Bounds(), &image.Uniform{transparent}, image.Point{}, draw.Src)
+	drawPuzzleShape(maskImg, pad, pad+tabH, total, total-tabH, 5, white, tabH, true)
 
 	return overlayImg, shadowImg, maskImg
 }
 
-// drawRoundedRect draws a filled rounded rectangle.
+func drawPuzzleShape(img *image.NRGBA, x1, y1, w, h, r int, c color.Color, tabH int, top bool) {
+	x2 := x1 + w
+	y2 := y1 + h
+	drawRoundedRect(img, x1, y1, x2, y2, r, c)
+	if top {
+		cx := (x1 + x2) / 2
+		tw := max(8, w/3)
+		for y := y1 - tabH; y < y1; y++ {
+			for x := cx - tw/2; x < cx+tw/2; x++ {
+				if x >= 0 && x < img.Bounds().Dx() && y >= 0 && y < img.Bounds().Dy() {
+					img.Set(x, y, c)
+				}
+			}
+		}
+		// Round the tab top
+		tabTop := y1 - tabH
+		for x := cx - tw/2 + 2; x < cx+tw/2-1; x++ {
+			if tabTop >= 0 && tabTop < img.Bounds().Dy() && x >= 0 && x < img.Bounds().Dx() {
+				img.Set(x, tabTop, c)
+			}
+		}
+	}
+}
+
+func max(a, b int) int {
+	if a > b { return a }
+	return b
+}
+
+func hslToRGB(h, s, l float64) (uint8, uint8, uint8) {
+	h = math.Mod(h, 360) / 360
+	c := (1 - math.Abs(2*l-1)) * s
+	x := c * (1 - math.Abs(math.Mod(h*6, 2)-1))
+	m := l - c/2
+	var rp, gp, bp float64
+	switch int(h * 6) {
+	case 0: rp, gp, bp = c, x, 0
+	case 1: rp, gp, bp = x, c, 0
+	case 2: rp, gp, bp = 0, c, x
+	case 3: rp, gp, bp = 0, x, c
+	case 4: rp, gp, bp = x, 0, c
+	default: rp, gp, bp = c, 0, x
+	}
+	return uint8((rp + m) * 255), uint8((gp + m) * 255), uint8((bp + m) * 255)
+}
+
 func drawRoundedRect(img *image.NRGBA, x1, y1, x2, y2, r int, c color.Color) {
 	for y := y1; y <= y2; y++ {
 		for x := x1; x <= x2; x++ {
-			// Corner rounding logic
 			inCorner := false
 			if x < x1+r && y < y1+r {
 				inCorner = (x-x1-r)*(x-x1-r)+(y-y1-r)*(y-y1-r) > r*r
@@ -234,3 +294,8 @@ func drawRoundedRect(img *image.NRGBA, x1, y1, x2, y2, r int, c color.Color) {
 		}
 	}
 }
+
+func drawCircle(img *image.NRGBA, cx, cy, radius int, c color.Color) {}
+
+func drawRandomCircles(img *image.NRGBA, rng *rand.Rand) {}
+

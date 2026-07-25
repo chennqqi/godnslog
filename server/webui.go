@@ -160,20 +160,25 @@ func (self *WebServer) initDatabase() error {
 		}
 	}
 
-	var wwwRcd models.TblResolve
-	exist, err := orm.Where(`host=?`, `www`).And(`type=?`, `A`).Get(&wwwRcd)
-	if err != nil {
-		logrus.Errorf("[webui.go::initDatabase] orm.Get(resolve): %v", err)
-		return err
-	} else if !exist {
-		wwwRcd.Host = "www"
-		wwwRcd.Value = self.IP
-		wwwRcd.Type = "A"
-		wwwRcd.Ttl = 600 // default 600s
-		orm.InsertOne(&wwwRcd)
-	} else if wwwRcd.Value != self.IP {
-		wwwRcd.Value = self.IP
-		orm.Update(&wwwRcd)
+	// Default DNS A records so the web interface is reachable via
+	// domain without manual DNS setup. Both www and @ are needed.
+	for _, host := range []string{"www", "@"} {
+		var rcd models.TblResolve
+		exist, err := orm.Where(`host=?`, host).And(`type=?`, `A`).Get(&rcd)
+		if err != nil {
+			logrus.Errorf("[webui.go::initDatabase] orm.Get(resolve host=%s): %v", host, err)
+			return err
+		}
+		if !exist {
+			rcd.Host = host
+			rcd.Value = self.IP
+			rcd.Type = "A"
+			rcd.Ttl = 600
+			orm.InsertOne(&rcd)
+		} else if rcd.Value != self.IP {
+			rcd.Value = self.IP
+			orm.Update(&rcd)
+		}
 	}
 
 	store := self.store
@@ -361,13 +366,14 @@ func (self *WebServer) getCaptcha(c *gin.Context) {
 			Data: map[string]interface{}{
 				"captcha_id":   "",
 				"image_base64": "",
-				"thumb_base64": "",
+				            "thumb_base64": "",
+                "block_y":      0,
 			},
 		})
 		return
 	}
 
-	captchaID, imageBase64, thumbBase64, err := self.captchaSvc.Generate()
+	captchaID, imageBase64, thumbBase64, blockY, err := self.captchaSvc.Generate()
 	if err != nil {
 		logrus.Errorf("[webui.go::getCaptcha] Generate: %v", err)
 		self.resp(c, 502, &CR{
@@ -382,7 +388,8 @@ func (self *WebServer) getCaptcha(c *gin.Context) {
 		Data: map[string]interface{}{
 			"captcha_id":   captchaID,
 			"image_base64": imageBase64,
-			"thumb_base64": thumbBase64,
+			            "thumb_base64": thumbBase64,
+            "block_y":      blockY,
 		},
 	})
 }
@@ -410,7 +417,7 @@ func (self *WebServer) userLogin(c *gin.Context) {
 			})
 			return
 		}
-		if !self.captchaSvc.Verify(req.CaptchaID, req.CaptchaValue) {
+		if !self.captchaSvc.Verify(req.CaptchaID, req.CaptchaValue, req.CaptchaY) {
 			self.resp(c, 400, &CR{
 				Code:    CodeBadData,
 				Message: T("bad request"),

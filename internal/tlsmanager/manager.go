@@ -1,6 +1,7 @@
 package tlsmanager
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -11,12 +12,14 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 // Mode represents the TLS deployment mode.
@@ -48,8 +51,10 @@ type Config struct {
 // Manager manages TLS certificates for the web server.
 // It supports Let's Encrypt ACME, static certificate files, and self-signed fallback.
 type Manager struct {
-	cfg     Config
-	tlsConf *tls.Config
+	cfg          Config
+	tlsConf      *tls.Config
+	acmeManager  *autocert.Manager
+	challengeSrv *http.Server
 }
 
 // NewManager creates a TLS manager based on the given config.
@@ -58,7 +63,7 @@ func NewManager(cfg Config) (*Manager, error) {
 
 	switch cfg.Mode {
 	case ModeDisabled:
-		logrus.Info("[tlsmanager] TLS disabled (plain HTTP mode)")
+		logrus.Warn("[tlsmanager] TLS disabled (plain HTTP mode)")
 		return m, nil
 	case ModeACME:
 		tlsConf, err := m.initACME()
@@ -101,13 +106,29 @@ func (m *Manager) IsTLSEnabled() bool {
 	return m.cfg.Mode != ModeDisabled && m.tlsConf != nil
 }
 
+// ACMEChallengeHandler returns the HTTP handler for ACME HTTP-01 challenges.
+func (m *Manager) ACMEChallengeHandler() http.Handler {
+	if m.acmeManager != nil {
+		return m.acmeManager.HTTPHandler(nil)
+	}
+	return nil
+}
+
+// Shutdown stops the ACME challenge server if running.
+func (m *Manager) Shutdown(ctx context.Context) error {
+	if m.challengeSrv != nil {
+		return m.challengeSrv.Shutdown(ctx)
+	}
+	return nil
+}
+
 // initStatic loads a TLS certificate from user-provided files.
 func (m *Manager) initStatic() (*tls.Config, error) {
 	cert, err := tls.LoadX509KeyPair(m.cfg.CertFile, m.cfg.KeyFile)
 	if err != nil {
 		return nil, fmt.Errorf("load X509 key pair: %w", err)
 	}
-	logrus.Infof("[tlsmanager] static TLS certificate loaded from %s", m.cfg.CertFile)
+	logrus.Warnf("[tlsmanager] static TLS certificate loaded from %s", m.cfg.CertFile)
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
 		MinVersion:   tls.VersionTLS12,
@@ -129,7 +150,7 @@ func (m *Manager) initSelfSigned() (*tls.Config, error) {
 
 	// Check if we already have a valid self-signed cert
 	if cached, err := loadCertIfValid(certFile, keyFile, m.cfg.Domain); err == nil {
-		logrus.Info("[tlsmanager] reusing existing self-signed certificate")
+		logrus.Warn("[tlsmanager] reusing existing self-signed certificate")
 		return cached, nil
 	}
 
@@ -143,17 +164,17 @@ func (m *Manager) initSelfSigned() (*tls.Config, error) {
 		logrus.Warnf("[tlsmanager] failed to cache self-signed cert: %v", err)
 	}
 
-	logrus.Infof("[tlsmanager] self-signed certificate generated for domain %q", m.cfg.Domain)
+	logrus.Warnf("[tlsmanager] self-signed certificate generated for domain %q", m.cfg.Domain)
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
 		MinVersion:   tls.VersionTLS12,
 	}, nil
 }
 
-// initACME attempts to obtain a certificate via Let's Encrypt ACME.
-// For simplicity and to avoid external dependencies, this implementation
-// uses a manual ACME flow placeholder. In production, this would integrate
-// with golang.org/x/crypto/acme/autocert or lego.
+// initACME sets up automatic certificate management via Let's Encrypt ACME.
+// Uses autocert.Manager for the full certificate lifecycle (issuance, caching, renewal).
+// No fallback certificate — autocert returns a temporary cert during the ACME
+// handshake and swaps in the real cert once Let's Encrypt validates domain ownership.
 func (m *Manager) initACME() (*tls.Config, error) {
 	if m.cfg.Domain == "" {
 		return nil, fmt.Errorf("ACME mode requires a domain")
@@ -170,28 +191,76 @@ func (m *Manager) initACME() (*tls.Config, error) {
 		return nil, fmt.Errorf("create ACME cert dir: %w", err)
 	}
 
-	certFile := filepath.Join(certDir, m.cfg.Domain+".crt")
-	keyFile := filepath.Join(certDir, m.cfg.Domain+".key")
-
-	// Try to load existing certificate
-	if cached, err := loadCertIfValid(certFile, keyFile, m.cfg.Domain); err == nil {
-		logrus.Infof("[tlsmanager] ACME certificate loaded from cache for %s", m.cfg.Domain)
-		return cached, nil
+	// autocert handles HTTP-01 for apex + www domains (SAN cert).
+	// DNS-01 wildcard is handled by a background goroutine after startup
+	// using our own DNS server to serve _acme-challenge TXT records.
+	m.acmeManager = &autocert.Manager{
+		Cache:      autocert.DirCache(certDir),
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist(m.cfg.Domain, "www."+m.cfg.Domain),
+		Email:      m.cfg.ACMEEmail,
 	}
 
-	// In a real implementation, we would use autocert.Manager or lego here.
-	// Since we cannot make outbound ACME calls in all environments,
-	// we return an error so the caller falls back to self-signed.
-	return nil, fmt.Errorf("ACME certificate not available in cache and auto-issuance requires network access")
+	// Start background HTTP server for ACME HTTP-01 challenges (port 80)
+	httpAddr := m.cfg.HTTPAddr
+	if httpAddr == "" {
+		httpAddr = ":80"
+	}
+	m.challengeSrv = &http.Server{
+		Addr:    httpAddr,
+		Handler: m.acmeManager.HTTPHandler(nil),
+	}
+	go func() {
+		logrus.Warnf("[tlsmanager] ACME HTTP-01 challenge server on %s", httpAddr)
+		if err := m.challengeSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logrus.Warnf("[tlsmanager] ACME challenge server: %v", err)
+		}
+	}()
+
+	// Pre-obtain certificates in background by making real TLS connections
+	// to ourselves. This triggers autocert's ACME flow correctly.
+	preObtain := func(serverName string, after time.Duration) {
+		go func() {
+			time.Sleep(after)
+			logrus.Warnf("[tlsmanager] pre-obtaining cert for %s...", serverName)
+			conf := &tls.Config{
+				ServerName:         serverName,
+				InsecureSkipVerify: true,
+			}
+			addr := m.cfg.HTTPSAddr
+			if addr == "" {
+				addr = "127.0.0.1:443"
+			}
+			conn, err := tls.Dial("tcp", addr, conf)
+			if err != nil {
+				logrus.Warnf("[tlsmanager] pre-obtain %s: %v", serverName, err)
+				return
+			}
+			conn.Close()
+			logrus.Warnf("[tlsmanager] pre-obtain %s complete", serverName)
+		}()
+	}
+	preObtain(m.cfg.Domain, 5*time.Second)
+	preObtain("www."+m.cfg.Domain, 7*time.Second)
+
+	// Self-signed fallback while ACME certificates are being obtained.
+	// Once autocert obtains the real certs, GetCertificate returns them.
+	return &tls.Config{
+		GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			cert, err := m.acmeManager.GetCertificate(hello)
+			if err == nil {
+				return cert, nil
+			}
+			if fb, fbErr := generateSelfSigned(m.cfg.Domain); fbErr == nil {
+				return &fb, nil
+			}
+			return nil, err
+		},
+		MinVersion: tls.VersionTLS12,
+		NextProtos: []string{"h2", "http/1.1", "acme-tls/1"},
+	}, nil
 }
 
-// SelfSignedCert represents a generated self-signed certificate and key.
-type SelfSignedCert struct {
-	CertPEM []byte
-	KeyPEM  []byte
-}
-
-// generateSelfSigned creates a self-signed TLS certificate for the given domain.
 func generateSelfSigned(domain string) (tls.Certificate, error) {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
