@@ -170,6 +170,7 @@ func NewWebServer(cfg *WebServerConfig, store *cache.Cache) (*WebServer, error) 
 				Domain:    cfg.Domain,
 				ACMEEmail: cfg.ACMEEmail,
 				CertDir:   cfg.CertDir,
+				DNS01:     app, // WebServer implements DNS01RecordWriter
 				CertFile:  cfg.TLSCertFile,
 				KeyFile:   cfg.TLSKeyFile,
 			})
@@ -348,8 +349,84 @@ FOR_LOOP:
 	close(self.storeQuit)
 }
 
+// PreObtainCert blocks until ACME certificates are obtained (or fail).
+// The DNS-01 challenge writes _acme-challenge TXT records via SetDNS01Record.
+func (self *WebServer) PreObtainCert() {
+	if self.tlsManager != nil {
+		if err := self.tlsManager.PreObtainCert(); err != nil {
+			logrus.Warnf("[webserver] PreObtainCert DNS-01 failed (using self-signed fallback): %v", err)
+		}
+	}
+}
+
+// SetDNS01Record implements tlsmanager.DNS01RecordWriter.
+// Writes a _acme-challenge TXT record into the DNS resolver table
+// and updates the in-memory cache so the DNS server answers immediately.
+func (self *WebServer) SetDNS01Record(fqdn, value string, ttl uint32) error {
+	// Strip trailing dot: "_acme-challenge.godnslog.com." → "_acme-challenge.godnslog.com"
+	name := strings.TrimSuffix(fqdn, ".")
+	// Split host from domain: "_acme-challenge.godnslog.com" → "_acme-challenge"
+	host := strings.TrimSuffix(name, "."+self.Domain)
+
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	var existing models.TblResolve
+	has, _ := session.Where("host=? AND type=?", host, "TXT").Get(&existing)
+	if has {
+		existing.Value = value
+		existing.Ttl = ttl
+		session.ID(existing.Id).Update(&existing)
+	} else {
+		record := models.TblResolve{
+			Host:  host,
+			Type:  "TXT",
+			Value: value,
+			Ttl:   ttl,
+		}
+		session.InsertOne(&record)
+	}
+
+	// Refresh in-memory cache
+	var all []models.TblResolve
+	self.orm.Where("host=? AND type=?", host, "TXT").Find(&all)
+	self.updateResolveCache(host, "TXT", all)
+	logrus.Warnf("[webserver] DNS-01 set %s TXT value=%s (cache=%d records)", host, value, len(all))
+	return nil
+}
+
+// DeleteDNS01Record implements tlsmanager.DNS01RecordWriter.
+func (self *WebServer) DeleteDNS01Record(fqdn string) error {
+	name := strings.TrimSuffix(fqdn, ".")
+	host := strings.TrimSuffix(name, "."+self.Domain)
+
+	session := self.orm.NewSession()
+	defer session.Close()
+	session.Where("host=? AND type=?", host, "TXT").Delete(&models.TblResolve{})
+
+	// Refresh cache
+	var all []models.TblResolve
+	self.orm.Where("host=? AND type=?", host, "TXT").Find(&all)
+	self.updateResolveCache(host, "TXT", all)
+	return nil
+}
+
+// RunHTTP starts a plain HTTP server on :80.
+// Test subdomains are served without HTTPS redirect for compatibility.
+// Only www (and bare domain) get redirected to HTTPS.
+// Called from Run() after engine setup.
+func (self *WebServer) RunHTTP() {
+	go func() {
+		logrus.Info("[webserver] HTTP server starting on :80")
+		if err := (&http.Server{Addr: ":80", Handler: self.engine}).ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logrus.Warnf("[webserver] HTTP server: %v", err)
+		}
+	}()
+}
+
 func (self *WebServer) Run() error {
 	r := gin.New()
+	self.engine = r
 	r.Use(gin.Recovery())
 	r.Use(gin.Logger())
 
@@ -368,11 +445,23 @@ func (self *WebServer) Run() error {
 	})
 
 	// Swagger UI (interactive API documentation)
-	// Redirect bare domain to www for consistent canonical URLs
+	// Redirect bare domain to www for consistent canonical URLs.
+	// Redirect www on HTTP to HTTPS. Test subdomains are NOT forced to HTTPS.
 	r.Use(func(c *gin.Context) {
 		host := c.Request.Host
 		domain := self.Domain
+		// Bare domain always -> https://www
 		if host == domain || host == domain+":443" || host == domain+":80" {
+			target := "https://www." + domain + c.Request.URL.Path
+			if c.Request.URL.RawQuery != "" {
+				target += "?" + c.Request.URL.RawQuery
+			}
+			c.Redirect(http.StatusMovedPermanently, target)
+			c.Abort()
+			return
+		}
+		// www on plain HTTP -> HTTPS upgrade
+		if c.Request.TLS == nil && (host == "www."+domain || host == "www."+domain+":80") {
 			target := "https://www." + domain + c.Request.URL.Path
 			if c.Request.URL.RawQuery != "" {
 				target += "?" + c.Request.URL.RawQuery
@@ -504,6 +593,9 @@ func (self *WebServer) Run() error {
 		return err
 	}
 	self.s = s
+
+	// Start HTTP :80 listener for redirects and test subdomain access.
+	self.RunHTTP()
 
 	// Use TLS if TLS manager is configured and enabled
 	if self.tlsManager != nil && self.tlsManager.IsTLSEnabled() {

@@ -12,13 +12,21 @@ export interface SlideCaptchaProps {
 }
 
 const THUMB_SIZE = 48
+// Backend renders the captcha background at this intrinsic width (server/captcha.go).
+const IMG_WIDTH = 300
 
 export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: SlideCaptchaProps) {
   const { t } = useI18n()
   const [captchaId, setCaptchaId] = useState('')
   const [imageBase64, setImageBase64] = useState('')
   const [thumbBase64, setThumbBase64] = useState('')
-  const [blockY, setBlockY] = useState(0)
+  const [blockDX, setBlockDX] = useState(0)
+  const [blockDY, setBlockDY] = useState(0)
+  const [blockWidth, setBlockWidth] = useState(0)
+  const [blockHeight, setBlockHeight] = useState(0)
+  // Rendered background width in display px; needed to scale the tile 1:1 with
+  // the hole. Measured reactively so it is correct on the very first paint.
+  const [displayedW, setDisplayedW] = useState(IMG_WIDTH)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [dragging, setDragging] = useState(false)
@@ -55,7 +63,10 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
         setCaptchaId(response.data.captcha_id)
         setImageBase64(response.data.image_base64)
         setThumbBase64(response.data.thumb_base64)
-        setBlockY(response.data.block_y ?? 0)
+        setBlockDX(response.data.block_dx ?? 0)
+        setBlockDY(response.data.block_dy ?? 0)
+        setBlockWidth(response.data.block_width ?? 0)
+        setBlockHeight(response.data.block_height ?? 0)
       } else {
         setError(response.message || t('login.captcha.error'))
       }
@@ -65,6 +76,19 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
       setLoading(false)
     }
   }, [t])
+
+  useEffect(() => {
+    if (!imageBase64) return
+    const img = imageRef.current
+    if (!img) return
+    const measure = () => {
+      if (imageRef.current) setDisplayedW(imageRef.current.clientWidth || IMG_WIDTH)
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(img)
+    return () => ro.disconnect()
+  }, [imageBase64])
 
   useEffect(() => {
     const id = requestAnimationFrame(() => loadCaptcha())
@@ -104,10 +128,11 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
     setDragging(false)
     if (captchaId) {
       setCompleted(true)
-      // Scale from display pixels to server image coordinates (300px)
-      const displayedW = imageRef.current?.clientWidth ?? 300
-      const scaled = Math.round(position * 300 / displayedW)
-      onReadyRef.current(captchaId, scaled, blockY)
+      // Final tile X in image coordinates = initial display X (blockDX) + drag
+      // distance, converted back to image px. When the tile visually overlaps
+      // the hole, this equals the hole's X — the server answer.
+      const scaled = Math.round(blockDX + position * IMG_WIDTH / displayedW)
+      onReadyRef.current(captchaId, scaled, blockDY)
     }
   }
 
@@ -154,6 +179,10 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
   // --- Hidden state (captcha disabled) ---
   if (hidden) return null
 
+  // Display scale: image rendered width vs its intrinsic 300px width.
+  // The tile is positioned/sized in the same scale so it matches the hole 1:1.
+  const scale = displayedW / IMG_WIDTH
+
   return (
     <div className="space-y-2">
       {/* Captcha image area (background + puzzle piece overlay) */}
@@ -171,14 +200,16 @@ export function SlideCaptcha({ onReady, onRefresh, invalid, disabled = false }: 
         <div
           className="absolute top-0 pointer-events-none"
           style={{
-            left: `${position}px`,
-            top: `${blockY}px`,
+            left: `${blockDX * scale + position}px`,
+            top: `${blockDY * scale}px`,
+            width: blockWidth * scale,
+            height: blockHeight * scale,
           }}
         >
           <img
             src={thumbBase64}
             alt="puzzle piece"
-            className="block"
+            className="block w-full h-full"
             draggable={false}
           />
         </div>

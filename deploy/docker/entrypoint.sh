@@ -15,6 +15,15 @@ if [ -n "$REDIS_URL" ]; then
   BACKEND_ARGS="$BACKEND_ARGS -redis $REDIS_URL"
 fi
 
+# SQLite database path. Defaults to /data (persistent volume) so data survives
+# container re-creates. Override with GODNSLOG_DB_PATH if needed.
+if [ -z "$GODNSLOG_MYSQL_DSN" ]; then
+  DB_PATH="${GODNSLOG_DB_PATH:-/data/godnslog.db}"
+  BACKEND_ARGS="$BACKEND_ARGS -dsn file:${DB_PATH}?cache=shared&mode=rwc"
+else
+  BACKEND_ARGS="$BACKEND_ARGS -driver mysql -dsn $GODNSLOG_MYSQL_DSN"
+fi
+
 # TLS mode (env: GODNSLOG_TLS_MODE)
 TLS_MODE="${GODNSLOG_TLS_MODE:-disabled}"
 if [ "$TLS_MODE" != "disabled" ] && [ -n "$TLS_MODE" ]; then

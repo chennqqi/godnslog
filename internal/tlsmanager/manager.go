@@ -2,6 +2,7 @@ package tlsmanager
 
 import (
 	"context"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -12,31 +13,32 @@ import (
 	"fmt"
 	"math/big"
 	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/crypto/acme/autocert"
+	"golang.org/x/crypto/acme"
 )
 
-// Mode represents the TLS deployment mode.
 type Mode string
 
 const (
-	// ModeDisabled means no TLS (plain HTTP, typically behind Nginx).
-	ModeDisabled Mode = "disabled"
-	// ModeACME means Let's Encrypt automatic certificate via ACME HTTP-01.
-	ModeACME Mode = "acme"
-	// ModeStatic means use user-provided certificate files.
-	ModeStatic Mode = "static"
-	// ModeSelfSigned means use a generated self-signed certificate.
+	ModeDisabled   Mode = "disabled"
+	ModeACME       Mode = "acme"
+	ModeStatic     Mode = "static"
 	ModeSelfSigned Mode = "self-signed"
 )
 
-// Config holds parameters for the TLS manager.
+// DNS01RecordWriter is called by the TLS manager to set or remove
+// _acme-challenge TXT records during DNS-01 certificate issuance.
+type DNS01RecordWriter interface {
+	SetDNS01Record(fqdn, value string, ttl uint32) error
+	DeleteDNS01Record(fqdn string) error
+}
+
 type Config struct {
 	Mode      Mode
 	Domain    string
@@ -44,34 +46,37 @@ type Config struct {
 	CertDir   string
 	CertFile  string
 	KeyFile   string
-	HTTPAddr  string // address for ACME HTTP-01 challenge listener (e.g. ":80")
-	HTTPSAddr string // address for HTTPS listener (e.g. ":443")
+	HTTPAddr  string
+	HTTPSAddr string
+
+	// DNS01, if set, enables DNS-01 challenge (wildcard support).
+	// The writer must persist TXT records into the DNS server's database.
+	DNS01 DNS01RecordWriter
 }
 
-// Manager manages TLS certificates for the web server.
-// It supports Let's Encrypt ACME, static certificate files, and self-signed fallback.
 type Manager struct {
-	cfg          Config
-	tlsConf      *tls.Config
-	acmeManager  *autocert.Manager
-	challengeSrv *http.Server
+	cfg     Config
+	tlsConf *tls.Config
+	certDir string
+
+	wildcardMu  sync.Mutex
+	wildcardCert *tls.Certificate
 }
 
-// NewManager creates a TLS manager based on the given config.
 func NewManager(cfg Config) (*Manager, error) {
 	m := &Manager{cfg: cfg}
 
 	switch cfg.Mode {
 	case ModeDisabled:
-		logrus.Warn("[tlsmanager] TLS disabled (plain HTTP mode)")
+		logrus.Warn("[tlsmanager] TLS disabled")
 		return m, nil
 	case ModeACME:
 		tlsConf, err := m.initACME()
 		if err != nil {
-			logrus.Warnf("[tlsmanager] ACME init failed, falling back to self-signed: %v", err)
+			logrus.Warnf("[tlsmanager] ACME init failed: %v", err)
 			tlsConf, err = m.initSelfSigned()
 			if err != nil {
-				return nil, fmt.Errorf("ACME failed and self-signed fallback failed: %w", err)
+				return nil, fmt.Errorf("ACME+self-signed both failed: %w", err)
 			}
 		}
 		m.tlsConf = tlsConf
@@ -79,14 +84,14 @@ func NewManager(cfg Config) (*Manager, error) {
 	case ModeStatic:
 		tlsConf, err := m.initStatic()
 		if err != nil {
-			return nil, fmt.Errorf("static TLS init failed: %w", err)
+			return nil, err
 		}
 		m.tlsConf = tlsConf
 		return m, nil
 	case ModeSelfSigned:
 		tlsConf, err := m.initSelfSigned()
 		if err != nil {
-			return nil, fmt.Errorf("self-signed TLS init failed: %w", err)
+			return nil, err
 		}
 		m.tlsConf = tlsConf
 		return m, nil
@@ -95,272 +100,323 @@ func NewManager(cfg Config) (*Manager, error) {
 	}
 }
 
-// TLSConfig returns the tls.Config for HTTPS listeners.
-// Returns nil if TLS is disabled.
-func (m *Manager) TLSConfig() *tls.Config {
-	return m.tlsConf
-}
+func (m *Manager) TLSConfig() *tls.Config { return m.tlsConf }
+func (m *Manager) IsTLSEnabled() bool     { return m.cfg.Mode != ModeDisabled && m.tlsConf != nil }
+func (m *Manager) Shutdown(_ context.Context) error { return nil }
 
-// IsTLSEnabled returns true if the server should listen with HTTPS.
-func (m *Manager) IsTLSEnabled() bool {
-	return m.cfg.Mode != ModeDisabled && m.tlsConf != nil
-}
-
-// ACMEChallengeHandler returns the HTTP handler for ACME HTTP-01 challenges.
-func (m *Manager) ACMEChallengeHandler() http.Handler {
-	if m.acmeManager != nil {
-		return m.acmeManager.HTTPHandler(nil)
-	}
-	return nil
-}
-
-// Shutdown stops the ACME challenge server if running.
-func (m *Manager) Shutdown(ctx context.Context) error {
-	if m.challengeSrv != nil {
-		return m.challengeSrv.Shutdown(ctx)
-	}
-	return nil
-}
-
-// initStatic loads a TLS certificate from user-provided files.
 func (m *Manager) initStatic() (*tls.Config, error) {
 	cert, err := tls.LoadX509KeyPair(m.cfg.CertFile, m.cfg.KeyFile)
 	if err != nil {
 		return nil, fmt.Errorf("load X509 key pair: %w", err)
 	}
-	logrus.Warnf("[tlsmanager] static TLS certificate loaded from %s", m.cfg.CertFile)
-	return &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		MinVersion:   tls.VersionTLS12,
-	}, nil
+	logrus.Warnf("[tlsmanager] static TLS certificate loaded")
+	return &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}, nil
 }
 
-// initSelfSigned generates a self-signed certificate and returns a tls.Config.
 func (m *Manager) initSelfSigned() (*tls.Config, error) {
 	certDir := m.cfg.CertDir
 	if certDir == "" {
 		certDir = filepath.Join(os.TempDir(), "godnslog-certs")
 	}
-	if err := os.MkdirAll(certDir, 0700); err != nil {
-		return nil, fmt.Errorf("create cert dir: %w", err)
-	}
+	os.MkdirAll(certDir, 0700)
 
 	certFile := filepath.Join(certDir, "self-signed.crt")
 	keyFile := filepath.Join(certDir, "self-signed.key")
-
-	// Check if we already have a valid self-signed cert
 	if cached, err := loadCertIfValid(certFile, keyFile, m.cfg.Domain); err == nil {
-		logrus.Warn("[tlsmanager] reusing existing self-signed certificate")
+		logrus.Warn("[tlsmanager] reusing self-signed certificate")
 		return cached, nil
 	}
 
 	cert, err := generateSelfSigned(m.cfg.Domain)
 	if err != nil {
-		return nil, fmt.Errorf("generate self-signed cert: %w", err)
+		return nil, err
 	}
-
-	// Write cert and key to disk for reuse
-	if err := writeCertToFile(cert, certFile, keyFile); err != nil {
-		logrus.Warnf("[tlsmanager] failed to cache self-signed cert: %v", err)
-	}
-
-	logrus.Warnf("[tlsmanager] self-signed certificate generated for domain %q", m.cfg.Domain)
-	return &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		MinVersion:   tls.VersionTLS12,
-	}, nil
+	writeCertToFile(cert, certFile, keyFile)
+	logrus.Warnf("[tlsmanager] self-signed certificate generated")
+	return &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}, nil
 }
 
-// initACME sets up automatic certificate management via Let's Encrypt ACME.
-// Uses autocert.Manager for the full certificate lifecycle (issuance, caching, renewal).
-// No fallback certificate — autocert returns a temporary cert during the ACME
-// handshake and swaps in the real cert once Let's Encrypt validates domain ownership.
+// initACME prepares a TLS config that serves the DNS-01 wildcard certificate
+// for any hostname under the configured domain. If no wildcard cert is
+// available yet (PreObtainCert not run or failed), it falls back to a
+// self-signed certificate so the HTTPS listener can still start.
 func (m *Manager) initACME() (*tls.Config, error) {
 	if m.cfg.Domain == "" {
 		return nil, fmt.Errorf("ACME mode requires a domain")
 	}
 	if m.cfg.ACMEEmail == "" {
-		return nil, fmt.Errorf("ACME mode requires an email for registration")
+		return nil, fmt.Errorf("ACME mode requires an email")
 	}
 
-	certDir := m.cfg.CertDir
-	if certDir == "" {
-		certDir = filepath.Join(os.TempDir(), "godnslog-acme")
+	m.certDir = m.cfg.CertDir
+	if m.certDir == "" {
+		m.certDir = filepath.Join(os.TempDir(), "godnslog-acme")
 	}
-	if err := os.MkdirAll(certDir, 0700); err != nil {
-		return nil, fmt.Errorf("create ACME cert dir: %w", err)
+	os.MkdirAll(m.certDir, 0700)
+
+	// Reuse an existing valid wildcard cert on disk so we don't re-issue on every restart.
+	if _, ok := m.loadWildcardCert(); ok {
+		logrus.Warn("[tlsmanager] reusing existing wildcard certificate")
 	}
 
-	// autocert handles HTTP-01 for apex + www domains (SAN cert).
-	// DNS-01 wildcard is handled by a background goroutine after startup
-	// using our own DNS server to serve _acme-challenge TXT records.
-	m.acmeManager = &autocert.Manager{
-		Cache:      autocert.DirCache(certDir),
-		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist(m.cfg.Domain, "www."+m.cfg.Domain),
-		Email:      m.cfg.ACMEEmail,
-	}
-
-	// Start background HTTP server for ACME HTTP-01 challenges (port 80)
-	httpAddr := m.cfg.HTTPAddr
-	if httpAddr == "" {
-		httpAddr = ":80"
-	}
-	m.challengeSrv = &http.Server{
-		Addr:    httpAddr,
-		Handler: m.acmeManager.HTTPHandler(nil),
-	}
-	go func() {
-		logrus.Warnf("[tlsmanager] ACME HTTP-01 challenge server on %s", httpAddr)
-		if err := m.challengeSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logrus.Warnf("[tlsmanager] ACME challenge server: %v", err)
-		}
-	}()
-
-	// Pre-obtain certificates in background by making real TLS connections
-	// to ourselves. This triggers autocert's ACME flow correctly.
-	preObtain := func(serverName string, after time.Duration) {
-		go func() {
-			time.Sleep(after)
-			logrus.Warnf("[tlsmanager] pre-obtaining cert for %s...", serverName)
-			conf := &tls.Config{
-				ServerName:         serverName,
-				InsecureSkipVerify: true,
-			}
-			addr := m.cfg.HTTPSAddr
-			if addr == "" {
-				addr = "127.0.0.1:443"
-			}
-			conn, err := tls.Dial("tcp", addr, conf)
-			if err != nil {
-				logrus.Warnf("[tlsmanager] pre-obtain %s: %v", serverName, err)
-				return
-			}
-			conn.Close()
-			logrus.Warnf("[tlsmanager] pre-obtain %s complete", serverName)
-		}()
-	}
-	preObtain(m.cfg.Domain, 5*time.Second)
-	preObtain("www."+m.cfg.Domain, 7*time.Second)
-
-	// Self-signed fallback while ACME certificates are being obtained.
-	// Once autocert obtains the real certs, GetCertificate returns them.
 	return &tls.Config{
-		GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			cert, err := m.acmeManager.GetCertificate(hello)
-			if err == nil {
-				return cert, nil
-			}
-			if fb, fbErr := generateSelfSigned(m.cfg.Domain); fbErr == nil {
-				return &fb, nil
-			}
-			return nil, err
-		},
-		MinVersion: tls.VersionTLS12,
-		NextProtos: []string{"h2", "http/1.1", "acme-tls/1"},
+		GetCertificate: m.getCertificate,
+		MinVersion:     tls.VersionTLS12,
+		NextProtos:     []string{"h2", "http/1.1"},
 	}, nil
 }
 
-func generateSelfSigned(domain string) (tls.Certificate, error) {
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("generate private key: %w", err)
+// getCertificate returns the DNS-01 wildcard certificate for any requested
+// hostname (the wildcard covers all subdomains of the configured domain).
+// Falls back to a self-signed certificate when no wildcard cert is loaded.
+func (m *Manager) getCertificate(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	m.wildcardMu.Lock()
+	defer m.wildcardMu.Unlock()
+	if m.wildcardCert != nil {
+		return m.wildcardCert, nil
 	}
-
-	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("generate serial number: %w", err)
-	}
-
-	// Parse domain and IP
-	var ipAddrs []net.IP
-	host := domain
-	if strings.Contains(domain, ":") {
-		host, _, err = net.SplitHostPort(domain)
-		if err != nil {
-			host = domain
-		}
-	}
-	if ip := net.ParseIP(host); ip != nil {
-		ipAddrs = []net.IP{ip}
-	}
-
-	template := x509.Certificate{
-		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			Organization: []string{"GoDNSLog"},
-			CommonName:   domain,
-		},
-		NotBefore:             time.Now().Add(-time.Hour),
-		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-		DNSNames:              []string{domain},
-		IPAddresses:           ipAddrs,
-	}
-
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("create certificate: %w", err)
-	}
-
-	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-
-	keyBytes, err := x509.MarshalECPrivateKey(priv)
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("marshal EC private key: %w", err)
-	}
-	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes})
-
-	return tls.X509KeyPair(certPEM, keyPEM)
+	fb, _ := generateSelfSigned(m.cfg.Domain)
+	return &fb, nil
 }
 
-// writeCertToFile writes a tls.Certificate's PEM data to the given files.
-func writeCertToFile(cert tls.Certificate, certFile, keyFile string) error {
-	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Certificate[0]})
-
-	keyBytes, err := x509.MarshalECPrivateKey(cert.PrivateKey.(*ecdsa.PrivateKey))
-	if err != nil {
-		return fmt.Errorf("marshal private key: %w", err)
+// PreObtainCert obtains a wildcard certificate via DNS-01 challenge, using
+// GODNSLOG's own DNS server to serve _acme-challenge TXT records.
+// If a valid wildcard cert already exists on disk, it is reused instead.
+// Must be called BEFORE the HTTPS server starts.
+func (m *Manager) PreObtainCert() error {
+	if m.cfg.DNS01 == nil || m.cfg.Domain == "" {
+		return nil
 	}
-	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes})
+	if m.certDir == "" {
+		m.certDir = m.cfg.CertDir
+		if m.certDir == "" {
+			m.certDir = filepath.Join(os.TempDir(), "godnslog-acme")
+		}
+		os.MkdirAll(m.certDir, 0700)
+	}
 
+	// Reuse existing cert if still valid for at least a month.
+	if _, ok := m.loadWildcardCert(); ok {
+		logrus.Warn("[tlsmanager] reusing existing wildcard certificate (no re-issue needed)")
+		return nil
+	}
+
+	wildcard := "*." + m.cfg.Domain
+	logrus.Warnf("[tlsmanager] DNS-01 obtaining wildcard cert for %s and %s...", wildcard, m.cfg.Domain)
+
+	// Load or create ACME account key.
+	accountKey, err := loadOrCreateAccountKey(m.certDir)
+	if err != nil {
+		return fmt.Errorf("account key: %w", err)
+	}
+
+	client := &acme.Client{
+		Key:          accountKey,
+		DirectoryURL: acme.LetsEncryptURL,
+	}
+
+	// Register or look up account.
+	acct := &acme.Account{Contact: []string{"mailto:" + m.cfg.ACMEEmail}}
+	if _, err := client.Register(context.Background(), acct, acme.AcceptTOS); err != nil {
+		if err != acme.ErrAccountAlreadyExists {
+			return fmt.Errorf("register: %w", err)
+		}
+	}
+
+	// DNS-01: create order for *.domain + domain (SAN).
+	order, err := client.AuthorizeOrder(context.Background(),
+		acme.DomainIDs(wildcard, m.cfg.Domain))
+	if err != nil {
+		return fmt.Errorf("authorize order: %w", err)
+	}
+
+	// Fulfill DNS-01 challenges.
+	for _, authzURL := range order.AuthzURLs {
+		authz, err := client.GetAuthorization(context.Background(), authzURL)
+		if err != nil {
+			return fmt.Errorf("get authz: %w", err)
+		}
+
+		// Use the identifier (domain name) from this authorization.
+		domain := authz.Identifier.Value
+
+		var dnsChal *acme.Challenge
+		for i := range authz.Challenges {
+			if authz.Challenges[i].Type == "dns-01" {
+				dnsChal = authz.Challenges[i]
+				break
+			}
+		}
+		if dnsChal == nil {
+			return fmt.Errorf("no DNS-01 challenge for %s", domain)
+		}
+
+		// Compute the TXT record value.
+		resp, err := client.DNS01ChallengeRecord(dnsChal.Token)
+		if err != nil {
+			return fmt.Errorf("dns-01 record: %w", err)
+		}
+
+		// Write _acme-challenge TXT record into GODNSLOG's DNS database.
+		recordName := "_acme-challenge." + domain + "."
+		if err := m.cfg.DNS01.SetDNS01Record(recordName, resp, 60); err != nil {
+			return fmt.Errorf("set DNS record: %w", err)
+		}
+
+		// Accept the challenge.
+		if _, err := client.Accept(context.Background(), dnsChal); err != nil {
+			m.cfg.DNS01.DeleteDNS01Record(recordName)
+			return fmt.Errorf("accept: %w", err)
+		}
+
+		// Wait for LE to validate via DNS query.
+		if _, err := client.WaitAuthorization(context.Background(), authz.URI); err != nil {
+			m.cfg.DNS01.DeleteDNS01Record(recordName)
+			return fmt.Errorf("wait authz: %w", err)
+		}
+
+		// Clean up the TXT record.
+		m.cfg.DNS01.DeleteDNS01Record(recordName)
+		logrus.Warnf("[tlsmanager] DNS-01 validated for %s", domain)
+	}
+
+	// Generate a cert key and finalize the order.
+	certKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return fmt.Errorf("generate cert key: %w", err)
+	}
+
+	csr, err := x509.CreateCertificateRequest(rand.Reader,
+		&x509.CertificateRequest{DNSNames: []string{wildcard, m.cfg.Domain}},
+		certKey,
+	)
+	if err != nil {
+		return fmt.Errorf("create CSR: %w", err)
+	}
+
+	derChain, _, err := client.CreateOrderCert(context.Background(), order.FinalizeURL, csr, true)
+	if err != nil {
+		return fmt.Errorf("finalize: %w", err)
+	}
+
+	// Save certificate to disk for persistence across restarts.
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derChain[0]})
+	keyDER, _ := x509.MarshalECPrivateKey(certKey)
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
+
+	certFile := filepath.Join(m.certDir, m.cfg.Domain+".crt")
+	keyFile := filepath.Join(m.certDir, m.cfg.Domain+".key")
 	if err := os.WriteFile(certFile, certPEM, 0600); err != nil {
-		return fmt.Errorf("write cert file: %w", err)
+		logrus.Warnf("[tlsmanager] failed to persist cert %s: %v", certFile, err)
 	}
 	if err := os.WriteFile(keyFile, keyPEM, 0600); err != nil {
-		return fmt.Errorf("write key file: %w", err)
+		logrus.Warnf("[tlsmanager] failed to persist key %s: %v", keyFile, err)
 	}
+
+	// Load the new cert into memory for serving.
+	if _, ok := m.loadWildcardCert(); ok {
+		logrus.Warnf("[tlsmanager] wildcard certificate obtained for %s (and %s)", wildcard, m.cfg.Domain)
+		return nil
+	}
+
+	return fmt.Errorf("obtained cert but failed to load %s/%s", certFile, keyFile)
+}
+
+// loadWildcardCert loads <domain>.crt/.key from the cert dir if the cert is
+// still valid for more than a month. Stores it in wildcardCert and returns it.
+func (m *Manager) loadWildcardCert() (*tls.Certificate, bool) {
+	if m.certDir == "" {
+		return nil, false
+	}
+	certFile := filepath.Join(m.certDir, m.cfg.Domain+".crt")
+	keyFile := filepath.Join(m.certDir, m.cfg.Domain+".key")
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, false
+	}
+	leaf, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return nil, false
+	}
+	// Renew if the cert expires within a month.
+	if time.Until(leaf.NotAfter) < 30*24*time.Hour {
+		logrus.Warnf("[tlsmanager] wildcard cert expires %s, renewing", leaf.NotAfter.Format(time.RFC3339))
+		return nil, false
+	}
+
+	m.wildcardMu.Lock()
+	m.wildcardCert = &cert
+	m.wildcardMu.Unlock()
+	return &cert, true
+}
+
+func loadOrCreateAccountKey(certDir string) (crypto.Signer, error) {
+	accountFile := filepath.Join(certDir, "acme_account+key")
+	data, err := os.ReadFile(accountFile)
+	if err == nil {
+		block, _ := pem.Decode(data)
+		if block != nil {
+			return x509.ParseECPrivateKey(block.Bytes)
+		}
+	}
+
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	der, _ := x509.MarshalECPrivateKey(key)
+	os.WriteFile(accountFile, pem.EncodeToMemory(&pem.Block{
+		Type: "EC PRIVATE KEY", Bytes: der,
+	}), 0600)
+	return key, nil
+}
+
+func generateSelfSigned(domain string) (tls.Certificate, error) {
+	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	serial, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	var ipAddrs []net.IP
+	if ip := net.ParseIP(domain); ip != nil {
+		ipAddrs = []net.IP{ip}
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber: serial,
+		Subject:      pkix.Name{Organization: []string{"GoDNSLog"}, CommonName: domain},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(365 * 24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		DNSNames:     []string{domain},
+		IPAddresses:  ipAddrs,
+	}
+	der, _ := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &priv.PublicKey, priv)
+	kp, _ := x509.MarshalECPrivateKey(priv)
+	return tls.X509KeyPair(
+		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}),
+		pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: kp}),
+	)
+}
+
+func writeCertToFile(cert tls.Certificate, certFile, keyFile string) error {
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Certificate[0]})
+	kp, _ := x509.MarshalECPrivateKey(cert.PrivateKey.(*ecdsa.PrivateKey))
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: kp})
+	os.WriteFile(certFile, certPEM, 0600)
+	os.WriteFile(keyFile, keyPEM, 0600)
 	return nil
 }
 
-// loadCertIfValid loads a certificate from disk if it exists and is still valid.
 func loadCertIfValid(certFile, keyFile, domain string) (*tls.Config, error) {
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
 		return nil, err
 	}
-
-	// Check if certificate is expired
-	leaf, err := x509.ParseCertificate(cert.Certificate[0])
-	if err != nil {
-		return nil, err
-	}
+	leaf, _ := x509.ParseCertificate(cert.Certificate[0])
 	if time.Now().After(leaf.NotAfter) {
 		return nil, fmt.Errorf("certificate expired")
 	}
-	if time.Now().After(leaf.NotAfter.Add(-30 * 24 * time.Hour)) {
-		logrus.Warnf("[tlsmanager] certificate for %s expires in less than 30 days", domain)
-	}
-
-	return &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		MinVersion:   tls.VersionTLS12,
-	}, nil
+	return &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}, nil
 }
 
-// ParseMode parses a string into a TLS mode.
 func ParseMode(s string) (Mode, error) {
 	switch strings.ToLower(s) {
 	case "", "disabled", "off", "none":

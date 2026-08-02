@@ -2372,6 +2372,19 @@ func (self *WebServer) v2ListUsers(c *gin.Context) {
 	})
 }
 
+// interactionTypeStats is a GroupBy projection over the interaction table.
+// TableName() pins the FROM table: without it xorm builds the query against a
+// "interaction_type_stats" table that does not exist. The name must match
+// internal/models Interaction.TableName().
+type interactionTypeStats struct {
+	Type  string `xorm:"type"`
+	Count int64  `xorm:"count"`
+}
+
+func (interactionTypeStats) TableName() string {
+	return "interactions"
+}
+
 // v2InteractionStats gets interaction statistics
 // v2InteractionStats
 // @Summary Get interaction statistics
@@ -2414,11 +2427,7 @@ func (self *WebServer) v2InteractionStats(c *gin.Context) {
 	}
 
 	// Count by type
-	type InteractionTypeStats struct {
-		Type  string `xorm:"type"`
-		Count int64  `xorm:"count"`
-	}
-	var typeStats []InteractionTypeStats
+	var typeStats []interactionTypeStats
 	err = query.GroupBy("type").Select("type, count(*) as count").Find(&typeStats)
 	if err != nil {
 		logrus.Errorf("[v2_api.go::v2InteractionStats] group by type error: %v", err)

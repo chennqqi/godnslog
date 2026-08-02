@@ -157,15 +157,7 @@ func (p *servePwCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 		}()
 	}
 
-	//run web server routine
-	{
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			web.Run()
-		}()
-	}
-
+	//run dns server (needed for DNS-01 ACME in future)
 	dns, err := server.NewDnsServer(&server.DnsServerConfig{
 		Domain:   p.domain,
 		RTimeout: 3 * time.Second,
@@ -175,15 +167,26 @@ func (p *servePwCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 		Upstream: p.upstream,
 	}, store)
 	if err != nil {
-		logrus.Fatalf("[main.go::main] NewWebServer: %v", err)
+		logrus.Fatalf("[main.go::main] NewDnsServer: %v", err)
 	}
-
-	//run dns server
 	{
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			dns.Run()
+		}()
+	}
+
+	// Pre-obtain wildcard certificate via DNS-01 using GODNSLOG's own DNS server.
+	// Blocks until certs are ready (or fail, using self-signed fallback).
+	web.PreObtainCert()
+
+	//run web server routine (HTTPS, also starts HTTP :80 internally)
+	{
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			web.Run()
 		}()
 	}
 

@@ -54,7 +54,11 @@ export interface CaptchaResponse {
   captcha_id: string
   image_base64: string
   thumb_base64: string
-  block_y: number
+  /** puzzle tile display position & size in image coordinates (go-captcha Block) */
+  block_dx: number
+  block_dy: number
+  block_width: number
+  block_height: number
 }
 
 // Case types

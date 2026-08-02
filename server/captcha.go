@@ -21,14 +21,27 @@ import (
 
 const (
 	defaultCaptchaExpire = 2 * time.Minute
-	captchaTolerance     = 4
+	captchaTolerance     = 5
 	captchaImageWidth    = 300
-	captchaImageHeight   = 220
+	captchaImageHeight   = 160
 )
 
 type captchaAnswer struct {
 	X int
 	Y int
+}
+
+// CaptchaChallenge carries everything the frontend needs to render the slide
+// captcha at 1:1 scale: the images plus the puzzle tile's display position and
+// size in image coordinates. The answer (hole position X/Y) is never exposed.
+type CaptchaChallenge struct {
+	CaptchaID   string
+	ImageBase64 string
+	ThumbBase64 string
+	BlockDX     int
+	BlockDY     int
+	BlockWidth  int
+	BlockHeight int
 }
 
 type captchaService struct {
@@ -68,34 +81,42 @@ func newCaptchaService(store *cache.Cache, expire time.Duration) *captchaService
 }
 
 // Generate creates a new slide captcha challenge.
-func (s *captchaService) Generate() (captchaID, imageBase64, thumbBase64 string, blockY int, err error) {
+func (s *captchaService) Generate() (*CaptchaChallenge, error) {
 	data, err := s.capt.Generate()
 	if err != nil {
-		return "", "", "", 0, fmt.Errorf("captcha generate: %w", err)
+		return nil, fmt.Errorf("captcha generate: %w", err)
 	}
 
 	block := data.GetData()
 	if block == nil {
-		return "", "", "", 0, fmt.Errorf("captcha data is nil")
+		return nil, fmt.Errorf("captcha data is nil")
 	}
 
 	masterBuf := new(bytes.Buffer)
 	if err := png.Encode(masterBuf, data.GetMasterImage().Get()); err != nil {
-		return "", "", "", 0, fmt.Errorf("encode master image: %w", err)
+		return nil, fmt.Errorf("encode master image: %w", err)
 	}
 	masterBase64 := "data:image/png;base64," + base64.StdEncoding.EncodeToString(masterBuf.Bytes())
 
 	thumbBuf := new(bytes.Buffer)
 	if err := png.Encode(thumbBuf, data.GetTileImage().Get()); err != nil {
-		return "", "", "", 0, fmt.Errorf("encode thumb image: %w", err)
+		return nil, fmt.Errorf("encode thumb image: %w", err)
 	}
-	thumbBase64 = "data:image/png;base64," + base64.StdEncoding.EncodeToString(thumbBuf.Bytes())
+	thumbBase64 := "data:image/png;base64," + base64.StdEncoding.EncodeToString(thumbBuf.Bytes())
 
-	captchaID = uuid.New().String()
+	challenge := &CaptchaChallenge{
+		CaptchaID:   uuid.New().String(),
+		ImageBase64: masterBase64,
+		ThumbBase64: thumbBase64,
+		BlockDX:     block.DX,
+		BlockDY:     block.DY,
+		BlockWidth:  block.Width,
+		BlockHeight: block.Height,
+	}
 	answer := &captchaAnswer{X: block.X, Y: block.Y}
-	s.store.Set("captcha:"+captchaID, answer, s.expire)
+	s.store.Set("captcha:"+challenge.CaptchaID, answer, s.expire)
 
-	return captchaID, masterBase64, thumbBase64, block.Y, nil
+	return challenge, nil
 }
 
 // Verify checks the user-provided captcha position using go-captcha's Validate.
@@ -116,7 +137,6 @@ func (s *captchaService) Verify(captchaID string, x, y int) bool {
 	return slide.Validate(ans.X, ans.Y, x, y, captchaTolerance)
 }
 
-
 // --- image generation helpers ---
 
 func generateBackground() image.Image {
@@ -125,7 +145,7 @@ func generateBackground() image.Image {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	// Soft pastel palette with subtle color shifts
-	baseH := 30.0 + rng.Float64()*60  // warm hue range
+	baseH := 30.0 + rng.Float64()*60 // warm hue range
 	baseL := 0.75 + rng.Float64()*0.15
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
@@ -218,9 +238,11 @@ func generateGraphShape() (overlay, shadow, mask image.Image) {
 	draw.Draw(overlayImg, overlayImg.Bounds(), &image.Uniform{transparent}, image.Point{}, draw.Src)
 	drawPuzzleShape(overlayImg, pad, pad+tabH, total, total-tabH, 5, fg, tabH, true)
 
+	// The shadow must be drawn at the SAME position as the overlay so that when
+	// the user aligns the puzzle piece with the hole, their left edges coincide.
 	sh := color.NRGBA{R: 0, G: 0, B: 0, A: 70}
 	draw.Draw(shadowImg, shadowImg.Bounds(), &image.Uniform{transparent}, image.Point{}, draw.Src)
-	drawPuzzleShape(shadowImg, pad+2, pad+tabH+2, total, total-tabH, 5, sh, tabH, true)
+	drawPuzzleShape(shadowImg, pad, pad+tabH, total, total-tabH, 5, sh, tabH, true)
 
 	white := color.NRGBA{R: 255, G: 255, B: 255, A: 255}
 	draw.Draw(maskImg, maskImg.Bounds(), &image.Uniform{transparent}, image.Point{}, draw.Src)
@@ -254,7 +276,9 @@ func drawPuzzleShape(img *image.NRGBA, x1, y1, w, h, r int, c color.Color, tabH 
 }
 
 func max(a, b int) int {
-	if a > b { return a }
+	if a > b {
+		return a
+	}
 	return b
 }
 
@@ -265,12 +289,18 @@ func hslToRGB(h, s, l float64) (uint8, uint8, uint8) {
 	m := l - c/2
 	var rp, gp, bp float64
 	switch int(h * 6) {
-	case 0: rp, gp, bp = c, x, 0
-	case 1: rp, gp, bp = x, c, 0
-	case 2: rp, gp, bp = 0, c, x
-	case 3: rp, gp, bp = 0, x, c
-	case 4: rp, gp, bp = x, 0, c
-	default: rp, gp, bp = c, 0, x
+	case 0:
+		rp, gp, bp = c, x, 0
+	case 1:
+		rp, gp, bp = x, c, 0
+	case 2:
+		rp, gp, bp = 0, c, x
+	case 3:
+		rp, gp, bp = 0, x, c
+	case 4:
+		rp, gp, bp = x, 0, c
+	default:
+		rp, gp, bp = c, 0, x
 	}
 	return uint8((rp + m) * 255), uint8((gp + m) * 255), uint8((bp + m) * 255)
 }
@@ -298,4 +328,3 @@ func drawRoundedRect(img *image.NRGBA, x1, y1, x2, y2, r int, c color.Color) {
 func drawCircle(img *image.NRGBA, cx, cy, radius int, c color.Color) {}
 
 func drawRandomCircles(img *image.NRGBA, rng *rand.Rand) {}
-

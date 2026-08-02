@@ -464,6 +464,13 @@ func (self *DnsServer) responseStandard(w dns.ResponseWriter, req *dns.Msg) {
 		w.WriteMsg(m)
 		return
 
+	case dns.TypeCAA:
+		// Let's Encrypt performs a CAA lookup before issuing certs.
+		// Return NOERROR with empty answer (no CAA records means any CA
+		// is permitted to issue for this domain).
+		w.WriteMsg(m)
+		return
+
 	default:
 	}
 

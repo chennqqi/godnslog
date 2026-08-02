@@ -73,13 +73,16 @@ func parseDomain(name, root string) (prefix, shortId string, rebind bool) {
 	//r.u3yszl9nidbsx8p9.example.com.
 	//abc.r.u3yszl9nidbsx8p9.example.com.
 	//127.0.0.1-100.100.100.cr.u3yszl9nidbsx8p9.example.com.
-	index := strings.Index(name, "."+root)
+	// DNS names are case-insensitive; clients (and LE) may randomize case.
+	lowerName := strings.ToLower(name)
+	lowerRoot := strings.ToLower(root)
+	index := strings.Index(lowerName, "."+lowerRoot)
 	if index <= 0 {
 		return
 	}
 
 	//prefix = r.u3yszl9nidbsx8p9
-	prefix = name[:index]
+	prefix = lowerName[:index]
 	lastIdx := strings.LastIndex(prefix, ".")
 	if lastIdx <= 0 {
 		shortId = prefix
@@ -99,12 +102,13 @@ func parseDomain(name, root string) (prefix, shortId string, rebind bool) {
 }
 
 func parseQuestionName(name, root string) (q string) {
-	index := strings.Index(name, "."+root)
+	// DNS names are case-insensitive; clients (and LE) may randomize case.
+	index := strings.Index(strings.ToLower(name), "."+strings.ToLower(root))
 	if index <= 0 {
 		return
 	}
 
-	q = name[:index]
+	q = strings.ToLower(name[:index])
 	return
 }
 

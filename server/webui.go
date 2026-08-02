@@ -12,6 +12,7 @@ import (
 	"github.com/chennqqi/godnslog/internal/demo"
 	"github.com/chennqqi/godnslog/internal/ha"
 	"github.com/chennqqi/godnslog/internal/marketplace"
+	"github.com/chennqqi/godnslog/internal/retention"
 	v2models "github.com/chennqqi/godnslog/internal/models"
 	"github.com/chennqqi/godnslog/internal/workflow"
 	"github.com/chennqqi/godnslog/models"
@@ -88,6 +89,10 @@ func (self *WebServer) initDatabase() error {
 		&ha.LeaderElection{},
 		// Workflow persistent action log
 		&workflow.PersistentActionLog{},
+		// Retention tables
+		&retention.RetentionPolicy{},
+		&retention.RetentionJob{},
+		&retention.Archive{},
 		// Marketplace models
 		&marketplace.Plugin{},
 		&marketplace.PluginVersion{},
@@ -366,14 +371,17 @@ func (self *WebServer) getCaptcha(c *gin.Context) {
 			Data: map[string]interface{}{
 				"captcha_id":   "",
 				"image_base64": "",
-				            "thumb_base64": "",
-                "block_y":      0,
+				"thumb_base64": "",
+				"block_dx":     0,
+				"block_dy":     0,
+				"block_width":  0,
+				"block_height": 0,
 			},
 		})
 		return
 	}
 
-	captchaID, imageBase64, thumbBase64, blockY, err := self.captchaSvc.Generate()
+	challenge, err := self.captchaSvc.Generate()
 	if err != nil {
 		logrus.Errorf("[webui.go::getCaptcha] Generate: %v", err)
 		self.resp(c, 502, &CR{
@@ -386,10 +394,13 @@ func (self *WebServer) getCaptcha(c *gin.Context) {
 	self.resp(c, 200, &CR{
 		Code: models.CodeOK,
 		Data: map[string]interface{}{
-			"captcha_id":   captchaID,
-			"image_base64": imageBase64,
-			            "thumb_base64": thumbBase64,
-            "block_y":      blockY,
+			"captcha_id":   challenge.CaptchaID,
+			"image_base64": challenge.ImageBase64,
+			"thumb_base64": challenge.ThumbBase64,
+			"block_dx":     challenge.BlockDX,
+			"block_dy":     challenge.BlockDY,
+			"block_width":  challenge.BlockWidth,
+			"block_height": challenge.BlockHeight,
 		},
 	})
 }
