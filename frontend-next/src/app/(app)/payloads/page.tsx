@@ -26,10 +26,10 @@ import {
 import { Badge } from '@/components/ui/badge'
 
 const templates = [
-  { id: 'ssrf-http', name: 'SSRF HTTP', template: '{{.token}}.{{.domain}}' },
-  { id: 'ssrf-cloud', name: 'SSRF Cloud Metadata', template: '{{.token}}.169.254.169.254.{{.domain}}' },
-  { id: 'xxe', name: 'XXE External Entity', template: 'http://{{.token}}.{{.domain}}/xxe.dtd' },
-  { id: 'rce', name: 'RCE Command Injection', template: 'curl http://{{.token}}.{{.domain}}' },
+  { id: 'ssrf-basic', name: 'SSRF HTTP', template: '{{.token}}.{{.domain}}' },
+  { id: 'ssrf-cloud-metadata', name: 'SSRF Cloud Metadata', template: '{{.token}}.169.254.169.254.{{.domain}}' },
+  { id: 'xxe-basic', name: 'XXE External Entity', template: 'http://{{.token}}.{{.domain}}/xxe.dtd' },
+  { id: 'rce-basic', name: 'RCE Command Injection', template: 'curl http://{{.token}}.{{.domain}}' },
   { id: 'blind-sqli', name: 'Blind SQLi DNS', template: '{{.token}}.{{.domain}}' },
 ]
 
@@ -73,7 +73,7 @@ export default function PayloadsPage() {
     e.preventDefault()
     const req: PayloadCreateRequest = {
       case_id: '',
-      template: selectedTemplate.id,
+      template_id: selectedTemplate.id,
       variables,
     }
     try {

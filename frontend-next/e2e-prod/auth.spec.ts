@@ -40,7 +40,7 @@ test.describe('Production Auth', () => {
     await page.goto(BASE_URL + '/login', { waitUntil: 'networkidle' })
     // Wait for the initial captcha to load
     await page.waitForFunction(() => {
-      const img = document.querySelector('img[alt="captcha background"]')
+      const img = document.querySelector('img[alt="captcha background"]') as HTMLImageElement | null
       return img && img.complete && img.naturalWidth > 0
     })
     await page.waitForTimeout(400)

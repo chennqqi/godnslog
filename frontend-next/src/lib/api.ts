@@ -18,13 +18,14 @@ function getToken(): string | null {
 }
 
 /**
- * Clear auth state and redirect to login.
+ * Clear auth state and redirect to login, flagging that the session expired so
+ * the login page can show a friendly notice instead of a silent/abrupt bounce.
  */
 function clearAuthAndRedirect() {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
-    window.location.href = '/login'
+    window.location.href = '/login?expired=1'
   }
 }
 

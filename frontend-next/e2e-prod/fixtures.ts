@@ -11,7 +11,7 @@ type Fixtures = {
 export const test = base.extend<Fixtures>({
   authToken: async ({ browser }, use) => {
     if (!PROD_PASSWORD) {
-      test.skip('set ADMIN_PASSWORD env var to run production auth tests')
+      test.skip(!PROD_PASSWORD, 'set ADMIN_PASSWORD env var to run production auth tests')
       return
     }
     const { token, context } = await loginAndGetToken(browser)

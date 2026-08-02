@@ -140,7 +140,7 @@ export default function ScannerHubPage() {
     try {
       const response = await payloadApi.create({
         case_id: selectedCase,
-        template: template,
+        template_id: template,
         variables: {},
       })
       if (response.data && response.data.data) {

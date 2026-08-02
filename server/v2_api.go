@@ -51,6 +51,7 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		// Auth
 		v2.POST("/auth/login", self.v2Login)
 		v2.POST("/auth/logout", self.authHandler, self.v2Logout)
+		v2.POST("/auth/change-password", self.authHandler, self.v2ChangePassword)
 		v2.GET("/auth/info", self.authHandler, self.v2UserInfo)
 		v2.GET("/auth/captcha", self.getCaptcha)
 
@@ -226,6 +227,7 @@ func (self *WebServer) registerV2API(r *gin.Engine) {
 		settings := v2.Group("/settings", self.authHandler)
 		{
 			settings.GET("", self.v2ListSettings)
+			settings.PUT("", self.v2UpdateSettingsUI)
 			settings.POST("", self.v2CreateSetting)
 			settings.GET("/:key", self.v2GetSetting)
 			settings.PUT("/:key", self.v2UpdateSetting)
@@ -462,6 +464,55 @@ func (self *WebServer) v2Logout(c *gin.Context) {
 		"code":    0,
 		"message": T("OK"),
 	})
+}
+
+// v2ChangePassword lets an authenticated user change their own password.
+// @Summary Change own password
+// @Description Verify the current password and set a new one
+// @Tags v2, auth
+// @Accept json
+// @Produce json
+// @Param body body object true "old_password and new_password"
+// @Success 200 {object} gin.H
+// @Failure 400 {object} gin.H
+// @Router /api/v2/auth/change-password [post]
+func (self *WebServer) v2ChangePassword(c *gin.Context) {
+	T := getTranslateFunc(c)
+	id := c.GetInt64("id")
+
+	var req struct {
+		OldPassword string `json:"old_password" binding:"required"`
+		NewPassword string `json:"new_password" binding:"required,min=6"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": T("bad input")})
+		return
+	}
+	if isWeakPass(req.NewPassword) {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": T("password too weak")})
+		return
+	}
+
+	var dbUser models.TblUser
+	has, err := self.orm.ID(id).Get(&dbUser)
+	if err != nil || !has {
+		logrus.Errorf("[v2_api.go::v2ChangePassword] load user: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "server internal error"})
+		return
+	}
+	if comparePassword(req.OldPassword, dbUser.Pass) != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "old password incorrect"})
+		return
+	}
+
+	dbUser.Pass = makePassword(req.NewPassword)
+	if _, err := self.orm.ID(dbUser.Id).Cols("pass").Update(&dbUser); err != nil {
+		logrus.Errorf("[v2_api.go::v2ChangePassword] update: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "server internal error"})
+		return
+	}
+	self.store.Set(fmt.Sprintf("%v.user", dbUser.Id), &dbUser, cache.NoExpiration)
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": T("OK")})
 }
 
 // v2UserInfo handles v2 user info
@@ -1170,8 +1221,8 @@ func (self *WebServer) v2ListPayloads(c *gin.Context) {
 	session := self.orm.NewSession()
 	defer session.Close()
 
-	var payloads []models.TblPayload
-	query := session.Table(new(models.TblPayload))
+	var payloads []v2models.Payload
+	query := session.Table(new(v2models.Payload))
 
 	if caseId != "" {
 		query = query.Where("case_id = ?", caseId)
@@ -1202,24 +1253,20 @@ func (self *WebServer) v2ListPayloads(c *gin.Context) {
 
 	items := make([]models.Payload, len(payloads))
 	for i, item := range payloads {
-		var variables map[string]string
-		if item.Variables != "" {
-			json.Unmarshal([]byte(item.Variables), &variables)
-		}
 		items[i] = models.Payload{
-			Id:               strconv.FormatInt(item.Id, 10),
-			CaseId:           strconv.FormatInt(item.CaseId, 10),
+			Id:               item.ID,
+			CaseId:           item.CaseID,
 			Token:            item.Token,
-			Template:         item.Template,
-			RenderedPayload:  item.RenderedPayload,
-			Variables:        variables,
+			Template:         item.TemplateID,
+			RenderedPayload:  item.TemplateRendered,
+			Variables:        map[string]string(item.Variables),
 			Status:           item.Status,
 			ExpectedProtocol: item.ExpectedProtocol,
-			CreatedBy:        strconv.FormatInt(item.CreatedBy, 10),
+			CreatedBy:        item.CreatedBy,
 			CreatedAt:        item.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:        item.UpdatedAt.Format(time.RFC3339),
 		}
-		if !item.ExpiresAt.IsZero() {
+		if item.ExpiresAt != nil {
 			items[i].ExpiresAt = item.ExpiresAt.Format(time.RFC3339)
 		}
 	}
@@ -1487,7 +1534,7 @@ func (self *WebServer) v2PreviewPayload(c *gin.Context) {
 // @Router /api/v2/payloads/batch [post]
 func (self *WebServer) v2BatchCreatePayloads(c *gin.Context) {
 	var req struct {
-		CaseID    string            `json:"case_id" binding:"required"`
+		CaseID    string            `json:"case_id"`
 		Template  string            `json:"template" binding:"required"`
 		Count     int               `json:"count" binding:"required,min=1,max=100"`
 		Variables map[string]string `json:"variables"`
@@ -1501,13 +1548,17 @@ func (self *WebServer) v2BatchCreatePayloads(c *gin.Context) {
 		return
 	}
 
-	caseId, err := strconv.ParseInt(req.CaseID, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    400,
-			"message": "invalid case id",
-		})
-		return
+	var caseId int64
+	var err error
+	if req.CaseID != "" {
+		caseId, err = strconv.ParseInt(req.CaseID, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"code":    400,
+				"message": "invalid case id",
+			})
+			return
+		}
 	}
 
 	session := self.orm.NewSession()
@@ -4279,17 +4330,79 @@ func (self *WebServer) v2ListSettings(c *gin.Context) {
 		totalPages++
 	}
 
+	// Flatten key/value rows into top-level fields so the settings UI can read
+	// them directly (e.g. data.system_name, data.language).
+	flat := gin.H{}
+	for _, s := range settings {
+		var v interface{}
+		if json.Unmarshal([]byte(s.Value), &v) == nil {
+			flat[s.Key] = v
+		} else {
+			flat[s.Key] = s.Value
+		}
+	}
+
+	data := gin.H{
+		"items":       settings,
+		"total":       total,
+		"page":        page,
+		"page_size":   pageSize,
+		"total_pages": totalPages,
+	}
+	for k, v := range flat {
+		data[k] = v
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
-		"data": v2models.SettingsListResponse{
-			Items:      settings,
-			Total:      total,
-			Page:       page,
-			PageSize:   pageSize,
-			TotalPages: totalPages,
-		},
+		"data":    data,
 	})
+}
+
+// v2UpdateSettingsUI accepts the frontend settings page's grouped payload
+// ({ general: {...}, domain: {...}, listener: {...} }) and upserts every field
+// as a key/value row in the settings table.
+func (self *WebServer) v2UpdateSettingsUI(c *gin.Context) {
+	var req map[string]json.RawMessage
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request body"})
+		return
+	}
+	session := self.orm.NewSession()
+	defer session.Close()
+
+	updated := []string{}
+	for _, raw := range req {
+		var fields map[string]interface{}
+		if err := json.Unmarshal(raw, &fields); err != nil {
+			continue
+		}
+		for k, v := range fields {
+			val, err := json.Marshal(v)
+			if err != nil {
+				continue
+			}
+			updated = append(updated, k)
+			var existing v2models.Settings
+			has, err := session.Where("key = ?", k).Get(&existing)
+			if err != nil {
+				continue
+			}
+			if has {
+				existing.Value = string(val)
+				if _, err := session.ID(existing.ID).Cols("value").Update(&existing); err != nil {
+					logrus.Errorf("[v2_api.go::v2UpdateSettingsUI] update %s: %v", k, err)
+				}
+			} else {
+				existing = v2models.Settings{ID: v2models.GenerateID(), Key: k, Value: string(val)}
+				if _, err := session.Insert(&existing); err != nil {
+					logrus.Errorf("[v2_api.go::v2UpdateSettingsUI] insert %s: %v", k, err)
+				}
+			}
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": updated})
 }
 
 // v2GetSetting gets a specific setting by key

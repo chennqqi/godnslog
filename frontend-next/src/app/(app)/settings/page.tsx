@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { settingsApi } from '@/lib/api-client'
+import { settingsApi, authApi } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -43,11 +43,12 @@ export default function SettingsPage() {
       <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">System Settings</h2>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="domain">Domain</TabsTrigger>
           <TabsTrigger value="listener">Listener</TabsTrigger>
           <TabsTrigger value="notification">Notification</TabsTrigger>
+          <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="tokens">API Keys</TabsTrigger>
         </TabsList>
 
@@ -65,6 +66,10 @@ export default function SettingsPage() {
 
         <TabsContent value="notification" className="mt-4">
           <NotificationSettings />
+        </TabsContent>
+
+        <TabsContent value="security" className="mt-4">
+          <ChangePassword />
         </TabsContent>
 
         <TabsContent value="tokens" className="mt-4">
@@ -416,6 +421,87 @@ function TokenManagement() {
           <p className="text-gray-500 dark:text-gray-400">No API Keys</p>
         )}
       </div>
+    </div>
+  )
+}
+
+function ChangePassword() {
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [form, setForm] = useState({ old_password: '', new_password: '', confirm: '' })
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setMessage(null)
+    if (form.new_password.length < 6) {
+      setMessage({ type: 'err', text: 'New password must be at least 6 characters' })
+      return
+    }
+    if (form.new_password !== form.confirm) {
+      setMessage({ type: 'err', text: 'New passwords do not match' })
+      return
+    }
+    setSaving(true)
+    try {
+      const resp = await authApi.changePassword({
+        old_password: form.old_password,
+        new_password: form.new_password,
+      })
+      if (resp.code === 0) {
+        setMessage({ type: 'ok', text: 'Password updated' })
+        setForm({ old_password: '', new_password: '', confirm: '' })
+      } else {
+        setMessage({ type: 'err', text: resp.message || 'Failed to change password' })
+      }
+    } catch (error) {
+      const e = error as { message?: string }
+      setMessage({ type: 'err', text: e.message || 'Failed to change password' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Change Password</h3>
+      <form className="space-y-4" onSubmit={handleSubmit}>
+        <div>
+          <Label htmlFor="old-password">Current Password</Label>
+          <Input
+            id="old-password"
+            type="password"
+            className="mt-1"
+            value={form.old_password}
+            onChange={(e) => setForm({ ...form, old_password: e.target.value })}
+          />
+        </div>
+        <div>
+          <Label htmlFor="new-password">New Password</Label>
+          <Input
+            id="new-password"
+            type="password"
+            className="mt-1"
+            value={form.new_password}
+            onChange={(e) => setForm({ ...form, new_password: e.target.value })}
+          />
+        </div>
+        <div>
+          <Label htmlFor="confirm-password">Confirm New Password</Label>
+          <Input
+            id="confirm-password"
+            type="password"
+            className="mt-1"
+            value={form.confirm}
+            onChange={(e) => setForm({ ...form, confirm: e.target.value })}
+          />
+        </div>
+        {message && (
+          <p className={`text-sm ${message.type === 'ok' ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+            {message.text}
+          </p>
+        )}
+        <Button type="submit" disabled={saving}>{saving ? 'Updating...' : 'Update Password'}</Button>
+      </form>
     </div>
   )
 }

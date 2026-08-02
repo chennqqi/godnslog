@@ -116,7 +116,7 @@ export interface Payload {
 
 export interface PayloadCreateRequest {
   case_id: string
-  template: string
+  template_id: string
   variables?: Record<string, string>
   expires_at?: string
   expected_protocol?: 'dns' | 'http' | 'smtp' | 'ldap'

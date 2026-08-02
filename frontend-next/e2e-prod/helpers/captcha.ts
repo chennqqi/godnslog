@@ -61,24 +61,25 @@ export async function findHoleX(page: Page, imageBase64: string): Promise<{ pred
  *  navigation so the /auth/captcha response is captured), then drags the tile
  *  onto the detected hole. Returns the captcha response data + drag distance. */
 export async function solveCaptcha(page: Page, loginUrl: string): Promise<{ captchaResp: CaptchaData | null; targetDisplay: number }> {
-  let captchaResp: CaptchaData | null = null
+  const captchaBox: { data: CaptchaData | null } = { data: null }
   page.on('response', async (res) => {
     if (res.url().includes('/auth/captcha')) {
       try {
         const j = (await res.json()) as { data?: CaptchaData }
-        if (j?.data) captchaResp = j.data
+        if (j?.data) captchaBox.data = j.data
       } catch {}
     }
   })
 
   await page.goto(loginUrl, { waitUntil: 'networkidle' })
   await page.waitForFunction(() => {
-    const img = document.querySelector('img[alt="captcha background"]')
+    const img = document.querySelector('img[alt="captcha background"]') as HTMLImageElement | null
     return img && img.complete && img.naturalWidth > 0
   })
   await page.waitForTimeout(400)
 
-  if (!captchaResp) throw new Error('no captcha response captured')
+  if (!captchaBox.data) throw new Error('no captcha response captured')
+  const captchaResp = captchaBox.data
   const blockDX = captchaResp.block_dx ?? 0
   const dims = await page.evaluate(() => ({
     imgW: (document.querySelector('img[alt="captcha background"]') as HTMLImageElement | null)?.clientWidth ?? 0,

@@ -132,7 +132,7 @@ type Payload struct {
 }
 
 type PayloadCreateRequest struct {
-	CaseID           string            `json:"case_id" binding:"required"`
+	CaseID           string            `json:"case_id"`
 	TemplateID       string            `json:"template_id" binding:"required"`
 	Variables        map[string]string `json:"variables"`
 	ExpiresAt        string            `json:"expires_at"`

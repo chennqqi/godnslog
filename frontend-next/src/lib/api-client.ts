@@ -85,6 +85,8 @@ export const authApi = {
   logout: () => api.post('/auth/logout'),
   info: () => api.get('/auth/info'),
   captcha: () => api.get<CaptchaResponse>('/auth/captcha'),
+  changePassword: (data: { old_password: string; new_password: string }) =>
+    api.post<unknown>('/auth/change-password', data),
 }
 
 /** Summary counts for a case from GET /cases/:id/stats */

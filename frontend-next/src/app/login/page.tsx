@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -53,6 +53,14 @@ export default function LoginPage() {
   const [captchaValue, setCaptchaValue] = useState(0)
   const [captchaY, setCaptchaY] = useState(0)
   const [captchaInvalid, setCaptchaInvalid] = useState(false)
+  const [sessionExpired, setSessionExpired] = useState(false)
+
+  useEffect(() => {
+    if (window.location.search.includes('expired=1')) {
+      setSessionExpired(true)
+      window.history.replaceState({}, '', '/login')
+    }
+  }, [])
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -212,6 +220,13 @@ export default function LoginPage() {
 
           {/* Form */}
           <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
+            {sessionExpired && (
+              <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
+                <span className="text-sm">
+                  Your session has expired (possibly signed in elsewhere). Please sign in again.
+                </span>
+              </div>
+            )}
             {error && (
               <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
                 <svg className="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -18,14 +18,14 @@ test.describe('Production Captcha Precision', () => {
       const context = await browser.newContext({ ignoreHTTPSErrors: true })
       const page = await context.newPage()
 
-      let captchaResp: { image_base64: string; block_dx: number } | null = null
+      const captchaBox: { data: { image_base64: string; block_dx: number } | null } = { data: null }
       let loginStatus = 0
       page.on('response', async (res) => {
         const url = res.url()
         if (url.includes('/auth/captcha')) {
           try {
             const j = (await res.json()) as { data?: { image_base64: string; block_dx: number } }
-            if (j?.data) captchaResp = j.data
+            if (j?.data) captchaBox.data = j.data
           } catch {}
         } else if (url.includes('/auth/login')) {
           loginStatus = res.status()
@@ -34,11 +34,12 @@ test.describe('Production Captcha Precision', () => {
 
       await page.goto(BASE_URL + '/login', { waitUntil: 'networkidle' })
       await page.waitForFunction(() => {
-        const img = document.querySelector('img[alt="captcha background"]')
+        const img = document.querySelector('img[alt="captcha background"]') as HTMLImageElement | null
         return img && img.complete && img.naturalWidth > 0
       })
       await page.waitForTimeout(400)
-      if (!captchaResp) throw new Error('no captcha response captured')
+      if (!captchaBox.data) throw new Error('no captcha response captured')
+      const captchaResp = captchaBox.data
 
       const imgW = await page.evaluate(
         () => (document.querySelector('img[alt="captcha background"]') as HTMLImageElement | null)?.clientWidth ?? 0,

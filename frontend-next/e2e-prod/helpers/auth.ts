@@ -15,8 +15,22 @@ export interface LoginResult {
   page: Page
 }
 
-/** Perform a real login (slide captcha + credentials) and return the JWT. */
+/** Perform a real login (slide captcha + credentials) and return the JWT.
+ *  The hole-detection occasionally lands a pixel outside tolerance, so retry a
+ *  few times on a fresh context before giving up. */
 export async function loginAndGetToken(browser: Browser): Promise<LoginResult> {
+  let lastError: Error | null = null
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await loginOnce(browser)
+    } catch (e) {
+      lastError = e as Error
+    }
+  }
+  throw lastError || new Error('login failed')
+}
+
+async function loginOnce(browser: Browser): Promise<LoginResult> {
   const context = await browser.newContext({ ignoreHTTPSErrors: true })
   const page = await context.newPage()
 
@@ -27,9 +41,14 @@ export async function loginAndGetToken(browser: Browser): Promise<LoginResult> {
     }
   })
 
-  await solveCaptcha(page, BASE_URL + '/login')
-  await submitLogin(page, PROD_USER, PROD_PASSWORD)
-  await page.waitForTimeout(2500)
+  try {
+    await solveCaptcha(page, BASE_URL + '/login')
+    await submitLogin(page, PROD_USER, PROD_PASSWORD)
+    await page.waitForTimeout(2500)
+  } catch (e) {
+    await context.close()
+    throw e
+  }
 
   const token = await page.evaluate(() => localStorage.getItem('token') || '')
   if (status !== 200 || !token) {
