@@ -74,3 +74,6 @@ godnslog.db
 # OS files
 Thumbs.db
 .DS_Store
+
+# Local deployment skill (contains production deploy info; keep local only)
+/.claude/skills/godnslog-deploy/
