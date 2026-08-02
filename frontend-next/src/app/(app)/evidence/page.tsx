@@ -336,9 +336,9 @@ function EvidenceReportContent() {
               {/* Timeline */}
               <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
                 <div className="px-4 py-5 sm:p-6">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Timeline ({evidence.timeline.length} interactions)</h3>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Timeline ({(evidence.timeline ?? []).length} interactions)</h3>
                   <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {evidence.timeline.map((interaction) => (
+                    {(evidence.timeline ?? []).map((interaction) => (
                       <div key={interaction.id} className="p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
                         <div className="flex justify-between items-start">
                           <div className="flex-1">

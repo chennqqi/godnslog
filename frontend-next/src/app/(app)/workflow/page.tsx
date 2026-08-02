@@ -164,7 +164,7 @@ export default function WorkflowBuilderPage() {
                         </label>
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        {rule.conditions.length} {t('workflow.condition_count')}, {rule.actions.length} {t('workflow.action_count')}
+                        {(rule.conditions ?? []).length} {t('workflow.condition_count')}, {(rule.actions ?? []).length} {t('workflow.action_count')}
                       </p>
                     </div>
                   ))
@@ -209,11 +209,11 @@ export default function WorkflowBuilderPage() {
                       {t('workflow.add_condition')}
                     </button>
                   </div>
-                  {selectedRule.conditions.length === 0 ? (
+                  {(selectedRule.conditions ?? []).length === 0 ? (
                     <p className="text-gray-500 text-sm mb-4">{t('workflow.no_conditions')}</p>
                   ) : (
                     <div className="space-y-2 mb-4">
-                      {selectedRule.conditions.map((condition, idx) => (
+                      {(selectedRule.conditions ?? []).map((condition, idx) => (
                         <div key={idx} className="border border-gray-200 rounded p-3">
                           <span className="text-sm">{condition.field} {condition.operator} {condition.value}</span>
                         </div>
@@ -229,11 +229,11 @@ export default function WorkflowBuilderPage() {
                       {t('workflow.add_action')}
                     </button>
                   </div>
-                  {selectedRule.actions.length === 0 ? (
+                  {(selectedRule.actions ?? []).length === 0 ? (
                     <p className="text-gray-500 text-sm mb-4">{t('workflow.no_actions')}</p>
                   ) : (
                     <div className="space-y-2 mb-4">
-                      {selectedRule.actions.map((action, idx) => (
+                      {(selectedRule.actions ?? []).map((action, idx) => (
                         <div key={idx} className="border border-gray-200 rounded p-3">
                           <span className="text-sm">{action.type}</span>
                         </div>

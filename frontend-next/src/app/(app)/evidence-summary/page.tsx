@@ -343,10 +343,10 @@ function EvidenceSummaryContent() {
                 <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
                   <div className="px-4 py-5 sm:p-6">
                     <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-                      Scanner Runs ({summary.scanner_runs.length})
+                      Scanner Runs ({(summary.scanner_runs ?? []).length})
                     </h3>
                     <div className="space-y-2">
-                      {summary.scanner_runs.map((run) => (
+                      {(summary.scanner_runs ?? []).map((run) => (
                         <div key={run.id} className="p-3 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-gray-900 dark:text-gray-200">
@@ -371,10 +371,10 @@ function EvidenceSummaryContent() {
                 <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
                   <div className="px-4 py-5 sm:p-6">
                     <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-                      Package Hashes ({summary.package_hashes.length})
+                      Package Hashes ({(summary.package_hashes ?? []).length})
                     </h3>
                     <div className="space-y-1">
-                      {summary.package_hashes.map((hash) => (
+                      {(summary.package_hashes ?? []).map((hash) => (
                         <div key={hash} className="text-sm font-mono text-gray-700 dark:text-gray-300 break-all">
                           {hash}
                         </div>

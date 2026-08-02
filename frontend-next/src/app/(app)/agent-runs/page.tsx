@@ -323,9 +323,9 @@ export default function AgentRunsPage() {
                       <div className="text-sm text-muted-foreground">
                         {run.interaction_count} {t('agent_runs.interactions')}
                       </div>
-                      {run.operations.length > 0 && (
+                      {(run.operations ?? []).length > 0 && (
                         <div className="text-xs text-muted-foreground">
-                          {run.operations.length} {t('agent_runs.operations')}
+                          {(run.operations ?? []).length} {t('agent_runs.operations')}
                         </div>
                       )}
                     </div>

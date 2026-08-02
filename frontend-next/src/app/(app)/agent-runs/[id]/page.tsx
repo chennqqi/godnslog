@@ -471,10 +471,10 @@ export default function AgentRunDetailPage() {
         {/* Operations */}
         <Card>
           <CardHeader>
-            <CardTitle>操作历史 ({agentRun.operations.length})</CardTitle>
+            <CardTitle>操作历史 ({(agentRun.operations ?? []).length})</CardTitle>
           </CardHeader>
           <CardContent>
-            {agentRun.operations.length === 0 ? (
+            {(agentRun.operations ?? []).length === 0 ? (
               <p className="text-muted-foreground">暂无操作记录</p>
             ) : (
               <div className="space-y-4">
