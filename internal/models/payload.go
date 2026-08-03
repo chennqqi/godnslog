@@ -115,8 +115,9 @@ var PayloadTemplates = map[string]string{
 	"ldap-injection":        "{token}.{domain}",
 
 	// RCE
-	"rce-basic":   "http://{token}.{domain}/cmd",
-	"rce-command": "curl http://{token}.{domain}",
+	"rce-basic":    "http://{token}.{domain}/cmd",
+	"rce-command":  "curl http://{token}.{domain}",
+	"rce-callback": "curl http://{token}.{domain}/cb",
 
 	// Client-side
 	"cors-jsonp":         "http://{token}.{domain}/callback",
@@ -268,6 +269,12 @@ var PayloadTemplateMetadata = map[string]TemplateMetadata{
 	"rce-command": {
 		Name:        "RCE Command Injection",
 		Description: "Remote Code Execution via command injection",
+		Category:    "rce",
+		Risk:        "critical",
+	},
+	"rce-callback": {
+		Name:        "RCE Callback",
+		Description: "Remote Code Execution via out-of-band callback",
 		Category:    "rce",
 		Risk:        "critical",
 	},
