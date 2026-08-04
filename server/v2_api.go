@@ -3446,6 +3446,9 @@ func (self *WebServer) v2CreateCanary(c *gin.Context) {
 		})
 		return
 	}
+	if req.ID == "" {
+		req.ID = v2models.GenerateID()
+	}
 
 	canaryService := canary.NewService(self.orm)
 	if err := canaryService.CreateCanary(&req); err != nil {
