@@ -20,11 +20,12 @@ export interface LoginResult {
  *  few times on a fresh context before giving up. */
 export async function loginAndGetToken(browser: Browser): Promise<LoginResult> {
   let lastError: Error | null = null
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     try {
       return await loginOnce(browser)
     } catch (e) {
       lastError = e as Error
+      await new Promise((r) => setTimeout(r, 1000))
     }
   }
   throw lastError || new Error('login failed')

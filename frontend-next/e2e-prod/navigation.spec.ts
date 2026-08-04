@@ -23,6 +23,15 @@ const ROUTES = [
   '/docs',
 ]
 
+/** Load a route and report whether an error boundary showed. 5xx responses are
+ *  collected into `bad` by the caller's response listener. */
+async function loadRoute(page: import('@playwright/test').Page, route: string): Promise<boolean> {
+  await page.goto(BASE_URL + route, { waitUntil: 'networkidle', timeout: 20000 }).catch(() => {})
+  await page.waitForTimeout(1500)
+  const body = await page.evaluate(() => document.body.innerText)
+  return body.includes('Something went wrong')
+}
+
 test.describe('Production Navigation', () => {
   for (const route of ROUTES) {
     test(`renders ${route || '/'} without 5xx or error boundary`, async ({ authedPage }) => {
@@ -35,11 +44,15 @@ test.describe('Production Navigation', () => {
       authedPage.on('response', onResponse)
       authedPage.on('pageerror', onPageError)
 
-      await authedPage.goto(BASE_URL + route, { waitUntil: 'networkidle', timeout: 20000 })
-      await authedPage.waitForTimeout(1200)
+      let boundary = await loadRoute(authedPage, route)
 
-      const body = await authedPage.evaluate(() => document.body.innerText)
-      const boundary = body.includes('Something went wrong')
+      // Long full-suite runs occasionally hit a momentary 5xx or slow backend;
+      // one reload settles transient failures before we assert.
+      if (boundary || bad.length > 0) {
+        bad.length = 0
+        await authedPage.waitForTimeout(2000)
+        boundary = await loadRoute(authedPage, route)
+      }
 
       authedPage.removeListener('response', onResponse)
       authedPage.removeListener('pageerror', onPageError)

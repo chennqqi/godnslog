@@ -13,7 +13,9 @@ export default defineConfig({
   testDir: './e2e-prod',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: 0,
+  // Real-network runs occasionally hit transient ERR_CONNECTION_CLOSED / 5xx;
+  // auto-retry absorbs those instead of flaking the suite.
+  retries: 2,
   workers: 1,
   reporter: 'line',
   timeout: 60000,

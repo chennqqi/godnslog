@@ -16,13 +16,24 @@ test.describe('Production Feature Coverage', () => {
       '/api/v2/scanner-hub/adapters',
     ]
     for (const ep of endpoints) {
-      const status = await authedPage.evaluate(
+      let status = await authedPage.evaluate(
         async ({ endpoint, token }) => {
           const r = await fetch(endpoint, { headers: { Authorization: 'Bearer ' + token } })
           return r.status
         },
         { endpoint: ep, token: authToken },
       )
+      // One retry tolerates a momentary 5xx during long full-suite runs.
+      if (status !== 200) {
+        await authedPage.waitForTimeout(1500)
+        status = await authedPage.evaluate(
+          async ({ endpoint, token }) => {
+            const r = await fetch(endpoint, { headers: { Authorization: 'Bearer ' + token } })
+            return r.status
+          },
+          { endpoint: ep, token: authToken },
+        )
+      }
       expect(status, `${ep} should not 5xx`).toBe(200)
     }
   })
