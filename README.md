@@ -119,10 +119,14 @@ go build
 # Backend tests
 go test ./...
 
-# Frontend E2E tests
+# Frontend local E2E tests (mock API, requires local dev server)
 cd frontend-next
 npm install
 npm run test:e2e
+
+# Production E2E tests (real deployed site; credentials from env only)
+cd frontend-next
+ADMIN_PASSWORD=<prod admin password> npm run test:e2e:prod
 ```
 
 ### CLI Usage

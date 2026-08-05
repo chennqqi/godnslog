@@ -103,13 +103,20 @@ docker run -p 80:8080 -p 53:53/udp "user/godnslog" serve -domain yourdomain.com 
 ### API 认证
 
 - 使用 Token 认证机制
-- 管理员用户: `admin` (首次运行密码在控制台显示)
+- 管理员用户: `admin` (首次运行密码在控制台显示，可在 Settings → Security 页自助改密)
 - 支持 JWT token (github.com/dgrijalva/jwt-go)
+- 会话过期（401）时前端跳转 `/login?expired=1` 并提示重新登录
 
 ### 测试
 
-- Go 测试文件: `server/utils_test.go`
-- 前端测试: `yarn test:unit`
+- Go 单元测试: `go test ./...`
+- 前端本地 E2E（mock API，需本地 dev server）: `cd frontend-next && pnpm exec playwright test`
+- **生产 E2E（真实环境）**:
+  ```bash
+  cd frontend-next
+  ADMIN_PASSWORD=<生产 admin 密码> pnpm exec playwright test --config=playwright.prod.config.ts
+  ```
+  覆盖认证、验证码精度、真实 DNS/HTTP 命中、发布前核查（payload/settings/apikeys/用户）、非核心功能（workflow/canary/rebinding/listener/marketplace）、全路由导航。凭据仅从环境变量读取，`retries: 2` 吸收瞬时网络波动。
 
 ### 关键配置常量
 
