@@ -8,6 +8,16 @@ English Doc | [中文文档](https://github.com/chennqqi/godnslog/blob/master/RE
 
 ## Version 2.0
 
+> **⚠️ Release Candidate** — This version is an **RC**. Automated E2E suites
+> have passed against a production deployment, but it has **not yet undergone
+> manual testing by humans**. Use with caution in production; expect possible
+> issues that automated tests did not cover.
+
+> **⛔ Not compatible with 1.x** — GODNSLOG 2.0 is a ground-up rewrite: the
+> database schema, configuration flags, and HTTP/DNS API are all new. **Do not
+> reuse a 1.x database or expect 1.x integrations to work**; start with a fresh
+> database and re-apply your configuration when upgrading from 1.x.
+
 GODNSLOG 2.0 is a complete rewrite with enterprise-grade features:
 
 - **OAST Evidence Platform**: Full evidence chain with Case/Payload/Interaction tracking

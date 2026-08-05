@@ -77,3 +77,18 @@ Thumbs.db
 
 # Local deployment skill (contains production deploy info; keep local only)
 /.claude/skills/godnslog-deploy/
+
+# Internal design/process docs (kept local only, not committed)
+/docs/superpowers/
+/docs/agent-native-specification.md
+/docs/ha-verification-runbook.md
+/docs/implementation-dependencies.md
+/docs/mvp-closed-loop.md
+/docs/official-support-boundary.md
+/docs/product-positioning.md
+/docs/release-acceptance-report.md
+/docs/scanner-hub-adapter-design.md
+/docs/test-core-integration.sh
+/docs/unified-control-plane.md
+/docs/unified-terminology.md
+/docs/verification.md

@@ -6,6 +6,10 @@ A dns&amp;http log server for verify SSRF/XXE/RFI/RCE vulnerability
 
 [English Doc](https://github.com/chennqqi/godnslog) | 中文文档
 
+> **⚠️ 发布候选（RC）** —— 当前版本为 **RC**。自动化 E2E 套件已针对生产部署全部通过，但**尚未经过人工测试**。生产使用请谨慎，可能存在自动化测试未覆盖的问题。
+
+> **⛔ 与 1.x 不兼容** —— GODNSLOG 2.0 是全新重写：数据库结构、配置参数、HTTP/DNS API 全部重做。**不要复用 1.x 的数据库，也不要期望 1.x 集成可直接工作**；从 1.x 升级时请使用全新数据库并重新配置。
+
 ## 功能特性
 
 - 标准DNS解析服务
