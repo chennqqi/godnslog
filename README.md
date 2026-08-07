@@ -6,6 +6,8 @@ A dns&amp;http log server for verify SSRF/XXE/RFI/RCE vulnerability
 
 English Doc | [中文文档](https://github.com/chennqqi/godnslog/blob/master/README_CN.md)
 
+> **⛔ This 1.x branch is no longer maintained.** Please use **GODNSLOG 2.0** instead (branch `2.x`, tag `2.x`). 1.x and 2.0 are **not compatible**; 2.0 has a redesigned database, configuration, and API.
+
 ## features
 
 - Standard Domain Resolve Service
